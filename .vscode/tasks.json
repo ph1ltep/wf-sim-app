@@ -25,6 +25,10 @@
           "Run Frontend",
           "Run Backend"
         ],
+        "group": {
+            "kind": "build",
+            "isDefault": true
+          },
         "dependsOrder": "parallel",
         "problemMatcher": []
       }
