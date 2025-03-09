@@ -1,5 +1,6 @@
 // backend/simulation/monte_carlo.js
 const math = require('mathjs');
+const randomNormal = require('random-normal');
 
 function calculateIRR(cashflows) {
   // This is a placeholder. In production, use a robust IRR calculation method or library.
@@ -24,7 +25,8 @@ function runSimulation(params, iterations = 10000) {
   for (let i = 0; i < iterations; i++) {
     let cashflows = [];
     // Randomize cost escalation and risk events for each iteration
-    const costEscalation = math.randomNormal(params.escalationMean, params.escalationStd);
+    // const costEscalation = math.randomNormal(params.escalationMean, params.escalationStd);
+    let costEscalation = randomNormal({ mean: params.escalationMean, dev: params.escalationStd });
     const riskCost = (Math.random() < params.riskProbability) ? params.riskCost : 0;
     
     for (let t = 1; t <= params.years; t++) {

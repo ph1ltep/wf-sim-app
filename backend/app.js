@@ -9,10 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// app.use(cors());
-// app.use(express.json());
-app.use(cors({ credentials: true, origin: 'http://localhost:3000' })); // Adjust for proxy if needed
+app.use(cors());
 app.use(express.json());
+//app.use(cors({ credentials: true, origin: 'http://localhost:3000' })); // Adjust for proxy if needed
+//app.use(express.json());
 
 // Connect to MongoDB using our db utility
 connectDB()
