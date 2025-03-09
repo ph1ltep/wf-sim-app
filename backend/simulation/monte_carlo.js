@@ -1,56 +1,78 @@
-// backend/simulation/monte_carlo.js
-const math = require('mathjs');
 const randomNormal = require('random-normal');
+const math = require('mathjs');
+const financial = require('financial');
 
-function calculateIRR(cashflows) {
-  // This is a placeholder. In production, use a robust IRR calculation method or library.
-  let npv, irr = 0.1, iterations = 100;
-  const tolerance = 1e-6;
-  while (iterations--) {
-    npv = 0;
-    for (let t = 0; t < cashflows.length; t++) {
-      npv += cashflows[t] / Math.pow(1 + irr, t + 1);
-    }
-    if (Math.abs(npv) < tolerance) break;
-    // Adjust IRR: simple adjustment (this is a naive approach)
-    irr += npv / 1000000;
-  }
-  return irr;
-}
+const calculateIRR = financial.irr;
 
 function runSimulation(params, iterations = 10000) {
-  let irrResults = [];
-  let dscrResults = [];
-  
-  for (let i = 0; i < iterations; i++) {
-    let cashflows = [];
-    // Randomize cost escalation and risk events for each iteration
-    // const costEscalation = math.randomNormal(params.escalationMean, params.escalationStd);
-    let costEscalation = randomNormal({ mean: params.escalationMean, dev: params.escalationStd });
-    const riskCost = (Math.random() < params.riskProbability) ? params.riskCost : 0;
-    
-    for (let t = 1; t <= params.years; t++) {
-      const baseCost = params.baseOM * Math.pow((1 + costEscalation), t - 1);
-      // Apply risk cost on a specified risk year (if defined)
-      const additionalCost = (t === params.riskYear) ? riskCost : 0;
-      const annualCost = baseCost + additionalCost;
-      const cashflow = params.annualRevenue - annualCost;
-      cashflows.push(cashflow);
+    const {
+        years,
+        oemTerm,
+        fixedOM,
+        baseOM,
+        escalationMean,
+        escalationStd,
+        annualRevenue,
+        annualDebtService,
+        riskEvents,
+        initialInvestment
+    } = params;
+
+    if (!initialInvestment || isNaN(initialInvestment)) {
+        throw new Error("Initial investment is missing or invalid.");
     }
-    
-    const irr = calculateIRR(cashflows);
-    const dscr = math.mean(cashflows) / params.annualDebtService;
-    
-    irrResults.push(irr);
-    dscrResults.push(dscr);
-  }
-  
-  return {
-    irrDistribution: irrResults,
-    dscrDistribution: dscrResults,
-    averageIRR: math.mean(irrResults),
-    averageDSCR: math.mean(dscrResults)
-  };
+    if (!annualDebtService || annualDebtService <= 0) {
+        throw new Error("Annual debt service must be a positive number.");
+    }
+
+    let irrResults = [];
+    let sumCashflow = new Array(years).fill(0);
+    let sumDscr = new Array(years).fill(0);
+
+    for (let i = 0; i < iterations; i++) {
+        let cashflows = [-initialInvestment];
+        let costEscalation = randomNormal({ mean: escalationMean, dev: escalationStd });
+        let occurredRisks = riskEvents.map(event => ({
+            ...event,
+            occurs: Math.random() < event.riskProbability
+        }));
+
+        for (let t = 1; t <= years; t++) {
+            let omCost;
+            if (t <= oemTerm) {
+                omCost = fixedOM;
+            } else {
+                omCost = baseOM * Math.pow(1 + costEscalation, t - oemTerm - 1);
+                occurredRisks.forEach(event => {
+                    if (event.riskYear === t && event.occurs) {
+                        omCost += event.riskCost;
+                    }
+                });
+            }
+            let cashflowBeforeDebt = annualRevenue - omCost;
+            let cashflow = cashflowBeforeDebt - annualDebtService;
+            let dscr = cashflowBeforeDebt / annualDebtService;
+            cashflows.push(cashflow);
+            sumCashflow[t - 1] += cashflow;
+            sumDscr[t - 1] += dscr;
+        }
+
+        let irr = calculateIRR(cashflows);
+        if (!isNaN(irr) && irr !== Infinity) {
+            irrResults.push(irr);
+        }
+    }
+
+    const averageCashflow = sumCashflow.map(sum => sum / iterations);
+    const averageDscr = sumDscr.map(sum => sum / iterations);
+    const averageIRR = irrResults.length > 0 ? math.mean(irrResults) : null;
+
+    return {
+        irrDistribution: irrResults,
+        averageIRR,
+        averageCashflow,
+        averageDscr
+    };
 }
 
 module.exports = { runSimulation };
