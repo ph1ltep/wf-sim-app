@@ -1,12 +1,14 @@
-// frontend/src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import SimulationPage from './pages/SimulationPage';
 import ScenarioList from './pages/ScenarioList';
 import { CssBaseline, Container } from '@mui/material';
 
-function App() {
+const App = () => {
+  // Optional: Uncomment if navigation is needed in this component
+  // const navigate = useNavigate();
+
   return (
     <Router basename="/proxy/3000">
       <CssBaseline />
@@ -19,6 +21,6 @@ function App() {
       </Container>
     </Router>
   );
-}
+};
 
 export default App;

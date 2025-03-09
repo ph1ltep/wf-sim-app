@@ -1,18 +1,18 @@
-// backend/routes/scenarios.js
+// backend/routes/scenarios.js (partial update)
 const express = require('express');
-const router = express.Router();
 const Simulation = require('../models/Simulation');
+const { runMonteCarloSimulation } = require('../simulation/monte_carlo');
+const router = express.Router();
 
-// Create a new simulation scenario
 router.post('/', async (req, res) => {
   try {
     const { name, parameters } = req.body;
-    const newScenario = new Simulation({ name, parameters });
-    await newScenario.save();
-    res.json({ success: true, scenario: newScenario });
+    const results = runMonteCarloSimulation(parameters);
+    const scenario = new Simulation({ name, parameters, results });
+    await scenario.save();
+    res.json({ success: true, scenario });
   } catch (error) {
-    console.error('Error saving scenario:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 

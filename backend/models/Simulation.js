@@ -1,29 +1,24 @@
 // backend/models/Simulation.js
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const SimulationSchema = new Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  parameters: {
-    type: Schema.Types.Mixed, // flexible JSON object to store all input parameters
-    required: true
-  },
+const SimulationSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  parameters: { type: mongoose.Schema.Types.Mixed, required: true },
   results: {
-    type: Schema.Types.Mixed, // will store summary outputs and distribution data
-    default: {}
+    averageIRR: Number,
+    irrPercentiles: { p10: Number, p50: Number, p90: Number },
+    averageCashFlow: [Number],
+    averageDSCR: [Number],
+    minDSCRDist: { mean: Number, p5: Number, probBelow1: Number },
+    avgCostBreakdown: {
+      routineOM: Number,
+      majorRepairs: Number,
+      insurancePremiums: Number,
+      other: Number
+    },
+    averagePayback: Number
   },
-  user: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+  createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Simulation', SimulationSchema);

@@ -1,190 +1,163 @@
-// backend/simulation/monte_carlo.js
 const math = require('mathjs');
+const jstat = require('jstat');
+const seedrandom = require('seedrandom');
+const financial = require('financial');
 
-// Helper function: sample from Normal distribution using Box-Muller
-function sampleNormal(mean, std) {
-  let u = 0, v = 0;
-  while(u === 0) u = Math.random(); // Avoid zero
-  while(v === 0) v = Math.random();
-  let z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  return mean + std * z;
-}
+const runMonteCarloSimulation = (params) => {
+  const {
+    projectLife, loanDuration, initialInvestment, baseOM, escalationMean, escalationStd,
+    oemTerm, fixedOM, riskEvents, scheduledMaintenance, insurance, otherCosts,
+    financing, revenue, simulation
+  } = params;
 
-// Helper function: sample from Weibull distribution
-// Formula: sample = scale * (-ln(1 - u))^(1/shape)
-function sampleWeibull(shape, scale) {
-  let u = Math.random();
-  return scale * Math.pow(-Math.log(1 - u), 1 / shape);
-}
+  const { iterations, seed, distributions } = simulation;
 
-// Helper function: sample from Triangle distribution
-function sampleTriangle(min, mode, max) {
-  let u = Math.random();
-  let c = (mode - min) / (max - min);
-  if (u < c) {
-    return min + Math.sqrt(u * (max - min) * (mode - min));
+  // Seed Math.random for reproducibility
+  if (seed) {
+    Math.random = seedrandom(seed);
   } else {
-    return max - Math.sqrt((1 - u) * (max - min) * (max - mode));
+    Math.random = seedrandom(); // Uses a random seed if none provided
   }
-}
 
-// Helper function: Calculate IRR using the Newton-Raphson method
-function calculateIRR(cashflows, guess = 0.1) {
-  const maxIter = 1000;
-  const tol = 1e-6;
-  let rate = guess;
-  
-  function npv(rate) {
-    return cashflows.reduce((acc, cf, t) => acc + cf / Math.pow(1 + rate, t), 0);
-  }
-  
-  function npvDerivative(rate) {
-    return cashflows.reduce((acc, cf, t) => acc - t * cf / Math.pow(1 + rate, t + 1), 0);
-  }
-  
-  for (let i = 0; i < maxIter; i++) {
-    let value = npv(rate);
-    let derivative = npvDerivative(rate);
-    if (Math.abs(derivative) < tol) break;
-    let newRate = rate - value / derivative;
-    if (Math.abs(newRate - rate) < tol) return newRate;
-    rate = newRate;
-  }
-  return rate;
-}
-
-// Main Monte Carlo simulation function
-// params: an object containing all simulation parameters
-// Expected structure of params (example):
-// {
-//   projectLife: Number,
-//   loanDuration: Number,
-//   initialInvestment: Number,
-//   baseOM: Number,
-//   escalationMean: Number,      // e.g., 0.02 for 2% mean escalation
-//   escalationStd: Number,       // e.g., 0.005
-//   oemTerm: Number,             // fixed-cost period in years
-//   fixedOM: Number,             // fixed annual cost during OEM term
-//   riskEvents: [                // array of risk events
-//      { description: String, minYear: Number, maxYear: Number, weibullShape: Number, weibullScale: Number, costImpact: Number }
-//   ],
-//   windResource: {              // parameters for wind resource variability
-//      baseProduction: Number,   // base annual production in MWh (or other units)
-//      weibullShape: Number,     
-//      weibullScale: Number
-//   },
-//   powerPrice: {                // triangle distribution for power price ($/MWh)
-//      min: Number,
-//      mode: Number,
-//      max: Number
-//   },
-//   debtService: Number,         // annual debt service cost
-//   // Additional financing inputs can be added here
-//   iterations: Number,          // number of simulation iterations (optional)
-// }
-function runSimulation(params, iterations = 10000) {
   let irrResults = [];
-  let projectLife = params.projectLife;
-  let loanDuration = params.loanDuration;
-  
-  // Prepare arrays to aggregate cash flow and DSCR for each year
-  let annualCashFlowSums = Array(projectLife + 1).fill(0); // index 0 is initial investment
-  let annualDscrSums = Array(loanDuration + 1).fill(0);
-  
+  let cashFlows = Array(projectLife + 1).fill(0).map(() => []);
+  let dscrResults = Array(projectLife + 1).fill(0).map(() => []);
+  let costBreakdown = { routineOM: [], majorRepairs: [], insurancePremiums: [], other: [] };
+  let minDSCRs = [];
+  let paybackYears = [];
+
   for (let i = 0; i < iterations; i++) {
-    let cashFlows = [];
-    // Year 0: initial investment (negative cash flow)
-    cashFlows[0] = -params.initialInvestment;
-    
-    for (let t = 1; t <= projectLife; t++) {
-      // Calculate O&M cost:
-      let omCost = 0;
-      if (t <= params.oemTerm) {
-        // During OEM term, use fixed O&M cost
-        omCost = params.fixedOM;
-      } else {
-        // Post OEM: escalate the base O&M cost using a randomly sampled escalation rate
-        let escalationRate = sampleNormal(params.escalationMean, params.escalationStd);
-        omCost = params.baseOM * Math.pow(1 + escalationRate, (t - params.oemTerm));
-      }
-      
-      // Calculate failure events cost for year t
-      let failureCostTotal = 0;
-      if (params.riskEvents && Array.isArray(params.riskEvents)) {
-        for (let event of params.riskEvents) {
-          if (t >= event.minYear && t <= event.maxYear) {
-            // Sample a failure time from a Weibull distribution for this event
-            let failureTime = sampleWeibull(event.weibullShape, event.weibullScale);
-            if (Math.round(failureTime) === t) {
-              failureCostTotal += event.costImpact;
-            }
+    let equityCashFlows = [-initialInvestment];
+    let annualCosts = [];
+    let annualRevenues = [];
+    let cumulativeCash = -initialInvestment;
+
+    for (let year = 1; year <= projectLife; year++) {
+      // Revenue Calculation
+      const energyProd = sampleDistribution(revenue.energyProduction, distributions.energyProduction);
+      const powerPrice = revenue.powerPrice.type === 'fixed'
+        ? revenue.powerPrice.value
+        : sampleDistribution(revenue.powerPrice, distributions.powerPrice);
+      const degradationFactor = Math.pow(1 - revenue.degradationRate, year - 1);
+      const otherRevenue = revenue.otherRevenue.reduce((sum, r) => sum + r.annualAmount, 0);
+      const yearlyRevenue = energyProd * powerPrice * degradationFactor + otherRevenue;
+      annualRevenues.push(yearlyRevenue);
+
+      // Cost Calculation
+      let totalCost = 0;
+      let routineOM = year <= oemTerm ? fixedOM : baseOM * Math.pow(1 + sampleDistribution({ mean: escalationMean, std: escalationStd }, 'normal'), year - 1);
+      totalCost += routineOM;
+      costBreakdown.routineOM.push(routineOM);
+
+      // Risk Events
+      let repairCost = 0;
+      riskEvents.forEach(event => {
+        if (year >= event.minYear && year <= event.maxYear && Math.random() < event.probability) {
+          let cost = event.costImpact;
+          if (insurance.enabled && cost > insurance.deductible) {
+            cost = Math.max(cost - (cost - insurance.deductible) * insurance.coveragePercent, insurance.deductible);
           }
+          repairCost += cost;
         }
+      });
+      totalCost += repairCost;
+      costBreakdown.majorRepairs.push(repairCost);
+
+      // Scheduled Maintenance
+      const maintenanceCost = scheduledMaintenance.filter(m => m.year === year).reduce((sum, m) => sum + m.cost, 0);
+      totalCost += maintenanceCost;
+      costBreakdown.majorRepairs.push(maintenanceCost);
+
+      // Insurance Premium
+      const insuranceCost = insurance.enabled ? insurance.premium : 0;
+      totalCost += insuranceCost;
+      costBreakdown.insurancePremiums.push(insuranceCost);
+
+      // Other Costs
+      const otherCost = otherCosts.reduce((sum, c) => sum + c.annualCost, 0);
+      totalCost += otherCost;
+      costBreakdown.other.push(otherCost);
+
+      annualCosts.push(totalCost);
+
+      // Cash Flow and DSCR
+      const netBeforeDebt = yearlyRevenue - totalCost;
+      const debtService = financing.debtService[Math.min(year - 1, financing.debtService.length - 1)];
+      const equityCashFlow = netBeforeDebt - debtService;
+      equityCashFlows.push(equityCashFlow);
+      cashFlows[year].push(equityCashFlow);
+
+      const dscr = debtService > 0 ? netBeforeDebt / debtService : Infinity;
+      dscrResults[year].push(dscr);
+
+      // Cumulative Cash and Payback
+      cumulativeCash += equityCashFlow;
+      if (cumulativeCash >= 0 && !paybackYears[i]) {
+        paybackYears[i] = year;
       }
-      
-      let totalOMCost = omCost + failureCostTotal;
-      
-      // Calculate annual energy production using Weibull for wind resource variability
-      // Multiply the base production by a sampled factor
-      let energyProductionFactor = sampleWeibull(params.windResource.weibullShape, params.windResource.weibullScale);
-      let energyProduction = params.windResource.baseProduction * energyProductionFactor;
-      
-      // Determine power price using a Triangle distribution
-      let price = sampleTriangle(params.powerPrice.min, params.powerPrice.mode, params.powerPrice.max);
-      
-      // Calculate revenue for the year
-      let revenue = energyProduction * price;
-      
-      // Net cash flow before debt = revenue - total O&M cost
-      let netCashFlowBeforeDebt = revenue - totalOMCost;
-      
-      // Debt service (if within loan duration)
-      let debtService = (t <= loanDuration) ? params.debtService : 0;
-      
-      let netCashFlowAfterDebt = netCashFlowBeforeDebt - debtService;
-      cashFlows[t] = netCashFlowAfterDebt;
-      
-      // Calculate DSCR for year t (if debt service exists)
-      let dscr = (debtService > 0) ? (netCashFlowBeforeDebt / debtService) : null;
-      if (t <= loanDuration && dscr !== null) {
-        annualDscrSums[t] += dscr;
-      }
-      
-      // Accumulate cash flow sums for averaging later
-      annualCashFlowSums[t] += netCashFlowAfterDebt;
     }
-    
-    // Calculate IRR for this simulation iteration
-    let irr = calculateIRR(cashFlows);
-    if (!isNaN(irr) && isFinite(irr)) {
-      irrResults.push(irr);
-    }
+
+    // IRR and Minimum DSCR
+    const irr = financial.irr(equityCashFlows);
+    if (!isNaN(irr) && irr !== null) irrResults.push(irr); // Ensure valid IRR
+    const minDSCR = Math.min(...dscrResults.slice(1, loanDuration + 1).map(y => Math.min(...y)));
+    minDSCRs.push(minDSCR);
   }
-  
-  // Compute average cash flows and DSCR per year
-  let avgCashFlows = annualCashFlowSums.map(sum => sum / iterations);
-  let avgDscr = annualDscrSums.map(sum => sum / iterations);
-  
-  // Compute average IRR
-  let avgIRR = irrResults.reduce((acc, val) => acc + val, 0) / irrResults.length;
-  
-  // Compute percentiles for IRR (e.g., P10, P50, P90)
-  let sortedIRRs = irrResults.slice().sort((a, b) => a - b);
-  let irrP10 = sortedIRRs[Math.floor(0.10 * sortedIRRs.length)];
-  let irrP50 = sortedIRRs[Math.floor(0.50 * sortedIRRs.length)];
-  let irrP90 = sortedIRRs[Math.floor(0.90 * sortedIRRs.length)];
-  
-  return {
-    averageCashFlow: avgCashFlows,
-    averageDSCR: avgDscr,
-    averageIRR: avgIRR,
-    irrPercentiles: {
-      p10: irrP10,
-      p50: irrP50,
-      p90: irrP90
-    },
-    irrDistribution: irrResults
+
+  // Aggregate Results with checks for empty arrays
+  const averageIRR = irrResults.length > 0 ? math.mean(irrResults) : 0; // Fallback to 0 if empty
+  const irrPercentiles = irrResults.length > 0 ? {
+    p10: math.quantileSeq(irrResults, 0.1),
+    p50: math.median(irrResults),
+    p90: math.quantileSeq(irrResults, 0.9)
+  } : { p10: 0, p50: 0, p90: 0 };
+  const averageCashFlow = cashFlows.map(y => y.length > 0 ? math.mean(y) : 0);
+  const averageDSCR = dscrResults.map(y => y.length > 0 ? math.mean(y.filter(d => d !== Infinity)) : 0);
+  const minDSCRDist = minDSCRs.length > 0 ? {
+    mean: math.mean(minDSCRs),
+    p5: math.quantileSeq(minDSCRs, 0.05),
+    probBelow1: minDSCRs.filter(d => d < 1).length / iterations
+  } : { mean: 0, p5: 0, probBelow1: 0 };
+  const avgCostBreakdown = {
+    routineOM: costBreakdown.routineOM.length > 0 ? math.mean(costBreakdown.routineOM) : 0,
+    majorRepairs: costBreakdown.majorRepairs.length > 0 ? math.mean(costBreakdown.majorRepairs) : 0,
+    insurancePremiums: costBreakdown.insurancePremiums.length > 0 ? math.mean(costBreakdown.insurancePremiums) : 0,
+    other: costBreakdown.other.length > 0 ? math.mean(costBreakdown.other) : 0
   };
+  const averagePayback = paybackYears.length > 0 ? math.mean(paybackYears.filter(y => y !== undefined)) : 0;
+
+  return {
+    averageIRR,
+    irrDistribution: irrResults,
+    irrPercentiles,
+    averageCashFlow,
+    averageDSCR,
+    minDSCRDist,
+    avgCostBreakdown,
+    averagePayback
+  };
+};
+
+function sampleDistribution(param, distType) {
+  switch (distType) {
+    case 'normal':
+      return jstat.normal.sample(param.mean, param.std);
+    case 'weibull':
+      return jstat.weibull.sample(param.scale, param.shape);
+    case 'triangle':
+      const { min, max, mode } = param;
+      const F = (mode - min) / (max - min);
+      const U = Math.random();
+      if (U < F) {
+        return min + Math.sqrt(U * (max - min) * (mode - min));
+      } else {
+        return max - Math.sqrt((1 - U) * (max - min) * (max - mode));
+      }
+    case 'fixed':
+      return param.value;
+    default:
+      throw new Error(`Unsupported distribution: ${distType}`);
+  }
 }
 
-module.exports = { runSimulation };
+module.exports = { runMonteCarloSimulation };

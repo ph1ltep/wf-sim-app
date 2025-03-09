@@ -1,4 +1,3 @@
-// frontend/src/pages/SimulationPage.jsx
 import React, { useContext } from 'react';
 import { Grid, Typography, Box } from '@mui/material';
 import ConfigPanel from '../components/ConfigPanel';
@@ -11,6 +10,12 @@ const SimulationPage = () => {
   const handleSimulationRun = (params, simResults) => {
     setSimulationData({ params, results: simResults });
   };
+
+  // Optional: Uncomment and use handleCompare if needed
+  // const handleCompare = () => {
+  //   console.log('Comparing scenarios...');
+  //   // Add your comparison logic here
+  // };
 
   return (
     <Box sx={{ mt: 4 }}>
@@ -29,6 +34,8 @@ const SimulationPage = () => {
           )}
         </Grid>
       </Grid>
+      {/* Optional: Uncomment to use handleCompare */}
+      {/* <Button onClick={handleCompare}>Compare Scenarios</Button> */}
     </Box>
   );
 };
