@@ -1,3 +1,4 @@
+// backend/utils/db.js
 const mongoose = require('mongoose');
 
 const MONGO_USER = process.env.MONGO_USER || 'default-user';
@@ -18,7 +19,7 @@ async function connectDB() {
     console.log('Connected to MongoDB successfully');
   } catch (err) {
     console.error('MongoDB connection error:', err);
-    throw err; // Re-throw to be caught in index.js
+    throw err;
   }
 }
 
