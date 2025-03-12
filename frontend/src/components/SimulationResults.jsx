@@ -6,6 +6,7 @@ import { exportToCSV, exportToPDF } from '../services/export';
 import { saveScenario } from '../services/api';
 
 const SimulationResults = ({ params, results, onSave }) => {
+  // Log props for debugging
   console.log('SimulationResults - params:', params);
   console.log('SimulationResults - results:', results);
 
@@ -18,10 +19,19 @@ const SimulationResults = ({ params, results, onSave }) => {
   };
 
   // Extract values with null-safe defaults
-  const averageIRR = results?.averageIRR ?? 0;
-  const irrPercentiles = results?.irrPercentiles ?? { p10: 0, p50: 0, p90: 0 };
+  const averageIRR = results?.averageIRR ?? 0; // Default to 0 if null/undefined
+  const irrPercentiles = results?.irrPercentiles ?? { p10: 0, p50: 0, p90: 0 }; // Default object
   const averagePayback = results?.averagePayback ?? 0;
   const minDSCRDist = results?.minDSCRDist ?? { p5: 0, probBelow1: 0 };
+
+  // Ensure all values are numbers before calling toFixed
+  const safeAverageIRR = typeof averageIRR === 'number' ? averageIRR : 0;
+  const safeP10 = typeof irrPercentiles.p10 === 'number' ? irrPercentiles.p10 : 0;
+  const safeP50 = typeof irrPercentiles.p50 === 'number' ? irrPercentiles.p50 : 0;
+  const safeP90 = typeof irrPercentiles.p90 === 'number' ? irrPercentiles.p90 : 0;
+  const safeAveragePayback = typeof averagePayback === 'number' ? averagePayback : 0;
+  const safeMinDSCR_P5 = typeof minDSCRDist.p5 === 'number' ? minDSCRDist.p5 : 0;
+  const safeProbBelow1 = typeof minDSCRDist.probBelow1 === 'number' ? minDSCRDist.probBelow1 : 0;
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -29,32 +39,32 @@ const SimulationResults = ({ params, results, onSave }) => {
         <Typography variant="h6" gutterBottom>Simulation Results</Typography>
         <Grid container spacing={2}>
           <Grid item xs={6}>
-            <Typography>Average IRR: {(averageIRR * 100).toFixed(2)}%</Typography>
+            <Typography>Average IRR: {(safeAverageIRR * 100).toFixed(2)}%</Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography>
-              IRR Percentiles: 
-              P10: {(irrPercentiles.p10 * 100).toFixed(2)}%, 
-              P50: {(irrPercentiles.p50 * 100).toFixed(2)}%, 
-              P90: {(irrPercentiles.p90 * 100).toFixed(2)}%
+              IRR Percentiles:
+              P10: {(safeP10 * 100).toFixed(2)}%,
+              P50: {(safeP50 * 100).toFixed(2)}%,
+              P90: {(safeP90 * 100).toFixed(2)}%
             </Typography>
           </Grid>
           <Grid item xs={6}>
-            <Typography>Average Payback Year: {(averagePayback || 0).toFixed(1)}</Typography>
+            <Typography>Average Payback Year: {safeAveragePayback.toFixed(1)}</Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography>
-              Min DSCR P5: {(minDSCRDist.p5 || 0).toFixed(2)}, 
-              Prob &lt; 1: {(minDSCRDist.probBelow1 * 100 || 0).toFixed(2)}%
+              Min DSCR P5: {safeMinDSCR_P5.toFixed(2)},
+              Prob &lt; 1: {(safeProbBelow1 * 100).toFixed(2)}%
             </Typography>
           </Grid>
         </Grid>
         <Divider sx={{ my: 2 }} />
         {results && params ? (
-          <ChartDisplay 
-            results={results} 
-            projectLife={params.projectLife} 
-            loanDuration={params.loanDuration} 
+          <ChartDisplay
+            results={results}
+            projectLife={params.projectLife}
+            loanDuration={params.loanDuration}
           />
         ) : (
           <Typography>No chart data available</Typography>
