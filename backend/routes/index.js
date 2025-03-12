@@ -2,6 +2,13 @@
 const express = require('express');
 const router = express.Router();
 
+// Import controllers directly for testing
+const { getDefaults } = require('../controllers/defaultsController');
+
+// Add a direct route for the defaults endpoint
+router.get('/simulate/defaults', getDefaults);
+
+// Then import and use the other routes as before
 const costRoutes = require('./costRoutes');
 const revenueRoutes = require('./revenueRoutes');
 const financingRoutes = require('./financingRoutes');
