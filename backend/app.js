@@ -2,9 +2,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { connectDB } = require('./utils/db');
-const simulationRoutes = require('./routes/simulation');
-const scenariosRoutes = require('./routes/scenarios');
+const routes = require('./routes');
+const errorHandler = require('./middleware/errorHandler');
+const { connectDB } = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,14 +22,15 @@ connectDB()
   });
 
 // API Routes
-app.use('/api/simulate', simulationRoutes);
-app.use('/api/scenarios', scenariosRoutes);
+app.use('/api', routes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK' });
+  res.json({ status: 'OK', timestamp: new Date() });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Error handling middleware
+app.use(errorHandler);
+
+// Export for testing
+module.exports = app;

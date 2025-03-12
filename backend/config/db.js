@@ -1,10 +1,10 @@
-// backend/utils/db.js
+// backend/config/db.js
 const mongoose = require('mongoose');
 
 const MONGO_USER = process.env.MONGO_USER || 'default-user';
 const MONGO_PASS = process.env.MONGO_PASS || 'default-password';
 const MONGO_URL = process.env.MONGO_URL || 'localhost:27017';
-const DATABASE = 'wfsimdb';
+const DATABASE = process.env.DB_NAME || 'wfsimdb';
 
 // Construct MongoDB connection string with authentication
 const MONGODB_URI = `mongodb://${encodeURIComponent(MONGO_USER)}:${encodeURIComponent(MONGO_PASS)}@${MONGO_URL}/${DATABASE}?authSource=admin`;

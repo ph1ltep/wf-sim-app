@@ -4,19 +4,18 @@
       {
         "type": "node",
         "request": "launch",
-        "name": "Launch Backend",
-        "program": "${workspaceFolder}/backend/app.js",
-        "cwd": "${workspaceFolder}/backend",
+        "name": "Debug Backend",
+        "skipFiles": ["<node_internals>/**"],
+        "program": "${workspaceFolder}/backend/server.js",
+        "envFile": "${workspaceFolder}/backend/.env",
         "console": "integratedTerminal",
-        "env": {
-          "NODE_ENV": "development"
-        }
+        "internalConsoleOptions": "neverOpen"
       }
     ],
     "compounds": [
       {
         "name": "Launch Both (Debug Backend)",
-        "configurations": ["Launch Backend"],
+        "configurations": ["Debug Backend"],
         "preLaunchTask": "Run Frontend"
       }
     ]
