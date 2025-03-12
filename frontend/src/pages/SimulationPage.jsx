@@ -1,41 +1,47 @@
-import React, { useContext } from 'react';
-import { Grid, Typography, Box } from '@mui/material';
+// frontend/src/pages/SimulationPage.jsx
+import React, { useContext, useState } from 'react';
+import { Grid, Typography, Box, Button } from '@mui/material';
 import ConfigPanel from '../components/ConfigPanel';
 import SimulationResults from '../components/SimulationResults';
+import InputDistributions from '../components/InputDistributions';
 import { SimulationContext } from '../context/SimulationContext';
 
-const SimulationPage = () => {
+const SimulationPage = ({ location }) => {
   const { simulationData, setSimulationData } = useContext(SimulationContext);
+  const [compareScenarios, setCompareScenarios] = useState(location?.state?.compareScenarios || []);
 
   const handleSimulationRun = (params, simResults) => {
     setSimulationData({ params, results: simResults });
   };
 
-  // Optional: Uncomment and use handleCompare if needed
-  // const handleCompare = () => {
-  //   console.log('Comparing scenarios...');
-  //   // Add your comparison logic here
-  // };
+  // Use location.state.scenario.parameters if available, otherwise fall back to simulationData.params or defaultParams
+  const initialParams = location?.state?.scenario?.parameters || 
+                       (simulationData?.params ? simulationData.params : null);
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Simulation Configuration
-      </Typography>
+      <Typography variant="h4" gutterBottom>Simulation Configuration</Typography>
       <Grid container spacing={4}>
         <Grid item xs={12} md={5}>
-          <ConfigPanel onRunSimulation={handleSimulationRun} initialParams={simulationData.params} />
+          <ConfigPanel 
+            onRunSimulation={handleSimulationRun} 
+            initialParams={initialParams || undefined} // Pass undefined if no initial params
+          />
         </Grid>
         <Grid item xs={12} md={7}>
-          {simulationData.results ? (
-            <SimulationResults params={simulationData.params} results={simulationData.results} />
-          ) : (
+          {simulationData?.params && <InputDistributions params={simulationData.params} />}
+          {simulationData?.results && (
+            <SimulationResults
+              params={simulationData.params}
+              results={simulationData.results}
+              onSave={() => {}}
+            />
+          )}
+          {!simulationData?.results && (
             <Typography variant="subtitle1">Run a simulation to view results.</Typography>
           )}
         </Grid>
       </Grid>
-      {/* Optional: Uncomment to use handleCompare */}
-      {/* <Button onClick={handleCompare}>Compare Scenarios</Button> */}
     </Box>
   );
 };

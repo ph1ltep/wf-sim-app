@@ -2,11 +2,23 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export const exportToCSV = (data, filename = 'simulation_results.csv') => {
+export const exportToCSV = (results, filename = 'simulation_results.csv') => {
   let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "Year,Average Cash Flow\n";
-  data.averageCashFlow.forEach((cf, index) => {
-    csvContent += `${index},${cf}\n`;
+  csvContent += "Metric,Value\n";
+  csvContent += `Average IRR,${(results.averageIRR * 100).toFixed(2)}%\n`;
+  csvContent += `IRR P10,${(results.irrPercentiles.p10 * 100).toFixed(2)}%\n`;
+  csvContent += `IRR P50,${(results.irrPercentiles.p50 * 100).toFixed(2)}%\n`;
+  csvContent += `IRR P90,${(results.irrPercentiles.p90 * 100).toFixed(2)}%\n`;
+  csvContent += `Average NPV,${results.averageNPV.toFixed(2)}\n`;
+  csvContent += `NPV P10,${results.npvPercentiles.p10.toFixed(2)}\n`;
+  csvContent += `NPV P50,${results.npvPercentiles.p50.toFixed(2)}\n`;
+  csvContent += `NPV P90,${results.npvPercentiles.p90.toFixed(2)}\n`;
+  csvContent += `Average Payback Year,${results.averagePayback.toFixed(1)}\n`;
+  csvContent += `Min DSCR P5,${results.minDSCRDist.p5.toFixed(2)}\n`;
+  csvContent += `Prob DSCR < 1,${(results.minDSCRDist.probBelow1 * 100).toFixed(2)}%\n`;
+  csvContent += "\nYear,Average Cash Flow\n";
+  results.averageCashFlow.forEach((cf, index) => {
+    csvContent += `${index},${cf.toFixed(2)}\n`;
   });
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
@@ -14,6 +26,7 @@ export const exportToCSV = (data, filename = 'simulation_results.csv') => {
   link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
 };
 
 export const exportToPDF = async (elementId, filename = 'simulation_report.pdf') => {

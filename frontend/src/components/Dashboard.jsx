@@ -1,17 +1,19 @@
+// frontend/src/pages/Dashboard.jsx
 import React from 'react';
+import { Typography, Button, Stack } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { Container, Typography, Button } from '@mui/material';
 
 const Dashboard = () => {
   return (
-    <Container sx={{ mt: 4 }}>
-      <Typography variant="h3" component="h1" gutterBottom>
-        Wind Farm Simulation Dashboard
-      </Typography>
-      <Button variant="contained" color="primary" component={Link} to="/simulation">
-        Start New Simulation
+    <Stack spacing={3} sx={{ mt: 4, textAlign: 'center' }}>
+      <Typography variant="h3">Wind Farm O&M Simulator</Typography>
+      <Button variant="contained" component={Link} to="/simulate">
+        Run New Simulation
       </Button>
-    </Container>
+      <Button variant="outlined" component={Link} to="/scenarios">
+        View Saved Scenarios
+      </Button>
+    </Stack>
   );
 };
 
