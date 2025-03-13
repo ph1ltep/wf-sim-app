@@ -9,7 +9,16 @@ const getDefaults = async (req, res) => {
     const defaults = {
       general: {
         projectLife: 20,
-        loanDuration: 15
+        numWTGs: 20,
+        mwPerWTG: 3.5,
+        capacityFactor: 35,
+        curtailmentLosses: 0,
+        electricalLosses: 0
+      },
+      projectMetrics: {
+        totalMW: 70,  // 20 * 3.5
+        grossAEP: 214032,  // 70 * 0.35 * 8760
+        netAEP: 214032  // Same as gross if losses are 0
       },
       financing: {
         capex: 50000000,
@@ -19,7 +28,8 @@ const getDefaults = async (req, res) => {
         debtToCapexRatio: 0.7,
         loanInterestRateBS: 5,
         loanInterestRatePF: 6,
-        minimumDSCR: 1.3
+        minimumDSCR: 1.3,
+        loanDuration: 15
       },
       cost: {
         annualBaseOM: 5000000,

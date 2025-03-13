@@ -87,6 +87,18 @@ const FinancingInputs = () => {
           </Row>
         </Card>
 
+        {/* Loan Parameters */}
+        <Card title="Loan Parameters" style={{ marginBottom: 24 }}>
+          <Form.Item
+            label="Loan Duration / Loan Tenor (Years)"
+            name="loanDuration"
+            rules={[{ required: true, message: 'Please input loan duration!' }]}
+            tooltip="Duration over which the loan is repaid"
+          >
+            <InputNumber min={1} max={30} />
+          </Form.Item>
+        </Card>
+
         {/* Financing Model Section */}
         <Card title="Financing Model" style={{ marginBottom: 24 }}>
           <Form.Item 

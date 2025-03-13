@@ -59,8 +59,10 @@ class MonteCarloEngine {
       summary: {},
     };
 
-    const { general } = parameters;
+    const { general, financing } = parameters;
     const projectLife = general.projectLife || 20;
+    // Update here: Use loanDuration from financing parameters
+    const loanDuration = financing.loanDuration || 15;
 
     // Run iterations
     for (let iter = 0; iter < this.options.iterations; iter++) {

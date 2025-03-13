@@ -23,6 +23,7 @@ const createScenario = async (req, res, next) => {
       name,
       description,
       parameters,
+      projectMetrics: parameters.projectMetrics || {},
       results: simulationResults.results,
       annualAdjustments: parameters.annualAdjustments || []
     });

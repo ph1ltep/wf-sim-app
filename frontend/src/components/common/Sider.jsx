@@ -11,7 +11,9 @@ import {
   RiseOutlined,
   SafetyOutlined,
   FundOutlined,
-  WarningOutlined
+  WarningOutlined,
+  GlobalOutlined,
+  EnvironmentOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -43,15 +45,27 @@ const Sider = ({ collapsed }) => {
       children: [
         {
           key: '/config/general',
-          label: 'General Settings'
+          label: 'General Settings',
+          children: [
+            {
+              key: '/config/general/simulation',
+              icon: <SettingOutlined />,
+              label: 'Simulation'
+            },
+            {
+              key: '/config/general/locations',
+              icon: <GlobalOutlined />,
+              label: 'Location Defaults'
+            }
+          ]
         },
         {
           key: '/config/project',
           label: 'Project Settings'
         },
         {
-          key: '/config/simulation',
-          label: 'Simulation Settings',
+          key: '/config/scenario',
+          label: 'Scenario Settings',
           children: [
             {
               key: '/config/modules/financing',
@@ -151,7 +165,7 @@ const Sider = ({ collapsed }) => {
         openKeys={openKeys}
         onOpenChange={onOpenChange}
         onClick={handleMenuClick}
-        defaultSelectedKeys={['/config/general']}
+        defaultSelectedKeys={['/config/general/simulation']}
         items={items}
         style={{ height: '100%', borderRight: 0 }}
       />

@@ -84,12 +84,20 @@ const AnnualAdjustmentSchema = new mongoose.Schema({
   additionalRevenue: { type: Number, default: 0 }
 });
 
+// Project Metrics Schema
+const ProjectMetricsSchema = new mongoose.Schema({
+  totalMW: { type: Number },
+  grossAEP: { type: Number },
+  netAEP: { type: Number }
+});
+
 // Main Simulation Schema
 const SimulationSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String },
   parameters: {
     general: { type: GeneralSchema, default: () => ({}) },
+    projectMetrics: { type: ProjectMetricsSchema, default: () => ({}) },
     financing: { type: FinancingSchema, default: () => ({}) },
     cost: { type: CostSchema, default: () => ({}) },
     revenue: { type: RevenueSchema, default: () => ({}) },

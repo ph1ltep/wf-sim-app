@@ -113,6 +113,16 @@ export const SimulationProvider = ({ children }) => {
     }
   };
 
+  const updateProjectMetrics = (metrics) => {
+    setParameters(prev => ({
+      ...prev,
+      projectMetrics: {
+        ...prev.projectMetrics,
+        ...metrics
+      }
+    }));
+  };
+
   const value = {
     parameters,
     results,
@@ -125,6 +135,7 @@ export const SimulationProvider = ({ children }) => {
     saveCurrentScenario,
     loadScenario,
     setCurrentScenario,
+    updateProjectMetrics,
   };
 
   return (

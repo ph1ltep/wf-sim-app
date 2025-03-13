@@ -7,15 +7,17 @@ import MainLayout from './layouts/MainLayout';
 // Config components
 import GeneralConfig from './components/config/GeneralConfig';
 import ProjectSettings from './components/config/ProjectSettings';
-import SimulationConfig from './components/config/SimulationConfig';
+import SimulationSettings from './components/config/SimulationSettings';
+import LocationDefaults from './components/config/LocationDefaults';
+import ScenarioSettings from './components/config/ScenarioSettings';
 
-// Module configuration components (moved from input to config/modules)
+// Module configuration components
 import CostInputs from './components/inputs/CostInputs';
 import RevenueInputs from './components/inputs/RevenueInputs';
 import FinancingInputs from './components/inputs/FinancingInputs';
 import RiskInputs from './components/inputs/RiskInputs';
 
-// Input analysis components (new)
+// Input analysis components
 import CashflowAnalysis from './components/inputs/CashflowAnalysis';
 import RiskAnalysis from './components/inputs/RiskAnalysis';
 
@@ -35,14 +37,18 @@ function App() {
       <Router basename="/proxy/3000">
         <Routes>
           <Route path="/" element={<MainLayout />}>
-            {/* Default redirect to general config */}
-            <Route index element={<Navigate to="/config/general" replace />} />
+            {/* Default redirect to simulation config */}
+            <Route index element={<Navigate to="/config/general/simulation" replace />} />
             
             {/* Configuration routes */}
             <Route path="config">
-              <Route path="general" element={<GeneralConfig />} />
+              <Route path="general">
+                <Route path="simulation" element={<SimulationSettings />} />
+                <Route path="locations" element={<LocationDefaults />} />
+                <Route index element={<Navigate to="/config/general/simulation" replace />} />
+              </Route>
               <Route path="project" element={<ProjectSettings />} />
-              <Route path="simulation" element={<SimulationConfig />} />
+              <Route path="scenario" element={<ScenarioSettings />} />
               
               {/* Module configuration routes */}
               <Route path="modules">
