@@ -6,13 +6,18 @@ import MainLayout from './layouts/MainLayout';
 
 // Config components
 import GeneralConfig from './components/config/GeneralConfig';
+import ProjectSettings from './components/config/ProjectSettings';
 import SimulationConfig from './components/config/SimulationConfig';
 
-// Input components
+// Module configuration components (moved from input to config/modules)
 import CostInputs from './components/inputs/CostInputs';
 import RevenueInputs from './components/inputs/RevenueInputs';
 import FinancingInputs from './components/inputs/FinancingInputs';
 import RiskInputs from './components/inputs/RiskInputs';
+
+// Input analysis components (new)
+import CashflowAnalysis from './components/inputs/CashflowAnalysis';
+import RiskAnalysis from './components/inputs/RiskAnalysis';
 
 // Results components
 import Overview from './components/results/Overview';
@@ -23,8 +28,6 @@ import IRRDistribution from './components/results/IRRDistribution';
 import ScenarioComparison from './components/results/ScenarioComparison';
 
 import './index.css';
-
-const PUBLIC_URL = process.env.PUBLIC_URL || '/absproxy/3000';
 
 function App() {
   return (
@@ -38,15 +41,22 @@ function App() {
             {/* Configuration routes */}
             <Route path="config">
               <Route path="general" element={<GeneralConfig />} />
+              <Route path="project" element={<ProjectSettings />} />
               <Route path="simulation" element={<SimulationConfig />} />
+              
+              {/* Module configuration routes */}
+              <Route path="modules">
+                <Route path="cost" element={<CostInputs />} />
+                <Route path="revenue" element={<RevenueInputs />} />
+                <Route path="financing" element={<FinancingInputs />} />
+                <Route path="risk" element={<RiskInputs />} />
+              </Route>
             </Route>
             
-            {/* Input routes */}
+            {/* Input analysis routes */}
             <Route path="input">
-              <Route path="cost" element={<CostInputs />} />
-              <Route path="revenue" element={<RevenueInputs />} />
-              <Route path="financing" element={<FinancingInputs />} />
-              <Route path="risk" element={<RiskInputs />} />
+              <Route path="cashflow" element={<CashflowAnalysis />} />
+              <Route path="risk" element={<RiskAnalysis />} />
             </Route>
             
             {/* Results routes */}

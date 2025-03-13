@@ -9,7 +9,9 @@ import {
   DollarOutlined,
   LineChartOutlined,
   RiseOutlined,
-  SafetyOutlined
+  SafetyOutlined,
+  FundOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -44,8 +46,34 @@ const Sider = ({ collapsed }) => {
           label: 'General Settings'
         },
         {
+          key: '/config/project',
+          label: 'Project Settings'
+        },
+        {
           key: '/config/simulation',
-          label: 'Simulation Settings'
+          label: 'Simulation Settings',
+          children: [
+            {
+              key: '/config/modules/financing',
+              icon: <DollarOutlined />,
+              label: 'Financing Module'
+            },
+            {
+              key: '/config/modules/cost',
+              icon: <DollarOutlined />,
+              label: 'Cost Module'
+            },
+            {
+              key: '/config/modules/revenue',
+              icon: <RiseOutlined />,
+              label: 'Revenue Module'
+            },
+            {
+              key: '/config/modules/risk',
+              icon: <SafetyOutlined />,
+              label: 'Risk Mitigation'
+            }
+          ]
         }
       ]
     },
@@ -55,24 +83,14 @@ const Sider = ({ collapsed }) => {
       label: 'Input Simulation',
       children: [
         {
-          key: '/input/financing',
-          icon: <DollarOutlined />,
-          label: 'Financing Module'
-        },
-        {
-          key: '/input/cost',
-          icon: <DollarOutlined />,
-          label: 'Cost Module'
-        },
-        {
-          key: '/input/revenue',
-          icon: <RiseOutlined />,
-          label: 'Revenue Module'
+          key: '/input/cashflow',
+          icon: <FundOutlined />,
+          label: 'Cashflow Analysis'
         },
         {
           key: '/input/risk',
-          icon: <SafetyOutlined />,
-          label: 'Risk Mitigation'
+          icon: <WarningOutlined />,
+          label: 'Risk Analysis'
         }
       ]
     },

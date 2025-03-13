@@ -61,6 +61,11 @@ const getDefaults = async (req, res) => {
         iterations: 10000,
         seed: 42
       },
+      probabilities: {
+        primary: 50,
+        upperBound: 75,
+        lowerBound: 25
+      },
       annualAdjustments: Array(20).fill().map((_, i) => ({
         year: i + 1,
         additionalOM: 0,
