@@ -2,6 +2,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getDefaultParameters, runSimulation } from '../api/simulation';
 import { createScenario, updateScenario, getScenarioById } from '../api/scenarios';
+
+// Import mock API instead
+//import { getDefaultParameters, runSimulation } from '../api/mockApi';
+
 import { message } from 'antd';
 
 const SimulationContext = createContext();

@@ -7,6 +7,7 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Origin': 'https://code-server.fthome.org'
   },
   // Add this to ensure cookies are sent with the request
   withCredentials: true,
