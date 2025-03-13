@@ -6,7 +6,6 @@ import Plot from 'react-plotly.js';
 import { useSimulation } from '../../contexts/SimulationContext';
 
 const { Title } = Typography;
-const { TabPane } = Tabs;
 
 const formatCurrency = (value) => {
   if (value >= 1e6) {
@@ -39,6 +38,71 @@ const Overview = () => {
   const costs = results.intermediateData?.annualCosts?.total?.P50 || Array(projectLife).fill(0);
   const revenues = results.intermediateData?.annualRevenue?.P50 || Array(projectLife).fill(0);
   
+  // Define tab items
+  const tabItems = [
+    {
+      key: 'cashflow',
+      label: 'Cash Flow Overview',
+      children: (
+        <Card>
+          <Plot
+            data={[
+              {
+                x: years,
+                y: revenues,
+                type: 'bar',
+                name: 'Revenue',
+                marker: { color: 'rgba(55, 128, 191, 0.7)' }
+              },
+              {
+                x: years,
+                y: costs.map(cost => -cost),
+                type: 'bar',
+                name: 'Costs',
+                marker: { color: 'rgba(219, 64, 82, 0.7)' }
+              },
+              {
+                x: years,
+                y: revenues.map((rev, i) => rev - costs[i]),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Net Cash Flow',
+                line: { color: 'green', width: 3 }
+              }
+            ]}
+            layout={{
+              title: 'Annual Cash Flow Overview',
+              barmode: 'relative',
+              xaxis: { title: 'Project Year' },
+              yaxis: { title: 'USD' },
+              height: 500,
+            }}
+            style={{ width: '100%' }}
+            config={{ responsive: true }}
+          />
+        </Card>
+      )
+    },
+    {
+      key: 'irr',
+      label: 'IRR Sensitivity',
+      children: (
+        <Card>
+          <p>IRR sensitivity analysis will be implemented in a future version.</p>
+        </Card>
+      )
+    },
+    {
+      key: 'risk',
+      label: 'Risk Analysis',
+      children: (
+        <Card>
+          <p>Risk analysis visualization will be implemented in a future version.</p>
+        </Card>
+      )
+    }
+  ];
+
   return (
     <div>
       <Title level={2}>Dashboard Overview</Title>
@@ -95,59 +159,7 @@ const Overview = () => {
       <Divider />
       
       {/* Charts */}
-      <Tabs defaultActiveKey="cashflow">
-        <TabPane tab="Cash Flow Overview" key="cashflow">
-          <Card>
-            <Plot
-              data={[
-                {
-                  x: years,
-                  y: revenues,
-                  type: 'bar',
-                  name: 'Revenue',
-                  marker: { color: 'rgba(55, 128, 191, 0.7)' }
-                },
-                {
-                  x: years,
-                  y: costs.map(cost => -cost),
-                  type: 'bar',
-                  name: 'Costs',
-                  marker: { color: 'rgba(219, 64, 82, 0.7)' }
-                },
-                {
-                  x: years,
-                  y: revenues.map((rev, i) => rev - costs[i]),
-                  type: 'scatter',
-                  mode: 'lines+markers',
-                  name: 'Net Cash Flow',
-                  line: { color: 'green', width: 3 }
-                }
-              ]}
-              layout={{
-                title: 'Annual Cash Flow Overview',
-                barmode: 'relative',
-                xaxis: { title: 'Project Year' },
-                yaxis: { title: 'USD' },
-                height: 500,
-              }}
-              style={{ width: '100%' }}
-              config={{ responsive: true }}
-            />
-          </Card>
-        </TabPane>
-        
-        <TabPane tab="IRR Sensitivity" key="irr">
-          <Card>
-            <p>IRR sensitivity analysis will be implemented in a future version.</p>
-          </Card>
-        </TabPane>
-        
-        <TabPane tab="Risk Analysis" key="risk">
-          <Card>
-            <p>Risk analysis visualization will be implemented in a future version.</p>
-          </Card>
-        </TabPane>
-      </Tabs>
+      <Tabs defaultActiveKey="cashflow" items={tabItems} />
     </div>
   );
 };
