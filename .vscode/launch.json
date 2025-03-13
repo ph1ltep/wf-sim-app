@@ -1,23 +1,40 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "type": "node",
-        "request": "launch",
-        "name": "Debug Backend",
-        "skipFiles": ["<node_internals>/**"],
-        "program": "${workspaceFolder}/backend/server.js",
-        "envFile": "${workspaceFolder}/backend/.env",
-        "console": "integratedTerminal",
-        "internalConsoleOptions": "neverOpen"
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Backend",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/backend/server.js",
+      "restart": true,
+      "runtimeExecutable": "nodemon",
+      "runtimeArgs": ["--inspect"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "cwd": "${workspaceFolder}/backend"
+    },
+    {
+      "name": "Debug Frontend",
+      "type": "chrome",
+      "request": "launch",
+      "url": "https://code-server.fthome.org/proxy/3000",
+      "webRoot": "${workspaceFolder}/frontend",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/src/*"
       }
-    ],
-    "compounds": [
-      {
-        "name": "Launch Both (Debug Backend)",
-        "configurations": ["Debug Backend"],
-        "preLaunchTask": "Run Frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Full Stack",
+      "configurations": ["Debug Backend", "Debug Frontend"],
+      "preLaunchTask": "Terminate All Tasks",
+      "presentation": {
+        "hidden": false,
+        "group": "",
+        "order": 1
       }
-    ]
-  }
-  
+    }
+  ]
+}

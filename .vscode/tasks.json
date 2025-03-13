@@ -1,37 +1,77 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        "label": "Run Frontend",
-        "type": "shell",
-        "command": "npm start",
-        "options": {
-          "cwd": "${workspaceFolder}/frontend"
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Frontend",
+      "type": "shell",
+      "command": "cd frontend && npm start",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "location": 2,
+          "message": 3
         },
-        "problemMatcher": []
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting the development server",
+          "endsPattern": "Compiled successfully"
+        }
       },
-      {
-        "label": "Run Backend",
-        "type": "shell",
-        "command": "node app.js",
-        "options": {
-          "cwd": "${workspaceFolder}/backend"
-        },
-        "problemMatcher": []
-      },
-      {
-        "label": "Run Both",
-        "dependsOn": [
-          "Run Frontend",
-          "Run Backend"
-        ],
-        "group": {
-            "kind": "build",
-            "isDefault": true
-          },
-        "dependsOrder": "parallel",
-        "problemMatcher": []
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
       }
-    ]
-  }
-  
+    },
+    {
+      "label": "Run Backend",
+      "type": "shell",
+      "command": "cd backend && npm run dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting",
+          "endsPattern": "Server is running on port"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Full Stack (No Debug)",
+      "dependsOrder": "parallel",
+      "dependsOn": ["Run Backend", "Run Frontend"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Terminate All Tasks",
+      "command": "echo ${input:terminate}",
+      "type": "shell",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "terminate",
+      "type": "command",
+      "command": "workbench.action.tasks.terminate",
+      "args": "terminateAll"
+    }
+  ]
+}

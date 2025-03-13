@@ -6,8 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/proxy/5000/api';
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
-    'Origin': 'https://code-server.fthome.org'
+    'Content-Type': 'application/json'
   },
   // Add this to ensure cookies are sent with the request
   withCredentials: true,
