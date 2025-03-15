@@ -1,6 +1,6 @@
 // src/components/results/Overview.jsx
-import React from 'react';
-import { Typography, Card, Row, Col, Statistic, Divider, Tabs } from 'antd';
+import React, { useMemo } from 'react';
+import { Typography, Card, Row, Col, Statistic, Divider, Tabs, Empty } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, DollarOutlined, PercentageOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { useSimulation } from '../../contexts/SimulationContext';
@@ -17,17 +17,51 @@ const formatCurrency = (value) => {
 const Overview = () => {
   const { results, parameters } = useSimulation();
   
+  // Extract percentile information
+  const percentiles = useMemo(() => {
+    if (results?.percentileInfo) {
+      return results.percentileInfo;
+    }
+    
+    // Fallback to parameters if available, or use defaults
+    if (parameters?.probabilities) {
+      return parameters.probabilities;
+    }
+    
+    return {
+      primary: 50,
+      upperBound: 75,
+      lowerBound: 25,
+      extremeUpper: 90,
+      extremeLower: 10
+    };
+  }, [results, parameters]);
+  
+  // Generate P-labels for accessing results
+  const pLabels = useMemo(() => {
+    return {
+      primary: `P${percentiles.primary}`,
+      upper: `P${percentiles.upperBound}`,
+      lower: `P${percentiles.lowerBound}`,
+      extremeUpper: `P${percentiles.extremeUpper}`,
+      extremeLower: `P${percentiles.extremeLower}`
+    };
+  }, [percentiles]);
+  
   // Check if we have results
   if (!results || !results.finalResults) {
     return (
       <div>
         <Title level={2}>Dashboard Overview</Title>
-        <p>No simulation results available. Please run a simulation first.</p>
+        <Empty 
+          description="No simulation results available. Please run a simulation first." 
+          style={{ margin: '50px 0' }}
+        />
       </div>
     );
   }
 
-  // Extract key metrics
+  // Extract key metrics using the percentile labels
   const irr = results.finalResults.IRR;
   const npv = results.finalResults.NPV;
   const minDSCR = results.finalResults.minDSCR;
@@ -35,8 +69,8 @@ const Overview = () => {
   
   // Get annual data for charts
   const years = Array.from({ length: projectLife }, (_, i) => i + 1);
-  const costs = results.intermediateData?.annualCosts?.total?.P50 || Array(projectLife).fill(0);
-  const revenues = results.intermediateData?.annualRevenue?.P50 || Array(projectLife).fill(0);
+  const costs = results.intermediateData?.annualCosts?.total?.[pLabels.primary] || Array(projectLife).fill(0);
+  const revenues = results.intermediateData?.annualRevenue?.[pLabels.primary] || Array(projectLife).fill(0);
   
   // Define tab items
   const tabItems = [
@@ -112,8 +146,8 @@ const Overview = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="P50 IRR"
-              value={irr.P50}
+              title={`${pLabels.primary} IRR`}
+              value={irr?.[pLabels.primary]}
               precision={2}
               valueStyle={{ color: '#3f8600' }}
               prefix={<PercentageOutlined />}
@@ -124,10 +158,10 @@ const Overview = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="P50 NPV"
-              value={npv.P50}
+              title={`${pLabels.primary} NPV`}
+              value={npv?.[pLabels.primary]}
               precision={0}
-              valueStyle={{ color: npv.P50 >= 0 ? '#3f8600' : '#cf1322' }}
+              valueStyle={{ color: npv?.[pLabels.primary] >= 0 ? '#3f8600' : '#cf1322' }}
               prefix={<DollarOutlined />}
               formatter={formatCurrency}
             />
@@ -136,10 +170,13 @@ const Overview = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Minimum DSCR"
-              value={minDSCR.P50}
+              title={`${pLabels.primary} Minimum DSCR`}
+              value={minDSCR?.[pLabels.primary]}
               precision={2}
-              valueStyle={{ color: minDSCR.P50 >= 1.3 ? '#3f8600' : (minDSCR.P50 >= 1 ? '#cf9700' : '#cf1322') }}
+              valueStyle={{ 
+                color: minDSCR?.[pLabels.primary] >= 1.3 ? '#3f8600' : 
+                      (minDSCR?.[pLabels.primary] >= 1 ? '#cf9700' : '#cf1322') 
+              }}
             />
           </Card>
         </Col>
@@ -155,6 +192,31 @@ const Overview = () => {
           </Card>
         </Col>
       </Row>
+      
+      {/* P-value Reference */}
+      <Card style={{ marginTop: 20, marginBottom: 20 }}>
+        <Title level={4}>Percentile Reference</Title>
+        <p>
+          The results shown use the following percentiles from your simulation settings:
+        </p>
+        <Row gutter={16}>
+          <Col span={4}>
+            <Statistic title="Primary" value={`P${percentiles.primary}`} />
+          </Col>
+          <Col span={4}>
+            <Statistic title="Upper Bound" value={`P${percentiles.upperBound}`} />
+          </Col>
+          <Col span={4}>
+            <Statistic title="Lower Bound" value={`P${percentiles.lowerBound}`} />
+          </Col>
+          <Col span={4}>
+            <Statistic title="Extreme Upper" value={`P${percentiles.extremeUpper}`} />
+          </Col>
+          <Col span={4}>
+            <Statistic title="Extreme Lower" value={`P${percentiles.extremeLower}`} />
+          </Col>
+        </Row>
+      </Card>
       
       <Divider />
       

@@ -10,6 +10,7 @@ const getDefaults = async (req, res) => {
       general: {
         projectLife: 20,
         numWTGs: 20,
+        wtgPlatformType: 'geared',
         mwPerWTG: 3.5,
         capacityFactor: 35,
         curtailmentLosses: 0,
@@ -18,7 +19,17 @@ const getDefaults = async (req, res) => {
       projectMetrics: {
         totalMW: 70,  // 20 * 3.5
         grossAEP: 214032,  // 70 * 0.35 * 8760
-        netAEP: 214032  // Same as gross if losses are 0
+        netAEP: 214032,  // Same as gross if losses are 0
+        componentQuantities: {
+          blades: 60,
+          bladeBearings: 60,
+          transformers: 20,
+          gearboxes: 20,
+          generators: 20,
+          converters: 20,
+          mainBearings: 20,
+          yawSystems: 20
+        }
       },
       financing: {
         capex: 50000000,
@@ -72,9 +83,11 @@ const getDefaults = async (req, res) => {
         seed: 42
       },
       probabilities: {
-        primary: 50,
-        upperBound: 75,
-        lowerBound: 25
+        primary: 50,       // P50 (median)
+        upperBound: 75,    // P75
+        lowerBound: 25,    // P25
+        extremeUpper: 90,  // P90
+        extremeLower: 10   // P10
       },
       annualAdjustments: Array(20).fill().map((_, i) => ({
         year: i + 1,

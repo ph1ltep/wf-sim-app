@@ -62,19 +62,55 @@ const FinancingSchema = new mongoose.Schema({
   loanInterestRateBS: { type: Number, default: 5 },
   loanInterestRatePF: { type: Number, default: 6 },
   equityInvestment: { type: Number },
-  minimumDSCR: { type: Number, default: 1.3 }
+  minimumDSCR: { type: Number, default: 1.3 },
+  loanDuration: { type: Number, default: 15 }
 });
 
 // Schema for General Module
 const GeneralSchema = new mongoose.Schema({
   projectLife: { type: Number, default: 20 },
-  loanDuration: { type: Number, default: 15 }
+  loanDuration: { type: Number, default: 15 },
+  numWTGs: { type: Number, default: 20 },
+  wtgPlatformType: { type: String, enum: ['geared', 'direct-drive'], default: 'geared' },
+  mwPerWTG: { type: Number, default: 3.5 },
+  capacityFactor: { type: Number, default: 35 },
+  curtailmentLosses: { type: Number, default: 0 },
+  electricalLosses: { type: Number, default: 0 }
 });
 
 // Schema for Simulation Settings
 const SimulationSettingsSchema = new mongoose.Schema({
   iterations: { type: Number, default: 10000 },
   seed: { type: Number, default: 42 }
+});
+
+// Schema for Probability Settings
+const ProbabilitySettingsSchema = new mongoose.Schema({
+  primary: { type: Number, default: 50 },
+  upperBound: { type: Number, default: 75 },
+  lowerBound: { type: Number, default: 25 },
+  extremeUpper: { type: Number, default: 90 },
+  extremeLower: { type: Number, default: 10 }
+});
+
+// Schema for Component Quantities
+const ComponentQuantitiesSchema = new mongoose.Schema({
+  blades: { type: Number },
+  bladeBearings: { type: Number },
+  transformers: { type: Number },
+  gearboxes: { type: Number },
+  generators: { type: Number },
+  converters: { type: Number },
+  mainBearings: { type: Number },
+  yawSystems: { type: Number }
+});
+
+// Project Metrics Schema
+const ProjectMetricsSchema = new mongoose.Schema({
+  totalMW: { type: Number },
+  grossAEP: { type: Number },
+  netAEP: { type: Number },
+  componentQuantities: { type: ComponentQuantitiesSchema, default: () => ({}) }
 });
 
 // Schema for Annual Adjustments
@@ -84,12 +120,19 @@ const AnnualAdjustmentSchema = new mongoose.Schema({
   additionalRevenue: { type: Number, default: 0 }
 });
 
-// Project Metrics Schema
-const ProjectMetricsSchema = new mongoose.Schema({
-  totalMW: { type: Number },
-  grossAEP: { type: Number },
-  netAEP: { type: Number }
+// Schema for Scenario details
+const ScenarioSchema = new mongoose.Schema({
+  location: { type: String },
+  currency: { type: String },
+  foreignCurrency: { type: String },
+  exchangeRate: { type: Number }
 });
+
+// Dynamic Percentile schema for annual data and metrics
+const PercentileSchema = new mongoose.Schema({
+  // This is a flexible schema that will hold different percentile values
+  // Each percentile key (e.g., "P50", "P75") will be dynamically added
+}, { strict: false });
 
 // Main Simulation Schema
 const SimulationSchema = new mongoose.Schema({
@@ -102,28 +145,31 @@ const SimulationSchema = new mongoose.Schema({
     cost: { type: CostSchema, default: () => ({}) },
     revenue: { type: RevenueSchema, default: () => ({}) },
     riskMitigation: { type: RiskMitigationSchema, default: () => ({}) },
-    simulation: { type: SimulationSettingsSchema, default: () => ({}) }
+    simulation: { type: SimulationSettingsSchema, default: () => ({}) },
+    probabilities: { type: ProbabilitySettingsSchema, default: () => ({}) },
+    scenario: { type: ScenarioSchema, default: () => ({}) }
   },
   annualAdjustments: [AnnualAdjustmentSchema],
+  percentileInfo: { type: ProbabilitySettingsSchema },
   results: {
     intermediateData: {
       annualCosts: {
         components: {
-          baseOM: { P50: [Number], P75: [Number], P90: [Number] },
-          failureRisk: { P50: [Number], P75: [Number], P90: [Number] },
-          majorRepairs: { P50: [Number], P75: [Number], P90: [Number] }
+          baseOM: { type: PercentileSchema },
+          failureRisk: { type: PercentileSchema },
+          majorRepairs: { type: PercentileSchema }
         },
-        total: { P50: [Number], P75: [Number], P90: [Number] }
+        total: { type: PercentileSchema }
       },
-      annualRevenue: { P50: [Number], P75: [Number], P90: [Number] },
-      dscr: { P50: [Number], P90: [Number] },
-      cashFlows: { P50: [Number], P75: [Number], P90: [Number] }
+      annualRevenue: { type: PercentileSchema },
+      dscr: { type: PercentileSchema },
+      cashFlows: { type: PercentileSchema }
     },
     finalResults: {
-      IRR: { P50: Number, P75: Number, P90: Number },
-      NPV: { P50: Number, P75: Number, P90: Number },
-      paybackPeriod: { P50: Number, P75: Number, P90: Number },
-      minDSCR: { P50: Number, P90: Number },
+      IRR: { type: PercentileSchema },
+      NPV: { type: PercentileSchema },
+      paybackPeriod: { type: PercentileSchema },
+      minDSCR: { type: PercentileSchema },
       probabilityOfDSCRBelow1: Number
     }
   },

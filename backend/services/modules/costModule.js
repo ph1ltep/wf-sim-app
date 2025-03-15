@@ -138,6 +138,19 @@ class CostModule {
     const projectLife = parameters.general?.projectLife || 20;
     const iterations = parameters.simulation?.iterations || 10000;
     
+    // Get percentile values from parameters or use defaults
+    const percentiles = this._getPercentileValues(parameters);
+    const percentileValues = [
+      percentiles.extremeLower,
+      percentiles.lowerBound,
+      percentiles.primary,
+      percentiles.upperBound,
+      percentiles.extremeUpper
+    ];
+    
+    // Create percentile labels (P10, P50, etc.)
+    const percentileLabels = percentileValues.map(p => `P${p}`);
+    
     // Results container
     const iterationResults = Array(iterations).fill().map(() => ({
       annualData: Array(projectLife).fill().map(() => ({})),
@@ -153,37 +166,64 @@ class CostModule {
     const results = {
       metrics: {},
       annualData: {
-        baseOMCost: { P10: [], P50: [], P75: [], P90: [] },
-        failureEventCost: { P10: [], P50: [], P75: [], P90: [] },
-        majorRepairCost: { P10: [], P50: [], P75: [], P90: [] },
-        totalCost: { P10: [], P50: [], P75: [], P90: [] }
+        baseOMCost: {},
+        failureEventCost: {},
+        majorRepairCost: {},
+        totalCost: {}
       }
     };
+    
+    // Initialize percentile arrays
+    percentileLabels.forEach(label => {
+      results.annualData.baseOMCost[label] = [];
+      results.annualData.failureEventCost[label] = [];
+      results.annualData.majorRepairCost[label] = [];
+      results.annualData.totalCost[label] = [];
+    });
     
     // Process metric percentiles
     const metricNames = Object.keys(iterationResults[0].metrics);
     metricNames.forEach(metric => {
       const values = iterationResults.map(iter => iter.metrics[metric]);
-      results.metrics[metric] = DistributionFactory.calculatePercentiles(values);
+      results.metrics[metric] = DistributionFactory.calculatePercentiles(values, percentileValues);
     });
     
     // Process annual data percentiles
     for (let year = 0; year < projectLife; year++) {
       ['baseOMCost', 'failureEventCost', 'majorRepairCost', 'totalCost'].forEach(field => {
         const yearValues = iterationResults.map(iter => iter.annualData[year][field] || 0);
-        const percentiles = DistributionFactory.calculatePercentiles(yearValues);
+        const percentiles = DistributionFactory.calculatePercentiles(yearValues, percentileValues);
         
-        results.annualData[field].P10.push(percentiles.P10);
-        results.annualData[field].P50.push(percentiles.P50);
-        results.annualData[field].P75.push(percentiles.P75);
-        results.annualData[field].P90.push(percentiles.P90);
+        // Add values for each percentile
+        percentileLabels.forEach(label => {
+          results.annualData[field][label].push(percentiles[label]);
+        });
       });
     }
     
     return {
       success: true,
       moduleName: this.name,
+      percentileInfo: percentiles, // Include percentile info for reference
       results
+    };
+  }
+  
+  /**
+   * Get percentile values from parameters or use defaults
+   * @param {Object} parameters - Simulation parameters
+   * @returns {Object} Percentile values
+   */
+  _getPercentileValues(parameters) {
+    // Get probability values from parameters or use defaults
+    const probabilities = parameters.probabilities || {};
+    
+    return {
+      primary: probabilities.primary || 50,      // Default: P50 (median)
+      upperBound: probabilities.upperBound || 75, // Default: P75
+      lowerBound: probabilities.lowerBound || 25, // Default: P25
+      extremeLower: probabilities.extremeLower || 10, // Default: P10
+      extremeUpper: probabilities.extremeUpper || 90  // Default: P90
     };
   }
 }

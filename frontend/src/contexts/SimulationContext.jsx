@@ -2,10 +2,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getDefaultParameters, runSimulation } from '../api/simulation';
 import { createScenario, updateScenario, getScenarioById } from '../api/scenarios';
-
-// Import mock API instead
-//import { getDefaultParameters, runSimulation } from '../api/mockApi';
-
 import { message } from 'antd';
 
 const SimulationContext = createContext();
@@ -37,13 +33,34 @@ export const SimulationProvider = ({ children }) => {
   };
 
   const updateModuleParameters = (moduleName, newParams) => {
-    setParameters(prev => ({
-      ...prev,
-      [moduleName]: {
-        ...prev[moduleName],
-        ...newParams,
-      },
-    }));
+    setParameters(prev => {
+      if (!prev) return prev;
+      
+      // Handle special case for componentQuantities that should go into projectMetrics
+      if (moduleName === 'general' && newParams.componentQuantities) {
+        const { componentQuantities, ...generalParams } = newParams;
+        
+        return {
+          ...prev,
+          [moduleName]: {
+            ...prev[moduleName],
+            ...generalParams,
+          },
+          projectMetrics: {
+            ...prev.projectMetrics,
+            componentQuantities: componentQuantities,
+          }
+        };
+      }
+      
+      return {
+        ...prev,
+        [moduleName]: {
+          ...prev[moduleName],
+          ...newParams,
+        },
+      };
+    });
   };
 
   const runFullSimulation = async () => {
@@ -55,6 +72,12 @@ export const SimulationProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await runSimulation(parameters);
+      
+      // Store the percentile information from results
+      if (response.percentileInfo) {
+        updateModuleParameters('probabilities', response.percentileInfo);
+      }
+      
       setResults(response.results);
       message.success('Simulation completed successfully');
       return response.results;
@@ -99,7 +122,31 @@ export const SimulationProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await getScenarioById(id);
-      setParameters(response.scenario.parameters);
+      
+      // Ensure the scenario has all required properties
+      const scenarioParams = response.scenario.parameters;
+      
+      // Ensure probabilities exists
+      if (!scenarioParams.probabilities) {
+        scenarioParams.probabilities = {
+          primary: 50,
+          upperBound: 75,
+          lowerBound: 25,
+          extremeUpper: 90,
+          extremeLower: 10
+        };
+      }
+      
+      // Ensure projectMetrics and componentQuantities exist
+      if (!scenarioParams.projectMetrics) {
+        scenarioParams.projectMetrics = {};
+      }
+      
+      if (!scenarioParams.projectMetrics.componentQuantities) {
+        scenarioParams.projectMetrics.componentQuantities = {};
+      }
+      
+      setParameters(scenarioParams);
       setCurrentScenario(response.scenario);
       setResults(response.scenario.results);
       message.success('Scenario loaded successfully');
@@ -144,3 +191,5 @@ export const SimulationProvider = ({ children }) => {
     </SimulationContext.Provider>
   );
 };
+
+export default SimulationProvider;

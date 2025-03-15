@@ -147,6 +147,19 @@ class FinancingModule {
     const projectLife = parameters.general?.projectLife || 20;
     const loanDuration = parameters.general?.loanDuration || 15;
     
+    // Get percentile values from parameters or use defaults
+    const percentiles = this._getPercentileValues(parameters);
+    const percentileValues = [
+      percentiles.extremeLower,
+      percentiles.lowerBound,
+      percentiles.primary,
+      percentiles.upperBound,
+      percentiles.extremeUpper
+    ];
+    
+    // Create percentile labels (P10, P50, etc.)
+    const percentileLabels = percentileValues.map(p => `P${p}`);
+    
     // Create mock revenue and cost data
     const mockData = {
       revenue: 10000000, // $10M annual revenue
@@ -165,15 +178,24 @@ class FinancingModule {
     // Run a single iteration
     const result = this.processIteration(parameters, iterationState, 0);
     
+    // For standalone module, we don't have multiple iterations for statistics,
+    // so we just use the primary percentile for displaying the result
+    const pPrimary = percentileLabels[2]; // The primary percentile (usually P50)
+    
     // Format results for API response
     return {
       success: true,
       moduleName: this.name,
+      percentileInfo: percentiles, // Include percentile info for reference
       results: {
         metrics: result.metrics,
         annualData: {
-          debtService: result.annualData.map(year => year.debtService),
-          dscr: result.annualData.map(year => year.dscr || null)
+          debtService: { 
+            [pPrimary]: result.annualData.map(year => year.debtService)
+          },
+          dscr: { 
+            [pPrimary]: result.annualData.map(year => year.dscr || null) 
+          }
         },
         scheduleSummary: {
           equityInvestment: result.metrics.equity,
@@ -183,6 +205,24 @@ class FinancingModule {
           averageDSCR: result.metrics.averageDSCR
         }
       }
+    };
+  }
+  
+  /**
+   * Get percentile values from parameters or use defaults
+   * @param {Object} parameters - Simulation parameters
+   * @returns {Object} Percentile values
+   */
+  _getPercentileValues(parameters) {
+    // Get probability values from parameters or use defaults
+    const probabilities = parameters.probabilities || {};
+    
+    return {
+      primary: probabilities.primary || 50,      // Default: P50 (median)
+      upperBound: probabilities.upperBound || 75, // Default: P75
+      lowerBound: probabilities.lowerBound || 25, // Default: P25
+      extremeLower: probabilities.extremeLower || 10, // Default: P10
+      extremeUpper: probabilities.extremeUpper || 90  // Default: P90
     };
   }
 }

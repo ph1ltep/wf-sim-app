@@ -137,6 +137,19 @@ class RiskModule {
     const failureEventProbability = parameters.cost?.failureEventProbability || 5;
     const failureEventCost = parameters.cost?.failureEventCost || 200000;
     
+    // Get percentile values from parameters or use defaults
+    const percentiles = this._getPercentileValues(parameters);
+    const percentileValues = [
+      percentiles.extremeLower,
+      percentiles.lowerBound,
+      percentiles.primary,
+      percentiles.upperBound,
+      percentiles.extremeUpper
+    ];
+    
+    // Create percentile labels (P10, P50, etc.)
+    const percentileLabels = percentileValues.map(p => `P${p}`);
+    
     // Results container
     const iterationResults = [];
     
@@ -163,29 +176,43 @@ class RiskModule {
     const results = {
       metrics: {},
       annualData: {
-        insurancePremium: { P50: Array(projectLife).fill(0) },
-        insurancePayout: { P10: [], P50: [], P90: [] },
-        netFailureCost: { P10: [], P50: [], P90: [] },
-        reserveUsed: parameters.riskMitigation.reserveFunds > 0 ? { P10: [], P50: [], P90: [] } : null
+        insurancePremium: { P50: Array(projectLife).fill(0) }, // This is deterministic
+        insurancePayout: {},
+        netFailureCost: {},
+        reserveUsed: parameters.riskMitigation.reserveFunds > 0 ? {} : null
       }
     };
+    
+    // Initialize percentile arrays
+    percentileLabels.forEach(label => {
+      if (!results.annualData.insurancePayout[label]) {
+        results.annualData.insurancePayout[label] = [];
+      }
+      if (!results.annualData.netFailureCost[label]) {
+        results.annualData.netFailureCost[label] = [];
+      }
+      if (parameters.riskMitigation.reserveFunds > 0 && !results.annualData.reserveUsed[label]) {
+        results.annualData.reserveUsed[label] = [];
+      }
+    });
     
     // Process metric percentiles
     const metricNames = Object.keys(iterationResults[0].metrics);
     metricNames.forEach(metric => {
       const values = iterationResults.map(iter => iter.metrics[metric]);
-      results.metrics[metric] = DistributionFactory.calculatePercentiles(values);
+      results.metrics[metric] = DistributionFactory.calculatePercentiles(values, percentileValues);
     });
     
-    // Process annual data percentiles
-    for (let year = a; year < projectLife; year++) {
+    // Process annual data percentiles - Fix the bug here (changed 'a' to 'year')
+    for (let year = 0; year < projectLife; year++) {
       ['insurancePayout', 'netFailureCost'].forEach(field => {
         const yearValues = iterationResults.map(iter => iter.annualData[year][field] || 0);
-        const percentiles = DistributionFactory.calculatePercentiles(yearValues);
+        const percentiles = DistributionFactory.calculatePercentiles(yearValues, percentileValues);
         
-        results.annualData[field].P10.push(percentiles.P10);
-        results.annualData[field].P50.push(percentiles.P50);
-        results.annualData[field].P90.push(percentiles.P90);
+        // Add values for each percentile
+        percentileLabels.forEach(label => {
+          results.annualData[field][label].push(percentiles[label]);
+        });
       });
       
       // Set fixed insurance premium values
@@ -196,18 +223,40 @@ class RiskModule {
       // Process reserve data if applicable
       if (parameters.riskMitigation.reserveFunds > 0) {
         const reserveValues = iterationResults.map(iter => iter.annualData[year].reserveUsed || 0);
-        const percentiles = DistributionFactory.calculatePercentiles(reserveValues);
+        const percentiles = DistributionFactory.calculatePercentiles(reserveValues, percentileValues);
         
-        results.annualData.reserveUsed.P10.push(percentiles.P10);
-        results.annualData.reserveUsed.P50.push(percentiles.P50);
-        results.annualData.reserveUsed.P90.push(percentiles.P90);
+        percentileLabels.forEach(label => {
+          if (!results.annualData.reserveUsed[label]) {
+            results.annualData.reserveUsed[label] = [];
+          }
+          results.annualData.reserveUsed[label].push(percentiles[label]);
+        });
       }
     }
     
     return {
       success: true,
       moduleName: this.name,
+      percentileInfo: percentiles, // Include percentile info for reference
       results
+    };
+  }
+  
+  /**
+   * Get percentile values from parameters or use defaults
+   * @param {Object} parameters - Simulation parameters
+   * @returns {Object} Percentile values
+   */
+  _getPercentileValues(parameters) {
+    // Get probability values from parameters or use defaults
+    const probabilities = parameters.probabilities || {};
+    
+    return {
+      primary: probabilities.primary || 50,      // Default: P50 (median)
+      upperBound: probabilities.upperBound || 75, // Default: P75
+      lowerBound: probabilities.lowerBound || 25, // Default: P25
+      extremeLower: probabilities.extremeLower || 10, // Default: P10
+      extremeUpper: probabilities.extremeUpper || 90  // Default: P90
     };
   }
 }

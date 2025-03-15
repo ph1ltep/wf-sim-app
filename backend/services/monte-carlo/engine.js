@@ -8,6 +8,13 @@ class MonteCarloEngine {
     this.options = {
       seed: options.seed || 42,
       iterations: options.iterations || 10000,
+      percentiles: options.percentiles || {
+        primary: 50,      // Default: P50 (median)
+        upperBound: 75,   // Default: P75
+        lowerBound: 25,   // Default: P25
+        extremeLower: 10, // Default: P10
+        extremeUpper: 90  // Default: P90
+      },
       ...options
     };
     
@@ -104,7 +111,7 @@ class MonteCarloEngine {
       this.results.iterations.push(iterationResult);
     }
 
-    // Calculate summary statistics
+    // Calculate summary statistics using the specified percentiles
     this.calculateSummary();
     
     // Restore RNG
@@ -114,7 +121,7 @@ class MonteCarloEngine {
   }
 
   /**
-   * Calculate summary statistics from all iterations
+   * Calculate summary statistics from all iterations using specified percentiles
    */
   calculateSummary() {
     if (!this.results || !this.results.iterations.length) {
@@ -123,6 +130,17 @@ class MonteCarloEngine {
 
     const { iterations } = this.results;
     const projectLife = iterations[0].annualData.length;
+    
+    // Generate percentile labels
+    const percentileValues = [
+      this.options.percentiles.extremeLower, 
+      this.options.percentiles.lowerBound,
+      this.options.percentiles.primary,
+      this.options.percentiles.upperBound,
+      this.options.percentiles.extremeUpper
+    ];
+    
+    const percentileLabels = percentileValues.map(p => `P${p}`);
 
     // Get all metric names
     const metricNames = new Set();
@@ -130,13 +148,13 @@ class MonteCarloEngine {
       Object.keys(iter.metrics).forEach(key => metricNames.add(key));
     });
 
-    // Calculate percentiles for each metric
+    // Calculate percentiles for each metric using the specified percentile values
     const metricResults = {};
     metricNames.forEach(metric => {
       const values = iterations.map(iter => iter.metrics[metric]);
       metricResults[metric] = DistributionFactory.calculatePercentiles(
         values, 
-        [10, 50, 75, 90]
+        percentileValues
       );
     });
 
@@ -151,14 +169,14 @@ class MonteCarloEngine {
       });
     });
     
-    // Then calculate percentiles for each field for each year
+    // Then calculate percentiles for each field for each year using specified percentiles
     annualDataFields.forEach(field => {
-      annualResults[field] = {
-        P10: [],
-        P50: [],
-        P75: [],
-        P90: []
-      };
+      annualResults[field] = {};
+      
+      // Initialize arrays for each percentile
+      percentileLabels.forEach(label => {
+        annualResults[field][label] = [];
+      });
       
       for (let year = 0; year < projectLife; year++) {
         const yearValues = iterations.map(iter => 
@@ -167,15 +185,33 @@ class MonteCarloEngine {
         
         const percentiles = DistributionFactory.calculatePercentiles(
           yearValues, 
-          [10, 50, 75, 90]
+          percentileValues
         );
         
-        annualResults[field].P10.push(percentiles.P10);
-        annualResults[field].P50.push(percentiles.P50);
-        annualResults[field].P75.push(percentiles.P75);
-        annualResults[field].P90.push(percentiles.P90);
+        // Add values for each percentile
+        percentileLabels.forEach(label => {
+          annualResults[field][label].push(percentiles[label]);
+        });
       }
     });
+
+    // Calculate DSCR below 1 probability
+    if (annualResults.dscr) {
+      const dscrValues = iterations.map(iter => {
+        // Find minimum DSCR for each iteration
+        const dscrArray = [];
+        for (let year = 0; year < projectLife; year++) {
+          if (iter.annualData[year].dscr !== undefined && iter.annualData[year].dscr !== Infinity) {
+            dscrArray.push(iter.annualData[year].dscr);
+          }
+        }
+        return dscrArray.length > 0 ? Math.min(...dscrArray) : Infinity;
+      });
+      
+      // Calculate probability of min DSCR falling below 1
+      const dscrBelow1Count = dscrValues.filter(dscr => dscr < 1).length;
+      metricResults.dscrBelow1Probability = dscrBelow1Count / iterations.length;
+    }
 
     this.results.summary = {
       metrics: metricResults,

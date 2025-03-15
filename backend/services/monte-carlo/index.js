@@ -37,81 +37,116 @@ function createSimulationEngine(options = {}) {
 function runSimulation(parameters) {
   const options = {
     iterations: parameters.simulation?.iterations || 10000,
-    seed: parameters.simulation?.seed || 42
+    seed: parameters.simulation?.seed || 42,
+    percentiles: getPercentileValues(parameters)
   };
   
   const engine = createSimulationEngine(options);
   const results = engine.run(parameters);
   
-  return formatResults(results);
+  return formatResults(results, options.percentiles);
+}
+
+/**
+ * Get percentile values from parameters or use defaults
+ * @param {Object} parameters - Simulation parameters
+ * @returns {Object} Percentile values
+ */
+function getPercentileValues(parameters) {
+  // Get probability values from parameters or use defaults
+  const probabilities = parameters.probabilities || {};
+  
+  return {
+    primary: probabilities.primary || 50,      // Default: P50 (median)
+    upperBound: probabilities.upperBound || 75, // Default: P75
+    lowerBound: probabilities.lowerBound || 25, // Default: P25
+    extremeLower: probabilities.extremeLower || 10, // Default: P10
+    extremeUpper: probabilities.extremeUpper || 90  // Default: P90
+  };
 }
 
 /**
  * Format raw simulation results into the expected API response format
  * @param {Object} results - Raw simulation results
+ * @param {Object} percentiles - Percentile values to use
  * @returns {Object} Formatted results
  */
-function formatResults(results) {
+function formatResults(results, percentiles) {
   // Transform results into the expected output format
   const { summary } = results;
   
+  // Create mappings from percentile values to labels
+  const pLabels = {
+    [percentiles.primary]: 'P' + percentiles.primary,
+    [percentiles.upperBound]: 'P' + percentiles.upperBound,
+    [percentiles.lowerBound]: 'P' + percentiles.lowerBound,
+    [percentiles.extremeUpper]: 'P' + percentiles.extremeUpper,
+    [percentiles.extremeLower]: 'P' + percentiles.extremeLower,
+  };
+
+  // Use primary, upper, and extreme upper for most displays
+  const pPrimary = pLabels[percentiles.primary];
+  const pUpper = pLabels[percentiles.upperBound];
+  const pExtreme = pLabels[percentiles.extremeUpper];
+  
   return {
     success: true,
+    percentileInfo: percentiles, // Include percentile info for reference
     results: {
       intermediateData: {
         annualCosts: {
           total: {
-            P50: summary.annualData.totalCost?.P50 || [],
-            P75: summary.annualData.totalCost?.P75 || [],
-            P90: summary.annualData.totalCost?.P90 || []
+            [pPrimary]: summary.annualData.totalCost?.[pPrimary] || [],
+            [pUpper]: summary.annualData.totalCost?.[pUpper] || [],
+            [pExtreme]: summary.annualData.totalCost?.[pExtreme] || []
           },
           components: {
             baseOM: {
-              P50: summary.annualData.baseOMCost?.P50 || [],
-              P75: summary.annualData.baseOMCost?.P75 || [],
-              P90: summary.annualData.baseOMCost?.P90 || []
+              [pPrimary]: summary.annualData.baseOMCost?.[pPrimary] || [],
+              [pUpper]: summary.annualData.baseOMCost?.[pUpper] || [],
+              [pExtreme]: summary.annualData.baseOMCost?.[pExtreme] || []
             },
             failureRisk: {
-              P50: summary.annualData.failureEventCost?.P50 || [],
-              P75: summary.annualData.failureEventCost?.P75 || [],
-              P90: summary.annualData.failureEventCost?.P90 || []
+              [pPrimary]: summary.annualData.failureEventCost?.[pPrimary] || [],
+              [pUpper]: summary.annualData.failureEventCost?.[pUpper] || [],
+              [pExtreme]: summary.annualData.failureEventCost?.[pExtreme] || []
             }
           }
         },
         annualRevenue: {
-          P50: summary.annualData.revenue?.P50 || [],
-          P75: summary.annualData.revenue?.P75 || [],
-          P90: summary.annualData.revenue?.P90 || []
+          [pPrimary]: summary.annualData.revenue?.[pPrimary] || [],
+          [pUpper]: summary.annualData.revenue?.[pUpper] || [],
+          [pExtreme]: summary.annualData.revenue?.[pExtreme] || []
         },
         dscr: {
-          P50: summary.annualData.dscr?.P50 || [],
-          P90: summary.annualData.dscr?.P90 || []
+          [pPrimary]: summary.annualData.dscr?.[pPrimary] || [],
+          [pExtreme]: summary.annualData.dscr?.[pExtreme] || []
         },
         cashFlows: {
-          P50: summary.annualData.cashFlow?.P50 || [],
-          P75: summary.annualData.cashFlow?.P75 || [],
-          P90: summary.annualData.cashFlow?.P90 || []
+          [pPrimary]: summary.annualData.cashFlow?.[pPrimary] || [],
+          [pUpper]: summary.annualData.cashFlow?.[pUpper] || [],
+          [pExtreme]: summary.annualData.cashFlow?.[pExtreme] || []
         }
       },
       finalResults: {
         IRR: {
-          P50: summary.metrics.irr?.P50 || 0,
-          P75: summary.metrics.irr?.P75 || 0,
-          P90: summary.metrics.irr?.P90 || 0
+          [pPrimary]: summary.metrics.irr?.[pPrimary] || 0,
+          [pUpper]: summary.metrics.irr?.[pUpper] || 0,
+          [pExtreme]: summary.metrics.irr?.[pExtreme] || 0
         },
         NPV: {
-          P50: summary.metrics.npv?.P50 || 0,
-          P75: summary.metrics.npv?.P75 || 0,
-          P90: summary.metrics.npv?.P90 || 0
+          [pPrimary]: summary.metrics.npv?.[pPrimary] || 0,
+          [pUpper]: summary.metrics.npv?.[pUpper] || 0,
+          [pExtreme]: summary.metrics.npv?.[pExtreme] || 0
         },
         paybackPeriod: {
-          P50: summary.metrics.paybackPeriod?.P50 || 0,
-          P75: summary.metrics.paybackPeriod?.P75 || 0,
-          P90: summary.metrics.paybackPeriod?.P90 || 0
+          [pPrimary]: summary.metrics.paybackPeriod?.[pPrimary] || 0,
+          [pUpper]: summary.metrics.paybackPeriod?.[pUpper] || 0,
+          [pExtreme]: summary.metrics.paybackPeriod?.[pExtreme] || 0
         },
         minDSCR: {
-          P50: summary.metrics.minDSCR?.P50 || 0,
-          P90: summary.metrics.minDSCR?.P90 || 0
+          [pPrimary]: summary.metrics.minDSCR?.[pPrimary] || 0,
+          [pExtreme]: summary.metrics.minDSCR?.[pExtreme] || 0
         },
         probabilityOfDSCRBelow1: summary.metrics.dscrBelow1Probability || 0
       }
