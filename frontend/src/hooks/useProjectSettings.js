@@ -8,9 +8,8 @@ import { message } from 'antd';
  * Custom hook for managing project settings data and operations
  */
 const useProjectSettings = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+  const { parameters, updateModuleParameters, selectedLocation, updateSelectedLocation } = useSimulation();
   const [locations, setLocations] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState(null);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
     capacityFactor: false,
@@ -144,25 +143,24 @@ const useProjectSettings = () => {
   }, []);
   
   // Handle location selection change
-  const handleLocationChange = useCallback((locationId) => {
-    setSelectedLocation(locationId);
-  }, []);
+  const handleLocationChange = useCallback(async (locationId) => {
+    // Find the location data for the selected ID
+    const locationData = locations.find(loc => loc._id === locationId);
+    if (locationData) {
+      updateSelectedLocation(locationData);
+    }
+  }, [locations, updateSelectedLocation]);
   
   // Load location defaults
   const loadLocationDefaults = useCallback(async (form) => {
-    if (!selectedLocation) {
+    if (!selectedLocation?._id) {
       message.warning('Please select a location first');
       return false;
     }
 
-    // Find the selected location
-    const locationData = locations.find(loc => loc._id === selectedLocation);
+    // The selected location is already available in the context
+    const locationData = selectedLocation;
     
-    if (!locationData) {
-      message.error('Selected location not found');
-      return false;
-    }
-
     // Update form values with location defaults
     const formValues = form.getFieldsValue();
     
@@ -233,7 +231,7 @@ const useProjectSettings = () => {
 
     message.success(`Loaded defaults for ${locationData.country}`);
     return true;
-  }, [selectedLocation, locations, calculateDerivedValues, parameters, updateModuleParameters, updateProjectMetrics]);
+  }, [selectedLocation, calculateDerivedValues, parameters, updateModuleParameters, updateProjectMetrics]);
   
   // Initialize data on mount
   useEffect(() => {
@@ -243,7 +241,7 @@ const useProjectSettings = () => {
   // Calculate initial metrics when parameters change
   useEffect(() => {
     if (parameters?.general) {
-      const metrics = calculateDerivedValues(parameters.general);
+      calculateDerivedValues(parameters.general);
       // Don't update module parameters here to avoid loops
     }
   }, [parameters?.general, calculateDerivedValues]);

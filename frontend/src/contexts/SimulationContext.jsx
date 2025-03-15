@@ -14,6 +14,7 @@ export const SimulationProvider = ({ children }) => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentScenario, setCurrentScenario] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);  // Add this state
 
   // Load default parameters on mount
   useEffect(() => {
@@ -62,6 +63,22 @@ export const SimulationProvider = ({ children }) => {
         },
       };
     });
+  };
+
+  // Add a function to update the selected location
+  const updateSelectedLocation = (locationData) => {
+    setSelectedLocation(locationData);
+    
+    // Also update the scenario location information in parameters
+    if (locationData) {
+      updateModuleParameters('scenario', { 
+        ...parameters?.scenario || {},
+        location: locationData.countryCode,
+        currency: locationData.currency,
+        foreignCurrency: locationData.foreignCurrency,
+        exchangeRate: locationData.exchangeRate
+      });
+    }
   };
 
   const loadOEMContractDetails = async (contractId) => {
@@ -208,6 +225,7 @@ export const SimulationProvider = ({ children }) => {
     results,
     loading,
     currentScenario,
+    selectedLocation,  // Add this
     setParameters,
     updateModuleParameters,
     loadDefaultParameters,
@@ -216,6 +234,7 @@ export const SimulationProvider = ({ children }) => {
     loadScenario,
     setCurrentScenario,
     updateProjectMetrics,
+    updateSelectedLocation,  // Add this
   };
 
   return (

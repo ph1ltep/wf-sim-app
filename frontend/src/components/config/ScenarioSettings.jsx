@@ -1,6 +1,6 @@
 // src/components/config/ScenarioSettings.jsx
 import React from 'react';
-import { Typography, Form, Input, Card, Button, Row, Col, DatePicker, Select } from 'antd';
+import { Typography, Form, Input, Card, Button, Row, Col, DatePicker, Select, Alert } from 'antd';
 import { useSimulation } from '../../contexts/SimulationContext';
 
 const { Title } = Typography;
@@ -8,7 +8,7 @@ const { TextArea } = Input;
 const { Option } = Select;
 
 const ScenarioSettings = () => {
-  const { parameters, updateModuleParameters, currentScenario } = useSimulation();
+  const { parameters, updateModuleParameters, currentScenario, selectedLocation } = useSimulation();
   const [form] = Form.useForm();
 
   // Only render if parameters are loaded
@@ -20,7 +20,7 @@ const ScenarioSettings = () => {
   const scenarioData = parameters.scenario || {
     name: currentScenario?.name || 'New Scenario',
     description: currentScenario?.description || '',
-    location: '',
+    location: selectedLocation?.countryCode || '',
     startDate: null,
     scenarioType: 'base'
   };
@@ -40,6 +40,16 @@ const ScenarioSettings = () => {
     <div>
       <Title level={2}>Scenario Settings</Title>
       <p>Configure the high-level parameters for your wind farm scenario.</p>
+
+      {selectedLocation && (
+        <Alert
+          message="Location Selected"
+          description={`Using location defaults from ${selectedLocation.country} (${selectedLocation.countryCode.toUpperCase()}) - ${selectedLocation.currency}`}
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <Form
         form={form}
@@ -75,7 +85,7 @@ const ScenarioSettings = () => {
                 name="location"
                 tooltip="Select the country where the wind farm is located"
               >
-                <Select placeholder="Select a location">
+                <Select placeholder="Select a location" disabled={!!selectedLocation}>
                   <Option value="">Not specified</Option>
                   <Option value="us">United States</Option>
                   <Option value="uk">United Kingdom</Option>
@@ -85,6 +95,11 @@ const ScenarioSettings = () => {
                   <Option value="custom">Custom Location</Option>
                 </Select>
               </Form.Item>
+              {selectedLocation && (
+                <p style={{ marginTop: -20, marginBottom: 10, color: 'rgba(0, 0, 0, 0.45)' }}>
+                  Location is set from Project Settings
+                </p>
+              )}
             </Col>
             <Col span={12}>
               <Form.Item

@@ -1,7 +1,7 @@
 // src/components/config/projectSettings/LocationSelector.jsx
 import React from 'react';
-import { Card, Row, Col, Select, Button } from 'antd';
-import { GlobalOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Select, Button, Tag } from 'antd';
+import { GlobalOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -24,6 +24,11 @@ const LocationSelector = ({
         </span>
       } 
       style={{ marginBottom: 24 }}
+      extra={selectedLocation && (
+        <Tag color="green" icon={<CheckCircleOutlined />}>
+          Using {selectedLocation.country} ({selectedLocation.countryCode.toUpperCase()})
+        </Tag>
+      )}
     >
       <Row gutter={16}>
         <Col span={18}>
@@ -33,7 +38,7 @@ const LocationSelector = ({
             onChange={onLocationChange}
             loading={loading}
             disabled={loading || locations.length === 0}
-            value={selectedLocation}
+            value={selectedLocation?._id}
           >
             {locations.map(location => (
               <Option key={location._id} value={location._id}>
