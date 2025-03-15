@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 
 // Schema for corrective maintenance major components
 const CorrectiveMajorSchema = new mongoose.Schema({
-  crane: { type: Boolean, default: false },
   tooling: { type: Boolean, default: false },
   manpower: { type: Boolean, default: false },
   parts: { type: Boolean, default: false }
@@ -49,7 +48,19 @@ const OEMScopeSchema = new mongoose.Schema({
     enum: ['none', 'partial', 'full'], 
     default: 'none' 
   },
-  correctiveMinor: { 
+  // Site personnel fields
+  siteManagement: { 
+    type: Boolean, 
+    default: false 
+  },
+  technicianPercent: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 100
+  },
+// backend/models/OEMScope.js (continued)
+correctiveMinor: { 
     type: Boolean, 
     default: false 
   },
@@ -60,6 +71,38 @@ const OEMScopeSchema = new mongoose.Schema({
   correctiveMajorDetails: {
     type: CorrectiveMajorSchema,
     default: () => ({})
+  },
+  // Blade integrity management
+  bladeIntegrityManagement: {
+    type: Boolean,
+    default: false
+  },
+  // New independent crane coverage
+  craneCoverage: {
+    type: Boolean,
+    default: false
+  },
+  // New caps for crane coverage
+  craneEventCap: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  craneFinancialCap: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // New caps for major components
+  majorEventCap: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  majorFinancialCap: {
+    type: Number,
+    min: 0,
+    default: 0
   },
   createdAt: { 
     type: Date, 
@@ -80,6 +123,14 @@ OEMScopeSchema.pre('save', function(next) {
     this.name = this.generateName();
   }
   
+  // Set sitePersonnel based on siteManagement and technicianPercent
+  if (this.siteManagement) {
+    this.sitePersonnel = this.technicianPercent === 100 ? 'full' : 'partial';
+  } else {
+    this.sitePersonnel = 'none';
+    this.technicianPercent = 0;
+  }
+  
   next();
 });
 
@@ -94,23 +145,45 @@ OEMScopeSchema.methods.generateName = function() {
   if (this.remoteMonitoring) parts.push('RM');
   if (this.remoteTechnicalSupport) parts.push('RTS');
   
-  if (this.sitePersonnel === 'full') parts.push('FSP');
-  else if (this.sitePersonnel === 'partial') parts.push('PSP');
+  // Site personnel handling
+  if (this.siteManagement) parts.push('SM');
+  
+  if (this.technicianPercent > 0) {
+    if (this.technicianPercent === 100) {
+      parts.push('FT'); // Full Technicians
+    } else {
+      parts.push(`T${this.technicianPercent}`); // Technicians with percentage
+    }
+  }
   
   if (this.correctiveMinor) parts.push('CMin');
+  if (this.bladeIntegrityManagement) parts.push('BIM');
+  
+  // Independent crane coverage
+  if (this.craneCoverage) {
+    let cranePart = 'Crane';
+    if (this.craneEventCap > 0 || this.craneFinancialCap > 0) {
+      cranePart += 'Cap';
+    }
+    parts.push(cranePart);
+  }
   
   if (this.correctiveMajor) {
     const majorParts = [];
-    if (this.correctiveMajorDetails.crane) majorParts.push('C');
     if (this.correctiveMajorDetails.tooling) majorParts.push('T');
     if (this.correctiveMajorDetails.manpower) majorParts.push('M');
     if (this.correctiveMajorDetails.parts) majorParts.push('P');
     
+    let majorStr = 'CMaj';
     if (majorParts.length > 0) {
-      parts.push(`CMaj(${majorParts.join('')})`);
-    } else {
-      parts.push('CMaj');
+      majorStr += `(${majorParts.join('')})`;
     }
+    
+    if (this.majorEventCap > 0 || this.majorFinancialCap > 0) {
+      majorStr += 'Cap';
+    }
+    
+    parts.push(majorStr);
   }
   
   // If no parts selected, use a default name

@@ -14,7 +14,10 @@ const OEMScopeTag = ({ children, color }) => {
         padding: '2px 8px', 
         borderRadius: '4px',
         display: 'inline-block',
-        fontSize: '12px'
+        fontSize: '12px',
+        fontWeight: '500',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+        margin: '2px 0'
       }}
     >
       {children}

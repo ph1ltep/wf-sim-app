@@ -45,9 +45,11 @@ const useOEMScopes = () => {
   const createScope = async (formData) => {
     try {
       setLoading(true);
+      console.log('Form data before restructuring:', formData);
       
       // Restructure the form data to match the API expectations
       const data = restructureFormData(formData);
+      console.log('Data after restructuring:', data);
       
       const response = await createOEMScope(data);
       const newScope = {
@@ -70,9 +72,11 @@ const useOEMScopes = () => {
   const updateScope = async (id, formData) => {
     try {
       setLoading(true);
+      console.log('Form data before restructuring:', formData);
       
       // Restructure the form data to match the API expectations
       const data = restructureFormData(formData);
+      console.log('Data after restructuring:', data);
       
       const response = await updateOEMScope(id, data);
       
@@ -121,6 +125,7 @@ const useOEMScopes = () => {
   const generateName = async (formData) => {
     try {
       setGenerateNameLoading(true);
+      console.log('Form data for name generation:', formData);
       
       // Restructure the form data to match the API expectations
       const data = restructureFormData(formData);
@@ -131,19 +136,19 @@ const useOEMScopes = () => {
         const parts = [];
         
         // Preventive Maintenance
-        if (data.preventiveMaintenance) parts.push('PM');
-        if (data.bladeInspections) parts.push('BI');
+        if (data.preventiveMaintenance === true) parts.push('PM');
+        if (data.bladeInspections === true) parts.push('BI');
         
         // Remote Support
-        if (data.remoteMonitoring) parts.push('RM');
-        if (data.remoteTechnicalSupport) parts.push('RTS');
+        if (data.remoteMonitoring === true) parts.push('RM');
+        if (data.remoteTechnicalSupport === true) parts.push('RTS');
         
         // Site Personnel
-        if (data.siteManagement) parts.push('SM');
+        if (data.siteManagement === true) parts.push('SM');
         
         // Handle technician percentage correctly
         const techPercent = data.technicianPercent;
-        if (techPercent !== undefined && techPercent > 0) {
+        if (typeof techPercent === 'number' && techPercent > 0) {
           if (techPercent === 100) {
             parts.push('FT'); // Full Technicians
           } else {
@@ -152,21 +157,34 @@ const useOEMScopes = () => {
         }
         
         // Corrective Maintenance
-        if (data.correctiveMinor) parts.push('CMin');
-        if (data.bladeIntegrityManagement) parts.push('BIM');
+        if (data.correctiveMinor === true) parts.push('CMin');
+        if (data.bladeIntegrityManagement === true) parts.push('BIM');
         
-        if (data.correctiveMajor) {
-          const majorParts = [];
-          if (data.correctiveMajorDetails.crane) majorParts.push('C');
-          if (data.correctiveMajorDetails.tooling) majorParts.push('T');
-          if (data.correctiveMajorDetails.manpower) majorParts.push('M');
-          if (data.correctiveMajorDetails.parts) majorParts.push('P');
-          
-          if (majorParts.length > 0) {
-            parts.push(`CMaj(${majorParts.join('')})`);
-          } else {
-            parts.push('CMaj');
+        // Crane Coverage (now independent)
+        if (data.craneCoverage === true) {
+          let cranePart = 'Crane';
+          if (data.craneEventCap > 0 || data.craneFinancialCap > 0) {
+            cranePart += 'Cap';
           }
+          parts.push(cranePart);
+        }
+        
+        if (data.correctiveMajor === true) {
+          const majorParts = [];
+          if (data.correctiveMajorDetails.tooling === true) majorParts.push('T');
+          if (data.correctiveMajorDetails.manpower === true) majorParts.push('M');
+          if (data.correctiveMajorDetails.parts === true) majorParts.push('P');
+          
+          let majorStr = 'CMaj';
+          if (majorParts.length > 0) {
+            majorStr += `(${majorParts.join('')})`;
+          }
+          
+          if (data.majorEventCap > 0 || data.majorFinancialCap > 0) {
+            majorStr += 'Cap';
+          }
+          
+          parts.push(majorStr);
         }
         
         // If no parts selected, use a default name
@@ -214,35 +232,65 @@ const useOEMScopes = () => {
   
   // Helper function to restructure form data for API
   const restructureFormData = (formData) => {
-    const restructured = {
-      ...formData,
-      // Structure the correctiveMajorDetails
-      correctiveMajorDetails: {
-        crane: formData['correctiveMajorDetails.crane'] || false,
-        tooling: formData['correctiveMajorDetails.tooling'] || false,
-        manpower: formData['correctiveMajorDetails.manpower'] || false,
-        parts: formData['correctiveMajorDetails.parts'] || false
-      },
-      // Ensure site personnel fields are properly set
-      siteManagement: formData.siteManagement || false,
-      technicianPercent: formData.technicianPercent !== undefined ? parseInt(formData.technicianPercent) : 100,
-      // Remove old blade properties if they exist
-      blade: undefined,
-      bladeLEP: undefined
-    };
+    // Create a clean copy without undefined values
+    const restructured = {};
     
-    // Ensure technicianPercent is a number
+    // Copy all primitive values directly
+    Object.keys(formData).forEach(key => {
+      // Skip the nested correctiveMajorDetails for special handling
+      if (!key.startsWith('correctiveMajorDetails.')) {
+        restructured[key] = formData[key];
+      }
+    });
+    
+    // Handle technician percent properly
+    restructured.technicianPercent = formData.technicianPercent !== undefined ? 
+      parseInt(formData.technicianPercent) : 
+      (formData.siteManagement ? 100 : 0);
+    
+    // Ensure technicianPercent is a valid number
     if (isNaN(restructured.technicianPercent)) {
       restructured.technicianPercent = 0;
     }
     
-    // Remove the flattened correctiveMajorDetails properties
+    // Handle boolean values properly - ensure they are true/false, not undefined
+    const booleanFields = [
+      'preventiveMaintenance', 'bladeInspections', 'remoteMonitoring', 
+      'remoteTechnicalSupport', 'siteManagement', 'correctiveMinor',
+      'bladeIntegrityManagement', 'correctiveMajor', 'craneCoverage'
+    ];
+    
+    booleanFields.forEach(field => {
+      restructured[field] = !!restructured[field];
+    });
+    
+    // Handle cap values
+    restructured.craneEventCap = formData.craneEventCap || 0;
+    restructured.craneFinancialCap = formData.craneFinancialCap || 0;
+    restructured.majorEventCap = formData.majorEventCap || 0;
+    restructured.majorFinancialCap = formData.majorFinancialCap || 0;
+    
+    // Handle sitePersonnel for backend compatibility (if needed)
+    // If the backend uses sitePersonnel enum instead of separate fields
+    if (restructured.siteManagement) {
+      // Map to 'full' or 'partial' based on technician percentage
+      restructured.sitePersonnel = restructured.technicianPercent === 100 ? 'full' : 'partial';
+    } else {
+      restructured.sitePersonnel = 'none';
+    }
+    
+    // Structure the correctiveMajorDetails properly
+    restructured.correctiveMajorDetails = {
+      tooling: !!formData['correctiveMajorDetails.tooling'],
+      manpower: !!formData['correctiveMajorDetails.manpower'],
+      parts: !!formData['correctiveMajorDetails.parts']
+    };
+    
+    // Remove the flattened properties to avoid duplication
     delete restructured['correctiveMajorDetails.crane'];
     delete restructured['correctiveMajorDetails.tooling'];
     delete restructured['correctiveMajorDetails.manpower'];
     delete restructured['correctiveMajorDetails.parts'];
-    
-    console.log('Restructured data:', restructured); // Log to verify site personnel data
     
     return restructured;
   };
