@@ -173,6 +173,8 @@ const SimulationSchema = new mongoose.Schema({
       probabilityOfDSCRBelow1: Number
     }
   },
+  // Add OEM responsibility matrix
+  oemResponsibilityMatrix: { type: mongoose.Schema.Types.Mixed },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

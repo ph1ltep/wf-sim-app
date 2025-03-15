@@ -15,8 +15,31 @@ const createScenario = async (req, res, next) => {
       });
     }
     
+    // Generate OEM responsibility matrix if there's an OEM contract
+    let oemResponsibilityMatrix = null;
+    if (parameters.cost && parameters.cost.oemContractId) {
+      // Fetch the contract and related contracts
+      const oemContracts = await OEMContract.find({
+        _id: parameters.cost.oemContractId
+      }).populate('oemScope');
+      
+      // Generate responsibility matrix
+      if (oemContracts.length > 0) {
+        oemResponsibilityMatrix = generateResponsibilityMatrix(
+          parameters.general.projectLife || 20,
+          parameters.general.numWTGs || 20,
+          oemContracts
+        );
+      }
+    }
+    
     // Run the simulation
     const simulationResults = runSimulation(parameters);
+    
+    // Add OEM responsibility matrix to results if available
+    if (oemResponsibilityMatrix) {
+      simulationResults.results.oemResponsibilityMatrix = oemResponsibilityMatrix;
+    }
     
     // Create and save the scenario
     const scenario = new Simulation({
@@ -25,7 +48,8 @@ const createScenario = async (req, res, next) => {
       parameters,
       projectMetrics: parameters.projectMetrics || {},
       results: simulationResults.results,
-      annualAdjustments: parameters.annualAdjustments || []
+      annualAdjustments: parameters.annualAdjustments || [],
+      oemResponsibilityMatrix // Save the matrix directly in the scenario document
     });
     
     await scenario.save();
@@ -89,6 +113,35 @@ const getScenarioById = async (req, res, next) => {
       });
     }
     
+    // If the scenario has an OEM contract but no matrix, generate it
+    if (scenario.parameters?.cost?.oemContractId && !scenario.oemResponsibilityMatrix) {
+      // Fetch the contract and related contracts
+      const oemContracts = await OEMContract.find({
+        _id: scenario.parameters.cost.oemContractId
+      }).populate('oemScope');
+      
+      // Generate responsibility matrix
+      if (oemContracts.length > 0) {
+        const matrix = generateResponsibilityMatrix(
+          scenario.parameters.general.projectLife || 20,
+          scenario.parameters.general.numWTGs || 20,
+          oemContracts
+        );
+        
+        // Update scenario with new matrix
+        scenario.oemResponsibilityMatrix = matrix;
+        
+        // Add to results
+        if (!scenario.results) {
+          scenario.results = {};
+        }
+        scenario.results.oemResponsibilityMatrix = matrix;
+        
+        // Save the updated scenario
+        await scenario.save();
+      }
+    }
+    
     res.json({ success: true, scenario });
   } catch (error) {
     next(error);
@@ -119,9 +172,34 @@ const updateScenario = async (req, res, next) => {
       scenario.parameters = parameters;
       scenario.annualAdjustments = parameters.annualAdjustments || [];
       
+      // Generate OEM responsibility matrix if there's an OEM contract
+      let oemResponsibilityMatrix = null;
+      if (parameters.cost && parameters.cost.oemContractId) {
+        // Fetch the contract and related contracts
+        const oemContracts = await OEMContract.find({
+          _id: parameters.cost.oemContractId
+        }).populate('oemScope');
+        
+        // Generate responsibility matrix
+        if (oemContracts.length > 0) {
+          oemResponsibilityMatrix = generateResponsibilityMatrix(
+            parameters.general.projectLife || 20,
+            parameters.general.numWTGs || 20,
+            oemContracts
+          );
+        }
+      }
+      
       // Run the simulation with new parameters
       const simulationResults = runSimulation(parameters);
+      
+      // Add OEM responsibility matrix to results if available
+      if (oemResponsibilityMatrix) {
+        simulationResults.results.oemResponsibilityMatrix = oemResponsibilityMatrix;
+      }
+      
       scenario.results = simulationResults.results;
+      scenario.oemResponsibilityMatrix = oemResponsibilityMatrix; // Update the matrix
     }
     
     // Save changes
