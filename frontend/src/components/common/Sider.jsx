@@ -13,7 +13,8 @@ import {
   FundOutlined,
   WarningOutlined,
   GlobalOutlined,
-  EnvironmentOutlined
+  EnvironmentOutlined,
+  ToolOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -56,6 +57,11 @@ const Sider = ({ collapsed }) => {
               key: '/config/general/locations',
               icon: <GlobalOutlined />,
               label: 'Location Defaults'
+            },
+            {
+              key: '/config/general/oemscopes',
+              icon: <ToolOutlined />,
+              label: 'OEM Scopes'
             }
           ]
         },

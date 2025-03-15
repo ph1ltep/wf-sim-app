@@ -9,6 +9,7 @@ import GeneralConfig from './components/config/GeneralConfig';
 import ProjectSettings from './components/config/ProjectSettings';
 import SimulationSettings from './components/config/SimulationSettings';
 import LocationDefaults from './components/config/LocationDefaults';
+import OEMScopes from './components/config/OEMScopes';
 import ScenarioSettings from './components/config/ScenarioSettings';
 
 // Module configuration components
@@ -45,6 +46,7 @@ function App() {
               <Route path="general">
                 <Route path="simulation" element={<SimulationSettings />} />
                 <Route path="locations" element={<LocationDefaults />} />
+                <Route path="oemscopes" element={<OEMScopes />} />
                 <Route index element={<Navigate to="/config/general/simulation" replace />} />
               </Route>
               <Route path="project" element={<ProjectSettings />} />
