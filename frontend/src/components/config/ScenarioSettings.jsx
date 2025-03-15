@@ -1,6 +1,6 @@
 // src/components/config/ScenarioSettings.jsx
 import React from 'react';
-import { Typography, Form, Input, Card, Button, Row, Col, DatePicker, Select, Alert } from 'antd';
+import { Typography, Form, Input, Card, Button, Row, Col, Select, Alert } from 'antd';
 import { useSimulation } from '../../contexts/SimulationContext';
 
 const { Title } = Typography;
@@ -20,8 +20,6 @@ const ScenarioSettings = () => {
   const scenarioData = parameters.scenario || {
     name: currentScenario?.name || 'New Scenario',
     description: currentScenario?.description || '',
-    location: selectedLocation?.countryCode || '',
-    startDate: null,
     scenarioType: 'base'
   };
 
@@ -78,39 +76,6 @@ const ScenarioSettings = () => {
         </Card>
         
         <Card title="Scenario Details" style={{ marginBottom: 24 }}>
-          <Row gutter={24}>
-            <Col span={12}>
-              <Form.Item
-                label="Project Location"
-                name="location"
-                tooltip="Select the country where the wind farm is located"
-              >
-                <Select placeholder="Select a location" disabled={!!selectedLocation}>
-                  <Option value="">Not specified</Option>
-                  <Option value="us">United States</Option>
-                  <Option value="uk">United Kingdom</Option>
-                  <Option value="de">Germany</Option>
-                  <Option value="fr">France</Option>
-                  <Option value="es">Spain</Option>
-                  <Option value="custom">Custom Location</Option>
-                </Select>
-              </Form.Item>
-              {selectedLocation && (
-                <p style={{ marginTop: -20, marginBottom: 10, color: 'rgba(0, 0, 0, 0.45)' }}>
-                  Location is set from Project Settings
-                </p>
-              )}
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Project Start Date"
-                name="startDate"
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          
           <Form.Item
             label="Scenario Type"
             name="scenarioType"

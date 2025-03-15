@@ -1,7 +1,8 @@
 // src/components/config/ProjectSettings.jsx
 import React, { useEffect } from 'react';
-import { Typography, Form, Button, Row, Col } from 'antd';
+import { Typography, Form, Input, Button, Row, Col, DatePicker } from 'antd';
 import { useSimulation } from '../../contexts/SimulationContext';
+import moment from 'moment';
 
 // Custom hook for project settings
 import useProjectSettings from '../../hooks/useProjectSettings';
@@ -41,8 +42,13 @@ const ProjectSettings = () => {
       // Get currency settings from scenario parameters or use defaults
       const currencySettings = parameters.scenario || {};
       
+      // Parse the date if it exists
+      let startDate = generalParams.startDate ? moment(generalParams.startDate) : null;
+      
       const initialValues = {
         ...generalParams,
+        projectName: generalParams.projectName || 'Wind Farm Project',
+        startDate: startDate,
         currency: currencySettings.currency || 'USD',
         foreignCurrency: currencySettings.foreignCurrency || 'EUR',
         exchangeRate: currencySettings.exchangeRate || 1.0
@@ -95,6 +101,22 @@ const ProjectSettings = () => {
         layout="vertical"
         onValuesChange={onValuesChange}
       >
+        {/* Project Identification */}
+        <Form.Item
+          label="Project Name"
+          name="projectName"
+          rules={[{ required: true, message: 'Please input project name!' }]}
+        >
+          <Input placeholder="e.g., Windward Valley Wind Farm" />
+        </Form.Item>
+        
+        <Form.Item
+          label="Project Start Date"
+          name="startDate"
+        >
+          <DatePicker style={{ width: '100%' }} />
+        </Form.Item>
+      
         {/* Project Timeline */}
         <ProjectTimeline />
         

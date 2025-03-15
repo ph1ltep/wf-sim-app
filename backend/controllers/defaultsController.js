@@ -1,4 +1,5 @@
 // backend/controllers/defaultsController.js
+
 /**
  * Get default parameter values for simulation
  * @param {Object} req - Express request object
@@ -8,6 +9,8 @@ const getDefaults = async (req, res) => {
   try {
     const defaults = {
       general: {
+        projectName: 'Wind Farm Project',
+        startDate: null,
         projectLife: 20,
         numWTGs: 20,
         wtgPlatformType: 'geared',
@@ -93,9 +96,17 @@ const getDefaults = async (req, res) => {
         year: i + 1,
         additionalOM: 0,
         additionalRevenue: 0
-      }))
+      })),
+      scenario: {
+        name: 'Default Scenario',
+        description: 'Default configuration scenario',
+        scenarioType: 'base',
+        currency: 'USD',
+        foreignCurrency: 'EUR',
+        exchangeRate: 1.0
+      }
     };
-    
+
     res.json({ success: true, defaults });
   } catch (error) {
     console.error('Error getting default parameters:', error);
@@ -104,3 +115,5 @@ const getDefaults = async (req, res) => {
 };
 
 module.exports = { getDefaults };
+
+    

@@ -76,8 +76,11 @@ const useProjectSettings = () => {
   
   // Handle form values change
   const handleValuesChange = useCallback((changedValues, allValues) => {
+    // Extract special fields (projectName, startDate) from allValues
+    const { projectName, startDate, ...otherValues } = allValues;
+    
     // Recalculate derived values
-    const metrics = calculateDerivedValues(allValues);
+    const metrics = calculateDerivedValues(otherValues);
     
     // Update module parameters (do this less frequently to avoid loops)
     updateProjectMetrics(metrics);
@@ -103,8 +106,12 @@ const useProjectSettings = () => {
     const currencyFields = ['currency', 'foreignCurrency', 'exchangeRate'];
     
     // Create a copy of general parameters without currency fields
-    const generalParams = { ...allValues };
+    const generalParams = { ...otherValues };
     currencyFields.forEach(field => delete generalParams[field]);
+    
+    // Add projectName and startDate to general parameters
+    generalParams.projectName = projectName;
+    generalParams.startDate = startDate;
     
     // Always update general parameters without currency fields
     updateModuleParameters('general', generalParams);
@@ -176,10 +183,7 @@ const useProjectSettings = () => {
     form.setFieldsValue(formValues);
     
     // Update the general parameters (without currency)
-    const generalParams = { ...formValues };
-    delete generalParams.currency;
-    delete generalParams.foreignCurrency;
-    delete generalParams.exchangeRate;
+    const { currency, foreignCurrency, exchangeRate, ...generalParams } = formValues;
     updateModuleParameters('general', generalParams);
     
     // Recalculate derived values

@@ -4,6 +4,7 @@ import { getDefaultParameters, runSimulation } from '../api/simulation';
 import { createScenario, updateScenario, getScenarioById } from '../api/scenarios';
 import { getOEMContractById } from '../api/oemContracts';
 import { message } from 'antd';
+import moment from 'moment';
 
 const SimulationContext = createContext();
 
@@ -14,7 +15,7 @@ export const SimulationProvider = ({ children }) => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentScenario, setCurrentScenario] = useState(null);
-  const [selectedLocation, setSelectedLocation] = useState(null);  // Add this state
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   // Load default parameters on mount
   useEffect(() => {
@@ -38,9 +39,15 @@ export const SimulationProvider = ({ children }) => {
     setParameters(prev => {
       if (!prev) return prev;
       
+      // Handle date fields specifically - convert moment objects to ISO strings
+      const processedParams = { ...newParams };
+      if (moduleName === 'general' && processedParams.startDate && moment.isMoment(processedParams.startDate)) {
+        processedParams.startDate = processedParams.startDate.toISOString();
+      }
+      
       // Handle special case for componentQuantities that should go into projectMetrics
-      if (moduleName === 'general' && newParams.componentQuantities) {
-        const { componentQuantities, ...generalParams } = newParams;
+      if (moduleName === 'general' && processedParams.componentQuantities) {
+        const { componentQuantities, ...generalParams } = processedParams;
         
         return {
           ...prev,
@@ -59,13 +66,13 @@ export const SimulationProvider = ({ children }) => {
         ...prev,
         [moduleName]: {
           ...prev[moduleName],
-          ...newParams,
+          ...processedParams,
         },
       };
     });
   };
 
-  // Add a function to update the selected location
+  // Update the selected location
   const updateSelectedLocation = (locationData) => {
     setSelectedLocation(locationData);
     
@@ -143,10 +150,22 @@ export const SimulationProvider = ({ children }) => {
   const saveCurrentScenario = async (name, description = '') => {
     try {
       setLoading(true);
+      
+      // Ensure the current parameters have the scenario name and description
+      if (parameters.scenario) {
+        parameters.scenario.name = name;
+        parameters.scenario.description = description;
+      } else {
+        parameters.scenario = { name, description };
+      }
+      
+      // Convert moment objects to ISO strings for saving
+      const preparedParameters = JSON.parse(JSON.stringify(parameters));
+      
       const scenarioData = {
         name,
         description,
-        parameters
+        parameters: preparedParameters
       };
 
       let response;
@@ -173,32 +192,24 @@ export const SimulationProvider = ({ children }) => {
       setLoading(true);
       const response = await getScenarioById(id);
       
-      // Ensure the scenario has all required properties
+      // Get the scenario parameters
       const scenarioParams = response.scenario.parameters;
-      
-      // Ensure probabilities exists
-      if (!scenarioParams.probabilities) {
-        scenarioParams.probabilities = {
-          primary: 50,
-          upperBound: 75,
-          lowerBound: 25,
-          extremeUpper: 90,
-          extremeLower: 10
-        };
-      }
-      
-      // Ensure projectMetrics and componentQuantities exist
-      if (!scenarioParams.projectMetrics) {
-        scenarioParams.projectMetrics = {};
-      }
-      
-      if (!scenarioParams.projectMetrics.componentQuantities) {
-        scenarioParams.projectMetrics.componentQuantities = {};
-      }
       
       setParameters(scenarioParams);
       setCurrentScenario(response.scenario);
       setResults(response.scenario.results);
+      
+      // Load location if it exists in the scenario
+      if (scenarioParams.scenario && scenarioParams.scenario.location) {
+        setSelectedLocation({
+          countryCode: scenarioParams.scenario.location,
+          currency: scenarioParams.scenario.currency || 'USD',
+          foreignCurrency: scenarioParams.scenario.foreignCurrency || 'EUR',
+          exchangeRate: scenarioParams.scenario.exchangeRate || 1.0,
+          country: scenarioParams.scenario.location.toUpperCase()
+        });
+      }
+      
       message.success('Scenario loaded successfully');
       return response.scenario;
     } catch (err) {
@@ -225,7 +236,7 @@ export const SimulationProvider = ({ children }) => {
     results,
     loading,
     currentScenario,
-    selectedLocation,  // Add this
+    selectedLocation,
     setParameters,
     updateModuleParameters,
     loadDefaultParameters,
@@ -234,7 +245,7 @@ export const SimulationProvider = ({ children }) => {
     loadScenario,
     setCurrentScenario,
     updateProjectMetrics,
-    updateSelectedLocation,  // Add this
+    updateSelectedLocation,
   };
 
   return (
