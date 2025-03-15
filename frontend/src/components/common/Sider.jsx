@@ -74,6 +74,16 @@ const Sider = ({ collapsed }) => {
           label: 'Scenario Settings',
           children: [
             {
+              key: '/config/scenario/settings',
+              icon: <SettingOutlined />,
+              label: 'General Settings'
+            },
+            {
+              key: '/config/scenario/oemcontracts',
+              icon: <ToolOutlined />,
+              label: 'OEM Contracts'
+            },
+            {
               key: '/config/modules/financing',
               icon: <DollarOutlined />,
               label: 'Financing Module'

@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getDefaultParameters, runSimulation } from '../api/simulation';
 import { createScenario, updateScenario, getScenarioById } from '../api/scenarios';
+import { getOEMContractById } from '../api/oemContracts';
 import { message } from 'antd';
 
 const SimulationContext = createContext();
@@ -63,6 +64,21 @@ export const SimulationProvider = ({ children }) => {
     });
   };
 
+  const loadOEMContractDetails = async (contractId) => {
+    if (!contractId) return null;
+    
+    try {
+      const response = await getOEMContractById(contractId);
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading OEM contract details:', error);
+      return null;
+    }
+  };
+
   const runFullSimulation = async () => {
     if (!parameters) {
       message.warning('Parameters not yet loaded.');
@@ -71,7 +87,24 @@ export const SimulationProvider = ({ children }) => {
 
     try {
       setLoading(true);
-      const response = await runSimulation(parameters);
+      
+      // Clone parameters to avoid mutating the state directly
+      const simulationParams = JSON.parse(JSON.stringify(parameters));
+      
+      // If there's an OEM contract selected, load its details
+      if (simulationParams.cost?.oemContractId) {
+        const contractDetails = await loadOEMContractDetails(simulationParams.cost.oemContractId);
+        
+        if (contractDetails) {
+          // Update cost parameters with contract details
+          simulationParams.cost.fixedOMFee = contractDetails.isPerTurbine ? 
+            contractDetails.fixedFee * simulationParams.general.numWTGs : 
+            contractDetails.fixedFee;
+          simulationParams.cost.oemTerm = contractDetails.endYear;
+        }
+      }
+      
+      const response = await runSimulation(simulationParams);
       
       // Store the percentile information from results
       if (response.percentileInfo) {

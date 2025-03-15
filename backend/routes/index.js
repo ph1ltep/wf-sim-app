@@ -1,4 +1,4 @@
-// backend/routes/index.js
+// backend/routes/index.js (updating to add new routes)
 const express = require('express');
 const router = express.Router();
 
@@ -16,7 +16,8 @@ const riskRoutes = require('./riskRoutes');
 const scenarioRoutes = require('./scenarioRoutes');
 const simulationRoutes = require('./simulationRoutes');
 const locationRoutes = require('./locationRoutes');
-const oemScopeRoutes = require('./oemScopeRoutes'); // Add the new OEM Scope routes
+const oemScopeRoutes = require('./oemScopeRoutes');
+const oemContractRoutes = require('./oemContractRoutes'); // New route
 
 // Mount all routes
 router.use('/cost', costRoutes);
@@ -26,6 +27,7 @@ router.use('/risk', riskRoutes);
 router.use('/scenarios', scenarioRoutes);
 router.use('/simulate', simulationRoutes);
 router.use('/locations', locationRoutes);
-router.use('/oemscopes', oemScopeRoutes); // Mount the OEM Scope routes
+router.use('/oemscopes', oemScopeRoutes);
+router.use('/oemcontracts', oemContractRoutes); // Mount new route
 
 module.exports = router;

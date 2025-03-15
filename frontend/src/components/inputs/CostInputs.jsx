@@ -1,7 +1,10 @@
 // src/components/inputs/CostInputs.jsx
-import React from 'react';
-import { Typography, Form, InputNumber, Select, Card, Divider, Tabs } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Typography, Form, InputNumber, Select, Card, Divider, Tabs, Button } from 'antd';
+import { InfoCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import { useSimulation } from '../../contexts/SimulationContext';
+import { useNavigate } from 'react-router-dom';
+import { getAllOEMContracts } from '../../api/oemContracts';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -9,6 +12,9 @@ const { Option } = Select;
 const CostInputs = () => {
   const { parameters, updateModuleParameters } = useSimulation();
   const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const [oemContracts, setOEMContracts] = useState([]);
+  const [loadingContracts, setLoadingContracts] = useState(false);
 
   // Only render if parameters are loaded
   if (!parameters || !parameters.cost) {
@@ -17,11 +23,36 @@ const CostInputs = () => {
 
   const costParams = parameters.cost;
 
+  // Fetch OEM contracts on component mount
+  useEffect(() => {
+    const fetchOEMContracts = async () => {
+      try {
+        setLoadingContracts(true);
+        const response = await getAllOEMContracts();
+        
+        if (response.success && response.data) {
+          setOEMContracts(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching OEM contracts:', error);
+      } finally {
+        setLoadingContracts(false);
+      }
+    };
+    
+    fetchOEMContracts();
+  }, []);
+
   const handleValuesChange = (changedValues, allValues) => {
     // Only update if we have actual changed values
     if (Object.keys(changedValues).length > 0) {
       updateModuleParameters('cost', allValues);
     }
+  };
+
+  // Navigate to OEM Contracts page
+  const goToOEMContracts = () => {
+    navigate('/config/scenario/oemcontracts');
   };
 
   // Define tabs items
@@ -79,28 +110,44 @@ const CostInputs = () => {
       key: 'oem',
       label: 'OEM Contract',
       children: (
-        <Card title="OEM Services">
-          <Form.Item
-            label="OEM Term (Years)"
-            name="oemTerm"
-            tooltip="Number of years covered by the OEM warranty/service agreement"
-          >
-            <InputNumber min={0} max={20} />
-          </Form.Item>
+        <Card 
+          title={
+            <span>
+              <ToolOutlined style={{ marginRight: 8 }} />
+              OEM Contract Settings
+            </span>
+          }
+          extra={
+            <Button type="primary" onClick={goToOEMContracts}>
+              Manage OEM Contracts
+            </Button>
+          }
+        >
+          <p>Select an OEM contract to use for this scenario. OEM contracts define scope and cost during the warranty period.</p>
           
           <Form.Item
-            label="Fixed O&M Fee during OEM Term / year (USD)"
-            name="fixedOMFee"
-            tooltip="Annual fixed fee during OEM coverage period"
+            label="OEM Contract"
+            name="oemContractId"
+            tooltip="Selected OEM contract for this scenario"
           >
-            <InputNumber 
-              min={0} 
-              step={100000} 
-              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={value => value.replace(/\$\s?|(,*)/g, '')}
-              style={{ width: '100%' }}
-            />
+            <Select 
+              placeholder="Select an OEM contract" 
+              loading={loadingContracts}
+              allowClear
+            >
+              {oemContracts.map(contract => (
+                <Option key={contract._id} value={contract._id}>
+                  {contract.name} - {contract.fixedFee.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}{contract.isPerTurbine ? '/WTG' : ''}/year
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
+          
+          <Divider dashed />
+          
+          <p style={{ fontStyle: 'italic', color: 'rgba(0, 0, 0, 0.45)' }}>
+            To create or edit OEM contracts, click the "Manage OEM Contracts" button above.
+          </p>
         </Card>
       )
     },

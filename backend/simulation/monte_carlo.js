@@ -58,7 +58,12 @@ function runSimulation(params) {
     for (let year = 1; year <= projectLife; year++) {
       // Costs
       let totalCost = 0;
-      if (year <= cost.oemTerm) {
+      
+      // Check if there's an OEM contract for this year
+      const oemContractId = cost.oemContractId;
+      if (oemContractId && year <= cost.oemTerm) {
+        // Fetch contract details from the DB or cache
+        // For simulation purposes, we'll use the fixed fee provided in parameters
         totalCost += cost.fixedOMFee || 0;
       } else {
         const escalation = escalationDistribution();
