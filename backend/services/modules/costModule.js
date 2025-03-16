@@ -8,14 +8,14 @@ class CostModule {
 
   /**
    * Process a single iteration for the cost module
-   * @param {Object} parameters - Full simulation parameters
+   * @param {Object} context - Context object with scenario settings
    * @param {Object} iterationState - Current state of the iteration
    * @param {number} iterationIndex - Current iteration index
    * @returns {Object} Cost module results for this iteration
    */
-  processIteration(parameters, iterationState, iterationIndex) {
-    const { cost, general, annualAdjustments = [] } = parameters;
-    const projectLife = general.projectLife || 20;
+  processIteration(context, iterationState, iterationIndex) {
+    const { settings, annualAdjustments, projectLife } = context;
+    const costParams = settings.modules.cost;
     
     // Create results containers
     const result = {
@@ -24,47 +24,49 @@ class CostModule {
     };
 
     // Create distribution generators
-    const escalationDistribution = this._createEscalationDistribution(cost);
+    const escalationDistribution = this._createEscalationDistribution(costParams);
+    
+    // Get active OEM contract if any
+    const activeContract = this._getActiveContract(settings);
     
     // Process each year
     for (let year = 0; year < projectLife; year++) {
       const yearIndex = year + 1; // 1-based for business logic
       
+      // Determine if this year is covered by OEM contract
+      const contractCoverage = this._getContractCoverageForYear(yearIndex, settings);
+      
       // Base O&M costs
       let baseOMCost = 0;
-      if (yearIndex <= cost.oemTerm) {
-        // During OEM term, use fixed fee
-        baseOMCost = cost.fixedOMFee || 0;
+      if (contractCoverage) {
+        // During OEM contract period, use fixed fee
+        baseOMCost = contractCoverage.isPerTurbine 
+          ? contractCoverage.fixedFee * context.numWTGs 
+          : contractCoverage.fixedFee;
       } else {
-        // After OEM term, apply escalation
+        // After OEM contract period, apply escalation
         const escalationRate = escalationDistribution();
-        baseOMCost = cost.annualBaseOM * Math.pow(1 + escalationRate, yearIndex - cost.oemTerm);
+        const oemEndYear = activeContract ? Math.max(...activeContract.years) : (costParams.oemTerm || 0);
+        baseOMCost = costParams.annualBaseOM * Math.pow(1 + (escalationRate || 0), yearIndex - oemEndYear);
       }
       
       // Failure events
       let failureEventCost = 0;
-      const failureProbability = (cost.failureEventProbability || 0) / 100;
+      const failureProbability = (costParams.failureEventProbability || 0) / 100;
       if (Math.random() < failureProbability) {
-        failureEventCost = cost.failureEventCost || 0;
+        failureEventCost = costParams.failureEventCost || 0;
       }
       
       // Major repairs/overhauls (deterministic or probabilistic)
       let majorRepairCost = 0;
-      if (cost.majorRepairEvents) {
-        for (const repair of cost.majorRepairEvents) {
-          if (repair.year === yearIndex) {
-            if (Math.random() < (repair.probability || 1) / 100) {
-              majorRepairCost += repair.cost || 0;
-            }
-          }
-        }
-      }
+      // Add any scheduled major repairs for this year
+      // This could be enhanced further to look at specific years in settings
       
       // Contingency costs
-      const contingencyCost = cost.contingencyCost || 0;
+      const contingencyCost = costParams.contingencyCost || 0;
       
-      // Additional manual adjustments
-      const manualAdjustment = (annualAdjustments[year]?.additionalOM || 0);
+      // Additional manual adjustments from annualAdjustments
+      const manualAdjustment = annualAdjustments[year].additionalOM || 0;
       
       // Calculate total cost for this year
       const totalCost = baseOMCost + failureEventCost + majorRepairCost + contingencyCost + manualAdjustment;
@@ -130,101 +132,48 @@ class CostModule {
   }
 
   /**
-   * Run a standalone cost module simulation
-   * @param {Object} parameters - Cost parameters
-   * @returns {Object} Cost module results
+   * Get the active OEM contract for the simulation
+   * @param {Object} settings - Scenario settings
+   * @returns {Object|null} Active OEM contract or null
    */
-  runStandalone(parameters) {
-    const projectLife = parameters.general?.projectLife || 20;
-    const iterations = parameters.simulation?.iterations || 10000;
+  _getActiveContract(settings) {
+    const oemContracts = settings.modules.contracts?.oemContracts || [];
+    if (oemContracts.length === 0) return null;
     
-    // Get percentile values from parameters or use defaults
-    const percentiles = this._getPercentileValues(parameters);
-    const percentileValues = [
-      percentiles.extremeLower,
-      percentiles.lowerBound,
-      percentiles.primary,
-      percentiles.upperBound,
-      percentiles.extremeUpper
-    ];
+    // Check if there's a contract ID in cost settings
+    const costParams = settings.modules.cost;
+    const contractId = costParams.oemContractId;
     
-    // Create percentile labels (P10, P50, etc.)
-    const percentileLabels = percentileValues.map(p => `P${p}`);
-    
-    // Results container
-    const iterationResults = Array(iterations).fill().map(() => ({
-      annualData: Array(projectLife).fill().map(() => ({})),
-      metrics: {}
-    }));
-    
-    // Run iterations
-    for (let i = 0; i < iterations; i++) {
-      iterationResults[i] = this.processIteration(parameters, {}, i);
+    if (contractId) {
+      // Find the referenced contract
+      return oemContracts.find(contract => contract.id === contractId) || null;
     }
     
-    // Calculate percentiles for metrics and annual data
-    const results = {
-      metrics: {},
-      annualData: {
-        baseOMCost: {},
-        failureEventCost: {},
-        majorRepairCost: {},
-        totalCost: {}
-      }
-    };
-    
-    // Initialize percentile arrays
-    percentileLabels.forEach(label => {
-      results.annualData.baseOMCost[label] = [];
-      results.annualData.failureEventCost[label] = [];
-      results.annualData.majorRepairCost[label] = [];
-      results.annualData.totalCost[label] = [];
-    });
-    
-    // Process metric percentiles
-    const metricNames = Object.keys(iterationResults[0].metrics);
-    metricNames.forEach(metric => {
-      const values = iterationResults.map(iter => iter.metrics[metric]);
-      results.metrics[metric] = DistributionFactory.calculatePercentiles(values, percentileValues);
-    });
-    
-    // Process annual data percentiles
-    for (let year = 0; year < projectLife; year++) {
-      ['baseOMCost', 'failureEventCost', 'majorRepairCost', 'totalCost'].forEach(field => {
-        const yearValues = iterationResults.map(iter => iter.annualData[year][field] || 0);
-        const percentiles = DistributionFactory.calculatePercentiles(yearValues, percentileValues);
-        
-        // Add values for each percentile
-        percentileLabels.forEach(label => {
-          results.annualData[field][label].push(percentiles[label]);
-        });
-      });
-    }
-    
-    return {
-      success: true,
-      moduleName: this.name,
-      percentileInfo: percentiles, // Include percentile info for reference
-      results
-    };
+    // Otherwise, find the contract that covers the most years
+    return [...oemContracts].sort((a, b) => 
+      (b.years?.length || 0) - (a.years?.length || 0)
+    )[0] || null;
   }
-  
+
   /**
-   * Get percentile values from parameters or use defaults
-   * @param {Object} parameters - Simulation parameters
-   * @returns {Object} Percentile values
+   * Get contract coverage for a specific year
+   * @param {number} year - The year to check
+   * @param {Object} settings - Scenario settings
+   * @returns {Object|null} Contract coverage or null
    */
-  _getPercentileValues(parameters) {
-    // Get probability values from parameters or use defaults
-    const probabilities = parameters.probabilities || {};
+  _getContractCoverageForYear(year, settings) {
+    const oemContracts = settings.modules.contracts?.oemContracts || [];
     
-    return {
-      primary: probabilities.primary || 50,      // Default: P50 (median)
-      upperBound: probabilities.upperBound || 75, // Default: P75
-      lowerBound: probabilities.lowerBound || 25, // Default: P25
-      extremeLower: probabilities.extremeLower || 10, // Default: P10
-      extremeUpper: probabilities.extremeUpper || 90  // Default: P90
-    };
+    for (const contract of oemContracts) {
+      if (contract.years && contract.years.includes(year)) {
+        return {
+          fixedFee: contract.fixedFee || 0,
+          isPerTurbine: contract.isPerTurbine || false
+        };
+      }
+    }
+    
+    return null;
   }
 }
 

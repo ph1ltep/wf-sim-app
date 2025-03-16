@@ -1,5 +1,5 @@
 // backend/services/monte-carlo/index.js
-const { MonteCarloEngine, DistributionFactory } = require('./utils');
+const { createSimulationEngine, convertToSimulationParams, getPercentileValues } = require('./utils');
 const runInputSimulation = require('./input-simulation');
 const runOutputSimulation = require('./output-simulation');
 
@@ -34,8 +34,9 @@ async function runSimulation(scenarioData, oemScopes = null) {
 }
 
 module.exports = {
-  MonteCarloEngine,
-  DistributionFactory,
+  createSimulationEngine,
+  convertToSimulationParams,
+  getPercentileValues,
   runSimulation,
   runInputSimulation,
   runOutputSimulation

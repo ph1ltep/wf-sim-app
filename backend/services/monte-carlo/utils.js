@@ -53,6 +53,24 @@ function convertToSimulationParams(settings) {
   // Extract modules from settings
   const { general, project, modules, simulation } = settings;
   
+  // If any of the required sections is missing, provide defaults
+  if (!general) general = { projectLife: 20 };
+  if (!project) project = { 
+    windFarm: { numWTGs: 20, mwPerWTG: 3.5, capacityFactor: 35 },
+    currency: { local: 'USD', foreign: 'EUR', exchangeRate: 1.0 }
+  };
+  if (!modules) modules = {
+    financing: { capex: 50000000, devex: 10000000, model: 'Balance-Sheet', debtToEquityRatio: 1.5, loanDuration: 15 },
+    cost: { annualBaseOM: 5000000, escalationRate: 2, oemTerm: 5, fixedOMFee: 4000000, failureEventProbability: 5 },
+    revenue: { 
+      energyProduction: { distribution: 'Normal', mean: 1000, std: 100 },
+      electricityPrice: { type: 'fixed', value: 50 }
+    },
+    risk: { insuranceEnabled: false, reserveFunds: 0 },
+    contracts: { oemContracts: [] }
+  };
+  if (!simulation) simulation = { iterations: 10000, seed: 42, probabilities: {} };
+
   // Extract relevant contracts from the contracts module
   const oemContracts = modules?.contracts?.oemContracts || [];
   let costModule = { ...modules.cost };
@@ -60,17 +78,24 @@ function convertToSimulationParams(settings) {
   // Find contracts that apply to each year and update cost parameters
   if (oemContracts.length > 0) {
     // Get the most extensive OEM contract (covering the most years)
-    const mostExtensiveContract = [...oemContracts].sort((a, b) => b.years.length - a.years.length)[0];
+    const mostExtensiveContract = [...oemContracts].sort((a, b) => 
+      (b.years?.length || 0) - (a.years?.length || 0)
+    )[0];
     
     if (mostExtensiveContract) {
       // Find the maximum year
-      const maxYear = Math.max(...mostExtensiveContract.years);
+      const maxYear = mostExtensiveContract.years && mostExtensiveContract.years.length > 0 ? 
+        Math.max(...mostExtensiveContract.years) : 
+        (mostExtensiveContract.endYear || 5);
       
       // Update OEM term and fixed fee
       costModule.oemTerm = maxYear;
       costModule.fixedOMFee = mostExtensiveContract.isPerTurbine ? 
-        mostExtensiveContract.fixedFee * project.windFarm.numWTGs : 
+        mostExtensiveContract.fixedFee * (project.windFarm?.numWTGs || 20) : 
         mostExtensiveContract.fixedFee;
+        
+      // Set OEM contract ID reference
+      costModule.oemContractId = mostExtensiveContract.id;
     }
   }
   
@@ -111,21 +136,34 @@ function convertToSimulationParams(settings) {
   
   return {
     general: {
-      ...general,
-      ...project.windFarm,
-      loanDuration: modules.financing.loanDuration
+      projectName: general.projectName || 'Wind Farm Project',
+      startDate: general.startDate || null,
+      projectLife: general.projectLife || 20,
+      loanDuration: modules.financing.loanDuration || 15,
+      ...project.windFarm
     },
     financing: {
-      ...modules.financing
+      ...modules.financing,
+      // Ensure consistent loan duration between general and financing
+      loanDuration: modules.financing.loanDuration || 15
     },
     cost: costModule,
     revenue: modules.revenue,
     riskMitigation: modules.risk,
-    simulation: simulation,
-    probabilities: simulation.probabilities,
+    simulation: {
+      iterations: simulation.iterations || 10000,
+      seed: simulation.seed || 42
+    },
+    probabilities: simulation.probabilities || {
+      primary: 50,
+      upperBound: 75,
+      lowerBound: 25,
+      extremeLower: 10,
+      extremeUpper: 90
+    },
     annualAdjustments: annualAdjustments,
     scenario: {
-      name: general.projectName,
+      name: general.projectName || 'Wind Farm Project',
       description: '',
       scenarioType: 'base',
       currency: project.currency?.local || 'USD',

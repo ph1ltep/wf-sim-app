@@ -7,13 +7,11 @@ const scenarioRoutes = require('./scenarioRoutes');
 const simulationRoutes = require('./simulationRoutes');
 const locationRoutes = require('./locationRoutes');
 const oemScopeRoutes = require('./oemScopeRoutes');
-const oemResponsibilityRoutes = require('./oemResponsibilityRoutes');
 
 // Mount routes
 router.use('/scenarios', scenarioRoutes);
 router.use('/simulate', simulationRoutes);
 router.use('/locations', locationRoutes);
 router.use('/oemscopes', oemScopeRoutes);
-router.use('/oemresponsibility', oemResponsibilityRoutes);
 
 module.exports = router;
