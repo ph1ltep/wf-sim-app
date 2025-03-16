@@ -42,6 +42,8 @@ function App() {
             {/* Default redirect to simulation config */}
             <Route index element={<Navigate to="/config/general/simulation" replace />} />
             
+            <Route path="scenarios" element={<ScenarioList />} />
+
             {/* Configuration routes */}
             <Route path="config">
               <Route path="general">

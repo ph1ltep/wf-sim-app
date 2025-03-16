@@ -1,42 +1,44 @@
 // backend/controllers/scenarioController.js
 const { Scenario } = require('../models/Scenario');
-const { runSimulation } = require('../services/monte-carlo');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
+const defaultsController = require('./defaultsController');
 
 // Create a new scenario
 const createScenario = async (req, res, next) => {
   try {
-    const { name, description, settings } = req.body;
+    const { name = 'New Scenario', description = '' } = req.body;
     
-    // Create the scenario object with initial data
+    // Get default settings from defaultsController
+    const defaults = await defaultsController.getDefaultSettings();
+    
+    // Create a scenario object with initial data but don't save it
     const scenario = new Scenario({
       name,
       description,
-      settings,
+      settings: defaults,
       simulation: {
         inputSim: {},
         outputSim: {}
       }
     });
     
-    // Run the simulation if settings are provided
-    if (settings) {
-      // runSimulation takes a full ScenarioSchema object and returns updated object
-      const simulatedScenario = await runSimulation(scenario);
-      
-      // Update our scenario with the simulation results
-      scenario.simulation = simulatedScenario.simulation;
+    // If client provided settings, override the defaults
+    if (req.body.settings) {
+      scenario.settings = {
+        ...defaults,
+        ...req.body.settings
+      };
     }
     
-    // Save to database
-    await scenario.save();
-    
+    // Return the unsaved scenario with 201 Created status
     res.status(201).json(formatSuccess({
-      _id: scenario._id,
+      _id: scenario._id, // This will be a temporary ID since we don't save
       name: scenario.name,
       description: scenario.description,
+      settings: scenario.settings,
       createdAt: scenario.createdAt
     }, 'Scenario created successfully'));
+    
   } catch (error) {
     console.error('Error creating scenario:', error);
     next(error);
@@ -56,10 +58,31 @@ const getAllScenarios = async (req, res, next) => {
     
     // Get scenarios with limited fields
     const scenarios = await Scenario.find()
-      .select('name description createdAt updatedAt')
+      .select('name description createdAt updatedAt settings.general settings.project')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+    
+    // Transform scenarios to include only the selected fields
+    const simplifiedScenarios = scenarios.map(scenario => {
+      const { _id, name, description, createdAt, updatedAt } = scenario;
+      return {
+        _id,
+        name,
+        description,
+        createdAt,
+        updatedAt,
+        settings: {
+          general: scenario.settings?.general || null,
+          project: scenario.settings?.project || null,
+          // Null out other settings
+          modules: null,
+          simulation: null,
+          metrics: null
+        },
+        simulation: null // Null out simulation data
+      };
+    });
     
     res.json(formatSuccess({
       pagination: {
@@ -68,7 +91,7 @@ const getAllScenarios = async (req, res, next) => {
         limit,
         pages: Math.ceil(total / limit)
       },
-      scenarios
+      scenarios: simplifiedScenarios
     }));
   } catch (error) {
     console.error('Error fetching scenarios:', error);
@@ -108,15 +131,9 @@ const updateScenario = async (req, res, next) => {
     if (name) scenario.name = name;
     if (description) scenario.description = description;
     
-    // If settings changed, re-run simulation
+    // If settings are provided, update them without running simulation
     if (settings) {
       scenario.settings = settings;
-      
-      // Run the simulation with new settings
-      const simulatedScenario = await runSimulation(scenario);
-      
-      // Update simulation results
-      scenario.simulation = simulatedScenario.simulation;
     }
     
     // Save changes
