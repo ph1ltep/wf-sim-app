@@ -1,8 +1,6 @@
 // backend/controllers/scenarioController.js
 const { Scenario } = require('../models/Scenario');
-const OEMScope = require('../models/OEMScope');
 const { runSimulation } = require('../services/monte-carlo');
-const { generateResponsibilityMatrix } = require('../services/oemResponsibilityMatrix');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 
 // Create a new scenario
@@ -10,67 +8,21 @@ const createScenario = async (req, res, next) => {
   try {
     const { name, description, settings } = req.body;
     
-    // Validate required fields
-    if (!name) {
-      return res.status(400).json(formatError('Name is required'));
-    }
-    
-    // Generate OEM responsibility matrix if there are OEM contracts
-    let responsibilityMatrix = null;
-    const oemContracts = settings?.modules?.contracts?.oemContracts || [];
-    
-    if (oemContracts.length > 0) {
-      // Get all OEM scope IDs referenced in contracts
-      const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
-      
-      if (oemScopeIds.length > 0) {
-        // Fetch all referenced OEM scopes
-        const oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
-        
-        // Create a map of OEM scope IDs to OEM scope objects for quick lookup
-        const oemScopeMap = oemScopes.reduce((map, scope) => {
-          map[scope._id.toString()] = scope;
-          return map;
-        }, {});
-        
-        // Create augmented contracts with scope objects for the matrix generator
-        const augmentedContracts = oemContracts.map(contract => {
-          const oemScope = oemScopeMap[contract.oemScopeId];
-          if (oemScope) {
-            return { ...contract, oemScope };
-          }
-          return null;
-        }).filter(Boolean);
-        
-        if (augmentedContracts.length > 0) {
-          // Generate responsibility matrix
-          responsibilityMatrix = generateResponsibilityMatrix(
-            settings.general.projectLife || 20,
-            settings.project.windFarm.numWTGs || 20,
-            augmentedContracts
-          );
-        }
-      }
-    }
-    
     // Create the scenario object with initial data
     const scenario = new Scenario({
       name,
       description,
       settings,
       simulation: {
-        inputSim: {
-          scope: {
-            responsibilityMatrix
-          }
-        }
+        inputSim: {},
+        outputSim: {}
       }
     });
     
     // Run the simulation if settings are provided
     if (settings) {
-      // runSimulation now takes a full ScenarioSchema object and returns updated object
-      const simulatedScenario = runSimulation(scenario);
+      // runSimulation takes a full ScenarioSchema object and returns updated object
+      const simulatedScenario = await runSimulation(scenario);
       
       // Update our scenario with the simulation results
       scenario.simulation = simulatedScenario.simulation;
@@ -133,60 +85,6 @@ const getScenarioById = async (req, res, next) => {
       return res.status(404).json(formatError('Scenario not found'));
     }
     
-    // If the scenario has OEM contracts but no responsibility matrix, generate it
-    const oemContracts = scenario.settings?.modules?.contracts?.oemContracts || [];
-    
-    if (oemContracts.length > 0 && !scenario.simulation?.inputSim?.scope?.responsibilityMatrix) {
-      // Get all OEM scope IDs referenced in contracts
-      const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
-      
-      if (oemScopeIds.length > 0) {
-        // Fetch all referenced OEM scopes
-        const oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
-        
-        // Create a map of OEM scope IDs to OEM scope objects for quick lookup
-        const oemScopeMap = oemScopes.reduce((map, scope) => {
-          map[scope._id.toString()] = scope;
-          return map;
-        }, {});
-        
-        // Create augmented contracts with scope objects for the matrix generator
-        const augmentedContracts = oemContracts.map(contract => {
-          const oemScope = oemScopeMap[contract.oemScopeId];
-          if (oemScope) {
-            return { ...contract, oemScope };
-          }
-          return null;
-        }).filter(Boolean);
-        
-        if (augmentedContracts.length > 0) {
-          // Generate responsibility matrix
-          const matrix = generateResponsibilityMatrix(
-            scenario.settings.general.projectLife || 20,
-            scenario.settings.project.windFarm.numWTGs || 20,
-            augmentedContracts
-          );
-          
-          // Make sure the inputSim and scope properties exist
-          if (!scenario.simulation) {
-            scenario.simulation = {};
-          }
-          if (!scenario.simulation.inputSim) {
-            scenario.simulation.inputSim = {};
-          }
-          if (!scenario.simulation.inputSim.scope) {
-            scenario.simulation.inputSim.scope = {};
-          }
-          
-          // Update scenario with new matrix
-          scenario.simulation.inputSim.scope.responsibilityMatrix = matrix;
-          
-          // Save the updated scenario
-          await scenario.save();
-        }
-      }
-    }
-    
     res.json(formatSuccess(scenario));
   } catch (error) {
     console.error('Error fetching scenario:', error);
@@ -214,60 +112,8 @@ const updateScenario = async (req, res, next) => {
     if (settings) {
       scenario.settings = settings;
       
-      // Generate OEM responsibility matrix if there are OEM contracts
-      let responsibilityMatrix = null;
-      const oemContracts = settings?.modules?.contracts?.oemContracts || [];
-      
-      if (oemContracts.length > 0) {
-        // Get all OEM scope IDs referenced in contracts
-        const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
-        
-        if (oemScopeIds.length > 0) {
-          // Fetch all referenced OEM scopes
-          const oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
-          
-          // Create a map of OEM scope IDs to OEM scope objects for quick lookup
-          const oemScopeMap = oemScopes.reduce((map, scope) => {
-            map[scope._id.toString()] = scope;
-            return map;
-          }, {});
-          
-          // Create augmented contracts with scope objects for the matrix generator
-          const augmentedContracts = oemContracts.map(contract => {
-            const oemScope = oemScopeMap[contract.oemScopeId];
-            if (oemScope) {
-              return { ...contract, oemScope };
-            }
-            return null;
-          }).filter(Boolean);
-          
-          if (augmentedContracts.length > 0) {
-            // Generate responsibility matrix
-            responsibilityMatrix = generateResponsibilityMatrix(
-              settings.general.projectLife || 20,
-              settings.project.windFarm.numWTGs || 20,
-              augmentedContracts
-            );
-          }
-        }
-      }
-      
-      // Create scope if it doesn't exist
-      if (!scenario.simulation) {
-        scenario.simulation = {};
-      }
-      if (!scenario.simulation.inputSim) {
-        scenario.simulation.inputSim = {};
-      }
-      if (!scenario.simulation.inputSim.scope) {
-        scenario.simulation.inputSim.scope = {};
-      }
-      
-      // Set responsibility matrix
-      scenario.simulation.inputSim.scope.responsibilityMatrix = responsibilityMatrix;
-      
       // Run the simulation with new settings
-      const simulatedScenario = runSimulation(scenario);
+      const simulatedScenario = await runSimulation(scenario);
       
       // Update simulation results
       scenario.simulation = simulatedScenario.simulation;
