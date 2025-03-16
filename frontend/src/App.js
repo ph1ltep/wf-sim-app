@@ -31,6 +31,9 @@ import CashFlowChart from './components/results/CashFlowChart';
 import IRRDistribution from './components/results/IRRDistribution';
 import ScenarioComparison from './components/results/ScenarioComparison';
 
+// Scenario management component
+import ScenarioList from './components/scenarios/ScenarioList';
+
 import './index.css';
 
 function App() {

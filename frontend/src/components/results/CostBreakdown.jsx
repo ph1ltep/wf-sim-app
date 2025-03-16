@@ -2,23 +2,21 @@
 import React, { useMemo } from 'react';
 import { Typography, Card, Row, Col, Radio, Empty, Alert } from 'antd';
 import Plot from 'react-plotly.js';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 
 const CostBreakdown = () => {
-  const { results, parameters } = useSimulation();
+  const { scenarioData, loading } = useScenario();
   const [viewType, setViewType] = React.useState('stacked');
+  
+  // Check if simulation results are loaded
+  const simulationResults = scenarioData?.simulation?.inputSim;
   
   // Extract percentile information
   const percentiles = useMemo(() => {
-    if (results?.percentileInfo) {
-      return results.percentileInfo;
-    }
-    
-    // Fallback to parameters if available, or use defaults
-    if (parameters?.probabilities) {
-      return parameters.probabilities;
+    if (scenarioData?.settings?.simulation?.probabilities) {
+      return scenarioData.settings.simulation.probabilities;
     }
     
     return {
@@ -28,21 +26,30 @@ const CostBreakdown = () => {
       extremeUpper: 90,
       extremeLower: 10
     };
-  }, [results, parameters]);
+  }, [scenarioData]);
   
   // Generate P-labels for accessing results
   const pLabels = useMemo(() => {
     return {
-      primary: `P${percentiles.primary}`,
-      upper: `P${percentiles.upperBound}`,
-      lower: `P${percentiles.lowerBound}`,
-      extremeUpper: `P${percentiles.extremeUpper}`,
-      extremeLower: `P${percentiles.extremeLower}`
+      primary: `Pprimary`,
+      upper: `Pupper_bound`,
+      lower: `Plower_bound`,
+      extremeUpper: `Pextreme_upper`,
+      extremeLower: `Pextreme_lower`
     };
-  }, [percentiles]);
+  }, []);
   
   // Check if we have results
-  if (!results || !results.intermediateData || !results.intermediateData.annualCosts) {
+  if (loading) {
+    return (
+      <div>
+        <Title level={2}>Cost Breakdown Analysis</Title>
+        <div>Loading cost breakdown data...</div>
+      </div>
+    );
+  }
+  
+  if (!simulationResults || !simulationResults.cashflow || !simulationResults.cashflow.annualCosts) {
     return (
       <div>
         <Title level={2}>Cost Breakdown Analysis</Title>
@@ -55,16 +62,24 @@ const CostBreakdown = () => {
   }
 
   // Extract data from results using dynamic percentile labels
-  const { annualCosts } = results.intermediateData;
-  const years = Array.from({ length: annualCosts.total[pLabels.primary].length }, (_, i) => i + 1);
+  const { annualCosts } = simulationResults.cashflow;
+  const projectLife = scenarioData?.settings?.general?.projectLife || 20;
+  const years = Array.from({ length: projectLife }, (_, i) => i + 1);
   
   // Extract cost components - use optional chaining to handle missing data gracefully
   const baseOMCosts = annualCosts.components?.baseOM?.[pLabels.primary] || Array(years.length).fill(0);
   const failureRiskCosts = annualCosts.components?.failureRisk?.[pLabels.primary] || Array(years.length).fill(0);
   const majorRepairCosts = annualCosts.components?.majorRepairs?.[pLabels.primary] || Array(years.length).fill(0);
+  const contingencyCosts = annualCosts.components?.contingency?.[pLabels.primary] || Array(years.length).fill(0);
   
-  // Calculate total costs
-  const totalCosts = annualCosts.total[pLabels.primary];
+  // Calculate total costs if not available directly
+  const totalCosts = annualCosts.total?.[pLabels.primary] || 
+    years.map((_, i) => {
+      return (baseOMCosts[i] || 0) + 
+             (failureRiskCosts[i] || 0) + 
+             (majorRepairCosts[i] || 0) + 
+             (contingencyCosts[i] || 0);
+    });
   
   const handleViewChange = (e) => {
     setViewType(e.target.value);
@@ -76,7 +91,7 @@ const CostBreakdown = () => {
       
       <Alert
         message="Dynamic Percentiles"
-        description={`This analysis uses the percentiles you've configured in Simulation Settings: Primary (${pLabels.primary}), Upper Bound (${pLabels.upper}), and Extreme (${pLabels.extremeUpper}).`}
+        description={`This analysis uses the percentiles you've configured in Simulation Settings: Primary (P${percentiles.primary}), Upper Bound (P${percentiles.upperBound}), and Extreme Upper (P${percentiles.extremeUpper}).`}
         type="info"
         showIcon
         style={{ marginBottom: 20 }}
@@ -116,6 +131,13 @@ const CostBreakdown = () => {
                 type: 'bar',
                 name: 'Major Repair Costs',
                 marker: { color: 'rgba(153, 102, 255, 0.7)' }
+              },
+              {
+                x: years,
+                y: contingencyCosts,
+                type: 'bar',
+                name: 'Contingency Costs',
+                marker: { color: 'rgba(255, 159, 64, 0.7)' }
               }
             ]}
             layout={{
@@ -156,6 +178,14 @@ const CostBreakdown = () => {
                 mode: 'lines+markers',
                 name: 'Major Repair Costs',
                 line: { width: 2 }
+              },
+              {
+                x: years,
+                y: contingencyCosts,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Contingency Costs',
+                line: { width: 2 }
               }
             ]}
             layout={{
@@ -177,7 +207,7 @@ const CostBreakdown = () => {
                 y: annualCosts.total[pLabels.primary],
                 type: 'scatter',
                 mode: 'lines',
-                name: `${pLabels.primary} (Primary)`,
+                name: `P${percentiles.primary} (Primary)`,
                 line: { color: 'rgb(31, 119, 180)', width: 2 }
               },
               {
@@ -185,7 +215,7 @@ const CostBreakdown = () => {
                 y: annualCosts.total[pLabels.upper],
                 type: 'scatter',
                 mode: 'lines',
-                name: pLabels.upper,
+                name: `P${percentiles.upperBound}`,
                 line: { color: 'rgb(255, 127, 14)', width: 2, dash: 'dash' }
               },
               {
@@ -193,7 +223,7 @@ const CostBreakdown = () => {
                 y: annualCosts.total[pLabels.extremeUpper],
                 type: 'scatter',
                 mode: 'lines',
-                name: pLabels.extremeUpper,
+                name: `P${percentiles.extremeUpper}`,
                 line: { color: 'rgb(214, 39, 40)', width: 2, dash: 'dot' }
               }
             ]}
