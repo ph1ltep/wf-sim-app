@@ -1,7 +1,7 @@
 // src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { SimulationProvider } from './contexts/SimulationContext';
+import { ScenarioProvider } from './contexts/ScenarioContext';
 import MainLayout from './layouts/MainLayout';
 
 // Config components
@@ -10,7 +10,7 @@ import ProjectSettings from './components/config/ProjectSettings';
 import SimulationSettings from './components/config/SimulationSettings';
 import LocationDefaults from './components/config/LocationDefaults';
 import OEMScopes from './components/config/OEMScopes';
-import OEMContracts from './components/config/OEMContracts'; // Add this import
+import OEMContracts from './components/config/OEMContracts';
 import ScenarioSettings from './components/config/ScenarioSettings';
 
 // Module configuration components
@@ -35,7 +35,7 @@ import './index.css';
 
 function App() {
   return (
-    <SimulationProvider>
+    <ScenarioProvider>
       <Router basename="/proxy/3000">
         <Routes>
           <Route path="/" element={<MainLayout />}>
@@ -84,7 +84,7 @@ function App() {
           </Route>
         </Routes>
       </Router>
-    </SimulationProvider>
+    </ScenarioProvider>
   );
 }
 

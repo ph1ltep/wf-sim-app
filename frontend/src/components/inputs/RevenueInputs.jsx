@@ -2,21 +2,21 @@
 import React from 'react';
 import { Typography, Form, InputNumber, Select, Card, Divider, Tabs, Radio } from 'antd';
 import { PercentageOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 const { Option } = Select;
 
 const RevenueInputs = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+  const { settings, updateModuleParameters } = useScenario();
   const [form] = Form.useForm();
 
-  // Only render if parameters are loaded
-  if (!parameters || !parameters.revenue) {
-    return <div>Loading parameters...</div>;
+  // Only render if settings are loaded
+  if (!settings || !settings.modules || !settings.modules.revenue) {
+    return <div>Loading settings...</div>;
   }
 
-  const revenueParams = parameters.revenue;
+  const revenueParams = settings.modules.revenue;
 
   const handleValuesChange = (changedValues, allValues) => {
     // Only update if we have actual changed values

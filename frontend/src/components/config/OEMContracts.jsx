@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Typography, Form, Card, Button, Modal, Table, message, Space } from 'antd';
 import { PlusOutlined, ToolOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useSimulation } from '../../contexts/ScenarioContext';
 
 // Component imports
 import OEMContractForm from './oemContracts/OEMContractForm';

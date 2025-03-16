@@ -1,7 +1,7 @@
 // src/components/config/ProjectSettings.jsx
 import React, { useEffect } from 'react';
 import { Typography, Form, Input, Button, Row, Col, DatePicker } from 'antd';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 import moment from 'moment';
 
 // Custom hook for project settings
@@ -17,7 +17,7 @@ import ProjectMetrics from './projectSettings/ProjectMetrics';
 const { Title } = Typography;
 
 const ProjectSettings = () => {
-  const { parameters } = useSimulation();
+  const { settings } = useScenario();
   const [form] = Form.useForm();
   
   // Use the custom hook for project settings
@@ -35,38 +35,33 @@ const ProjectSettings = () => {
 
   // Initialize form values
   useEffect(() => {
-    if (parameters && parameters.general) {
+    if (settings && settings.general) {
       // Get the general parameters
-      const generalParams = { ...parameters.general };
+      const generalParams = { ...settings.general };
       
-      // Get currency settings from scenario parameters or use defaults
-      const currencySettings = parameters.scenario || {};
+      // Get wind farm settings
+      const windFarmParams = settings.project?.windFarm || {};
+      
+      // Get currency settings
+      const currencySettings = settings.project?.currency || {};
       
       // Parse the date if it exists
       let startDate = generalParams.startDate ? moment(generalParams.startDate) : null;
       
       const initialValues = {
         ...generalParams,
+        ...windFarmParams,
         projectName: generalParams.projectName || 'Wind Farm Project',
         startDate: startDate,
-        currency: currencySettings.currency || 'USD',
-        foreignCurrency: currencySettings.foreignCurrency || 'EUR',
+        projectLife: generalParams.projectLife || 20,
+        currency: currencySettings.local || 'USD',
+        foreignCurrency: currencySettings.foreign || 'EUR',
         exchangeRate: currencySettings.exchangeRate || 1.0
       };
       
       form.setFieldsValue(initialValues);
     }
-  }, [form, parameters]);
-
-  // Handle form values change
-  const onValuesChange = (changedValues, allValues) => {
-    handleValuesChange(changedValues, allValues);
-  };
-
-  // Handle loading location defaults
-  const onLoadLocationDefaults = () => {
-    loadLocationDefaults(form);
-  };
+  }, [form, settings]);
 
   // Handle form reset
   const handleReset = () => {
@@ -77,9 +72,9 @@ const ProjectSettings = () => {
     calculateDerivedValues(values);
   };
 
-  // If parameters are not loaded yet, show loading indicator
-  if (!parameters || !parameters.general) {
-    return <div>Loading parameters...</div>;
+  // If settings are not loaded yet, show loading indicator
+  if (!settings) {
+    return <div>Loading settings...</div>;
   }
 
   return (
@@ -93,13 +88,13 @@ const ProjectSettings = () => {
         selectedLocation={selectedLocation}
         loading={loadingLocations}
         onLocationChange={handleLocationChange}
-        onLoadDefaults={onLoadLocationDefaults}
+        onLoadDefaults={loadLocationDefaults}
       />
 
       <Form
         form={form}
         layout="vertical"
-        onValuesChange={onValuesChange}
+        onValuesChange={handleValuesChange}
       >
         {/* Project Identification */}
         <Form.Item

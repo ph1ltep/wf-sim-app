@@ -1,26 +1,26 @@
 // src/components/config/ScenarioSettings.jsx
 import React from 'react';
 import { Typography, Form, Input, Card, Button, Row, Col, Select, Alert } from 'antd';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
 const ScenarioSettings = () => {
-  const { parameters, updateModuleParameters, currentScenario, selectedLocation } = useSimulation();
+  const { scenarioData, settings, updateModuleParameters, selectedLocation } = useScenario();
   const [form] = Form.useForm();
 
-  // Only render if parameters are loaded
-  if (!parameters) {
-    return <div>Loading parameters...</div>;
+  // Only render if settings are loaded
+  if (!settings) {
+    return <div>Loading settings...</div>;
   }
 
-  // Get scenario data if available
-  const scenarioData = parameters.scenario || {
-    name: currentScenario?.name || 'New Scenario',
-    description: currentScenario?.description || '',
-    scenarioType: 'base'
+  // Get scenario data
+  const initialValues = {
+    name: scenarioData?.name || 'New Scenario',
+    description: scenarioData?.description || '',
+    scenarioType: settings.project?.scenarioType || 'base'
   };
 
   const handleValuesChange = (changedValues, allValues) => {
@@ -52,7 +52,7 @@ const ScenarioSettings = () => {
       <Form
         form={form}
         layout="vertical"
-        initialValues={scenarioData}
+        initialValues={initialValues}
         onValuesChange={handleValuesChange}
       >
         <Card title="Basic Scenario Information" style={{ marginBottom: 24 }}>

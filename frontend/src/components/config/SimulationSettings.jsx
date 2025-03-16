@@ -2,34 +2,35 @@
 import React from 'react';
 import { Typography, Form, InputNumber, Card, Button, Row, Col, Tooltip, Divider, Alert } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 
 const SimulationSettings = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+  const { settings, updateModuleParameters } = useScenario();
   const [form] = Form.useForm();
 
-  // Only render if parameters are loaded
-  if (!parameters) {
-    return <div>Loading parameters...</div>;
+  // Only render if settings are loaded
+  if (!settings) {
+    return <div>Loading settings...</div>;
   }
 
-  // Make sure simulation exists in parameters
-  const simulation = parameters.simulation || { iterations: 10000, seed: 42 };
-  
-  // Make sure probability settings exist
-  const probabilities = parameters.probabilities || { 
-    primary: 50, 
-    upperBound: 75, 
-    lowerBound: 25,
-    extremeUpper: 90,
-    extremeLower: 10
+  // Get simulation settings or use defaults
+  const simulation = settings.simulation || { 
+    iterations: 10000, 
+    seed: 42,
+    probabilities: {
+      primary: 50, 
+      upperBound: 75, 
+      lowerBound: 25,
+      extremeUpper: 90,
+      extremeLower: 10
+    }
   };
 
   const initialValues = {
     ...simulation,
-    ...probabilities
+    ...simulation.probabilities
   };
 
   const handleValuesChange = (changedValues, allValues) => {

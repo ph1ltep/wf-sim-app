@@ -10,6 +10,7 @@ import useOEMScopes from '../../hooks/useOEMScopes';
 import OEMScopeForm from './oemScopes/OEMScopeForm';
 import OEMScopeDetails from './oemScopes/OEMScopeDetails';
 import { getOEMScopeColumns } from './oemScopes/oemScopeColumns';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 

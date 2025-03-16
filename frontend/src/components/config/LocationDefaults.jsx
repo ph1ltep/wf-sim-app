@@ -10,6 +10,7 @@ import useLocations from '../../hooks/useLocations';
 import LocationForm from './locations/LocationForm';
 import { getLocationColumns } from './locations/locationColumns';
 import { currencies } from './locations/currencyConstants';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 

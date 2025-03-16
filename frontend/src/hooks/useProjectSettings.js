@@ -1,6 +1,6 @@
 // src/hooks/useProjectSettings.js
 import { useState, useEffect, useCallback } from 'react';
-import { useSimulation } from '../contexts/SimulationContext';
+import { useScenario } from '../contexts/ScenarioContext';
 import { getAllLocations } from '../api/locations';
 import { message } from 'antd';
 
@@ -8,7 +8,7 @@ import { message } from 'antd';
  * Custom hook for managing project settings data and operations
  */
 const useProjectSettings = () => {
-  const { parameters, updateModuleParameters, selectedLocation, updateSelectedLocation } = useSimulation();
+  const { settings, updateModuleParameters, selectedLocation, updateSelectedLocation } = useScenario();
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
@@ -69,21 +69,13 @@ const useProjectSettings = () => {
     return updatedValues;
   }, []);
   
-  // Separate function to update module parameters to avoid infinite loops
-  const updateProjectMetrics = useCallback((metrics) => {
-    updateModuleParameters('projectMetrics', metrics);
-  }, [updateModuleParameters]);
-  
   // Handle form values change
   const handleValuesChange = useCallback((changedValues, allValues) => {
     // Extract special fields (projectName, startDate) from allValues
-    const { projectName, startDate, ...otherValues } = allValues;
+    const { projectName, startDate, projectLife, ...otherValues } = allValues;
     
     // Recalculate derived values
-    const metrics = calculateDerivedValues(otherValues);
-    
-    // Update module parameters (do this less frequently to avoid loops)
-    updateProjectMetrics(metrics);
+    calculateDerivedValues(otherValues);
     
     // Check if any field loaded from locations was changed
     if (changedValues.capacityFactor && fieldsFromLocations.capacityFactor) {
@@ -102,33 +94,49 @@ const useProjectSettings = () => {
       setFieldsFromLocations(prev => ({ ...prev, exchangeRate: false }));
     }
     
-    // Check if currency related fields were changed
-    const currencyFields = ['currency', 'foreignCurrency', 'exchangeRate'];
+    // Update general settings
+    if (changedValues.projectName || changedValues.startDate || changedValues.projectLife) {
+      const generalParams = {};
+      if (changedValues.projectName) generalParams.projectName = projectName;
+      if (changedValues.startDate) generalParams.startDate = startDate;
+      if (changedValues.projectLife) generalParams.projectLife = projectLife;
+      
+      updateModuleParameters('general', generalParams);
+    }
     
-    // Create a copy of general parameters without currency fields
-    const generalParams = { ...otherValues };
-    currencyFields.forEach(field => delete generalParams[field]);
-    
-    // Add projectName and startDate to general parameters
-    generalParams.projectName = projectName;
-    generalParams.startDate = startDate;
-    
-    // Always update general parameters without currency fields
-    updateModuleParameters('general', generalParams);
-    
-    // Handle currency field changes or ensure they persist in scenario parameters
-    const scenarioParams = { 
-      ...parameters?.scenario || {},
-      currency: allValues.currency,
-      foreignCurrency: allValues.foreignCurrency,
-      exchangeRate: allValues.exchangeRate
+    // Update wind farm settings
+    const windFarmParams = {
+      numWTGs: allValues.numWTGs,
+      mwPerWTG: allValues.mwPerWTG,
+      capacityFactor: allValues.capacityFactor,
+      wtgPlatformType: allValues.wtgPlatformType,
+      curtailmentLosses: allValues.curtailmentLosses,
+      electricalLosses: allValues.electricalLosses
     };
     
-    // Update scenario parameters with currency info
-    updateModuleParameters('scenario', scenarioParams);
+    if (Object.keys(changedValues).some(key => 
+      ['numWTGs', 'mwPerWTG', 'capacityFactor', 'wtgPlatformType', 'curtailmentLosses', 'electricalLosses'].includes(key)
+    )) {
+      updateModuleParameters('windFarm', windFarmParams);
+    }
+    
+    // Update currency settings
+    if (changedValues.currency || changedValues.foreignCurrency || changedValues.exchangeRate) {
+      const currencyParams = {
+        currency: allValues.currency,
+        foreignCurrency: allValues.foreignCurrency,
+        exchangeRate: allValues.exchangeRate
+      };
+      
+      updateModuleParameters('scenario', currencyParams);
+    }
+    
+    // Calculate metrics and update
+    const metrics = calculateDerivedValues(otherValues);
+    updateModuleParameters('projectMetrics', metrics);
     
     return metrics;
-  }, [calculateDerivedValues, fieldsFromLocations, parameters, updateModuleParameters, updateProjectMetrics]);
+  }, [calculateDerivedValues, fieldsFromLocations, updateModuleParameters]);
   
   // Fetch available locations
   const fetchLocations = useCallback(async () => {
@@ -182,41 +190,18 @@ const useProjectSettings = () => {
     // Update the form with these values
     form.setFieldsValue(formValues);
     
-    // Update the general parameters (without currency)
-    const { currency, foreignCurrency, exchangeRate, ...generalParams } = formValues;
-    updateModuleParameters('general', generalParams);
+    // Update wind farm settings
+    const windFarmParams = {
+      capacityFactor: locationData.capacityFactor
+    };
+    updateModuleParameters('windFarm', windFarmParams);
     
     // Recalculate derived values
-    const metrics = calculateDerivedValues(generalParams);
-    updateProjectMetrics(metrics);
+    const metrics = calculateDerivedValues(formValues);
+    updateModuleParameters('projectMetrics', metrics);
 
-    // Update revenue module values with location defaults
-    if (parameters?.revenue) {
-      const revenueParams = { ...parameters.revenue };
-      
-      // Update electricity price
-      if (revenueParams.electricityPrice) {
-        revenueParams.electricityPrice.value = locationData.energyPrice;
-      }
-      
-      // Update module parameters
-      updateModuleParameters('revenue', revenueParams);
-    }
-
-    // Update cost module values with location defaults (inflation rate for escalation)
-    if (parameters?.cost) {
-      const costParams = { ...parameters.cost };
-      
-      // Update escalation rate to match inflation rate
-      costParams.escalationRate = locationData.inflationRate;
-      
-      // Update module parameters
-      updateModuleParameters('cost', costParams);
-    }
-
-    // Update the scenario with currency information and location
+    // Update scenario with currency information and location
     const scenarioParams = { 
-      ...parameters?.scenario || {},
       location: locationData.countryCode,
       currency: locationData.currency,
       foreignCurrency: locationData.foreignCurrency,
@@ -233,22 +218,49 @@ const useProjectSettings = () => {
       exchangeRate: true
     });
 
+    // Update revenue module values with location defaults
+    if (settings?.modules?.revenue) {
+      const revenueParams = { ...settings.modules.revenue };
+      
+      // Update electricity price
+      if (revenueParams.electricityPrice) {
+        revenueParams.electricityPrice.value = locationData.energyPrice;
+      }
+      
+      // Update module parameters
+      updateModuleParameters('revenue', revenueParams);
+    }
+
+    // Update cost module values with location defaults (inflation rate for escalation)
+    if (settings?.modules?.cost) {
+      const costParams = { ...settings.modules.cost };
+      
+      // Update escalation rate to match inflation rate
+      costParams.escalationRate = locationData.inflationRate;
+      
+      // Update module parameters
+      updateModuleParameters('cost', costParams);
+    }
+
     message.success(`Loaded defaults for ${locationData.country}`);
     return true;
-  }, [selectedLocation, calculateDerivedValues, parameters, updateModuleParameters, updateProjectMetrics]);
+  }, [selectedLocation, calculateDerivedValues, settings, updateModuleParameters]);
   
   // Initialize data on mount
   useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
   
-  // Calculate initial metrics when parameters change
+  // Calculate initial metrics when settings change
   useEffect(() => {
-    if (parameters?.general) {
-      calculateDerivedValues(parameters.general);
-      // Don't update module parameters here to avoid loops
+    if (settings?.general) {
+      const formValues = {
+        ...settings.general,
+        ...settings.project?.windFarm
+      };
+      calculateDerivedValues(formValues);
     }
-  }, [parameters?.general, calculateDerivedValues]);
+  }, [settings, calculateDerivedValues]);
   
   return {
     locations,

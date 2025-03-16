@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Form, InputNumber, Select, Card, Divider, Tabs, Button } from 'antd';
 import { InfoCircleOutlined, ToolOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 import { useNavigate } from 'react-router-dom';
 import { getAllOEMContracts } from '../../api/oemContracts';
 
@@ -10,18 +10,18 @@ const { Title } = Typography;
 const { Option } = Select;
 
 const CostInputs = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+  const { settings, updateModuleParameters } = useScenario();
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const [oemContracts, setOEMContracts] = useState([]);
   const [loadingContracts, setLoadingContracts] = useState(false);
-
-  // Only render if parameters are loaded
-  if (!parameters || !parameters.cost) {
-    return <div>Loading parameters...</div>;
+// src/components/inputs/CostInputs.jsx (continued)
+  // Only render if settings are loaded
+  if (!settings || !settings.modules || !settings.modules.cost) {
+    return <div>Loading settings...</div>;
   }
 
-  const costParams = parameters.cost;
+  const costParams = settings.modules.cost;
 
   // Fetch OEM contracts on component mount
   useEffect(() => {
