@@ -1,110 +1,70 @@
-// src/components/inputs/CashflowAnalysis.jsx
+// src/components/analysis/CashflowAnalysis.jsx
 import React from 'react';
 import { Typography, Card, Tabs } from 'antd';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 import Plot from 'react-plotly.js';
 
 const { Title } = Typography;
 
 const CashflowAnalysis = () => {
-  const { parameters, results } = useSimulation();
+  const { scenarioData, loading } = useScenario();
   
-  // Check if parameters are loaded
-  if (!parameters) {
-    return <div>Loading parameters...</div>;
-  }
-
-  const projectLife = parameters.general?.projectLife || 20;
+  // Check if simulation results are loaded
+  const simulationData = scenarioData?.simulation?.inputSim?.cashflow;
+  const projectLife = scenarioData?.settings?.general?.projectLife || 20;
   const years = Array.from({ length: projectLife }, (_, i) => i + 1);
   
-  // Generate cost breakdown data
-  // If we have results from simulation, use them, otherwise generate mock data
+  // If no simulation data is available yet, create empty placeholders
   let baseOMCosts = [];
-  let failureEventCosts = [];
+  let failureRiskCosts = [];
   let majorRepairCosts = [];
   let oemCosts = [];
   let contingencyCosts = [];
   let totalCosts = [];
+  let revenues = [];
+  let netCashFlow = [];
   
-  if (results?.intermediateData?.annualCosts?.components) {
-    // Use real data if available
-    const costData = results.intermediateData.annualCosts;
-    baseOMCosts = costData.components.baseOM?.P50 || Array(projectLife).fill(0);
-    failureEventCosts = costData.components.failureRisk?.P50 || Array(projectLife).fill(0);
-    majorRepairCosts = costData.components.majorRepairs?.P50 || Array(projectLife).fill(0);
-    totalCosts = costData.total.P50 || Array(projectLife).fill(0);
+  // Extract data from simulation results if available
+  if (simulationData) {
+    // Extract cost components
+    baseOMCosts = simulationData.annualCosts?.components?.baseOM?.Pprimary || Array(projectLife).fill(0);
+    failureRiskCosts = simulationData.annualCosts?.components?.failureRisk?.Pprimary || Array(projectLife).fill(0);
+    majorRepairCosts = simulationData.annualCosts?.components?.majorRepairs?.Pprimary || Array(projectLife).fill(0);
+    contingencyCosts = simulationData.annualCosts?.components?.contingency?.Pprimary || Array(projectLife).fill(0);
     
-    // Calculate OEM costs and contingency as the remainder if not directly available
-    oemCosts = Array(projectLife).fill(0);
-    contingencyCosts = Array(projectLife).fill(0);
+    // Get total costs
+    totalCosts = simulationData.annualCosts?.total?.Pprimary || Array(projectLife).fill(0);
     
-    // Generate a remainder to account for any difference between total and components
-    const remainder = years.map((_, i) => {
-      return totalCosts[i] - (baseOMCosts[i] + failureEventCosts[i] + majorRepairCosts[i]);
+    // Calculate OEM costs as the remainder
+    oemCosts = years.map((_, i) => {
+      const knownCosts = (baseOMCosts[i] || 0) + (failureRiskCosts[i] || 0) + 
+                       (majorRepairCosts[i] || 0) + (contingencyCosts[i] || 0);
+      return Math.max(0, (totalCosts[i] || 0) - knownCosts);
     });
     
-    // Distribute the remainder between OEM and contingency
-    for (let i = 0; i < projectLife; i++) {
-      if (remainder[i] > 0) {
-        if (i < (parameters.cost?.oemTerm || 5)) {
-          oemCosts[i] = remainder[i];
-        } else {
-          contingencyCosts[i] = remainder[i];
-        }
-      }
-    }
-  } else {
-    // Generate mock data
-    const baseAnnualOM = parameters.cost?.annualBaseOM || 5000000;
-    const oemTerm = parameters.cost?.oemTerm || 5;
-    const fixedOMFee = parameters.cost?.fixedOMFee || 4000000;
-    
-    for (let i = 0; i < projectLife; i++) {
-      const year = i + 1;
-      
-      // Base O&M costs (with escalation)
-      const escalationRate = (parameters.cost?.escalationRate || 2) / 100;
-      baseOMCosts[i] = baseAnnualOM * Math.pow(1 + escalationRate, i);
-      
-      // OEM costs during OEM term
-      oemCosts[i] = year <= oemTerm ? fixedOMFee : 0;
-      
-      // Failure costs (random variation based on probability)
-      const failureProb = (parameters.cost?.failureEventProbability || 5) / 100;
-      const failureCost = parameters.cost?.failureEventCost || 200000;
-      failureEventCosts[i] = Math.random() < failureProb ? failureCost : 0;
-      
-      // Major repairs (more likely in later years)
-      const majorRepairProb = 0.05 + (i / projectLife) * 0.15; // Increases with time
-      majorRepairCosts[i] = Math.random() < majorRepairProb ? 500000 + Math.random() * 500000 : 0;
-      
-      // Contingency (small percentage of total)
-      contingencyCosts[i] = (baseOMCosts[i] + oemCosts[i] + failureEventCosts[i] + majorRepairCosts[i]) * 0.05;
-      
-      // Total costs
-      totalCosts[i] = baseOMCosts[i] + oemCosts[i] + failureEventCosts[i] + majorRepairCosts[i] + contingencyCosts[i];
-    }
+    // Get revenue and calculate net cash flow
+    revenues = simulationData.annualRevenue?.Pprimary || Array(projectLife).fill(0);
+    netCashFlow = simulationData.netCashFlow?.Pprimary || 
+                  years.map((_, i) => (revenues[i] || 0) - (totalCosts[i] || 0));
   }
   
-  // Generate revenue data
-  const revenues = results?.intermediateData?.annualRevenue?.P50 || 
-    Array(projectLife).fill().map((_, i) => 8000000 - i * 50000); // Dummy data
-  
-  // Net cash flow
-  const netCashFlow = years.map((_, i) => revenues[i] - totalCosts[i]);
-  
-  // Create sample data table
+  // Format data for table display
   const tableData = years.map((year, i) => ({
     year,
-    baseOM: baseOMCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    oem: oemCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    failures: failureEventCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    majorRepairs: majorRepairCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    contingency: contingencyCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    totalCost: totalCosts[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    revenue: revenues[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
-    netCashFlow: netCashFlow[i].toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    baseOM: formatCurrency(baseOMCosts[i] || 0),
+    oem: formatCurrency(oemCosts[i] || 0),
+    failures: formatCurrency(failureRiskCosts[i] || 0),
+    majorRepairs: formatCurrency(majorRepairCosts[i] || 0),
+    contingency: formatCurrency(contingencyCosts[i] || 0),
+    totalCost: formatCurrency(totalCosts[i] || 0),
+    revenue: formatCurrency(revenues[i] || 0),
+    netCashFlow: formatCurrency(netCashFlow[i] || 0)
   }));
+
+  // Helper function to format currency
+  function formatCurrency(value) {
+    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
 
   // Define tabs items
   const tabItems = [
@@ -132,7 +92,7 @@ const CashflowAnalysis = () => {
               },
               {
                 x: years,
-                y: failureEventCosts,
+                y: failureRiskCosts,
                 type: 'bar',
                 name: 'Failure Events',
                 marker: { color: 'rgba(219, 64, 82, 0.7)' }
@@ -276,28 +236,36 @@ const CashflowAnalysis = () => {
     }
   ];
 
+  // Styling for the table
+  const tableStyle = {
+    header: {
+      backgroundColor: '#f0f2f5',
+      padding: '12px 8px',
+      textAlign: 'left',
+      borderBottom: '1px solid #e8e8e8'
+    },
+    cell: {
+      padding: '12px 8px',
+      borderBottom: '1px solid #e8e8e8'
+    }
+  };
+
   return (
     <div>
       <Title level={2}>Cashflow Analysis</Title>
       <p>Analyze projected costs, revenue, and net cash flow over the project lifetime.</p>
       
-      <Tabs defaultActiveKey="costs" items={tabItems} />
+      {loading ? (
+        <div>Loading cashflow data...</div>
+      ) : !simulationData ? (
+        <div>
+          <p>No simulation data available. Run a simulation first to see the cashflow analysis.</p>
+        </div>
+      ) : (
+        <Tabs defaultActiveKey="costs" items={tabItems} />
+      )}
     </div>
   );
-};
-
-// Styling for the table
-const tableStyle = {
-  header: {
-    backgroundColor: '#f0f2f5',
-    padding: '12px 8px',
-    textAlign: 'left',
-    borderBottom: '1px solid #e8e8e8'
-  },
-  cell: {
-    padding: '12px 8px',
-    borderBottom: '1px solid #e8e8e8'
-  }
 };
 
 export default CashflowAnalysis;

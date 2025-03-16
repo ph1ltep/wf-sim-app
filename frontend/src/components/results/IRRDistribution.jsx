@@ -2,46 +2,66 @@
 import React, { useMemo } from 'react';
 import { Typography, Card, Row, Col, Statistic, Empty, Alert } from 'antd';
 import Plot from 'react-plotly.js';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 
 const IRRDistribution = () => {
-  const { results, parameters } = useSimulation();
+  const { scenarioData, loading } = useScenario();
   
-  // Extract percentile information
-  const percentiles = useMemo(() => {
-    if (results?.percentileInfo) {
-      return results.percentileInfo;
-    }
-    
-    // Fallback to parameters if available, or use defaults
-    if (parameters?.probabilities) {
-      return parameters.probabilities;
-    }
-    
-    return {
-      primary: 50,
-      upperBound: 75,
-      lowerBound: 25,
-      extremeUpper: 90,
-      extremeLower: 10
+  // Check if simulation results are loaded
+  const simulationResults = scenarioData?.simulation?.outputSim;
+  const percentiles = scenarioData?.settings?.simulation?.probabilities;
+  
+  // Get percentile mappings
+  const percentileMapping = useMemo(() => {
+    if (!percentiles) return {
+      primary: 'Pprimary',
+      upper: 'Pupper_bound',
+      lower: 'Plower_bound',
+      extremeUpper: 'Pextreme_upper',
+      extremeLower: 'Pextreme_lower'
     };
-  }, [results, parameters]);
-  
-  // Generate P-labels for accessing results
-  const pLabels = useMemo(() => {
+    
     return {
-      primary: `P${percentiles.primary}`,
-      upper: `P${percentiles.upperBound}`,
-      lower: `P${percentiles.lowerBound}`,
-      extremeUpper: `P${percentiles.extremeUpper}`,
-      extremeLower: `P${percentiles.extremeLower}`
+      primary: `Pprimary`,
+      upper: `Pupper_bound`,
+      lower: `Plower_bound`,
+      extremeUpper: `Pextreme_upper`,
+      extremeLower: `Pextreme_lower`
     };
   }, [percentiles]);
   
+  // Get percentile values
+  const percentileValues = useMemo(() => {
+    if (!percentiles) return {
+      primary: 50,
+      upper: 75,
+      lower: 25,
+      extremeUpper: 90,
+      extremeLower: 10
+    };
+    
+    return {
+      primary: percentiles.primary || 50,
+      upper: percentiles.upperBound || 75,
+      lower: percentiles.lowerBound || 25,
+      extremeUpper: percentiles.extremeUpper || 90,
+      extremeLower: percentiles.extremeLower || 10
+    };
+  }, [percentiles]);
+
   // Check if we have results
-  if (!results || !results.finalResults || !results.finalResults.IRR) {
+  if (loading) {
+    return (
+      <div>
+        <Title level={2}>IRR Distribution Analysis</Title>
+        <div>Loading IRR distribution data...</div>
+      </div>
+    );
+  }
+  
+  if (!simulationResults || !simulationResults.IRR) {
     return (
       <div>
         <Title level={2}>IRR Distribution Analysis</Title>
@@ -54,11 +74,11 @@ const IRRDistribution = () => {
   }
 
   // Extract IRR percentiles
-  const irrResults = results.finalResults.IRR;
+  const irrResults = simulationResults.IRR;
   
   // Create mock histogram data (since we don't have the raw distribution, just percentiles)
   // In a real implementation, we'd use actual histogram data from the backend
-  const primary = irrResults[pLabels.primary] || 0;
+  const primary = irrResults[percentileMapping.primary] || 0;
   const mockHistogramData = [
     { x: primary * 0.7, y: 5 },
     { x: primary * 0.8, y: 15 },
@@ -77,7 +97,7 @@ const IRRDistribution = () => {
       
       <Alert
         message="Dynamic Percentiles"
-        description={`This analysis uses the percentiles you've configured in Simulation Settings: Primary (${pLabels.primary}), Upper Bound (${pLabels.upper}), and Extreme Upper (${pLabels.extremeUpper}).`}
+        description={`This analysis uses the percentiles you've configured in Simulation Settings: Primary (P${percentileValues.primary}), Upper Bound (P${percentileValues.upper}), and Extreme Upper (P${percentileValues.extremeUpper}).`}
         type="info"
         showIcon
         style={{ marginBottom: 20 }}
@@ -104,26 +124,26 @@ const IRRDistribution = () => {
                 {
                   type: 'scatter',
                   mode: 'lines',
-                  x: [irrResults[pLabels.primary], irrResults[pLabels.primary]],
+                  x: [irrResults[percentileMapping.primary], irrResults[percentileMapping.primary]],
                   y: [0, 55],
                   line: { color: 'green', width: 2, dash: 'dash' },
-                  name: pLabels.primary
+                  name: `P${percentileValues.primary}`
                 },
                 {
                   type: 'scatter',
                   mode: 'lines',
-                  x: [irrResults[pLabels.upper], irrResults[pLabels.upper]],
+                  x: [irrResults[percentileMapping.upper], irrResults[percentileMapping.upper]],
                   y: [0, 55],
                   line: { color: 'orange', width: 2, dash: 'dash' },
-                  name: pLabels.upper
+                  name: `P${percentileValues.upper}`
                 },
                 {
                   type: 'scatter',
                   mode: 'lines',
-                  x: [irrResults[pLabels.extremeUpper], irrResults[pLabels.extremeUpper]],
+                  x: [irrResults[percentileMapping.extremeUpper], irrResults[percentileMapping.extremeUpper]],
                   y: [0, 55],
                   line: { color: 'red', width: 2, dash: 'dash' },
-                  name: pLabels.extremeUpper
+                  name: `P${percentileValues.extremeUpper}`
                 }
               ]}
               layout={{
@@ -150,37 +170,37 @@ const IRRDistribution = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title={`${pLabels.primary} IRR`}
-              value={irrResults[pLabels.primary]}
+              title={`P${percentileValues.primary} IRR`}
+              value={irrResults[percentileMapping.primary]}
               precision={2}
               valueStyle={{ color: '#3f8600' }}
               suffix="%"
             />
-            <p>{percentiles.primary}% chance of achieving this IRR or better</p>
+            <p>{percentileValues.primary}% chance of achieving this IRR or better</p>
           </Card>
         </Col>
         <Col span={8}>
           <Card>
             <Statistic
-              title={`${pLabels.upper} IRR`}
-              value={irrResults[pLabels.upper]}
+              title={`P${percentileValues.upper} IRR`}
+              value={irrResults[percentileMapping.upper]}
               precision={2}
               valueStyle={{ color: '#cf9700' }}
               suffix="%"
             />
-            <p>{percentiles.upperBound}% chance of achieving this IRR or better</p>
+            <p>{percentileValues.upper}% chance of achieving this IRR or better</p>
           </Card>
         </Col>
         <Col span={8}>
           <Card>
             <Statistic
-              title={`${pLabels.extremeUpper} IRR`}
-              value={irrResults[pLabels.extremeUpper]}
+              title={`P${percentileValues.extremeUpper} IRR`}
+              value={irrResults[percentileMapping.extremeUpper]}
               precision={2}
               valueStyle={{ color: '#cf1322' }}
               suffix="%"
             />
-            <p>{percentiles.extremeUpper}% chance of achieving this IRR or better</p>
+            <p>{percentileValues.extremeUpper}% chance of achieving this IRR or better</p>
           </Card>
         </Col>
       </Row>

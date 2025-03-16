@@ -20,8 +20,8 @@ import FinancingModule from './components/modules/FinancingModule';
 import RiskModule from './components/modules/RiskModule';
 
 // Input analysis components
-import CashflowAnalysis from './components/inputs/CashflowAnalysis';
-import RiskAnalysis from './components/inputs/RiskAnalysis';
+import CashflowAnalysis from './components/analysis/CashflowAnalysis';
+import RiskAnalysis from './components/analysis/RiskAnalysis';
 
 // Results components
 import Overview from './components/results/Overview';

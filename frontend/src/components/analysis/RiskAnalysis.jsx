@@ -1,45 +1,81 @@
-// src/components/inputs/RiskAnalysis.jsx
+// src/components/analysis/RiskAnalysis.jsx
 import React from 'react';
 import { Typography, Card, Tabs, Table } from 'antd';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 import Plot from 'react-plotly.js';
 
 const { Title } = Typography;
 
 const RiskAnalysis = () => {
-  const { parameters } = useSimulation();
+  const { scenarioData, loading } = useScenario();
   
-  // Check if parameters are loaded
-  if (!parameters) {
-    return <div>Loading parameters...</div>;
-  }
-
-  const projectLife = parameters.general?.projectLife || 20;
+  // Check if simulation results are loaded
+  const simulationData = scenarioData?.simulation?.inputSim?.risk;
+  const parameters = scenarioData?.settings?.modules;
+  const projectLife = scenarioData?.settings?.general?.projectLife || 20;
   const years = Array.from({ length: projectLife }, (_, i) => i + 1);
   
-  // Generate some sample data for the risk analysis
+  // If no parameters or simulation data available, display loading or empty state
+  if (loading) {
+    return (
+      <div>
+        <Title level={2}>Risk Analysis</Title>
+        <div>Loading risk analysis data...</div>
+      </div>
+    );
+  }
+  
+  if (!parameters) {
+    return (
+      <div>
+        <Title level={2}>Risk Analysis</Title>
+        <div>No parameters loaded. Please configure the simulation parameters first.</div>
+      </div>
+    );
+  }
+  
+  // Generate some sample data for the risk analysis or use simulation data if available
   const failureProbability = parameters.cost?.failureEventProbability || 5;
   
   // Create failure rate data
-  const failureRates = years.map(() => failureProbability + (Math.random() * 2 - 1)); // Random variation around the base rate
+  let failureRates = [];
+  if (simulationData && simulationData.failureRates && simulationData.failureRates.Pprimary) {
+    failureRates = simulationData.failureRates.Pprimary;
+  } else {
+    // Generate mock data if simulation data isn't available
+    failureRates = years.map(() => failureProbability + (Math.random() * 2 - 1));
+  }
+  
+  // Create event probability data
+  let eventProbabilities = [];
+  if (simulationData && simulationData.eventProbabilities && simulationData.eventProbabilities.Pprimary) {
+    eventProbabilities = simulationData.eventProbabilities.Pprimary;
+  }
   
   // Create event data
   const eventData = [];
   const eventTypes = ['Turbine Failure', 'Gearbox Issue', 'Blade Damage', 'Electrical System', 'Control System'];
   
-  for (let i = 0; i < 10; i++) {
-    eventData.push({
-      key: i,
-      year: Math.floor(Math.random() * projectLife) + 1,
-      eventType: eventTypes[Math.floor(Math.random() * eventTypes.length)],
-      probability: (Math.random() * 10).toFixed(2),
-      impact: Math.floor(Math.random() * 500000) + 100000,
-      mitigation: Math.random() > 0.5 ? 'Insurance' : 'Reserve Funds'
-    });
+  // If we have event data from simulation, use it
+  if (simulationData && simulationData.events) {
+    // We would map the simulation event data here
+    // This is placeholder as the exact structure of event data may vary
+  } else {
+    // Generate mock event data
+    for (let i = 0; i < 10; i++) {
+      eventData.push({
+        key: i,
+        year: Math.floor(Math.random() * projectLife) + 1,
+        eventType: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+        probability: (Math.random() * 10).toFixed(2),
+        impact: Math.floor(Math.random() * 500000) + 100000,
+        mitigation: Math.random() > 0.5 ? 'Insurance' : 'Reserve Funds'
+      });
+    }
+    
+    // Sort by year
+    eventData.sort((a, b) => a.year - b.year);
   }
-  
-  // Sort by year
-  eventData.sort((a, b) => a.year - b.year);
   
   // Define the event table columns
   const eventColumns = [
@@ -201,7 +237,15 @@ const RiskAnalysis = () => {
       <Title level={2}>Risk Analysis</Title>
       <p>Analyze potential risks, failure rates, and their impact on the wind farm project.</p>
       
-      <Tabs defaultActiveKey="failure" items={tabItems} />
+      {!simulationData ? (
+        <div>
+          <p>No simulation data available. You can still view expected risk patterns based on parameters, 
+            but run a simulation for more accurate analysis.</p>
+          <Tabs defaultActiveKey="failure" items={tabItems} />
+        </div>
+      ) : (
+        <Tabs defaultActiveKey="failure" items={tabItems} />
+      )}
     </div>
   );
 };
