@@ -10,7 +10,7 @@ import ProjectSettings from './components/config/ProjectSettings';
 import SimulationSettings from './components/general/SimulationSettings';
 import LocationDefaults from './components/general/LocationDefaults';
 import OEMScopes from './components/general/OEMScopes';
-import OEMContracts from './components/config/OEMContracts';
+import OEMContracts from './components/modules/Contracts';
 import ScenarioSettings from './components/config/ScenarioSettings';
 
 // Module configuration components

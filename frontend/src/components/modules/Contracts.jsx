@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { Typography, Form, Card, Button, Modal, Table, message, Space } from 'antd';
 import { PlusOutlined, ToolOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/ScenarioContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 // Component imports
-import OEMContractForm from './oemContracts/OEMContractForm';
+import OEMContractForm from './Contracts/ContractForm';
 
 const { Title } = Typography;
 
@@ -16,7 +16,7 @@ const OEMContracts = () => {
   const [editIndex, setEditIndex] = useState(-1);
   
   // Use the simulation context to get/update parameters
-  const { parameters, updateModuleParameters, loading } = useSimulation();
+  const { parameters, updateModuleParameters, loading } = useScenario();
   
   // Get OEM contracts from parameters
   const oemContracts = parameters?.oemContracts || [];

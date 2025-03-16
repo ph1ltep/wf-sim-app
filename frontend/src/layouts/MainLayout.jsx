@@ -4,13 +4,13 @@ import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sider from '../components/common/Sider';
-import { useSimulation } from '../contexts/SimulationContext';
+import { useScenario } from '../contexts/ScenarioContext';
 
 const { Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const { loading } = useSimulation();
+  const { loading } = useScenario();
 
   const toggleSider = () => {
     setCollapsed(!collapsed);

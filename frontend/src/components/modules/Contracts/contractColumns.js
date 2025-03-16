@@ -2,7 +2,7 @@
 import React from 'react';
 import { Space, Button, Popconfirm, Tooltip } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import OEMScopeTag from '../oemScopes/OEMScopeTag';
+import OEMScopeTag from '../../config/oemScopes/OEMScopeTag';
 import { formatCurrency, getTagTooltip, renderScopeTags } from '../../../utils/oemScopeUtils';
 
 /**

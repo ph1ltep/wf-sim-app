@@ -9,28 +9,48 @@ import {
   UploadOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Header: AntHeader } = Layout;
 const { Title } = Typography;
 
 const Header = ({ collapsed, toggle }) => {
   const { 
-    runFullSimulation, 
-    saveCurrentScenario, 
-    loadDefaultParameters,
-    currentScenario,
-    loading
-  } = useSimulation();
+    scenarioData,
+    loading,
+    initializeScenario,
+    updateScenario,
+    getAllScenarios
+  } = useScenario();
   
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
+  const [scenarioList, setScenarioList] = useState([]);
+  const [loadingScenarios, setLoadingScenarios] = useState(false);
   const [form] = Form.useForm();
 
+  // Handle opening the save modal
+  const handleOpenSaveModal = () => {
+    if (scenarioData) {
+      form.setFieldsValue({
+        name: scenarioData.name,
+        description: scenarioData.description || ''
+      });
+    }
+    setSaveModalVisible(true);
+  };
+
+  // Handle saving the scenario
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      await saveCurrentScenario(values.name, values.description);
+      
+      // Update the scenario with new name and description
+      await updateScenario(scenarioData._id, {
+        name: values.name,
+        description: values.description
+      });
+      
       setSaveModalVisible(false);
       form.resetFields();
     } catch (error) {
@@ -38,14 +58,23 @@ const Header = ({ collapsed, toggle }) => {
     }
   };
 
-  const handleOpenSaveModal = () => {
-    if (currentScenario) {
-      form.setFieldsValue({
-        name: currentScenario.name,
-        description: currentScenario.description || ''
-      });
+  // Handle opening the load modal
+  const handleOpenLoadModal = async () => {
+    setLoadingScenarios(true);
+    const result = await getAllScenarios();
+    if (result && result.scenarios) {
+      setScenarioList(result.scenarios);
     }
-    setSaveModalVisible(true);
+    setLoadingScenarios(false);
+    setLoadModalVisible(true);
+  };
+
+  // Handle running a simulation
+  const handleRunSimulation = async () => {
+    // This would call an API to run the simulation
+    // For now, we'll just log to console
+    console.log('Running simulation with scenario:', scenarioData);
+    // In a real implementation, you would call your simulation API here
   };
 
   return (
@@ -66,7 +95,7 @@ const Header = ({ collapsed, toggle }) => {
           <Button 
             type="primary" 
             icon={<PlayCircleOutlined />} 
-            onClick={runFullSimulation}
+            onClick={handleRunSimulation}
             loading={loading}
           >
             Run Simulation
@@ -74,23 +103,23 @@ const Header = ({ collapsed, toggle }) => {
           <Button 
             icon={<SaveOutlined />} 
             onClick={handleOpenSaveModal}
-            disabled={loading}
+            disabled={loading || !scenarioData}
           >
             Save Scenario
           </Button>
           <Button 
             icon={<UploadOutlined />}
-            onClick={() => setLoadModalVisible(true)}
+            onClick={handleOpenLoadModal}
             disabled={loading}
           >
             Load Scenario
           </Button>
           <Button 
             icon={<ReloadOutlined />}
-            onClick={loadDefaultParameters}
+            onClick={initializeScenario}
             disabled={loading}
           >
-            Reset
+            New Scenario
           </Button>
         </Space>
       </AntHeader>
@@ -123,15 +152,39 @@ const Header = ({ collapsed, toggle }) => {
         </Form>
       </Modal>
 
-      {/* Load Modal placeholder - to be implemented with scenario listing */}
+      {/* Load Modal - would be improved with a proper scenario selector component */}
       <Modal
         title="Load Scenario"
         open={loadModalVisible}
         onCancel={() => setLoadModalVisible(false)}
         footer={null}
       >
-        <p>Scenario list will be loaded here...</p>
-        {loading && <Spin />}
+        {loadingScenarios ? (
+          <Spin />
+        ) : (
+          <div>
+            {scenarioList.length > 0 ? (
+              <ul>
+                {scenarioList.map(scenario => (
+                  <li key={scenario._id}>
+                    <Button 
+                      type="link" 
+                      onClick={() => {
+                        // This would load the selected scenario
+                        setLoadModalVisible(false);
+                      }}
+                    >
+                      {scenario.name}
+                    </Button>
+                    {scenario.description && <p>{scenario.description}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No saved scenarios found.</p>
+            )}
+          </div>
+        )}
       </Modal>
     </>
   );
