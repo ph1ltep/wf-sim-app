@@ -10,14 +10,14 @@ import ProjectSettings from './components/config/ProjectSettings';
 import SimulationSettings from './components/general/SimulationSettings';
 import LocationDefaults from './components/general/LocationDefaults';
 import OEMScopes from './components/general/OEMScopes';
-import OEMContracts from './components/modules/Contracts';
+import ContractsModule from './components/modules/ContractsModule';
 import ScenarioSettings from './components/config/ScenarioSettings';
 
 // Module configuration components
-import CostInputs from './components/inputs/CostInputs';
-import RevenueInputs from './components/inputs/RevenueInputs';
-import FinancingInputs from './components/inputs/FinancingInputs';
-import RiskInputs from './components/inputs/RiskInputs';
+import CostModule from './components/modules/CostModule';
+import RevenueModule from './components/modules/RevenueModule';
+import FinancingModule from './components/modules/FinancingModule';
+import RiskModule from './components/modules/RiskModule';
 
 // Input analysis components
 import CashflowAnalysis from './components/inputs/CashflowAnalysis';
@@ -55,16 +55,16 @@ function App() {
               <Route path="project" element={<ProjectSettings />} />
               <Route path="scenario">
                 <Route path="settings" element={<ScenarioSettings />} />
-                <Route path="oemcontracts" element={<OEMContracts />} />
+                <Route path="contracts" element={<ContractsModule />} />
                 <Route index element={<Navigate to="/config/scenario/settings" replace />} />
               </Route>
               
               {/* Module configuration routes */}
               <Route path="modules">
-                <Route path="cost" element={<CostInputs />} />
-                <Route path="revenue" element={<RevenueInputs />} />
-                <Route path="financing" element={<FinancingInputs />} />
-                <Route path="risk" element={<RiskInputs />} />
+                <Route path="cost" element={<CostModule />} />
+                <Route path="revenue" element={<RevenueModule />} />
+                <Route path="financing" element={<FinancingModule />} />
+                <Route path="risk" element={<RiskModule />} />
               </Route>
             </Route>
             

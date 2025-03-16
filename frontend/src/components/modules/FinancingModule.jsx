@@ -1,28 +1,31 @@
-// src/components/inputs/FinancingInputs.jsx
+// src/components/modules/FinancingModule.jsx
 import React, { useState } from 'react';
 import { Typography, Form, InputNumber, Select, Card, Divider, Row, Col, Radio, Alert } from 'antd';
 import { DollarOutlined, PercentageOutlined } from '@ant-design/icons';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 const { Option } = Select;
 
-const FinancingInputs = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+const FinancingModule = () => {
+  const { settings, updateScenario, scenarioData } = useScenario();
   const [form] = Form.useForm();
   const [financingModel, setFinancingModel] = useState('Balance-Sheet');
 
-  // Only render if parameters are loaded
-  if (!parameters || !parameters.financing) {
-    return <div>Loading parameters...</div>;
+  // Only render if settings are loaded
+  if (!settings || !scenarioData) {
+    return <div>Loading settings...</div>;
   }
 
-  const financingParams = parameters.financing;
+  // Get financing parameters, ensuring the object exists
+  const financingParams = settings.modules?.financing || {};
   
-  // Set initial financing model
-  if (financingParams.model && financingParams.model !== financingModel) {
-    setFinancingModel(financingParams.model);
-  }
+  // Set initial financing model when parameters load or change
+  React.useEffect(() => {
+    if (financingParams.model && financingParams.model !== financingModel) {
+      setFinancingModel(financingParams.model);
+    }
+  }, [financingParams.model]);
 
   const handleValuesChange = (changedValues, allValues) => {
     // Check if the financing model has changed
@@ -32,7 +35,21 @@ const FinancingInputs = () => {
     
     // Only update if we have actual changed values
     if (Object.keys(changedValues).length > 0) {
-      updateModuleParameters('financing', allValues);
+      // Create updated settings
+      const updatedSettings = { ...settings };
+      
+      // Ensure modules and financing objects exist
+      if (!updatedSettings.modules) updatedSettings.modules = {};
+      if (!updatedSettings.modules.financing) updatedSettings.modules.financing = {};
+      
+      // Update financing settings
+      updatedSettings.modules.financing = {
+        ...updatedSettings.modules.financing,
+        ...allValues
+      };
+      
+      // Update the scenario with new settings
+      updateScenario(scenarioData._id, { settings: updatedSettings });
     }
   };
 
@@ -203,4 +220,4 @@ const FinancingInputs = () => {
   );
 };
 
-export default FinancingInputs;
+export default FinancingModule;

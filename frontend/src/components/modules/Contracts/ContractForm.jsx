@@ -1,4 +1,4 @@
-// frontend/src/components/config/oemContracts/OEMContractForm.jsx
+// src/components/modules/Contracts/ContractForm.jsx
 import React from 'react';
 import { 
   Form, 
@@ -7,25 +7,41 @@ import {
   Col, 
   InputNumber, 
   Select, 
-  Switch
+  Switch,
+  Tooltip,
+  Space,
+  Button
 } from 'antd';
+import { InfoCircleOutlined, PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
 /**
  * OEM Contract Form component
  */
-const OEMContractForm = ({ form, oemScopes = [] }) => {
-  // Get the selected OEM scope
-  const oemScopeId = Form.useWatch('oemScopeId', form);
-  const selectedScope = oemScopes.find(scope => scope.id === oemScopeId);
-
-  // When scope changes, update the oemScopeName field
-  React.useEffect(() => {
-    if (selectedScope) {
-      form.setFieldValue('oemScopeName', selectedScope.name);
+const ContractForm = ({ form, oemScopes = [] }) => {
+  // Add a year range to the years field
+  const addYearRange = () => {
+    const values = form.getFieldValue('years') || [];
+    
+    // Find the max year if it exists
+    let nextYear = 1;
+    if (values.length > 0) {
+      nextYear = Math.max(...values) + 1;
     }
-  }, [selectedScope, form]);
+    
+    // Add the next 5 years
+    const newYears = [...values];
+    for (let i = 0; i < 5; i++) {
+      if (!newYears.includes(nextYear + i)) {
+        newYears.push(nextYear + i);
+      }
+    }
+    
+    // Sort years
+    newYears.sort((a, b) => a - b);
+    form.setFieldsValue({ years: newYears });
+  };
 
   return (
     <Form
@@ -40,24 +56,39 @@ const OEMContractForm = ({ form, oemScopes = [] }) => {
         <Input placeholder="e.g., Basic OEM Contract (Years 1-5)" />
       </Form.Item>
       
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            name="startYear"
-            label="Start Year"
-            rules={[{ required: true, message: 'Please enter start year' }]}
+      <Form.Item
+        name="years"
+        label={
+          <Space>
+            Years Covered
+            <Tooltip title="Select which project years this contract covers">
+              <InfoCircleOutlined />
+            </Tooltip>
+          </Space>
+        }
+        rules={[{ required: true, message: 'Please specify years covered by contract' }]}
+      >
+        <Select
+          mode="multiple"
+          placeholder="Select years covered by contract"
+          style={{ width: '100%' }}
+          options={Array.from({ length: 30 }, (_, i) => ({ 
+            label: `Year ${i + 1}`, 
+            value: i + 1 
+          }))}
+        />
+      </Form.Item>
+      
+      <Row>
+        <Col>
+          <Button 
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={addYearRange}
+            style={{ marginBottom: 16 }}
           >
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            name="endYear"
-            label="End Year"
-            rules={[{ required: true, message: 'Please enter end year' }]}
-          >
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
+            Add 5 Year Range
+          </Button>
         </Col>
       </Row>
       
@@ -116,4 +147,4 @@ const OEMContractForm = ({ form, oemScopes = [] }) => {
   );
 };
 
-export default OEMContractForm;
+export default ContractForm;

@@ -1,25 +1,40 @@
-// src/components/inputs/RiskInputs.jsx
+// src/components/modules/RiskModule.jsx
 import React from 'react';
 import { Typography, Form, InputNumber, Switch, Card, Divider, Row, Col } from 'antd';
-import { useSimulation } from '../../contexts/SimulationContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 
-const RiskInputs = () => {
-  const { parameters, updateModuleParameters } = useSimulation();
+const RiskModule = () => {
+  const { settings, updateScenario, scenarioData } = useScenario();
   const [form] = Form.useForm();
 
-  // Only render if parameters are loaded
-  if (!parameters || !parameters.riskMitigation) {
-    return <div>Loading parameters...</div>;
+  // Only render if settings are loaded
+  if (!settings || !scenarioData) {
+    return <div>Loading settings...</div>;
   }
 
-  const riskParams = parameters.riskMitigation;
+  // Get risk parameters, ensuring the object exists
+  const riskParams = settings.modules?.risk || {};
 
   const handleValuesChange = (changedValues, allValues) => {
     // Only update if we have actual changed values
     if (Object.keys(changedValues).length > 0) {
-      updateModuleParameters('riskMitigation', allValues);
+      // Create updated settings
+      const updatedSettings = { ...settings };
+      
+      // Ensure modules and risk objects exist
+      if (!updatedSettings.modules) updatedSettings.modules = {};
+      if (!updatedSettings.modules.risk) updatedSettings.modules.risk = {};
+      
+      // Update risk settings
+      updatedSettings.modules.risk = {
+        ...updatedSettings.modules.risk,
+        ...allValues
+      };
+      
+      // Update the scenario with new settings
+      updateScenario(scenarioData._id, { settings: updatedSettings });
     }
   };
 
@@ -99,4 +114,4 @@ const RiskInputs = () => {
   );
 };
 
-export default RiskInputs;
+export default RiskModule;

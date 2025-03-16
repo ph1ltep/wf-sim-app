@@ -1,27 +1,42 @@
-// src/components/inputs/RevenueInputs.jsx
+// src/components/modules/RevenueModule.jsx
 import React from 'react';
-import { Typography, Form, InputNumber, Select, Card, Divider, Tabs, Radio } from 'antd';
+import { Typography, Form, InputNumber, Select, Card, Tabs, Radio } from 'antd';
 import { PercentageOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 const { Option } = Select;
 
-const RevenueInputs = () => {
-  const { settings, updateModuleParameters } = useScenario();
+const RevenueModule = () => {
+  const { settings, updateScenario, scenarioData } = useScenario();
   const [form] = Form.useForm();
 
   // Only render if settings are loaded
-  if (!settings || !settings.modules || !settings.modules.revenue) {
+  if (!settings || !scenarioData) {
     return <div>Loading settings...</div>;
   }
 
-  const revenueParams = settings.modules.revenue;
+  // Get revenue parameters, ensuring the object exists
+  const revenueParams = settings.modules?.revenue || {};
 
   const handleValuesChange = (changedValues, allValues) => {
     // Only update if we have actual changed values
     if (Object.keys(changedValues).length > 0) {
-      updateModuleParameters('revenue', allValues);
+      // Create updated settings
+      const updatedSettings = { ...settings };
+      
+      // Ensure modules and revenue objects exist
+      if (!updatedSettings.modules) updatedSettings.modules = {};
+      if (!updatedSettings.modules.revenue) updatedSettings.modules.revenue = {};
+      
+      // Update revenue settings
+      updatedSettings.modules.revenue = {
+        ...updatedSettings.modules.revenue,
+        ...allValues
+      };
+      
+      // Update the scenario with new settings
+      updateScenario(scenarioData._id, { settings: updatedSettings });
     }
   };
 
@@ -242,4 +257,4 @@ const RevenueInputs = () => {
   );
 };
 
-export default RevenueInputs;
+export default RevenueModule;
