@@ -1,5 +1,4 @@
 // backend/controllers/defaultsController.js
-
 /**
  * Get default parameter values for simulation
  * @param {Object} req - Express request object
@@ -52,7 +51,8 @@ const getDefaults = async (req, res) => {
         oemTerm: 5,
         fixedOMFee: 4000000,
         failureEventProbability: 5,
-        failureEventCost: 200000
+        failureEventCost: 200000,
+        oemContractId: null
       },
       revenue: {
         energyProduction: {
@@ -104,6 +104,99 @@ const getDefaults = async (req, res) => {
         currency: 'USD',
         foreignCurrency: 'EUR',
         exchangeRate: 1.0
+      },
+      // OEM scopes for the user to select from (these don't change per simulation)
+      oemScopes: [
+        {
+          id: 'scope_1',
+          name: 'Full-Service OEM',
+          preventiveMaintenance: true,
+          bladeInspections: true,
+          remoteMonitoring: true,
+          remoteTechnicalSupport: true,
+          siteManagement: true,
+          technicianPercent: 100,
+          correctiveMinor: true,
+          bladeIntegrityManagement: true,
+          correctiveMajor: true,
+          correctiveMajorDetails: {
+            tooling: true,
+            manpower: true,
+            parts: true
+          },
+          craneCoverage: true
+        },
+        {
+          id: 'scope_2',
+          name: 'Basic OEM Service',
+          preventiveMaintenance: true,
+          bladeInspections: true,
+          remoteMonitoring: true,
+          remoteTechnicalSupport: true,
+          siteManagement: false,
+          correctiveMinor: false,
+          bladeIntegrityManagement: false,
+          correctiveMajor: false,
+          craneCoverage: false
+        },
+        {
+          id: 'scope_3',
+          name: 'Remote Only',
+          preventiveMaintenance: false,
+          bladeInspections: false,
+          remoteMonitoring: true,
+          remoteTechnicalSupport: true,
+          siteManagement: false,
+          correctiveMinor: false,
+          bladeIntegrityManagement: false,
+          correctiveMajor: false,
+          craneCoverage: false
+        }
+      ],
+      // OEM contracts for this specific simulation
+      oemContracts: [
+        {
+          id: 'contract_1',
+          name: 'Standard OEM Warranty (Years 1-5)',
+          startYear: 1,
+          endYear: 5,
+          fixedFee: 4000000,
+          isPerTurbine: false,
+          oemScopeId: 'scope_1',
+          oemScopeName: 'Full-Service OEM'
+        }
+      ],
+      // Default structure for results - important for schema consistency
+      results: {
+        intermediateData: {
+          annualCosts: {
+            components: {
+              baseOM: {},
+              failureRisk: {},
+              majorRepairs: {}
+            },
+            total: {}
+          },
+          annualRevenue: {},
+          dscr: {},
+          cashFlows: {},
+          oemResponsibilityMatrix: null
+        },
+        finalResults: {
+          IRR: {},
+          NPV: {},
+          paybackPeriod: {},
+          minDSCR: {},
+          probabilityOfDSCRBelow1: 0
+        }
+      },
+      // Percentile info - copy from probabilities
+      percentileInfo: {
+        primary: 50,
+        upperBound: 75,
+        lowerBound: 25,
+        extremeUpper: 90,
+        extremeLower: 10
       }
     };
 
@@ -115,5 +208,3 @@ const getDefaults = async (req, res) => {
 };
 
 module.exports = { getDefaults };
-
-    

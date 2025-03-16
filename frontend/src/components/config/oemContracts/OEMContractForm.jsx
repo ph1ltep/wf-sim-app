@@ -1,5 +1,5 @@
 // frontend/src/components/config/oemContracts/OEMContractForm.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { 
   Form, 
   Input, 
@@ -15,53 +15,22 @@ const { Option } = Select;
 /**
  * OEM Contract Form component
  */
-const OEMContractForm = ({ 
-  form, 
-  initialValues = {}, 
-  oemScopes = [] 
-}) => {
-  // Set form values when initialValues changes
-  useEffect(() => {
-    if (Object.keys(initialValues).length > 0) {
-      // Create a clean form values object
-      const formValues = {
-        ...initialValues,
-        // Handle references correctly
-        oemScope: initialValues.oemScope?._id || initialValues.oemScope
-      };
-      
-      console.log('Setting form values:', formValues);
-      form.setFieldsValue(formValues);
-    }
-  }, [form, initialValues]);
+const OEMContractForm = ({ form, oemScopes = [] }) => {
+  // Get the selected OEM scope
+  const oemScopeId = Form.useWatch('oemScopeId', form);
+  const selectedScope = oemScopes.find(scope => scope.id === oemScopeId);
 
-  // Generate a default name based on form values
-  const generateAutoName = (values) => {
-    // Skip if no values
-    if (!values) return '';
-    
-    // Find the selected scope
-    const selectedScope = oemScopes.find(scope => scope.value === values.oemScope);
-    const scopeName = selectedScope?.label || 'Standard OEM';
-    
-    // Generate name based on term and scope
-    return `${scopeName} (Year ${values.startYear || 1}-${values.endYear || 5})`;
-  };
-
-  // Handle values change for auto-generating name
-  const handleValuesChange = (changedValues, allValues) => {
-    // If name is empty or user is changing term-related values, auto-generate name
-    if (!form.getFieldValue('name') || changedValues.startYear || changedValues.endYear || changedValues.oemScope) {
-      const autoName = generateAutoName(allValues);
-      form.setFieldValue('name', autoName);
+  // When scope changes, update the oemScopeName field
+  React.useEffect(() => {
+    if (selectedScope) {
+      form.setFieldValue('oemScopeName', selectedScope.name);
     }
-  };
+  }, [selectedScope, form]);
 
   return (
     <Form
       form={form}
       layout="vertical"
-      onValuesChange={handleValuesChange}
     >
       <Form.Item
         name="name"
@@ -121,7 +90,7 @@ const OEMContractForm = ({
       </Row>
       
       <Form.Item
-        name="oemScope"
+        name="oemScopeId"
         label="OEM Scope"
         rules={[{ required: true, message: 'Please select an OEM scope' }]}
       >
@@ -134,9 +103,14 @@ const OEMContractForm = ({
           }
         >
           {oemScopes.map(scope => (
-            <Option key={scope.value} value={scope.value}>{scope.label}</Option>
+            <Option key={scope.id} value={scope.id}>{scope.name}</Option>
           ))}
         </Select>
+      </Form.Item>
+
+      {/* Hidden field to store the name of the selected scope */}
+      <Form.Item name="oemScopeName" hidden>
+        <Input />
       </Form.Item>
     </Form>
   );

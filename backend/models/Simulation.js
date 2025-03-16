@@ -15,7 +15,8 @@ const CostSchema = new mongoose.Schema({
     cost: Number,
     probability: Number
   }],
-  contingencyCost: { type: Number, default: 0 }
+  contingencyCost: { type: Number, default: 0 },
+  oemContractId: { type: String }
 });
 
 // Schema for Revenue Module
@@ -68,6 +69,8 @@ const FinancingSchema = new mongoose.Schema({
 
 // Schema for General Module
 const GeneralSchema = new mongoose.Schema({
+  projectName: { type: String, default: 'Wind Farm Project' },
+  startDate: { type: Date },
   projectLife: { type: Number, default: 20 },
   loanDuration: { type: Number, default: 15 },
   numWTGs: { type: Number, default: 20 },
@@ -95,21 +98,21 @@ const ProbabilitySettingsSchema = new mongoose.Schema({
 
 // Schema for Component Quantities
 const ComponentQuantitiesSchema = new mongoose.Schema({
-  blades: { type: Number },
-  bladeBearings: { type: Number },
-  transformers: { type: Number },
-  gearboxes: { type: Number },
-  generators: { type: Number },
-  converters: { type: Number },
-  mainBearings: { type: Number },
-  yawSystems: { type: Number }
+  blades: { type: Number, default: 60 },
+  bladeBearings: { type: Number, default: 60 },
+  transformers: { type: Number, default: 20 },
+  gearboxes: { type: Number, default: 20 },
+  generators: { type: Number, default: 20 },
+  converters: { type: Number, default: 20 },
+  mainBearings: { type: Number, default: 20 },
+  yawSystems: { type: Number, default: 20 }
 });
 
 // Project Metrics Schema
 const ProjectMetricsSchema = new mongoose.Schema({
-  totalMW: { type: Number },
-  grossAEP: { type: Number },
-  netAEP: { type: Number },
+  totalMW: { type: Number, default: 70 },
+  grossAEP: { type: Number, default: 214032 },
+  netAEP: { type: Number, default: 214032 },
   componentQuantities: { type: ComponentQuantitiesSchema, default: () => ({}) }
 });
 
@@ -122,10 +125,13 @@ const AnnualAdjustmentSchema = new mongoose.Schema({
 
 // Schema for Scenario details
 const ScenarioSchema = new mongoose.Schema({
+  name: { type: String, default: 'Default Scenario' },
+  description: { type: String, default: 'Default configuration scenario' },
+  scenarioType: { type: String, default: 'base' },
   location: { type: String },
-  currency: { type: String },
-  foreignCurrency: { type: String },
-  exchangeRate: { type: Number }
+  currency: { type: String, default: 'USD' },
+  foreignCurrency: { type: String, default: 'EUR' },
+  exchangeRate: { type: Number, default: 1.0 }
 });
 
 // Dynamic Percentile schema for annual data and metrics
@@ -133,6 +139,79 @@ const PercentileSchema = new mongoose.Schema({
   // This is a flexible schema that will hold different percentile values
   // Each percentile key (e.g., "P50", "P75") will be dynamically added
 }, { strict: false });
+
+// Schema for Component Allocation in Responsibility Matrix
+const ComponentAllocationSchema = new mongoose.Schema({
+  oem: { type: Number, default: 0.0 },
+  owner: { type: Number, default: 1.0 }
+});
+
+// Schema for Crane Coverage in Responsibility Matrix
+const CraneCoverageSchema = new mongoose.Schema({
+  oem: { type: Number, default: 0.0 },
+  owner: { type: Number, default: 1.0 },
+  eventCap: { type: Number, default: null },
+  financialCap: { type: Number, default: null }
+});
+
+// Schema for Major Component Coverage in Responsibility Matrix
+const MajorComponentCoverageSchema = new mongoose.Schema({
+  oem: { type: Number, default: 0.0 },
+  owner: { type: Number, default: 1.0 },
+  eventCap: { type: Number, default: null },
+  financialCap: { type: Number, default: null },
+  components: {
+    tooling: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+    manpower: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+    parts: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) }
+  }
+});
+
+// Schema for Scope Allocations in Responsibility Matrix
+const ScopeAllocationsSchema = new mongoose.Schema({
+  preventiveMaintenance: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  bladeInspections: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  remoteMonitoring: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  remoteTechnicalSupport: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  siteManagement: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  technicians: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  correctiveMinor: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  bladeIntegrityManagement: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
+  craneCoverage: { type: CraneCoverageSchema, default: () => ({ oem: 0.0, owner: 1.0, eventCap: null, financialCap: null }) },
+  correctiveMajor: { type: MajorComponentCoverageSchema, default: () => ({
+    oem: 0.0,
+    owner: 1.0,
+    eventCap: null,
+    financialCap: null,
+    components: {
+      tooling: { oem: 0.0, owner: 1.0 },
+      manpower: { oem: 0.0, owner: 1.0 },
+      parts: { oem: 0.0, owner: 1.0 }
+    }
+  })}
+});
+
+// Schema for Yearly Responsibility in Responsibility Matrix
+const YearlyResponsibilitySchema = new mongoose.Schema({
+  year: { type: Number, required: true },
+  oemContractId: { type: String, default: null },
+  oemContractName: { type: String, default: null },
+  scopeAllocations: { type: ScopeAllocationsSchema, default: () => ({}) },
+  fixedFee: { type: Number, default: 0 },
+  isPerTurbine: { type: Boolean, default: false }
+});
+
+// Schema for OEM Contract
+const OEMContractSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  startYear: { type: Number, required: true },
+  endYear: { type: Number, required: true },
+  fixedFee: { type: Number, required: true },
+  isPerTurbine: { type: Boolean, default: false },
+  oemScopeId: { type: String, required: true },
+  oemScopeName: { type: String }
+});
 
 // Main Simulation Schema
 const SimulationSchema = new mongoose.Schema({
@@ -149,32 +228,62 @@ const SimulationSchema = new mongoose.Schema({
     probabilities: { type: ProbabilitySettingsSchema, default: () => ({}) },
     scenario: { type: ScenarioSchema, default: () => ({}) }
   },
-  annualAdjustments: [AnnualAdjustmentSchema],
-  percentileInfo: { type: ProbabilitySettingsSchema },
+  // Array of OEM scopes - referenced by OEM contracts
+  oemScopes: { 
+    type: [OEMScopeSchema], 
+    default: () => [] 
+  },
+  // Array of OEM contracts specific to this simulation instance
+  oemContracts: { 
+    type: [OEMContractSchema], 
+    default: () => [] 
+  },
+  annualAdjustments: {
+    type: [AnnualAdjustmentSchema],
+    default: function() {
+      // Create default annual adjustments for each year of project life
+      const projectLife = this.parameters?.general?.projectLife || 20;
+      return Array(projectLife).fill().map((_, i) => ({
+        year: i + 1,
+        additionalOM: 0,
+        additionalRevenue: 0
+      }));
+    }
+  },
+  percentileInfo: { type: ProbabilitySettingsSchema, default: () => ({
+    primary: 50,
+    upperBound: 75,
+    lowerBound: 25,
+    extremeUpper: 90,
+    extremeLower: 10
+  }) },
   results: {
     intermediateData: {
       annualCosts: {
         components: {
-          baseOM: { type: PercentileSchema },
-          failureRisk: { type: PercentileSchema },
-          majorRepairs: { type: PercentileSchema }
+          baseOM: { type: PercentileSchema, default: () => ({}) },
+          failureRisk: { type: PercentileSchema, default: () => ({}) },
+          majorRepairs: { type: PercentileSchema, default: () => ({}) }
         },
-        total: { type: PercentileSchema }
+        total: { type: PercentileSchema, default: () => ({}) }
       },
-      annualRevenue: { type: PercentileSchema },
-      dscr: { type: PercentileSchema },
-      cashFlows: { type: PercentileSchema }
+      annualRevenue: { type: PercentileSchema, default: () => ({}) },
+      dscr: { type: PercentileSchema, default: () => ({}) },
+      cashFlows: { type: PercentileSchema, default: () => ({}) },
+      // OEM responsibility matrix inside intermediateData, can be null
+      oemResponsibilityMatrix: {
+        type: [YearlyResponsibilitySchema],
+        default: null
+      }
     },
     finalResults: {
-      IRR: { type: PercentileSchema },
-      NPV: { type: PercentileSchema },
-      paybackPeriod: { type: PercentileSchema },
-      minDSCR: { type: PercentileSchema },
-      probabilityOfDSCRBelow1: Number
+      IRR: { type: PercentileSchema, default: () => ({}) },
+      NPV: { type: PercentileSchema, default: () => ({}) },
+      paybackPeriod: { type: PercentileSchema, default: () => ({}) },
+      minDSCR: { type: PercentileSchema, default: () => ({}) },
+      probabilityOfDSCRBelow1: { type: Number, default: 0 }
     }
   },
-  // Add OEM responsibility matrix
-  oemResponsibilityMatrix: { type: mongoose.Schema.Types.Mixed },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

@@ -1,8 +1,7 @@
-// src/contexts/SimulationContext.jsx
+// frontend/src/contexts/SimulationContext.jsx - Simplified
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getDefaultParameters, runSimulation } from '../api/simulation';
 import { createScenario, updateScenario, getScenarioById } from '../api/scenarios';
-import { getOEMContractById } from '../api/oemContracts';
 import { message } from 'antd';
 import moment from 'moment';
 
@@ -27,6 +26,8 @@ export const SimulationProvider = ({ children }) => {
       setLoading(true);
       const response = await getDefaultParameters();
       setParameters(response.defaults);
+      setCurrentScenario(null);
+      setResults(null);
     } catch (err) {
       message.error('Failed to load default parameters');
       console.error(err);
@@ -62,6 +63,15 @@ export const SimulationProvider = ({ children }) => {
         };
       }
       
+      // For oemContracts and oemScopes, update at the root level (not inside a module)
+      if (moduleName === 'oemContracts' || moduleName === 'oemScopes') {
+        return {
+          ...prev,
+          [moduleName]: processedParams
+        };
+      }
+      
+      // For regular modules, update the module
       return {
         ...prev,
         [moduleName]: {
@@ -88,21 +98,6 @@ export const SimulationProvider = ({ children }) => {
     }
   };
 
-  const loadOEMContractDetails = async (contractId) => {
-    if (!contractId) return null;
-    
-    try {
-      const response = await getOEMContractById(contractId);
-      if (response.success && response.data) {
-        return response.data;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error loading OEM contract details:', error);
-      return null;
-    }
-  };
-
   const runFullSimulation = async () => {
     if (!parameters) {
       message.warning('Parameters not yet loaded.');
@@ -115,16 +110,18 @@ export const SimulationProvider = ({ children }) => {
       // Clone parameters to avoid mutating the state directly
       const simulationParams = JSON.parse(JSON.stringify(parameters));
       
-      // If there's an OEM contract selected, load its details
+      // If there's an OEM contract selected, update the cost module with its values
       if (simulationParams.cost?.oemContractId) {
-        const contractDetails = await loadOEMContractDetails(simulationParams.cost.oemContractId);
+        const selectedContract = simulationParams.oemContracts.find(
+          contract => contract.id === simulationParams.cost.oemContractId
+        );
         
-        if (contractDetails) {
+        if (selectedContract) {
           // Update cost parameters with contract details
-          simulationParams.cost.fixedOMFee = contractDetails.isPerTurbine ? 
-            contractDetails.fixedFee * simulationParams.general.numWTGs : 
-            contractDetails.fixedFee;
-          simulationParams.cost.oemTerm = contractDetails.endYear;
+          simulationParams.cost.oemTerm = selectedContract.endYear;
+          simulationParams.cost.fixedOMFee = selectedContract.isPerTurbine ? 
+            selectedContract.fixedFee * simulationParams.general.numWTGs : 
+            selectedContract.fixedFee;
         }
       }
       
@@ -151,16 +148,28 @@ export const SimulationProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Ensure the current parameters have the scenario name and description
-      if (parameters.scenario) {
-        parameters.scenario.name = name;
-        parameters.scenario.description = description;
-      } else {
-        parameters.scenario = { name, description };
+      // Ensure parameters exists
+      if (!parameters) {
+        message.error('No parameters to save');
+        return null;
       }
       
-      // Convert moment objects to ISO strings for saving
-      const preparedParameters = JSON.parse(JSON.stringify(parameters));
+      // Update scenario name and description
+      updateModuleParameters('scenario', { 
+        ...parameters.scenario || {},
+        name, 
+        description 
+      });
+      
+      // Prepare a deep copy of parameters for saving
+      const preparedParameters = JSON.parse(JSON.stringify({
+        ...parameters,
+        scenario: {
+          ...parameters.scenario,
+          name,
+          description
+        }
+      }));
       
       const scenarioData = {
         name,
@@ -195,6 +204,7 @@ export const SimulationProvider = ({ children }) => {
       // Get the scenario parameters
       const scenarioParams = response.scenario.parameters;
       
+      // Set parameters from the loaded scenario
       setParameters(scenarioParams);
       setCurrentScenario(response.scenario);
       setResults(response.scenario.results);

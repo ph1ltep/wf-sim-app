@@ -1,5 +1,5 @@
-// frontend/src/hooks/useOEMContracts.js
-import { useState, useEffect } from 'react';
+// frontend/src/hooks/useOEMContracts.js - Updated version
+import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import { 
   getAllOEMContracts, 
@@ -19,7 +19,7 @@ const useOEMContracts = () => {
   const [loading, setLoading] = useState(false);
   
   // Fetch OEM contracts data
-  const fetchOEMContracts = async () => {
+  const fetchOEMContracts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getAllOEMContracts();
@@ -39,10 +39,10 @@ const useOEMContracts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch OEM scopes for dropdowns
-  const fetchOEMScopes = async () => {
+  const fetchOEMScopes = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getAllOEMScopes();
@@ -63,7 +63,7 @@ const useOEMContracts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
   // Create a new OEM contract
   const createContract = async (formData) => {
@@ -77,8 +77,11 @@ const useOEMContracts = () => {
         ...response.data
       };
       
+      // Update the contracts list
       setOEMContracts(prevContracts => [...prevContracts, newContract]);
       message.success('OEM contract added successfully');
+      
+      // Return the result for further processing if needed
       return { success: true, data: newContract };
     } catch (error) {
       handleError(error, 'Failed to add OEM contract');
@@ -96,6 +99,7 @@ const useOEMContracts = () => {
       
       const response = await updateOEMContract(id, formData);
       
+      // Update the contracts list
       setOEMContracts(prevContracts => {
         const index = prevContracts.findIndex(contract => contract.key === id);
         if (index > -1) {
@@ -110,7 +114,7 @@ const useOEMContracts = () => {
       });
       
       message.success('OEM contract updated successfully');
-      return { success: true };
+      return { success: true, data: response.data };
     } catch (error) {
       handleError(error, 'Failed to update OEM contract');
       return { success: false, error };
@@ -125,6 +129,7 @@ const useOEMContracts = () => {
       setLoading(true);
       await deleteOEMContract(id);
       
+      // Update the contracts list
       setOEMContracts(prevContracts => prevContracts.filter(contract => contract.key !== id));
       message.success('OEM contract deleted successfully');
       return { success: true };
@@ -151,7 +156,7 @@ const useOEMContracts = () => {
   useEffect(() => {
     fetchOEMContracts();
     fetchOEMScopes();
-  }, []);
+  }, [fetchOEMContracts, fetchOEMScopes]);
   
   return {
     oemContracts,
