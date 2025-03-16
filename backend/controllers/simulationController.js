@@ -11,7 +11,7 @@ const RiskModule = require('../services/modules/riskModule');
 const { generateResponsibilityMatrix } = require('../services/oemResponsibilityMatrix');
 const OEMScope = require('../models/OEMScope');
 const OEMContract = require('../models/OEMContract');
-const { getDefaults } = require('./defaultsController'); // Import getDefaults
+const { formatSuccess, formatError } = require('../utils/responseFormatter');
 
 // Run a full simulation
 const runFullSimulation = async (req, res, next) => {
@@ -25,9 +25,6 @@ const runFullSimulation = async (req, res, next) => {
         error: 'Missing required parameters' 
       });
     }
-    
-    // Convert from new structure to old structure for simulation engine
-    const simulationParams = convertSettingsToSimulationParams(settings);
     
     // Generate OEM responsibility matrix if there are OEM contracts
     let responsibilityMatrix = null;
@@ -68,7 +65,7 @@ const runFullSimulation = async (req, res, next) => {
     }
     
     // Run the simulation
-    const simResults = runSimulation(simulationParams);
+    const simResults = runSimulation(settings);
     
     // Return results in the new format
     const results = {
@@ -76,12 +73,22 @@ const runFullSimulation = async (req, res, next) => {
       percentileInfo: settings.simulation.probabilities || simResults.percentileInfo,
       simulation: {
         inputSim: {
-          ...simResults.results.intermediateData,
+          cashflow: {
+            annualCosts: simResults.results.intermediateData.annualCosts,
+            annualRevenue: simResults.results.intermediateData.annualRevenue,
+            dscr: simResults.results.intermediateData.dscr,
+            netCashFlow: simResults.results.intermediateData.cashFlows
+          },
+          risk: {
+            // We don't have specific risk outputs yet in the existing implementation
+            failureRates: {},
+            eventProbabilities: {}
+          },
           scope: {
             responsibilityMatrix
           }
         },
-        outputSim: mapOutputSim(simResults.results.finalResults, settings.simulation.probabilities)
+        outputSim: mapToOutputSim(simResults.results.finalResults, settings.simulation.probabilities)
       }
     };
     
@@ -107,14 +114,19 @@ const runCostModule = async (req, res, next) => {
     // Create cost module and run
     const costModule = new CostModule();
     
-    // Convert from new structure to old structure
+    // Convert settings to format expected by the module
     const simulationParams = {
       general: {
         ...settings.general,
         ...settings.project.windFarm
       },
       cost: settings.modules.cost,
-      probabilities: settings.simulation.probabilities
+      probabilities: settings.simulation.probabilities,
+      annualAdjustments: convertAdjustmentsToAnnual(
+        settings.general.projectLife,
+        settings.modules.cost.adjustments,
+        []
+      )
     };
     
     const results = costModule.runStandalone(simulationParams);
@@ -141,14 +153,20 @@ const runRevenueModule = async (req, res, next) => {
     // Create revenue module and run
     const revenueModule = new RevenueModule();
     
-    // Convert from new structure to old structure
+    // Convert settings to format expected by the module
     const simulationParams = {
       general: {
         ...settings.general,
         ...settings.project.windFarm
       },
       revenue: settings.modules.revenue,
-      probabilities: settings.simulation.probabilities
+      cost: settings.modules.cost, // Revenue module uses some cost parameters for failure probabilities
+      probabilities: settings.simulation.probabilities,
+      annualAdjustments: convertAdjustmentsToAnnual(
+        settings.general.projectLife,
+        [],
+        settings.modules.revenue.adjustments
+      )
     };
     
     const results = revenueModule.runStandalone(simulationParams);
@@ -175,7 +193,7 @@ const runFinancingModule = async (req, res, next) => {
     // Create financing module and run
     const financingModule = new FinancingModule();
     
-    // Convert from new structure to old structure
+    // Convert settings to format expected by the module
     const simulationParams = {
       general: {
         ...settings.general,
@@ -209,7 +227,7 @@ const runRiskModule = async (req, res, next) => {
     // Create risk module and run
     const riskModule = new RiskModule();
     
-    // Convert from new structure to old structure
+    // Convert settings to format expected by the module
     const simulationParams = {
       general: {
         ...settings.general,
@@ -229,35 +247,14 @@ const runRiskModule = async (req, res, next) => {
 };
 
 /**
- * Helper function to convert from new settings structure to simulation engine format
- * @param {Object} settings - The new settings structure
- * @returns {Object} The old simulation engine parameter structure
+ * Helper function to convert adjustment arrays to annual adjustments
+ * @param {number} projectLife - Project lifetime in years
+ * @param {Array} costAdjustments - Cost adjustments array
+ * @param {Array} revenueAdjustments - Revenue adjustments array
+ * @returns {Array} Annual adjustments array
  */
-function convertSettingsToSimulationParams(settings) {
-  // Extract relevant contracts from the contracts module
-  const oemContracts = settings?.modules?.contracts?.oemContracts || [];
-  let costModule = { ...settings.modules.cost };
-  
-  // Find contracts that apply to each year and update cost parameters
-  if (oemContracts.length > 0) {
-    // Get the most extensive OEM contract (covering the most years)
-    const mostExtensiveContract = [...oemContracts].sort((a, b) => b.years.length - a.years.length)[0];
-    
-    if (mostExtensiveContract) {
-      // Find the maximum year
-      const maxYear = Math.max(...mostExtensiveContract.years);
-      
-      // Update OEM term and fixed fee
-      costModule.oemTerm = maxYear;
-      costModule.fixedOMFee = mostExtensiveContract.isPerTurbine ? 
-        mostExtensiveContract.fixedFee * settings.project.windFarm.numWTGs : 
-        mostExtensiveContract.fixedFee;
-    }
-  }
-  
-  // Convert cost and revenue adjustments to annual adjustments
+function convertAdjustmentsToAnnual(projectLife, costAdjustments = [], revenueAdjustments = []) {
   const annualAdjustments = [];
-  const projectLife = settings.general.projectLife || 20;
   
   // Initialize annual adjustments array
   for (let year = 1; year <= projectLife; year++) {
@@ -269,61 +266,33 @@ function convertSettingsToSimulationParams(settings) {
   }
   
   // Process cost adjustments
-  if (settings.modules.cost.adjustments && settings.modules.cost.adjustments.length > 0) {
-    settings.modules.cost.adjustments.forEach(adjustment => {
-      adjustment.years.forEach(year => {
-        if (year >= 1 && year <= projectLife) {
-          annualAdjustments[year - 1].additionalOM += adjustment.amount;
-        }
-      });
+  costAdjustments.forEach(adjustment => {
+    adjustment.years.forEach(year => {
+      if (year >= 1 && year <= projectLife) {
+        annualAdjustments[year - 1].additionalOM += adjustment.amount;
+      }
     });
-  }
+  });
   
   // Process revenue adjustments
-  if (settings.modules.revenue.adjustments && settings.modules.revenue.adjustments.length > 0) {
-    settings.modules.revenue.adjustments.forEach(adjustment => {
-      adjustment.years.forEach(year => {
-        if (year >= 1 && year <= projectLife) {
-          annualAdjustments[year - 1].additionalRevenue += adjustment.amount;
-        }
-      });
+  revenueAdjustments.forEach(adjustment => {
+    adjustment.years.forEach(year => {
+      if (year >= 1 && year <= projectLife) {
+        annualAdjustments[year - 1].additionalRevenue += adjustment.amount;
+      }
     });
-  }
+  });
   
-  return {
-    general: {
-      ...settings.general,
-      ...settings.project.windFarm,
-      loanDuration: settings.modules.financing.loanDuration
-    },
-    financing: {
-      ...settings.modules.financing
-    },
-    cost: costModule,
-    revenue: settings.modules.revenue,
-    riskMitigation: settings.modules.risk,
-    simulation: settings.simulation,
-    probabilities: settings.simulation.probabilities,
-    annualAdjustments: annualAdjustments,
-    scenario: {
-      name: settings.general.projectName,
-      description: '',
-      scenarioType: 'base',
-      currency: settings.project.currency.local,
-      foreignCurrency: settings.project.currency.foreign,
-      exchangeRate: settings.project.currency.exchangeRate,
-      location: settings.project.location
-    }
-  };
+  return annualAdjustments;
 }
 
 /**
- * Maps the old-style simulation results to the new outputSim structure
- * @param {Object} finalResults - The old-style finalResults 
+ * Maps the simulation results to the new outputSim structure
+ * @param {Object} finalResults - The finalResults from simulation
  * @param {Object} probabilities - The probability settings
  * @returns {Object} The new outputSim structure
  */
-function mapOutputSim(finalResults, probabilities) {
+function mapToOutputSim(finalResults, probabilities) {
   // Define percentile mapping
   const percentileMapping = {
     P10: `Pextreme_lower`,
@@ -360,11 +329,128 @@ function mapOutputSim(finalResults, probabilities) {
   return outputSim;
 }
 
+// Get default parameters for simulation - reused from the original controller
+const getDefaultParameters = async (req, res) => {
+  try {
+    // Default parameters in the new schema format
+    const defaults = {
+      general: {
+        projectName: 'Wind Farm Project',
+        startDate: null,
+        projectLife: 20
+      },
+      project: {
+        windFarm: {
+          numWTGs: 20,
+          wtgPlatformType: 'geared',
+          mwPerWTG: 3.5,
+          capacityFactor: 35,
+          curtailmentLosses: 0,
+          electricalLosses: 0
+        },
+        currency: {
+          local: 'USD',
+          foreign: 'EUR',
+          exchangeRate: 1.0
+        },
+        location: null
+      },
+      modules: {
+        financing: {
+          capex: 50000000,
+          devex: 10000000,
+          model: 'Balance-Sheet',
+          debtToEquityRatio: 1.5,
+          debtToCapexRatio: 0.7,
+          loanInterestRateBS: 5,
+          loanInterestRatePF: 6,
+          minimumDSCR: 1.3,
+          loanDuration: 15
+        },
+        cost: {
+          annualBaseOM: 5000000,
+          escalationRate: 2,
+          escalationDistribution: 'Normal',
+          oemTerm: 5,
+          fixedOMFee: 4000000,
+          failureEventProbability: 5,
+          failureEventCost: 200000,
+          majorRepairEvents: [],
+          contingencyCost: 0,
+          adjustments: []
+        },
+        revenue: {
+          energyProduction: {
+            distribution: 'Normal',
+            mean: 1000,
+            std: 100
+          },
+          electricityPrice: {
+            type: 'fixed',
+            value: 50
+          },
+          revenueDegradationRate: 0.5,
+          downtimePerEvent: {
+            distribution: 'Weibull',
+            scale: 24,
+            shape: 1.5
+          },
+          windVariabilityMethod: 'Default',
+          turbulenceIntensity: 10,
+          surfaceRoughness: 0.03,
+          kaimalScale: 8.1,
+          adjustments: []
+        },
+        risk: {
+          insuranceEnabled: false,
+          insurancePremium: 50000,
+          insuranceDeductible: 10000,
+          reserveFunds: 0
+        },
+        contracts: {
+          oemContracts: []
+        }
+      },
+      simulation: {
+        iterations: 10000,
+        seed: 42,
+        probabilities: {
+          primary: 50,       // P50 (median)
+          upperBound: 75,    // P75
+          lowerBound: 25,    // P25
+          extremeUpper: 90,  // P90
+          extremeLower: 10   // P10
+        }
+      },
+      metrics: {
+        totalMW: 70,  // 20 * 3.5
+        grossAEP: 214032,  // 70 * 0.35 * 8760
+        netAEP: 214032,  // Same as gross if losses are 0
+        componentQuantities: {
+          blades: 60,
+          bladeBearings: 60,
+          transformers: 20,
+          gearboxes: 20,
+          generators: 20,
+          converters: 20,
+          mainBearings: 20,
+          yawSystems: 20
+        }
+      }
+    };
+
+    res.json(formatSuccess({ defaults }));
+  } catch (error) {
+    console.error('Error getting default parameters:', error);
+    res.status(500).json(formatError(error.message));
+  }
+};
+
 module.exports = {
   runFullSimulation,
   runCostModule,
   runRevenueModule,
   runFinancingModule,
   runRiskModule,
-  getDefaultParameters: getDefaults // Export the imported function
+  getDefaultParameters
 };
