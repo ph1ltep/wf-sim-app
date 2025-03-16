@@ -1,168 +1,98 @@
 // backend/services/monte-carlo/input-simulation.js
-const { createSimulationEngine, convertToSimulationParams, getPercentileValues } = require('./utils');
+const ModularMonteCarloEngine = require('./ModularMonteCarloEngine');
+const ContextFactory = require('./ContextFactory');
+const ResultFormatter = require('./ResultFormatter');
+const ValidationService = require('./ValidationService');
 const { generateResponsibilityMatrix } = require('../oemResponsibilityMatrix');
-const OEMScope = require('../../models/OEMScope');
+
+// Import modules
+const CostModule = require('../modules/costModule');
+const RevenueModule = require('../modules/revenueModule');
+const RiskModule = require('../modules/riskModule');
 
 /**
- * Run the input part of the simulation to get intermediateData
- * @param {Object} settings - Scenario settings using the new schema structure
+ * Run the input part of the simulation to generate operational results
+ * 
+ * @param {Object} settings - Scenario settings
  * @param {Array} oemScopes - Optional pre-fetched OEM scopes
- * @returns {Object} inputSim object
+ * @returns {Object} Input simulation results
  */
 async function runInputSimulation(settings, oemScopes = null) {
-  // Convert from the new scenario schema structure to the parameters format expected by the engine
-  const parameters = convertToSimulationParams(settings);
+  // Validate scenario settings
+  const settingsValidation = ValidationService.validateScenarioSettings(settings);
+  if (!settingsValidation.isValid) {
+    console.error('Scenario settings validation failed:', settingsValidation.errors);
+    throw new Error(`Scenario validation failed: ${settingsValidation.errors[0]}`);
+  }
   
+  // Configure the simulation engine
   const options = {
     iterations: settings.simulation?.iterations || 10000,
     seed: settings.simulation?.seed || 42,
-    percentiles: getPercentileValues(settings.simulation?.probabilities)
+    percentiles: {
+      primary: settings.simulation?.probabilities?.primary || 50,
+      upperBound: settings.simulation?.probabilities?.upperBound || 75,
+      lowerBound: settings.simulation?.probabilities?.lowerBound || 25,
+      extremeUpper: settings.simulation?.probabilities?.extremeUpper || 90,
+      extremeLower: settings.simulation?.probabilities?.extremeLower || 10
+    }
   };
   
-  const engine = createSimulationEngine(options);
-  const results = engine.run(parameters);
+  // Create the modular engine
+  const engine = new ModularMonteCarloEngine(options);
   
-  // Extract percentiles
-  const percentiles = options.percentiles;
+  // Create modules
+  const costModule = new CostModule();
+  const revenueModule = new RevenueModule();
+  const riskModule = new RiskModule();
   
-  // Map traditional percentile keys (P50) to new format (Pprimary)
-  const percentileMapping = {
-    [`P${percentiles.extremeLower}`]: 'Pextreme_lower',
-    [`P${percentiles.lowerBound}`]: 'Plower_bound',
-    [`P${percentiles.primary}`]: 'Pprimary',
-    [`P${percentiles.upperBound}`]: 'Pupper_bound',
-    [`P${percentiles.extremeUpper}`]: 'Pextreme_upper'
-  };
+  // Register modules with the engine
+  engine.registerModule(costModule);
+  engine.registerModule(revenueModule);
+  engine.registerModule(riskModule);
   
-  // Initialize input simulation result structure
-  const inputSim = {
-    cashflow: {
-      annualCosts: {
-        total: {},
-        components: {
-          baseOM: {},
-          failureRisk: {}
-        }
-      },
-      annualRevenue: {},
-      dscr: {},
-      netCashFlow: {}
-    },
-    risk: {
-      failureRates: {},
-      eventProbabilities: {}
-    },
-    scope: {
-      responsibilityMatrix: null
-    },
-    // Store raw results for internal use
-    _rawResults: results,
-    _percentiles: percentiles
-  };
+  // Create standardized context
+  const context = await ContextFactory.createInputContext(settings, oemScopes);
   
-  // Process annual costs total
-  if (results.summary.annualData.totalCost) {
-    Object.keys(results.summary.annualData.totalCost).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.annualCosts.total[newKey] = results.summary.annualData.totalCost[oldKey];
-    });
-  }
-  
-  // Process baseOM costs
-  if (results.summary.annualData.baseOMCost) {
-    Object.keys(results.summary.annualData.baseOMCost).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.annualCosts.components.baseOM[newKey] = results.summary.annualData.baseOMCost[oldKey];
-    });
-  }
-  
-  // Process failure event costs
-  if (results.summary.annualData.failureEventCost) {
-    Object.keys(results.summary.annualData.failureEventCost).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.annualCosts.components.failureRisk[newKey] = results.summary.annualData.failureEventCost[oldKey];
-    });
-  }
-  
-  // Process annual revenue
-  if (results.summary.annualData.revenue) {
-    Object.keys(results.summary.annualData.revenue).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.annualRevenue[newKey] = results.summary.annualData.revenue[oldKey];
-    });
-  }
-  
-  // Process DSCR
-  if (results.summary.annualData.dscr) {
-    Object.keys(results.summary.annualData.dscr).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.dscr[newKey] = results.summary.annualData.dscr[oldKey];
-    });
-  }
-  
-  // Process cashFlow
-  if (results.summary.annualData.cashFlow) {
-    Object.keys(results.summary.annualData.cashFlow).forEach(oldKey => {
-      const newKey = percentileMapping[oldKey] || oldKey;
-      inputSim.cashflow.netCashFlow[newKey] = results.summary.annualData.cashFlow[oldKey];
-    });
-  }
+  // Run the simulation
+  const rawResults = engine.run(context);
   
   // Generate OEM responsibility matrix
-  const responsibilityMatrix = await generateOEMResponsibilityMatrix(settings, oemScopes);
-  inputSim.scope.responsibilityMatrix = responsibilityMatrix;
+  const responsibilityContext = ContextFactory.createResponsibilityContext(settings, oemScopes);
+  const responsibilityMatrix = await generateResponsibilityMatrix(
+    responsibilityContext.projectLife,
+    responsibilityContext.numWTGs,
+    responsibilityContext.oemContracts.map(contract => {
+      // Find OEM scope for this contract
+      const oemScope = responsibilityContext.oemScopes.find(
+        scope => scope._id.toString() === contract.oemScopeId
+      );
+      
+      return {
+        ...contract,
+        oemScope
+      };
+    }).filter(Boolean)
+  );
   
-  return inputSim;
-}
-
-/**
- * Generate the OEM responsibility matrix
- * @param {Object} settings - Settings object
- * @param {Array} preloadedScopes - Optional pre-loaded OEM scopes
- * @returns {Object|null} Responsibility matrix or null
- */
-async function generateOEMResponsibilityMatrix(settings, preloadedScopes = null) {
-  let responsibilityMatrix = null;
-  const oemContracts = settings?.modules?.contracts?.oemContracts || [];
+  // Add responsibility matrix to results
+  rawResults.responsibilityMatrix = responsibilityMatrix;
   
-  if (oemContracts.length > 0) {
-    // Get all OEM scope IDs referenced in contracts
-    const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
-    
-    if (oemScopeIds.length > 0) {
-      // Use preloaded scopes or fetch from database
-      let oemScopes = preloadedScopes;
-      if (!oemScopes) {
-        oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
-      }
-      
-      // Create a map of OEM scope IDs to OEM scope objects for quick lookup
-      const oemScopeMap = oemScopes.reduce((map, scope) => {
-        map[scope._id.toString()] = scope;
-        return map;
-      }, {});
-      
-      // Create augmented contracts with scope objects for the matrix generator
-      const augmentedContracts = oemContracts.map(contract => {
-        const oemScope = oemScopeMap[contract.oemScopeId];
-        if (oemScope) {
-          return { ...contract, oemScope };
-        }
-        return null;
-      }).filter(Boolean);
-      
-      if (augmentedContracts.length > 0) {
-        // Generate responsibility matrix
-        responsibilityMatrix = generateResponsibilityMatrix(
-          settings.general.projectLife || 20,
-          settings.project.windFarm.numWTGs || 20,
-          augmentedContracts
-        );
-      }
-    }
+  // Format the results using the standard formatter
+  const formattedResults = ResultFormatter.formatResults(rawResults, options.percentiles, true);
+  
+  // Validate formatted results
+  const resultsValidation = ValidationService.validateInputResults(formattedResults);
+  if (!resultsValidation.isValid) {
+    console.warn('Input results validation warnings:', resultsValidation.errors);
+    // Continue with warnings but don't throw error
   }
   
-  return responsibilityMatrix;
+  // Store raw results for potential use by output simulation
+  formattedResults._rawResults = rawResults;
+  formattedResults._percentiles = options.percentiles;
+  
+  return formattedResults;
 }
 
 module.exports = runInputSimulation;

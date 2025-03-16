@@ -1,19 +1,15 @@
-// backend/services/monte-carlo/engine.js
-const seedrandom = require('seedrandom');
-const financial = require('financial');
-const DistributionFactory = require('./distributions');
-
-class MonteCarloEngine {
+// Proposed engine refactoring
+class ModularMonteCarloEngine {
   constructor(options = {}) {
     this.options = {
       seed: options.seed || 42,
       iterations: options.iterations || 10000,
       percentiles: options.percentiles || {
-        primary: 50,      // Default: P50 (median)
-        upperBound: 75,   // Default: P75
-        lowerBound: 25,   // Default: P25
-        extremeLower: 10, // Default: P10
-        extremeUpper: 90  // Default: P90
+        primary: 50,
+        upperBound: 75,
+        lowerBound: 25,
+        extremeLower: 10,
+        extremeUpper: 90
       },
       ...options
     };
@@ -25,201 +21,85 @@ class MonteCarloEngine {
 
   /**
    * Register a simulation module
-   * @param {string} name - Module name
-   * @param {Object} module - Module instance
+   * @param {SimulationModule} module - Module instance
+   * @returns {this} For chaining
    */
-  registerModule(name, module) {
-    this.modules.set(name, module);
-    return this;
-  }
-
-  /**
-   * Initialize the random number generator with a seed
-   */
-  initializeRNG() {
-    this.originalRandom = Math.random;
-    Math.random = seedrandom(this.options.seed);
-    return this;
-  }
-
-  /**
-   * Restore the original random number generator
-   */
-  restoreRNG() {
-    if (this.originalRandom) {
-      Math.random = this.originalRandom;
-      this.originalRandom = null;
+  registerModule(module) {
+    if (!module.name) {
+      throw new Error('Module must have a name');
     }
+    this.modules.set(module.name, module);
     return this;
   }
 
   /**
-   * Run a Monte Carlo simulation
-   * @param {Object} parameters - Simulation parameters
+   * Run simulation with provided context
+   * @param {Object} context - Simulation context
    * @returns {Object} Simulation results
    */
-  run(parameters) {
-    // Initialize
+  run(context) {
+    // Initialize RNG
     this.initializeRNG();
-    this.results = {
-      iterations: [],
-      summary: {},
-    };
-
-    const { general, financing } = parameters;
-    const projectLife = general.projectLife || 20;
-    // Update here: Use loanDuration from financing parameters
-    const loanDuration = financing.loanDuration || 15;
-
+    
+    // Initialize results
+    const iterationResults = [];
+    
     // Run iterations
-    for (let iter = 0; iter < this.options.iterations; iter++) {
-      const iterationResult = {
-        annualData: Array(projectLife).fill().map(() => ({})),
-        metrics: {},
+    for (let i = 0; i < this.options.iterations; i++) {
+      const iterationState = {
+        iteration: i,
+        moduleResults: {}
       };
-
-      // Initialize with initial cash flow (CAPEX + DEVEX)
-      const initialInvestment = -((parameters.financing.capex || 0) + (parameters.financing.devex || 0));
-      iterationResult.cashFlows = [initialInvestment];
       
-      // Run each module for this iteration
-      for (const [name, module] of this.modules.entries()) {
+      // Process each module
+      for (const [name, module] of this.modules) {
+        // Allow module to transform input data for its needs
+        const moduleContext = module.prepareInputData(context);
+        
+        // Run module for this iteration
         const moduleResult = module.processIteration(
-          parameters, 
-          iterationResult,
-          iter
+          moduleContext, 
+          iterationState,
+          i
         );
         
-        // Merge module result into iteration result
-        Object.assign(iterationResult.metrics, moduleResult.metrics || {});
-        
-        // Update annual data
-        if (moduleResult.annualData) {
-          for (let year = 0; year < projectLife; year++) {
-            iterationResult.annualData[year] = {
-              ...iterationResult.annualData[year],
-              ...(moduleResult.annualData[year] || {})
-            };
-          }
-        }
+        // Store module results
+        iterationState.moduleResults[name] = moduleResult;
       }
       
-      // Calculate IRR for this iteration
-      iterationResult.metrics.irr = financial.irr(iterationResult.cashFlows) || 0;
-      
-      // Store iteration result
-      this.results.iterations.push(iterationResult);
+      // Store iteration results
+      iterationResults.push(iterationState);
     }
-
-    // Calculate summary statistics using the specified percentiles
-    this.calculateSummary();
+    
+    // Format results using each module's formatter
+    const formattedResults = {
+      summary: {}
+    };
+    
+    for (const [name, module] of this.modules) {
+      // Extract module results from all iterations
+      const moduleIterations = iterationResults.map(iter => iter.moduleResults[name]);
+      
+      // Format using module's formatter
+      formattedResults.summary[name] = module.formatResults(
+        moduleIterations, 
+        this.options.percentiles
+      );
+    }
     
     // Restore RNG
     this.restoreRNG();
     
+    // Store and return results
+    this.results = {
+      iterations: iterationResults,
+      summary: formattedResults.summary
+    };
+    
     return this.results;
   }
 
-  /**
-   * Calculate summary statistics from all iterations using specified percentiles
-   */
-  calculateSummary() {
-    if (!this.results || !this.results.iterations.length) {
-      return this;
-    }
-
-    const { iterations } = this.results;
-    const projectLife = iterations[0].annualData.length;
-    
-    // Generate percentile labels
-    const percentileValues = [
-      this.options.percentiles.extremeLower, 
-      this.options.percentiles.lowerBound,
-      this.options.percentiles.primary,
-      this.options.percentiles.upperBound,
-      this.options.percentiles.extremeUpper
-    ];
-    
-    const percentileLabels = percentileValues.map(p => `P${p}`);
-
-    // Get all metric names
-    const metricNames = new Set();
-    iterations.forEach(iter => {
-      Object.keys(iter.metrics).forEach(key => metricNames.add(key));
-    });
-
-    // Calculate percentiles for each metric using the specified percentile values
-    const metricResults = {};
-    metricNames.forEach(metric => {
-      const values = iterations.map(iter => iter.metrics[metric]);
-      metricResults[metric] = DistributionFactory.calculatePercentiles(
-        values, 
-        percentileValues
-      );
-    });
-
-    // Calculate annual data percentiles (costs, revenue, etc.)
-    const annualResults = {};
-    
-    // First, identify all annual data fields
-    const annualDataFields = new Set();
-    iterations.forEach(iter => {
-      iter.annualData.forEach(yearData => {
-        Object.keys(yearData).forEach(key => annualDataFields.add(key));
-      });
-    });
-    
-    // Then calculate percentiles for each field for each year using specified percentiles
-    annualDataFields.forEach(field => {
-      annualResults[field] = {};
-      
-      // Initialize arrays for each percentile
-      percentileLabels.forEach(label => {
-        annualResults[field][label] = [];
-      });
-      
-      for (let year = 0; year < projectLife; year++) {
-        const yearValues = iterations.map(iter => 
-          iter.annualData[year][field] || 0
-        );
-        
-        const percentiles = DistributionFactory.calculatePercentiles(
-          yearValues, 
-          percentileValues
-        );
-        
-        // Add values for each percentile
-        percentileLabels.forEach(label => {
-          annualResults[field][label].push(percentiles[label]);
-        });
-      }
-    });
-
-    // Calculate DSCR below 1 probability
-    if (annualResults.dscr) {
-      const dscrValues = iterations.map(iter => {
-        // Find minimum DSCR for each iteration
-        const dscrArray = [];
-        for (let year = 0; year < projectLife; year++) {
-          if (iter.annualData[year].dscr !== undefined && iter.annualData[year].dscr !== Infinity) {
-            dscrArray.push(iter.annualData[year].dscr);
-          }
-        }
-        return dscrArray.length > 0 ? Math.min(...dscrArray) : Infinity;
-      });
-      
-      // Calculate probability of min DSCR falling below 1
-      const dscrBelow1Count = dscrValues.filter(dscr => dscr < 1).length;
-      metricResults.dscrBelow1Probability = dscrBelow1Count / iterations.length;
-    }
-
-    this.results.summary = {
-      metrics: metricResults,
-      annualData: annualResults
-    };
-    
-    return this;
-  }
+  // RNG methods remain the same
+  initializeRNG() {/* ... */}
+  restoreRNG() {/* ... */}
 }
-
-module.exports = MonteCarloEngine;

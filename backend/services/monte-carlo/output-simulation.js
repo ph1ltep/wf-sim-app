@@ -1,85 +1,96 @@
 // backend/services/monte-carlo/output-simulation.js
-const { createSimulationEngine, convertToSimulationParams, getPercentileValues } = require('./utils');
+const ModularMonteCarloEngine = require('./ModularMonteCarloEngine');
+const ContextFactory = require('./ContextFactory');
+const ResultFormatter = require('./ResultFormatter');
+const SimulationBridge = require('./SimulationBridge');
+const ValidationService = require('./ValidationService');
+
+// Import financial modules
+const FinancingModule = require('../modules/financingModule');
+const IRRModule = require('../modules/irrModule');
+const NPVModule = require('../modules/npvModule');
+const PaybackModule = require('../modules/paybackModule');
 
 /**
- * Run the output part of the simulation to get final metrics
- * @param {Object} settings - Scenario settings using the new schema structure
- * @param {Object} inputSimData - Optional inputSim data from runInputSimulation
- * @returns {Object} outputSim object
+ * Run the output part of the simulation to generate financial metrics
+ * 
+ * @param {Object} settings - Scenario settings
+ * @param {Object} inputSimData - Input simulation data
+ * @returns {Object} Output simulation results
  */
 async function runOutputSimulation(settings, inputSimData = null) {
-  let results;
-  let percentiles;
-  
-  if (inputSimData && inputSimData._rawResults) {
-    // Reuse results from previous calculation if available
-    results = inputSimData._rawResults;
-    percentiles = inputSimData._percentiles;
-  } else {
-    // Otherwise run a full simulation
-    const parameters = convertToSimulationParams(settings);
-    
-    const options = {
-      iterations: settings.simulation?.iterations || 10000,
-      seed: settings.simulation?.seed || 42,
-      percentiles: getPercentileValues(settings.simulation?.probabilities)
-    };
-    
-    const engine = createSimulationEngine(options);
-    results = engine.run(parameters);
-    percentiles = options.percentiles;
+  // Validate scenario settings
+  const settingsValidation = ValidationService.validateScenarioSettings(settings);
+  if (!settingsValidation.isValid) {
+    console.error('Scenario settings validation failed:', settingsValidation.errors);
+    throw new Error(`Scenario validation failed: ${settingsValidation.errors[0]}`);
   }
   
-  // Map traditional percentile keys (P50) to new format (Pprimary)
-  const percentileMapping = {
-    [`P${percentiles.extremeLower}`]: 'Pextreme_lower',
-    [`P${percentiles.lowerBound}`]: 'Plower_bound',
-    [`P${percentiles.primary}`]: 'Pprimary',
-    [`P${percentiles.upperBound}`]: 'Pupper_bound',
-    [`P${percentiles.extremeUpper}`]: 'Pextreme_upper'
+  // If input simulation data is provided, validate it
+  if (inputSimData) {
+    const inputDataValidation = ValidationService.validateInputResults(inputSimData);
+    if (!inputDataValidation.isValid) {
+      console.warn('Input data validation warnings:', inputDataValidation.errors);
+      // Continue with warnings but don't throw error
+    }
+  }
+  
+  // Configure the simulation engine
+  const options = {
+    iterations: settings.simulation?.iterations || 10000,
+    seed: settings.simulation?.seed || 42,
+    percentiles: {
+      primary: settings.simulation?.probabilities?.primary || 50,
+      upperBound: settings.simulation?.probabilities?.upperBound || 75,
+      lowerBound: settings.simulation?.probabilities?.lowerBound || 25,
+      extremeUpper: settings.simulation?.probabilities?.extremeUpper || 90,
+      extremeLower: settings.simulation?.probabilities?.extremeLower || 10
+    }
   };
   
-  // Format the results for outputSim
-  const outputSim = {
-    IRR: {},
-    NPV: {},
-    paybackPeriod: {},
-    minDSCR: {}
-  };
+  // Create the modular engine
+  const engine = new ModularMonteCarloEngine(options);
   
-  // Process IRR
-  if (results.summary.metrics.irr) {
-    Object.keys(results.summary.metrics.irr).forEach(percentileKey => {
-      const newKey = percentileMapping[percentileKey] || percentileKey;
-      outputSim.IRR[newKey] = results.summary.metrics.irr[percentileKey];
-    });
+  // Create financial modules
+  const financingModule = new FinancingModule();
+  const irrModule = new IRRModule();
+  const npvModule = new NPVModule();
+  const paybackModule = new PaybackModule();
+  
+  // Register modules with the engine
+  engine.registerModule(financingModule);
+  engine.registerModule(irrModule);
+  engine.registerModule(npvModule);
+  engine.registerModule(paybackModule);
+  
+  // Prepare bridge data from input simulation if available
+  let bridgeData = null;
+  if (inputSimData) {
+    bridgeData = SimulationBridge.bridgeInputToOutput(inputSimData);
   }
   
-  // Process NPV
-  if (results.summary.metrics.npv) {
-    Object.keys(results.summary.metrics.npv).forEach(percentileKey => {
-      const newKey = percentileMapping[percentileKey] || percentileKey;
-      outputSim.NPV[newKey] = results.summary.metrics.npv[percentileKey];
-    });
+  // Create standardized context
+  const context = ContextFactory.createOutputContext(settings, inputSimData);
+  
+  // Add bridge data to context if available
+  if (bridgeData) {
+    context.bridgeData = bridgeData;
   }
   
-  // Process paybackPeriod
-  if (results.summary.metrics.paybackPeriod) {
-    Object.keys(results.summary.metrics.paybackPeriod).forEach(percentileKey => {
-      const newKey = percentileMapping[percentileKey] || percentileKey;
-      outputSim.paybackPeriod[newKey] = results.summary.metrics.paybackPeriod[percentileKey];
-    });
+  // Run the simulation
+  const rawResults = engine.run(context);
+  
+  // Format the results using the standard formatter
+  const formattedResults = ResultFormatter.formatResults(rawResults, options.percentiles, false);
+  
+  // Validate formatted results
+  const resultsValidation = ValidationService.validateOutputResults(formattedResults);
+  if (!resultsValidation.isValid) {
+    console.warn('Output results validation warnings:', resultsValidation.errors);
+    // Continue with warnings but don't throw error
   }
   
-  // Process minDSCR
-  if (results.summary.metrics.minDSCR) {
-    Object.keys(results.summary.metrics.minDSCR).forEach(percentileKey => {
-      const newKey = percentileMapping[percentileKey] || percentileKey;
-      outputSim.minDSCR[newKey] = results.summary.metrics.minDSCR[percentileKey];
-    });
-  }
-  
-  return outputSim;
+  return formattedResults;
 }
 
 module.exports = runOutputSimulation;
