@@ -7,7 +7,7 @@ const { createSimulationEngine, convertToSimulationParams, getPercentileValues }
  * @param {Object} inputSimData - Optional inputSim data from runInputSimulation
  * @returns {Object} outputSim object
  */
-function runOutputSimulation(settings, inputSimData = null) {
+async function runOutputSimulation(settings, inputSimData = null) {
   let results;
   let percentiles;
   

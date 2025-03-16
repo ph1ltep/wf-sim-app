@@ -1,5 +1,4 @@
-// Example code from scenarioController.js showing how to use the refactored code without legacy support
-
+// backend/controllers/scenarioController.js
 const { Scenario } = require('../models/Scenario');
 const OEMScope = require('../models/OEMScope');
 const { runSimulation } = require('../services/monte-carlo');
@@ -92,6 +91,109 @@ const createScenario = async (req, res, next) => {
   }
 };
 
+// Get all scenarios
+const getAllScenarios = async (req, res, next) => {
+  try {
+    // Get pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Get total count
+    const total = await Scenario.countDocuments();
+    
+    // Get scenarios with limited fields
+    const scenarios = await Scenario.find()
+      .select('name description createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    
+    res.json(formatSuccess({
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      },
+      scenarios
+    }));
+  } catch (error) {
+    console.error('Error fetching scenarios:', error);
+    next(error);
+  }
+};
+
+// Get a single scenario by ID
+const getScenarioById = async (req, res, next) => {
+  try {
+    const scenario = await Scenario.findById(req.params.id);
+    
+    if (!scenario) {
+      return res.status(404).json(formatError('Scenario not found'));
+    }
+    
+    // If the scenario has OEM contracts but no responsibility matrix, generate it
+    const oemContracts = scenario.settings?.modules?.contracts?.oemContracts || [];
+    
+    if (oemContracts.length > 0 && !scenario.simulation?.inputSim?.scope?.responsibilityMatrix) {
+      // Get all OEM scope IDs referenced in contracts
+      const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
+      
+      if (oemScopeIds.length > 0) {
+        // Fetch all referenced OEM scopes
+        const oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
+        
+        // Create a map of OEM scope IDs to OEM scope objects for quick lookup
+        const oemScopeMap = oemScopes.reduce((map, scope) => {
+          map[scope._id.toString()] = scope;
+          return map;
+        }, {});
+        
+        // Create augmented contracts with scope objects for the matrix generator
+        const augmentedContracts = oemContracts.map(contract => {
+          const oemScope = oemScopeMap[contract.oemScopeId];
+          if (oemScope) {
+            return { ...contract, oemScope };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        if (augmentedContracts.length > 0) {
+          // Generate responsibility matrix
+          const matrix = generateResponsibilityMatrix(
+            scenario.settings.general.projectLife || 20,
+            scenario.settings.project.windFarm.numWTGs || 20,
+            augmentedContracts
+          );
+          
+          // Make sure the inputSim and scope properties exist
+          if (!scenario.simulation) {
+            scenario.simulation = {};
+          }
+          if (!scenario.simulation.inputSim) {
+            scenario.simulation.inputSim = {};
+          }
+          if (!scenario.simulation.inputSim.scope) {
+            scenario.simulation.inputSim.scope = {};
+          }
+          
+          // Update scenario with new matrix
+          scenario.simulation.inputSim.scope.responsibilityMatrix = matrix;
+          
+          // Save the updated scenario
+          await scenario.save();
+        }
+      }
+    }
+    
+    res.json(formatSuccess(scenario));
+  } catch (error) {
+    console.error('Error fetching scenario:', error);
+    next(error);
+  }
+};
+
 // Update a scenario
 const updateScenario = async (req, res, next) => {
   try {
@@ -117,8 +219,37 @@ const updateScenario = async (req, res, next) => {
       const oemContracts = settings?.modules?.contracts?.oemContracts || [];
       
       if (oemContracts.length > 0) {
-        // ... (Matrix generation code - same as in createScenario)
-        // For brevity, this part is omitted but would be the same as above
+        // Get all OEM scope IDs referenced in contracts
+        const oemScopeIds = oemContracts.map(contract => contract.oemScopeId).filter(Boolean);
+        
+        if (oemScopeIds.length > 0) {
+          // Fetch all referenced OEM scopes
+          const oemScopes = await OEMScope.find({ _id: { $in: oemScopeIds } });
+          
+          // Create a map of OEM scope IDs to OEM scope objects for quick lookup
+          const oemScopeMap = oemScopes.reduce((map, scope) => {
+            map[scope._id.toString()] = scope;
+            return map;
+          }, {});
+          
+          // Create augmented contracts with scope objects for the matrix generator
+          const augmentedContracts = oemContracts.map(contract => {
+            const oemScope = oemScopeMap[contract.oemScopeId];
+            if (oemScope) {
+              return { ...contract, oemScope };
+            }
+            return null;
+          }).filter(Boolean);
+          
+          if (augmentedContracts.length > 0) {
+            // Generate responsibility matrix
+            responsibilityMatrix = generateResponsibilityMatrix(
+              settings.general.projectLife || 20,
+              settings.project.windFarm.numWTGs || 20,
+              augmentedContracts
+            );
+          }
+        }
       }
       
       // Create scope if it doesn't exist
@@ -157,6 +288,22 @@ const updateScenario = async (req, res, next) => {
   }
 };
 
+// Delete a scenario
+const deleteScenario = async (req, res, next) => {
+  try {
+    const scenario = await Scenario.findByIdAndDelete(req.params.id);
+    
+    if (!scenario) {
+      return res.status(404).json(formatError('Scenario not found'));
+    }
+    
+    res.json(formatSuccess(null, 'Scenario deleted successfully'));
+  } catch (error) {
+    console.error('Error deleting scenario:', error);
+    next(error);
+  }
+};
+
 // Compare multiple scenarios
 const compareScenarios = async (req, res, next) => {
   try {
@@ -174,7 +321,7 @@ const compareScenarios = async (req, res, next) => {
       return res.status(404).json(formatError('One or more scenarios not found'));
     }
     
-    // Format for comparison - using new structure directly
+    // Format for comparison - directly use new schema structure
     const comparison = scenarios.map(scenario => ({
       id: scenario._id,
       name: scenario.name,
@@ -191,10 +338,11 @@ const compareScenarios = async (req, res, next) => {
   }
 };
 
-// Example export
 module.exports = {
   createScenario,
+  getAllScenarios,
+  getScenarioById,
   updateScenario,
+  deleteScenario,
   compareScenarios
-  // ... other methods
 };

@@ -6,14 +6,15 @@ const runOutputSimulation = require('./output-simulation');
 /**
  * Run a complete Monte Carlo simulation with all modules
  * @param {Object} scenarioData - ScenarioSchema object
+ * @param {Array} oemScopes - Optional pre-fetched OEM scopes 
  * @returns {Object} Updated ScenarioSchema object with simulation results
  */
-function runSimulation(scenarioData) {
+async function runSimulation(scenarioData, oemScopes = null) {
   const settings = scenarioData.settings;
   
   // Run both input and output parts of the simulation
-  const inputSim = runInputSimulation(settings);
-  const outputSim = runOutputSimulation(settings, inputSim);
+  const inputSim = await runInputSimulation(settings, oemScopes);
+  const outputSim = await runOutputSimulation(settings, inputSim);
   
   // Create a copy of the scenario to avoid modifying the original
   const updatedScenario = JSON.parse(JSON.stringify(scenarioData));
