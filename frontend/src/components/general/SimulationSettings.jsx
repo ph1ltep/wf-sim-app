@@ -1,76 +1,69 @@
-// src/components/config/SimulationSettings.jsx
+// src/components/general/SimulationSettings.jsx
 import React from 'react';
-import { Typography, Form, InputNumber, Card, Button, Row, Col, Tooltip, Divider, Alert } from 'antd';
+import { Typography, Form, InputNumber, Card, Row, Col, Tooltip } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 
 const SimulationSettings = () => {
-  const { settings, updateModuleParameters } = useScenario();
+  const { scenarioData, updateScenario } = useScenario();
   const [form] = Form.useForm();
 
   // Only render if settings are loaded
-  if (!settings) {
+  if (!scenarioData || !scenarioData.settings) {
     return <div>Loading settings...</div>;
   }
 
-  // Get simulation settings or use defaults
-  const simulation = settings.simulation || { 
-    iterations: 10000, 
-    seed: 42,
-    probabilities: {
-      primary: 50, 
-      upperBound: 75, 
-      lowerBound: 25,
-      extremeUpper: 90,
-      extremeLower: 10
-    }
-  };
+  const simulation = scenarioData.settings.simulation || {};
+  const probabilities = simulation.probabilities || {};
 
-  const initialValues = {
-    ...simulation,
-    ...simulation.probabilities
-  };
-
+  // Handle form value changes
   const handleValuesChange = (changedValues, allValues) => {
     // Split the values between simulation and probabilities
     const simulationParams = {};
     const probabilityParams = {};
     
-    if ('iterations' in allValues) simulationParams.iterations = allValues.iterations;
-    if ('seed' in allValues) simulationParams.seed = allValues.seed;
+    if ('iterations' in changedValues) simulationParams.iterations = allValues.iterations;
+    if ('seed' in changedValues) simulationParams.seed = allValues.seed;
     
-    if ('primary' in allValues) probabilityParams.primary = allValues.primary;
-    if ('upperBound' in allValues) probabilityParams.upperBound = allValues.upperBound;
-    if ('lowerBound' in allValues) probabilityParams.lowerBound = allValues.lowerBound;
-    if ('extremeUpper' in allValues) probabilityParams.extremeUpper = allValues.extremeUpper;
-    if ('extremeLower' in allValues) probabilityParams.extremeLower = allValues.extremeLower;
+    if ('primary' in changedValues) probabilityParams.primary = allValues.primary;
+    if ('upperBound' in changedValues) probabilityParams.upperBound = allValues.upperBound;
+    if ('lowerBound' in changedValues) probabilityParams.lowerBound = allValues.lowerBound;
+    if ('extremeUpper' in changedValues) probabilityParams.extremeUpper = allValues.extremeUpper;
+    if ('extremeLower' in changedValues) probabilityParams.extremeLower = allValues.extremeLower;
     
-    // Update simulation parameters if they've changed
-    if (Object.keys(simulationParams).length > 0) {
-      updateModuleParameters('simulation', simulationParams);
-    }
+    // Create updated settings
+    const updatedSettings = {
+      ...scenarioData.settings,
+      simulation: {
+        ...scenarioData.settings.simulation,
+        ...simulationParams,
+        probabilities: {
+          ...(scenarioData.settings.simulation?.probabilities || {}),
+          ...probabilityParams
+        }
+      }
+    };
     
-    // Update probability parameters if they've changed
-    if (Object.keys(probabilityParams).length > 0) {
-      updateModuleParameters('probabilities', probabilityParams);
-    }
-  };
-
-  const handleReset = () => {
-    form.resetFields();
+    // Update the scenario with new settings
+    updateScenario(scenarioData._id, {
+      settings: updatedSettings
+    });
   };
 
   return (
     <div>
       <Title level={2}>Simulation Settings</Title>
-      <p>Configure general simulation parameters and probability levels for visualization.</p>
+      <p>Configure simulation parameters and probability levels for visualization.</p>
 
       <Form
         form={form}
         layout="vertical"
-        initialValues={initialValues}
+        initialValues={{
+          ...simulation,
+          ...probabilities
+        }}
         onValuesChange={handleValuesChange}
       >
         <Card title="Monte Carlo Simulation Settings" style={{ marginBottom: 24 }}>
@@ -107,14 +100,6 @@ const SimulationSettings = () => {
 
         <Card title="Probability Levels for Visualization" style={{ marginBottom: 24 }}>
           <p>Configure which probability levels (P-values) to display in charts and results.</p>
-          
-          <Alert
-            message="Probability Level Guidance"
-            description="P50 represents the median outcome. Lower values (e.g., P10) represent optimistic scenarios, while higher values (e.g., P90) represent conservative scenarios."
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
           
           <Row gutter={24}>
             <Col span={12}>
@@ -262,22 +247,7 @@ const SimulationSettings = () => {
               </Form.Item>
             </Col>
           </Row>
-          
-          <Divider dashed />
-          
-          <p style={{ fontStyle: 'italic', color: 'rgba(0, 0, 0, 0.45)' }}>
-            Note: P-values represent percentiles of the simulated outcomes. The primary P-value (typically P50) 
-            represents the median value. Lower P-values represent more optimistic outcomes, while higher 
-            P-values represent more conservative outcomes. These values will be used throughout all charts 
-            and result displays.
-          </p>
         </Card>
-
-        <Row justify="end">
-          <Col>
-            <Button onClick={handleReset}>Reset</Button>
-          </Col>
-        </Row>
       </Form>
     </div>
   );

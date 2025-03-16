@@ -7,10 +7,10 @@ import { PlusOutlined, ToolOutlined } from '@ant-design/icons';
 import useOEMScopes from '../../hooks/useOEMScopes';
 
 // Component imports
-import OEMScopeForm from './oemScopes/OEMScopeForm';
-import OEMScopeDetails from './oemScopes/OEMScopeDetails';
-import { getOEMScopeColumns } from './oemScopes/oemScopeColumns';
-import { useScenario } from '../../contexts/ScenarioContext';
+import OEMScopeForm from '../config/oemScopes/OEMScopeForm';
+import OEMScopeDetails from '../config/oemScopes/OEMScopeDetails';
+import { getOEMScopeColumns } from '../config/oemScopes/oemScopeColumns';
+//import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 

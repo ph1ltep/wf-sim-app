@@ -7,10 +7,10 @@ import { PlusOutlined, GlobalOutlined } from '@ant-design/icons';
 import useLocations from '../../hooks/useLocations';
 
 // Component imports
-import LocationForm from './locations/LocationForm';
-import { getLocationColumns } from './locations/locationColumns';
-import { currencies } from './locations/currencyConstants';
-import { useScenario } from '../../contexts/ScenarioContext';
+import LocationForm from '../config/locations/LocationForm';
+import { getLocationColumns } from '../config/locations/locationColumns';
+import { currencies } from '../config/locations/currencyConstants';
+//import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Title } = Typography;
 

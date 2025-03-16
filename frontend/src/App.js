@@ -5,11 +5,11 @@ import { ScenarioProvider } from './contexts/ScenarioContext';
 import MainLayout from './layouts/MainLayout';
 
 // Config components
-import GeneralConfig from './components/config/GeneralConfig';
+//import GeneralConfig from './components/config/xGeneralConfig';
 import ProjectSettings from './components/config/ProjectSettings';
-import SimulationSettings from './components/config/SimulationSettings';
-import LocationDefaults from './components/config/LocationDefaults';
-import OEMScopes from './components/config/OEMScopes';
+import SimulationSettings from './components/general/SimulationSettings';
+import LocationDefaults from './components/general/LocationDefaults';
+import OEMScopes from './components/general/OEMScopes';
 import OEMContracts from './components/config/OEMContracts';
 import ScenarioSettings from './components/config/ScenarioSettings';
 
