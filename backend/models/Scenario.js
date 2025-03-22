@@ -75,6 +75,27 @@ const AdjustmentSchema = new mongoose.Schema({
   description: { type: String }
 });
 
+// First define the FailureModelSchema
+const FailureModelSchema = new mongoose.Schema({
+  designLife: { type: Number, default: 20 },
+  totalLifetime: { type: Number, default: 25 },
+  componentCount: { type: Number, default: 100 },
+  percentiles: { type: [Number], default: [10, 50, 90] },
+  assumedFailureRate: { type: Number, default: 0.01 },
+  componentType: { type: String, default: 'gearbox' },
+  historicalData: {
+    type: {
+      type: String,
+      enum: ['separate', 'analysis', 'none'],
+      default: 'none'
+    },
+    data: [{
+      year: { type: Number, required: true },
+      failureRate: { type: Number, required: true }
+    }]
+  }
+});
+
 // Settings schema - extracted to be reusable
 const SettingsSchema = new mongoose.Schema({
   // General settings
@@ -137,7 +158,8 @@ const SettingsSchema = new mongoose.Schema({
         probability: Number
       }],
       contingencyCost: { type: Number, default: 0 },
-      adjustments: { type: [AdjustmentSchema], default: [] }
+      adjustments: { type: [AdjustmentSchema], default: [] },
+      failureModel: { type: FailureModelSchema, default: () => ({}) }
     },
     
     // Revenue module

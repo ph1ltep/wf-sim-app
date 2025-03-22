@@ -48,10 +48,22 @@ Scenario
 │   │   │   │   ├── cost             // Cost of repair
 │   │   │   │   └── probability      // Probability of repair being needed
 │   │   │   ├── contingencyCost      // Contingency cost
-│   │   │   └── adjustments[]        // Cost adjustments
-│   │   │       ├── years[]          // Array of years this adjustment applies to
-│   │   │       ├── amount           // Adjustment amount
-│   │   │       └── description      // Description of the adjustment
+│   │   │   ├── adjustments[]        // Cost adjustments
+│   │   │   │   ├── years[]          // Array of years this adjustment applies to
+│   │   │   │   ├── amount           // Adjustment amount
+│   │   │   │   └── description      // Description of the adjustment
+│   │   │   └── failureModel         // Component failure model parameters
+│   │   │       ├── designLife       // Expected component lifetime in years
+│   │   │       ├── totalLifetime    // Total simulation period
+│   │   │       ├── componentCount   // Number of components (N)
+│   │   │       ├── percentiles[]    // Percentiles to calculate [P10, P50, P90]
+│   │   │       ├── assumedFailureRate // Default failure probability at design life
+│   │   │       ├── componentType    // Type of component being modeled
+│   │   │       └── historicalData   // Historical failure data for calibration
+│   │   │           ├── type         // "separate" or "analysis"
+│   │   │           └── data[]       // Calibration data points
+│   │   │               ├── year     // Year of observation
+│   │   │               └── failureRate // Observed failure rate
 │   │   ├── revenue
 │   │   │   ├── energyProduction     // Energy production configuration
 │   │   │   │   ├── distribution     // 'Fixed', 'Normal', 'Triangular', 'Uniform'
