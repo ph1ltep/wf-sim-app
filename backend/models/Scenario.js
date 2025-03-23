@@ -75,14 +75,48 @@ const AdjustmentSchema = new mongoose.Schema({
   description: { type: String }
 });
 
-// First define the FailureModelSchema
+// MajorComponentSchema (embedded, not a reference)
+const MajorComponentSchema = new mongoose.Schema({
+  name: { 
+    type: String, 
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  appliesTo: {
+    geared: { 
+      type: Boolean, 
+      default: true 
+    },
+    directDrive: { 
+      type: Boolean, 
+      default: true 
+    }
+  },
+  quantityPerWTG: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 1
+  },
+  defaultFailureRate: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 5
+  }
+});
+
+// Define the FailureModelSchema
 const FailureModelSchema = new mongoose.Schema({
   designLife: { type: Number, default: 20 },
-  totalLifetime: { type: Number, default: 25 },
   componentCount: { type: Number, default: 100 },
-  percentiles: { type: [Number], default: [10, 50, 90] },
   assumedFailureRate: { type: Number, default: 0.01 },
-  componentType: { type: String, default: 'gearbox' },
+  // Embed the major component data (not a reference)
+  majorComponent: { type: MajorComponentSchema, required: true },
   historicalData: {
     type: {
       type: String,
@@ -159,7 +193,8 @@ const SettingsSchema = new mongoose.Schema({
       }],
       contingencyCost: { type: Number, default: 0 },
       adjustments: { type: [AdjustmentSchema], default: [] },
-      failureModel: { type: FailureModelSchema, default: () => ({}) }
+      // Changed to an array of FailureModelSchema
+      failureModels: { type: [FailureModelSchema], default: [] }
     },
     
     // Revenue module
