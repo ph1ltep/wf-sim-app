@@ -1,0 +1,1007 @@
+# Wind Farm Risk Analysis and Visualization Tool API Reference
+
+## Overview
+
+This document serves as a comprehensive API reference guide for the Wind Farm Risk Analysis and Visualization Tool backend. All endpoints are relative to the base URL: `/api`
+
+## Authentication
+
+Authentication is currently not implemented. All endpoints are accessible without authentication.
+
+## General Response Format
+
+All API responses follow a consistent format:
+
+For successful operations:
+```json
+{
+  "success": true,
+  "message": "Operation successful message",
+  "data": { /* Response data object */ }
+}
+```
+
+For errors:
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "statusCode": 400 // HTTP status code
+}
+```
+
+## Endpoints
+
+### Scenarios
+
+Scenarios represent complete wind farm investment cases that can be simulated and analyzed.
+
+#### GET /scenarios
+
+Retrieve a list of all available scenarios.
+
+**Query Parameters:**
+- `page` (integer, optional): Page number for pagination (default: 1)
+- `limit` (integer, optional): Number of items per page (default: 10)
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "pagination": {
+      "total": 15,
+      "page": 1,
+      "limit": 10,
+      "pages": 2
+    },
+    "scenarios": [
+      {
+        "_id": "60d21b4667d0d8992e610c83",
+        "name": "Offshore Wind Farm - Base Case",
+        "description": "Base scenario for North Sea offshore wind farm",
+        "createdAt": "2023-06-19T14:20:30.000Z",
+        "updatedAt": "2023-06-20T09:15:45.000Z",
+        "settings": {
+          "general": { /* General settings */ },
+          "project": { /* Project settings */ }
+          // Note: other settings are null in list view
+        },
+        "simulation": null // Simulation data is null in list view
+      },
+      // ... other scenarios
+    ]
+  }
+}
+```
+
+#### GET /scenarios/:id
+
+Retrieve a specific scenario by ID.
+
+**Path Parameters:**
+- `id` (string, required): The scenario ID
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "60d21b4667d0d8992e610c83",
+    "name": "Offshore Wind Farm - Base Case",
+    "description": "Base scenario for North Sea offshore wind farm",
+    "createdAt": "2023-06-19T14:20:30.000Z",
+    "updatedAt": "2023-06-20T09:15:45.000Z",
+    "settings": {
+      "general": { /* Complete general settings */ },
+      "project": { /* Complete project settings */ },
+      "modules": { /* Complete modules settings */ },
+      "simulation": { /* Complete simulation settings */ }
+    },
+    "simulation": {
+      "inputSim": { /* Complete input simulation results */ },
+      "outputSim": { /* Complete output simulation results */ }
+    }
+  }
+}
+```
+
+#### POST /scenarios
+
+Create a new scenario.
+
+**Request Body:**
+```json
+{
+  "name": "New Wind Farm Scenario",
+  "description": "Description of the new scenario",
+  "settings": { /* Optional settings object */ }
+}
+```
+
+**Response:** Returns the newly created scenario with a temporary ID.
+
+#### PUT /scenarios/:id
+
+Update an existing scenario.
+
+**Path Parameters:**
+- `id` (string, required): The scenario ID
+
+**Request Body:**
+```json
+{
+  "name": "Updated Scenario Name",
+  "description": "Updated description",
+  "settings": { /* Updated settings object */ }
+}
+```
+
+**Response:** Returns basic information about the updated scenario.
+
+#### DELETE /scenarios/:id
+
+Delete a scenario.
+
+**Path Parameters:**
+- `id` (string, required): The scenario ID
+
+**Response:** Success message with no data.
+
+#### POST /scenarios/compare
+
+Compare multiple scenarios.
+
+**Request Body:**
+```json
+{
+  "ids": ["60d21b4667d0d8992e610c83", "60d21b4667d0d8992e610c84"]
+}
+```
+
+**Response:** Returns comparison data for the specified scenarios.
+
+### Simulation
+
+The simulation endpoints allow running Monte Carlo simulations on scenarios.
+
+#### POST /simulate
+
+Run a full simulation (both input and output) for a scenario.
+
+**Request Body:**
+```json
+{
+  "settings": { /* Complete scenario settings object */ }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "simulation": {
+      "inputSim": { /* Input simulation results */ },
+      "outputSim": { /* Output simulation results */ }
+    }
+  }
+}
+```
+
+#### POST /simulate/input
+
+Run only the input part of a simulation (operational data).
+
+**Request Body:**
+```json
+{
+  "settings": { /* Complete scenario settings object */ }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "inputSim": { /* Input simulation results */ }
+  }
+}
+```
+
+#### POST /simulate/output
+
+Run only the output part of a simulation (financial metrics) using input simulation data.
+
+**Request Body:**
+```json
+{
+  "settings": { /* Scenario settings object */ },
+  "inputSim": { /* Input simulation data */ }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "outputSim": { /* Output simulation results */ }
+  }
+}
+```
+
+### Failure Models
+
+Failure models represent the component failure characteristics for wind turbines.
+
+#### GET /scenarios/:scenarioId/failure-models
+
+Get all failure models for a specific scenario.
+
+**Path Parameters:**
+- `scenarioId` (string, required): The scenario ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "designLife": 20,
+      "componentCount": 60,
+      "assumedFailureRate": 0.01,
+      "majorComponent": {
+        "name": "Blade",
+        "description": "Wind turbine blade",
+        "appliesTo": {
+          "geared": true,
+          "directDrive": true
+        },
+        "quantityPerWTG": 3,
+        "defaultFailureRate": 0.5
+      },
+      "historicalData": {
+        "type": "none",
+        "data": []
+      }
+    },
+    // ... other failure models
+  ]
+}
+```
+
+#### POST /scenarios/:scenarioId/failure-models/generate
+
+Generate default failure models for a scenario based on the platform type.
+
+**Path Parameters:**
+- `scenarioId` (string, required): The scenario ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Failure models generated successfully",
+  "data": {
+    "count": 8,
+    "models": [ /* Array of generated failure models */ ]
+  }
+}
+```
+
+#### PUT /scenarios/:scenarioId/failure-models/:modelIndex
+
+Update a specific failure model in a scenario.
+
+**Path Parameters:**
+- `scenarioId` (string, required): The scenario ID
+- `modelIndex` (integer, required): The index of the failure model to update
+
+**Request Body:**
+```json
+{
+  "designLife": 25,
+  "assumedFailureRate": 0.015,
+  "historicalData": {
+    "type": "analysis",
+    "data": [
+      {
+        "year": 1,
+        "failureRate": 0.005
+      },
+      {
+        "year": 2,
+        "failureRate": 0.008
+      }
+    ]
+  }
+}
+```
+
+**Response:** Returns the updated failure model.
+
+### Major Components
+
+Major components represent the physical components of wind turbines that can fail.
+
+#### GET /components
+
+Get all major components.
+
+**Query Parameters:**
+- `platform` (string, optional): Filter by platform type ('geared' or 'direct-drive')
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "60d21b4667d0d8992e610c85",
+      "name": "Blade",
+      "description": "Wind turbine blade",
+      "appliesTo": {
+        "geared": true,
+        "directDrive": true
+      },
+      "quantityPerWTG": 3,
+      "defaultFailureRate": 0.5,
+      "createdAt": "2023-06-19T14:20:30.000Z",
+      "updatedAt": "2023-06-20T09:15:45.000Z"
+    },
+    // ... other components
+  ]
+}
+```
+
+#### GET /components/:id
+
+Get a specific major component by ID.
+
+**Path Parameters:**
+- `id` (string, required): The component ID
+
+**Response:** Returns the specified component.
+
+#### POST /components
+
+Create a new major component.
+
+**Request Body:**
+```json
+{
+  "name": "New Component",
+  "description": "Description of the new component",
+  "appliesTo": {
+    "geared": true,
+    "directDrive": false
+  },
+  "quantityPerWTG": 1,
+  "defaultFailureRate": 0.3
+}
+```
+
+**Response:** Returns the newly created component.
+
+#### PUT /components/:id
+
+Update a major component.
+
+**Path Parameters:**
+- `id` (string, required): The component ID
+
+**Request Body:**
+```json
+{
+  "name": "Updated Component Name",
+  "description": "Updated description",
+  "defaultFailureRate": 0.4
+}
+```
+
+**Response:** Returns the updated component.
+
+#### DELETE /components/:id
+
+Delete a major component.
+
+**Path Parameters:**
+- `id` (string, required): The component ID
+
+**Response:** Success message with no data.
+
+### OEM Scopes
+
+OEM scopes define the service coverage options for Operation & Maintenance contracts.
+
+#### GET /oemscopes
+
+Get all OEM scopes.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "60d21b4667d0d8992e610c86",
+      "name": "Basic-PM-CMin",
+      "isDefault": true,
+      "preventiveMaintenance": true,
+      "bladeInspections": false,
+      "blade": false,
+      "bladeLEP": false,
+      "remoteMonitoring": false,
+      "remoteTechnicalSupport": false,
+      "sitePersonnel": "none",
+      "siteManagement": false,
+      "technicianPercent": 0,
+      "correctiveMinor": true,
+      "correctiveMajor": false,
+      "correctiveMajorDetails": {
+        "tooling": false,
+        "manpower": false,
+        "parts": false
+      },
+      "bladeIntegrityManagement": false,
+      "craneCoverage": false,
+      "craneEventCap": 0,
+      "craneFinancialCap": 0,
+      "majorEventCap": 0,
+      "majorFinancialCap": 0,
+      "createdAt": "2023-06-19T14:20:30.000Z",
+      "updatedAt": "2023-06-20T09:15:45.000Z"
+    },
+    // ... other OEM scopes
+  ]
+}
+```
+
+#### GET /oemscopes/:id
+
+Get a specific OEM scope by ID.
+
+**Path Parameters:**
+- `id` (string, required): The OEM scope ID
+
+**Response:** Returns the specified OEM scope.
+
+#### POST /oemscopes
+
+Create a new OEM scope.
+
+**Request Body:**
+```json
+{
+  "name": "New OEM Scope",
+  "preventiveMaintenance": true,
+  "bladeInspections": true,
+  "correctiveMinor": true,
+  "correctiveMajor": false,
+  "correctiveMajorDetails": {
+    "tooling": false,
+    "manpower": false,
+    "parts": false
+  },
+  "siteManagement": false
+}
+```
+
+**Response:** Returns the newly created OEM scope.
+
+#### POST /oemscopes/generate-name
+
+Generate a name for an OEM scope based on selected features.
+
+**Request Body:**
+```json
+{
+  "preventiveMaintenance": true,
+  "bladeInspections": true,
+  "blade": false,
+  "correctiveMinor": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Name generated successfully",
+  "data": {
+    "name": "PM-BI-CMin"
+  }
+}
+```
+
+#### PUT /oemscopes/:id
+
+Update an OEM scope.
+
+**Path Parameters:**
+- `id` (string, required): The OEM scope ID
+
+**Request Body:**
+```json
+{
+  "name": "Updated OEM Scope",
+  "bladeInspections": true,
+  "craneCoverage": true,
+  "craneEventCap": 2
+}
+```
+
+**Response:** Returns the updated OEM scope.
+
+#### DELETE /oemscopes/:id
+
+Delete an OEM scope.
+
+**Path Parameters:**
+- `id` (string, required): The OEM scope ID
+
+**Response:** Success message with no data.
+
+### Locations
+
+Locations represent geographical locations with default values for currency, inflation, and energy prices.
+
+#### GET /locations
+
+Get all locations.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "60d21b4667d0d8992e610c87",
+      "country": "United States",
+      "countryCode": "us",
+      "inflationRate": 2.1,
+      "capacityFactor": 35,
+      "energyPrice": 45,
+      "currency": "USD",
+      "foreignCurrency": "EUR",
+      "exchangeRate": 0.85,
+      "createdAt": "2023-06-19T14:20:30.000Z",
+      "updatedAt": "2023-06-20T09:15:45.000Z"
+    },
+    // ... other locations
+  ]
+}
+```
+
+#### GET /locations/:id
+
+Get a specific location by ID.
+
+**Path Parameters:**
+- `id` (string, required): The location ID
+
+**Response:** Returns the specified location.
+
+#### POST /locations
+
+Create a new location.
+
+**Request Body:**
+```json
+{
+  "country": "New Country",
+  "countryCode": "nc",
+  "inflationRate": 2.5,
+  "capacityFactor": 40,
+  "energyPrice": 55,
+  "currency": "CAD",
+  "foreignCurrency": "USD",
+  "exchangeRate": 0.75
+}
+```
+
+**Response:** Returns the newly created location.
+
+#### PUT /locations/:id
+
+Update a location.
+
+**Path Parameters:**
+- `id` (string, required): The location ID
+
+**Request Body:**
+```json
+{
+  "inflationRate": 2.8,
+  "energyPrice": 60,
+  "exchangeRate": 0.78
+}
+```
+
+**Response:** Returns the updated location.
+
+#### DELETE /locations/:id
+
+Delete a location.
+
+**Path Parameters:**
+- `id` (string, required): The location ID
+
+**Response:** Success message with no data.
+
+## Data Models
+
+### Scenario
+
+The core data model representing a complete wind farm investment case.
+
+```typescript
+interface Scenario {
+  _id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  settings: {
+    general: {
+      projectName: string;
+      startDate?: string;
+      projectLife: number;
+    };
+    project: {
+      windFarm: {
+        numWTGs: number;
+        wtgPlatformType: "geared" | "direct-drive";
+        mwPerWTG: number;
+        capacityFactor: number;
+        curtailmentLosses: number;
+        electricalLosses: number;
+      };
+      currency: {
+        local: string;
+        foreign: string;
+        exchangeRate: number;
+      };
+      location?: string;
+    };
+    modules: {
+      financing: {
+        capex: number;
+        devex: number;
+        model: "Balance-Sheet" | "Project-Finance";
+        debtToEquityRatio: number;
+        debtToCapexRatio: number;
+        loanDuration: number;
+        loanInterestRateBS: number;
+        loanInterestRatePF: number;
+        equityInvestment?: number;
+        minimumDSCR: number;
+      };
+      cost: {
+        annualBaseOM: number;
+        escalationRate: number;
+        escalationDistribution: "Normal" | "Lognormal" | "Triangular" | "Uniform";
+        oemTerm: number;
+        fixedOMFee: number;
+        failureEventProbability: number;
+        failureEventCost: number;
+        majorRepairEvents: Array<{
+          year: number;
+          cost: number;
+          probability: number;
+        }>;
+        contingencyCost: number;
+        adjustments: Array<{
+          years: number[];
+          amount: number;
+          description?: string;
+        }>;
+        failureModels: FailureModel[];
+      };
+      revenue: {
+        energyProduction: {
+          distribution: "Fixed" | "Normal" | "Triangular" | "Uniform";
+          mean: number;
+          std?: number;
+          min?: number;
+          max?: number;
+        };
+        electricityPrice: {
+          type: "fixed" | "variable";
+          value: number;
+          distribution?: "Normal" | "Lognormal" | "Triangular" | "Uniform";
+        };
+        revenueDegradationRate: number;
+        downtimePerEvent: {
+          distribution: "Weibull" | "Lognormal" | "Exponential";
+          scale: number;
+          shape: number;
+        };
+        windVariabilityMethod: "Default" | "Kaimal";
+        turbulenceIntensity: number;
+        surfaceRoughness: number;
+        kaimalScale: number;
+        adjustments: Array<{
+          years: number[];
+          amount: number;
+          description?: string;
+        }>;
+      };
+      risk: {
+        insuranceEnabled: boolean;
+        insurancePremium: number;
+        insuranceDeductible: number;
+        reserveFunds: number;
+      };
+      contracts: {
+        oemContracts: Array<{
+          id: string;
+          name: string;
+          years: number[];
+          fixedFee: number;
+          isPerTurbine: boolean;
+          oemScopeId: string;
+          oemScopeName?: string;
+        }>;
+      };
+    };
+    simulation: {
+      iterations: number;
+      seed: number;
+      percentiles: Array<{
+        value: number;
+        description: "primary" | "upper_bound" | "lower_bound" | "extreme_upper" | "extreme_lower";
+        label?: string;
+      }>;
+      primaryPercentileIndex: number;
+    };
+    metrics: {
+      totalMW: number;
+      grossAEP: number;
+      netAEP: number;
+      componentQuantities: {
+        blades: number;
+        bladeBearings: number;
+        transformers: number;
+        gearboxes: number;
+        generators: number;
+        converters: number;
+        mainBearings: number;
+        yawSystems: number;
+      };
+    };
+  };
+  simulation: {
+    inputSim: {
+      cashflow: {
+        annualCosts: {
+          components: {
+            baseOM: SimResultsSchema[];
+            failureRisk: SimResultsSchema[];
+            majorRepairs: SimResultsSchema[];
+          };
+          total: SimResultsSchema[];
+        };
+        annualRevenue: SimResultsSchema[];
+        dscr: SimResultsSchema[];
+        netCashFlow: SimResultsSchema[];
+      };
+      risk: {
+        failureRates: SimResultsSchema[];
+        eventProbabilities: SimResultsSchema[];
+      };
+      scope: {
+        responsibilityMatrix: YearlyResponsibility[];
+      };
+    };
+    outputSim: {
+      IRR: SimResultsSchema[];
+      NPV: SimResultsSchema[];
+      paybackPeriod: SimResultsSchema[];
+      minDSCR: SimResultsSchema[];
+    };
+  };
+}
+```
+
+### SimResultsSchema
+
+Represents a percentile-based simulation result with time series data.
+
+```typescript
+interface SimResultsSchema {
+  percentile: {
+    value: number;
+    description: string;
+    label?: string;
+  };
+  data: Array<{
+    year: number;
+    value: number;
+  }>;
+}
+```
+
+### YearlyResponsibility
+
+Represents the responsibility allocation for a specific year.
+
+```typescript
+interface YearlyResponsibility {
+  year: number;
+  oemContractId: string | null;
+  oemContractName: string | null;
+  scopeAllocations: {
+    preventiveMaintenance: { oem: number; owner: number };
+    bladeInspections: { oem: number; owner: number };
+    remoteMonitoring: { oem: number; owner: number };
+    remoteTechnicalSupport: { oem: number; owner: number };
+    siteManagement: { oem: number; owner: number };
+    technicians: { oem: number; owner: number };
+    correctiveMinor: { oem: number; owner: number };
+    bladeIntegrityManagement: { oem: number; owner: number };
+    craneCoverage: {
+      oem: number;
+      owner: number;
+      eventCap: number | null;
+      financialCap: number | null;
+    };
+    correctiveMajor: {
+      oem: number;
+      owner: number;
+      eventCap: number | null;
+      financialCap: number | null;
+      components: {
+        tooling: { oem: number; owner: number };
+        manpower: { oem: number; owner: number };
+        parts: { oem: number; owner: number };
+      };
+    };
+  };
+  fixedFee: number;
+  isPerTurbine: boolean;
+}
+```
+
+### FailureModel
+
+Represents a component failure model.
+
+```typescript
+interface FailureModel {
+  designLife: number;
+  componentCount: number;
+  assumedFailureRate: number;
+  majorComponent: {
+    name: string;
+    description: string;
+    appliesTo: {
+      geared: boolean;
+      directDrive: boolean;
+    };
+    quantityPerWTG: number;
+    defaultFailureRate: number;
+  };
+  historicalData: {
+    type: "separate" | "analysis" | "none";
+    data: Array<{
+      year: number;
+      failureRate: number;
+    }>;
+  };
+}
+```
+
+### OEMScope
+
+Represents a service coverage option for Operation & Maintenance contracts.
+
+```typescript
+interface OEMScope {
+  _id: string;
+  name: string;
+  isDefault: boolean;
+  preventiveMaintenance: boolean;
+  bladeInspections: boolean;
+  blade: boolean;
+  bladeLEP: boolean;
+  remoteMonitoring: boolean;
+  remoteTechnicalSupport: boolean;
+  sitePersonnel: "none" | "partial" | "full";
+  siteManagement: boolean;
+  technicianPercent: number;
+  correctiveMinor: boolean;
+  correctiveMajor: boolean;
+  correctiveMajorDetails: {
+    tooling: boolean;
+    manpower: boolean;
+    parts: boolean;
+  };
+  bladeIntegrityManagement: boolean;
+  craneCoverage: boolean;
+  craneEventCap: number;
+  craneFinancialCap: number;
+  majorEventCap: number;
+  majorFinancialCap: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Location
+
+Represents a geographical location with default values.
+
+```typescript
+interface Location {
+  _id: string;
+  country: string;
+  countryCode: string;
+  inflationRate: number;
+  capacityFactor: number;
+  energyPrice: number;
+  currency: string;
+  foreignCurrency: string;
+  exchangeRate: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## Common Workflows
+
+### Creating and Simulating a Scenario
+
+1. Create a new scenario with basic information:
+   ```
+   POST /api/scenarios
+   ```
+
+2. Generate default failure models for the scenario:
+   ```
+   POST /api/scenarios/:scenarioId/failure-models/generate
+   ```
+
+3. Update scenario settings if needed:
+   ```
+   PUT /api/scenarios/:id
+   ```
+
+4. Run a full simulation:
+   ```
+   POST /api/simulate
+   ```
+
+5. Save the simulation results back to the scenario:
+   ```
+   PUT /api/scenarios/:id
+   ```
+
+### Comparing Multiple Scenarios
+
+1. Create multiple scenarios with variations in parameters.
+
+2. Run simulations for each scenario.
+
+3. Compare the scenarios:
+   ```
+   POST /api/scenarios/compare
+   ```
+
+4. Analyze the comparative results.
+
+## Error Codes
+
+Common HTTP status codes returned by the API:
+
+- `200 OK`: Request succeeded
+- `201 Created`: Resource was successfully created
+- `400 Bad Request`: Invalid parameters or request
+- `404 Not Found`: Resource not found
+- `500 Internal Server Error`: Server-side error
+
+## Rate Limits
+
+There are currently no rate limits implemented on the API.
