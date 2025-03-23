@@ -1,5 +1,29 @@
 // backend data structure and architecture of Scenario Schema object
 
+// SHARED SCHEMAS (referenced across multiple models)
+// =================================================
+// PercentileSchema - represents a percentile configuration
+// ├── value             // Numeric value of the percentile (1-99)
+// ├── description       // Type of percentile (primary, upper_bound, lower_bound, etc.)
+// └── label             // Generated label (e.g., "P50")
+//
+// DataPointSchema - represents a time series data point
+// ├── year              // Year of the data point (1-based)
+// └── value             // Numeric value of the data point
+//
+// SimResultsSchema - represents a percentile-based simulation result
+// ├── percentile        // Percentile configuration (PercentileSchema)
+// └── data              // Array of data points (DataPointSchema[])
+//
+// MajorComponentSchema - represents a major wind turbine component
+// ├── name              // Component name
+// ├── description       // Component description
+// ├── appliesTo         // Platform types the component applies to
+// │   ├── geared        // Applies to geared platforms
+// │   └── directDrive   // Applies to direct-drive platforms
+// ├── quantityPerWTG    // Quantity of component per turbine
+// └── defaultFailureRate // Default failure rate (as percentage)
+
 Scenario
 ├── name                 // Name of the scenario
 ├── description          // Description of the scenario
@@ -52,13 +76,13 @@ Scenario
 │   │   │   │   ├── years[]          // Array of years this adjustment applies to
 │   │   │   │   ├── amount           // Adjustment amount
 │   │   │   │   └── description      // Description of the adjustment
-│   │   │   └── majorComponents[]    // Component failure model parameters
+│   │   │   └── failureModels[]      // Component failure model parameters
 │   │   │       ├── designLife       // Expected component lifetime in years
-│   │   │       ├── componentCount   // Number of components (N)
-│   │   │       ├── assumedFailureRate // Default failure probability at design life
-│   │   │       ├── componentType    // Type of component being modeled
+│   │   │       ├── componentCount   // Number of components (quantityPerWTG * numWTGs)
+│   │   │       ├── assumedFailureRate // Default failure probability (as decimal)
+│   │   │       ├── majorComponent   // References MajorComponentSchema (without unique constraint)
 │   │   │       └── historicalData   // Historical failure data for calibration
-│   │   │           ├── type         // "separate" or "analysis"
+│   │   │           ├── type         // "separate", "analysis", or "none"
 │   │   │           └── data[]       // Calibration data points
 │   │   │               ├── year     // Year of observation
 │   │   │               └── failureRate // Observed failure rate
@@ -103,12 +127,11 @@ Scenario
 │   ├── simulation
 │   │   ├── iterations              // Number of Monte Carlo iterations
 │   │   ├── seed                    // Random seed for reproducibility
-│   │   └── probabilities           // Percentile definitions
-│   │       ├── primary             // Primary percentile (typically 50)
-│   │       ├── upperBound          // Upper bound percentile (typically 75)
-│   │       ├── lowerBound          // Lower bound percentile (typically 25)
-│   │       ├── extremeUpper        // Extreme upper percentile (typically 90)
-│   │       └── extremeLower        // Extreme lower percentile (typically 10)
+│   │   ├── percentiles[]           // Array of PercentileSchema objects
+│   │   │   ├── value               // Numeric value (e.g., 50 for P50)
+│   │   │   ├── description         // Type (primary, upper_bound, etc.)
+│   │   │   └── label               // Generated label (e.g., "P50")
+│   │   └── primaryPercentileIndex  // Index of primary percentile in the array
 │   └── metrics                     // Calculated project metrics
 │       ├── totalMW                 // Total project capacity in MW
 │       ├── grossAEP                // Gross annual energy production
@@ -127,16 +150,16 @@ Scenario
     │   ├── cashflow                // Cash flow results
     │   │   ├── annualCosts         // Annual cost results
     │   │   │   ├── components      // Cost components
-    │   │   │   │   ├── baseOM      // Base O&M costs
-    │   │   │   │   ├── failureRisk // Failure risk costs
-    │   │   │   │   └── majorRepairs // Major repair costs
-    │   │   │   └── total           // Total costs
-    │   │   ├── annualRevenue       // Annual revenue
-    │   │   ├── dscr                // Debt Service Coverage Ratio
-    │   │   └── netCashFlow         // Net cash flow
+    │   │   │   │   ├── baseOM      // Base O&M costs (array of SimResultsSchema)
+    │   │   │   │   ├── failureRisk // Failure risk costs (array of SimResultsSchema)
+    │   │   │   │   └── majorRepairs // Major repair costs (array of SimResultsSchema)
+    │   │   │   └── total           // Total costs (array of SimResultsSchema)
+    │   │   ├── annualRevenue       // Annual revenue (array of SimResultsSchema)
+    │   │   ├── dscr                // Debt Service Coverage Ratio (array of SimResultsSchema)
+    │   │   └── netCashFlow         // Net cash flow (array of SimResultsSchema)
     │   ├── risk                    // Risk analysis results
-    │   │   ├── failureRates        // Failure rate analysis
-    │   │   └── eventProbabilities  // Event probability analysis
+    │   │   ├── failureRates        // Failure rate analysis (array of SimResultsSchema)
+    │   │   └── eventProbabilities  // Event probability analysis (array of SimResultsSchema)
     │   └── scope                   // Scope analysis
     │       └── responsibilityMatrix // OEM responsibility matrix
     │           └── [YearlyResponsibilities] // Array of yearly responsibilities
@@ -145,39 +168,53 @@ Scenario
     │               ├── oemContractName      // Name of applicable contract
     │               ├── scopeAllocations     // Allocation of responsibilities
     │               │   ├── preventiveMaintenance
+    │               │   │   ├── oem          // OEM responsibility ratio (0-1)
+    │               │   │   └── owner        // Owner responsibility ratio (0-1)
     │               │   ├── bladeInspections
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── remoteMonitoring
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── remoteTechnicalSupport
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── siteManagement
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── technicians
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── correctiveMinor
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── bladeIntegrityManagement
+    │               │   │   ├── oem
+    │               │   │   └── owner
     │               │   ├── craneCoverage
+    │               │   │   ├── oem
+    │               │   │   ├── owner
+    │               │   │   ├── eventCap     // Maximum events covered
+    │               │   │   └── financialCap // Maximum financial coverage
     │               │   └── correctiveMajor
+    │               │       ├── oem
+    │               │       ├── owner
+    │               │       ├── eventCap     // Maximum events covered
+    │               │       ├── financialCap // Maximum financial coverage
+    │               │       └── components
+    │               │           ├── tooling
+    │               │           │   ├── oem
+    │               │           │   └── owner
+    │               │           ├── manpower
+    │               │           │   ├── oem
+    │               │           │   └── owner
+    │               │           └── parts
+    │               │               ├── oem
+    │               │               └── owner
     │               ├── fixedFee             // Fixed fee for the year
     │               └── isPerTurbine         // Whether fee is per turbine
     └── outputSim                   // Output simulation results
-        ├── IRR                     // Internal Rate of Return
-        │   ├── Pextreme_lower      // Extreme lower percentile (typically P10)
-        │   ├── Plower_bound        // Lower bound percentile (typically P25)
-        │   ├── Pprimary            // Primary percentile (typically P50)
-        │   ├── Pupper_bound        // Upper bound percentile (typically P75)
-        │   └── Pextreme_upper      // Extreme upper percentile (typically P90)
-        ├── NPV                     // Net Present Value
-        │   ├── Pextreme_lower
-        │   ├── Plower_bound
-        │   ├── Pprimary
-        │   ├── Pupper_bound
-        │   └── Pextreme_upper
-        ├── paybackPeriod           // Payback period
-        │   ├── Pextreme_lower
-        │   ├── Plower_bound
-        │   ├── Pprimary
-        │   ├── Pupper_bound
-        │   └── Pextreme_upper
-        └── minDSCR                 // Minimum DSCR
-            ├── Pextreme_lower
-            ├── Plower_bound
-            ├── Pprimary
-            ├── Pupper_bound
-            └── Pextreme_upper
+        ├── IRR                     // Internal Rate of Return (array of SimResultsSchema)
+        ├── NPV                     // Net Present Value (array of SimResultsSchema)
+        ├── paybackPeriod           // Payback period (array of SimResultsSchema)
+        └── minDSCR                 // Minimum DSCR (array of SimResultsSchema)

@@ -1,5 +1,5 @@
 // backend/controllers/majorComponentController.js
-const MajorComponent = require('../models/MajorComponent');
+const { MajorComponent } = require('../models/MajorComponent');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 
 // Get all major components

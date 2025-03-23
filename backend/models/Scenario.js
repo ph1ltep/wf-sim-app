@@ -1,5 +1,7 @@
 // backend/models/Scenario.js
 const mongoose = require('mongoose');
+const { MajorComponentSchema } = require('./MajorComponent');
+
 
 // Schema for Component Allocation in Responsibility Matrix
 const ComponentAllocationSchema = new mongoose.Schema({
@@ -62,11 +64,33 @@ const YearlyResponsibilitySchema = new mongoose.Schema({
   isPerTurbine: { type: Boolean, default: false }
 });
 
-// Dynamic Percentile schema for annual data and metrics
+// Percentile Schema - representing a percentile configuration
 const PercentileSchema = new mongoose.Schema({
-  // This is a flexible schema that will hold different percentile values
-  // Each percentile key (e.g., "Pprimary", "Pupper_bound") will be dynamically added
-}, { strict: false });
+  value: { type: Number, required: true, min: 1, max: 99, default: 50 },
+  description: { 
+    type: String, 
+    enum: ['primary', 'upper_bound', 'lower_bound', 'extreme_upper', 'extreme_lower'],
+    default: 'primary'
+  },
+  label: {
+    type: String,
+    get: function() {
+      return `P${this.value}`;
+    }
+  }
+});
+
+// Simulation Results Schema - for storing a percentile-based result set
+const SimResultsSchema = new mongoose.Schema({
+  percentile: { type: PercentileSchema, required: true },
+  data: { type: [DataPointSchema], default: [] }
+});
+
+// Simulation Result Data Point Schema - for storing time series data
+const DataPointSchema = new mongoose.Schema({
+  year: { type: Number, required: true, min: 0 },
+  value: { type: Number, required: true }
+});
 
 // Schema for Adjustment
 const AdjustmentSchema = new mongoose.Schema({
@@ -75,48 +99,20 @@ const AdjustmentSchema = new mongoose.Schema({
   description: { type: String }
 });
 
-// MajorComponentSchema (embedded, not a reference)
-const MajorComponentSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  appliesTo: {
-    geared: { 
-      type: Boolean, 
-      default: true 
-    },
-    directDrive: { 
-      type: Boolean, 
-      default: true 
-    }
-  },
-  quantityPerWTG: {
-    type: Number,
-    required: true,
-    min: 0,
-    default: 1
-  },
-  defaultFailureRate: {
-    type: Number,
-    min: 0,
-    max: 100,
-    default: 5
-  }
-});
-
 // Define the FailureModelSchema
 const FailureModelSchema = new mongoose.Schema({
   designLife: { type: Number, default: 20 },
   componentCount: { type: Number, default: 100 },
   assumedFailureRate: { type: Number, default: 0.01 },
-  // Embed the major component data (not a reference)
-  majorComponent: { type: MajorComponentSchema, required: true },
+  // Reference the imported schema (without unique constraints)
+  majorComponent: { 
+    type: new mongoose.Schema(
+      Object.assign({}, MajorComponentSchema.obj, {
+        name: { type: String, required: true, trim: true } // Remove unique constraint
+      })
+    ), 
+    required: true 
+  },
   historicalData: {
     type: {
       type: String,
@@ -250,13 +246,17 @@ const SettingsSchema = new mongoose.Schema({
   simulation: {
     iterations: { type: Number, default: 10000 },
     seed: { type: Number, default: 42 },
-    probabilities: {
-      primary: { type: Number, default: 50 },
-      upperBound: { type: Number, default: 75 },
-      lowerBound: { type: Number, default: 25 },
-      extremeUpper: { type: Number, default: 90 },
-      extremeLower: { type: Number, default: 10 }
-    }
+    percentiles: { 
+      type: [PercentileSchema], 
+      default: [
+        { value: 50, description: 'primary' },
+        { value: 75, description: 'upper_bound' },
+        { value: 25, description: 'lower_bound' },
+        { value: 90, description: 'extreme_upper' },
+        { value: 10, description: 'extreme_lower' }
+      ]
+    },
+    primaryPercentileIndex: { type: Number, default: 50 } // Index pointing to the primary percentile in the array  
   },
   
   // Project metrics
@@ -308,10 +308,10 @@ const InputSimSchema = new mongoose.Schema({
 
 // OutputSim schema - extracted to be reusable
 const OutputSimSchema = new mongoose.Schema({
-  IRR: { type: PercentileSchema, default: () => ({}) },
-  NPV: { type: PercentileSchema, default: () => ({}) },
-  paybackPeriod: { type: PercentileSchema, default: () => ({}) },
-  minDSCR: { type: PercentileSchema, default: () => ({}) }
+  IRR: { type: [SimResultsSchema], default: [] },
+  NPV: { type: [SimResultsSchema], default: [] },
+  paybackPeriod: { type: [SimResultsSchema], default: [] },
+  minDSCR: { type: [SimResultsSchema], default: [] }
 });
 
 // Main Scenario Schema

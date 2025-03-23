@@ -50,4 +50,8 @@ MajorComponentSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('MajorComponent', MajorComponentSchema);
+// Export both the model and the schema
+module.exports = {
+    MajorComponent: mongoose.model('MajorComponent', MajorComponentSchema),
+    MajorComponentSchema
+  };
