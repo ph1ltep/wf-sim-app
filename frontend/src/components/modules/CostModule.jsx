@@ -130,13 +130,13 @@ const CostInputs = () => {
             name="oemContractId"
             tooltip="Selected OEM contract for this scenario"
           >
-            <Select 
-              placeholder="Select an OEM contract" 
-              loading={loadingContracts}
+            <Select
+              placeholder="Select an OEM contract"
+              loading={loading}
               allowClear
             >
               {oemContracts.map(contract => (
-                <Option key={contract._id} value={contract._id}>
+                <Option key={contract.id} value={contract.id}>
                   {contract.name} - {contract.fixedFee.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}{contract.isPerTurbine ? '/WTG' : ''}/year
                 </Option>
               ))}

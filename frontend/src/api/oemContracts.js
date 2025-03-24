@@ -1,22 +1,13 @@
-// frontend/src/api/oemContracts.js
+// src/api/oemContracts.js
 import api from './index';
 
-export const getAllOEMContracts = () => {
-  return api.get('/oemcontracts');
+// OEM contracts are now stored within scenario settings, so we shouldn't
+// have separate API endpoints for them. Instead, we work with scenario data.
+
+// This function is just for backward compatibility
+export const getAllOEMContracts = async () => {
+  console.log("Note: OEM contracts are now stored within scenario settings");
+  return { success: true, data: [] };
 };
 
-export const getOEMContractById = (id) => {
-  return api.get(`/oemcontracts/${id}`);
-};
-
-export const createOEMContract = (data) => {
-  return api.post('/oemcontracts', data);
-};
-
-export const updateOEMContract = (id, data) => {
-  return api.put(`/oemcontracts/${id}`, data);
-};
-
-export const deleteOEMContract = (id) => {
-  return api.delete(`/oemcontracts/${id}`);
-};
+// For any actual contract operations, we should use the scenario API

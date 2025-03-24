@@ -12,7 +12,7 @@ import {
   Space,
   Button
 } from 'antd';
-import { InfoCircleOutlined, PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -129,9 +129,6 @@ const ContractForm = ({ form, oemScopes = [] }) => {
           placeholder="Select an OEM scope"
           optionFilterProp="children"
           showSearch
-          filterOption={(input, option) =>
-            option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-          }
         >
           {oemScopes.map(scope => (
             <Option key={scope.id} value={scope.id}>{scope.name}</Option>

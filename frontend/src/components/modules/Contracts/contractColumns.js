@@ -9,7 +9,7 @@ import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
  * @returns {string} Formatted currency string
  */
 const formatCurrency = (value) => {
-  if (!value) return '$0';
+  if (!value && value !== 0) return '$0';
   return `$${value.toLocaleString()}`;
 };
 
@@ -50,7 +50,7 @@ export const getOEMContractColumns = (handleEdit, handleDelete) => [
     title: 'Name',
     dataIndex: 'name',
     key: 'name',
-    sorter: (a, b) => a.name.localeString ? a.name.localeCompare(b.name) : 0,
+    sorter: (a, b) => a.name && b.name ? a.name.localeCompare(b.name) : 0,
   },
   {
     title: 'Term',
@@ -71,7 +71,7 @@ export const getOEMContractColumns = (handleEdit, handleDelete) => [
         {formatCurrency(record.fixedFee)}{record.isPerTurbine ? '/WTG' : ''}/year
       </span>
     ),
-    sorter: (a, b) => a.fixedFee - b.fixedFee,
+    sorter: (a, b) => (a.fixedFee || 0) - (b.fixedFee || 0),
   },
   {
     title: 'OEM Scope',

@@ -96,29 +96,68 @@ export const ScenarioProvider = ({ children }) => {
   const updateScenario = async (id, data) => {
     try {
       setLoading(true);
-      const response = await api.put(`/scenarios/${id}`, data);
+      
+      // Validate the input
+      if (!id) {
+        throw new Error('No scenario ID provided');
+      }
+      
+      console.log(`Updating scenario ${id} with:`, JSON.stringify(data, null, 2));
+      
+      // Create a sanitized copy of the data to send
+      const sanitizedData = {};
+      
+      // Only include specific fields that the backend allows
+      if (data.name !== undefined) sanitizedData.name = data.name;
+      if (data.description !== undefined) sanitizedData.description = data.description;
+      
+      // For settings, do a deeper check
+      if (data.settings) {
+        // Make a deep copy to avoid reference issues
+        sanitizedData.settings = JSON.parse(JSON.stringify(data.settings));
+      }
+      
+      console.log("Sanitized data to send:", JSON.stringify(sanitizedData, null, 2));
+      
+      // Make the API call
+      const response = await api.put(`/scenarios/${id}`, sanitizedData);
       
       if (response.success && response.data) {
         // If we're updating the currently loaded scenario, update the local state
         if (scenarioData && scenarioData._id === id) {
-          setScenarioData({
-            ...scenarioData,
-            ...response.data,
-            // Preserve any fields not returned by the update endpoint
-            settings: data.settings || scenarioData.settings,
-            simulation: scenarioData.simulation
+          setScenarioData(prevData => {
+            // Create a new object with the updated fields
+            const updatedScenario = {
+              ...prevData,
+              ...response.data
+            };
+            
+            // If the update included settings, update those too
+            if (data.settings) {
+              updatedScenario.settings = {
+                ...prevData.settings,
+                ...data.settings
+              };
+            }
+            
+            return updatedScenario;
           });
         }
         
         message.success('Scenario updated successfully');
         return response.data;
       } else {
+        console.error('API returned success: false', response);
         message.error('Failed to update scenario: ' + (response.error || 'Unknown error'));
         return null;
       }
     } catch (err) {
-      message.error('Failed to update scenario');
-      console.error(err);
+      console.error('Error in updateScenario:', err);
+      
+      // Better error message based on the response
+      const errorMessage = err.response?.data?.error || err.message || 'Unknown error';
+      message.error('Failed to update scenario: ' + errorMessage);
+      
       return null;
     } finally {
       setLoading(false);

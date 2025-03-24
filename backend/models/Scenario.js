@@ -80,16 +80,16 @@ const PercentileSchema = new mongoose.Schema({
   }
 });
 
-// Simulation Results Schema - for storing a percentile-based result set
-const SimResultsSchema = new mongoose.Schema({
-  percentile: { type: PercentileSchema, required: true },
-  data: { type: [DataPointSchema], default: [] }
-});
-
 // Simulation Result Data Point Schema - for storing time series data
 const DataPointSchema = new mongoose.Schema({
   year: { type: Number, required: true, min: 0 },
   value: { type: Number, required: true }
+});
+
+// Simulation Results Schema - for storing a percentile-based result set
+const SimResultsSchema = new mongoose.Schema({
+  percentile: { type: PercentileSchema, required: true },
+  data: { type: [DataPointSchema], default: [] }
 });
 
 // Schema for Adjustment

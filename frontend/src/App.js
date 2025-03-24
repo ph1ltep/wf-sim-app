@@ -5,7 +5,6 @@ import { ScenarioProvider } from './contexts/ScenarioContext';
 import MainLayout from './layouts/MainLayout';
 
 // Config components
-//import GeneralConfig from './components/config/xGeneralConfig';
 import ProjectSettings from './components/config/ProjectSettings';
 import SimulationSettings from './components/general/SimulationSettings';
 import LocationDefaults from './components/general/LocationDefaults';
@@ -58,7 +57,7 @@ function App() {
               <Route path="project" element={<ProjectSettings />} />
               <Route path="scenario">
                 <Route path="settings" element={<ScenarioSettings />} />
-                <Route path="contracts" element={<ContractsModule />} />
+                <Route path="oemcontracts" element={<ContractsModule />} />
                 <Route index element={<Navigate to="/config/scenario/settings" replace />} />
               </Route>
               
