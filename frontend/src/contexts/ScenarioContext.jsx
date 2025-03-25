@@ -1,6 +1,8 @@
 // src/contexts/ScenarioContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { message } from 'antd';
+import { produce } from 'immer';
+import { get, set, update, cloneDeep } from 'lodash';
 import api from '../api/index';
 
 const ScenarioContext = createContext();
@@ -18,12 +20,11 @@ export const ScenarioProvider = ({ children }) => {
     initializeScenario();
   }, []);
 
-  // Create a new scenario with default parameters
+  // =========== API Operations ===========
+
   const initializeScenario = async () => {
     try {
       setLoading(true);
-      
-      // Create a new scenario with default settings
       const response = await api.post('/scenarios', {
         name: 'New Scenario',
         description: 'Default configuration scenario'
@@ -34,7 +35,6 @@ export const ScenarioProvider = ({ children }) => {
         message.success('Scenario initialized successfully');
       } else {
         message.error('Failed to initialize scenario: ' + (response.error || 'Unknown error'));
-        console.error('Failed to initialize scenario:', response);
       }
     } catch (err) {
       message.error('Failed to initialize scenario');
@@ -44,8 +44,7 @@ export const ScenarioProvider = ({ children }) => {
     }
   };
 
-  // Get a specific scenario by ID
-  const getScenario = async (id) => {
+  const getScenario = useCallback(async (id) => {
     try {
       setLoading(true);
       const response = await api.get(`/scenarios/${id}`);
@@ -65,10 +64,9 @@ export const ScenarioProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Get all scenarios (with optional pagination)
-  const getAllScenarios = async (page = 1, limit = 10) => {
+  const getAllScenarios = useCallback(async (page = 1, limit = 10) => {
     try {
       setLoading(true);
       const response = await api.get(`/scenarios?page=${page}&limit=${limit}`);
@@ -90,97 +88,50 @@ export const ScenarioProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Update a scenario
-  const updateScenario = async (id, data) => {
+  const saveScenario = useCallback(async () => {
+    if (!scenarioData || !scenarioData._id) {
+      message.error('No scenario to save');
+      return null;
+    }
+    
     try {
       setLoading(true);
-      
-      // Validate the input
-      if (!id) {
-        throw new Error('No scenario ID provided');
-      }
-      
-      console.log(`Updating scenario ${id} with:`, JSON.stringify(data, null, 2));
-      
-      // Create a sanitized copy of the data to send
-      const sanitizedData = {};
-      
-      // Only include specific fields that the backend allows
-      if (data.name !== undefined) sanitizedData.name = data.name;
-      if (data.description !== undefined) sanitizedData.description = data.description;
-      
-      // For settings, do a deeper check
-      if (data.settings) {
-        // Make a deep copy to avoid reference issues
-        sanitizedData.settings = JSON.parse(JSON.stringify(data.settings));
-      }
-      
-      console.log("Sanitized data to send:", JSON.stringify(sanitizedData, null, 2));
-      
-      // Make the API call
-      const response = await api.put(`/scenarios/${id}`, sanitizedData);
+      const response = await api.put(`/scenarios/${scenarioData._id}`, {
+        name: scenarioData.name,
+        description: scenarioData.description,
+        settings: scenarioData.settings
+      });
       
       if (response.success && response.data) {
-        // If we're updating the currently loaded scenario, update the local state
-        if (scenarioData && scenarioData._id === id) {
-          setScenarioData(prevData => {
-            // Create a new object with the updated fields
-            const updatedScenario = {
-              ...prevData,
-              ...response.data
-            };
-            
-            // If the update included settings, update those too
-            if (data.settings) {
-              updatedScenario.settings = {
-                ...prevData.settings,
-                ...data.settings
-              };
-            }
-            
-            return updatedScenario;
-          });
-        }
-        
-        message.success('Scenario updated successfully');
+        message.success('Scenario saved successfully');
         return response.data;
       } else {
-        console.error('API returned success: false', response);
-        message.error('Failed to update scenario: ' + (response.error || 'Unknown error'));
+        message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
         return null;
       }
     } catch (err) {
-      console.error('Error in updateScenario:', err);
-      
-      // Better error message based on the response
-      const errorMessage = err.response?.data?.error || err.message || 'Unknown error';
-      message.error('Failed to update scenario: ' + errorMessage);
-      
+      message.error('Failed to save scenario');
+      console.error(err);
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, [scenarioData]);
 
-  // Delete a scenario
-  const deleteScenario = async (id) => {
+  const deleteScenario = useCallback(async (id) => {
     try {
       setLoading(true);
       const response = await api.delete(`/scenarios/${id}`);
       
       if (response.success) {
-        // If the deleted scenario is currently loaded, clear it
         if (scenarioData && scenarioData._id === id) {
           setScenarioData(null);
-          // Optionally initialize a new one
           initializeScenario();
         }
         
-        // Update the scenario list
         setScenarioList(prev => prev.filter(scenario => scenario._id !== id));
-        
         message.success('Scenario deleted successfully');
         return true;
       } else {
@@ -194,22 +145,188 @@ export const ScenarioProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scenarioData]);
+
+  // =========== Data Operations Using Lodash & Immer ===========
+
+  // Utility to check if we have a valid scenario
+  const hasValidScenario = useCallback(() => {
+    if (!scenarioData) {
+      message.error('No active scenario');
+      return false;
+    }
+    return true;
+  }, [scenarioData]);
+
+  // Get a value by path
+  const getValueByPath = useCallback((path, defaultValue = null) => {
+    if (!hasValidScenario()) return defaultValue;
+    return get(scenarioData, path, defaultValue);
+  }, [scenarioData, hasValidScenario]);
+
+  // Update a value by path
+  const updateByPath = useCallback((path, value) => {
+    if (!hasValidScenario()) return false;
+    
+    setScenarioData(produce(draft => {
+      set(draft, path, value);
+    }));
+    
+    return true;
+  }, [hasValidScenario]);
+
+  // Update a value by applying a function to it
+  const updateByFunction = useCallback((path, updateFn) => {
+    if (!hasValidScenario()) return false;
+    
+    setScenarioData(produce(draft => {
+      const currentValue = get(draft, path);
+      const newValue = updateFn(currentValue);
+      set(draft, path, newValue);
+    }));
+    
+    return true;
+  }, [hasValidScenario]);
+
+  // Array operations with paths
+  const arrayOperations = useCallback((path, operation, item, itemId = null) => {
+    if (!hasValidScenario()) return false;
+    
+    setScenarioData(produce(draft => {
+      // Ensure the path exists
+      const pathParts = typeof path === 'string' ? path.split('.') : path;
+      let current = draft;
+      
+      // Build the path if it doesn't exist
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const part = pathParts[i];
+        if (current[part] === undefined) {
+          // If the next part is a number, create an array, otherwise an object
+          const nextPart = pathParts[i + 1];
+          current[part] = !isNaN(parseInt(nextPart)) ? [] : {};
+        }
+        current = current[part];
+      }
+      
+      // Get the array at the path
+      const lastPart = pathParts[pathParts.length - 1];
+      if (current[lastPart] === undefined) {
+        current[lastPart] = [];
+      }
+      
+      const array = current[lastPart];
+      
+      // Ensure we have an array
+      if (!Array.isArray(array)) {
+        console.warn('Path does not point to an array:', path);
+        return false;
+      }
+      
+      // Perform the operation
+      switch (operation) {
+        case 'add':
+          array.push(item);
+          break;
+        case 'update':
+          if (itemId === null) return false;
+          
+          const index = array.findIndex(i => 
+            (i.id && i.id === itemId) || (i._id && i._id === itemId)
+          );
+          
+          if (index >= 0) {
+            array[index] = { ...array[index], ...item };
+          }
+          break;
+        case 'remove':
+          if (itemId === null) return false;
+          
+          const removeIndex = array.findIndex(i => 
+            (i.id && i.id === itemId) || (i._id && i._id === itemId)
+          );
+          
+          if (removeIndex >= 0) {
+            array.splice(removeIndex, 1);
+          }
+          break;
+        case 'replace':
+          // Replace the entire array
+          current[lastPart] = item;
+          break;
+        default:
+          console.warn(`Unknown array operation: ${operation}`);
+          return false;
+      }
+    }));
+    
+    return true;
+  }, [hasValidScenario]);
+
+  // =========== Shorthand Functions for Common Operations ===========
+
+  // Update basic scenario properties
+  const updateScenarioMeta = useCallback((updates) => {
+    if (!hasValidScenario()) return false;
+    
+    setScenarioData(produce(draft => {
+      if (updates.name !== undefined) draft.name = updates.name;
+      if (updates.description !== undefined) draft.description = updates.description;
+    }));
+    
+    return true;
+  }, [hasValidScenario]);
+
+  // Update any section of settings
+  const updateSettings = useCallback((section, updates) => {
+    if (!hasValidScenario()) return false;
+    
+    return updateByPath(['settings', section], {
+      ...getValueByPath(['settings', section], {}),
+      ...updates
+    });
+  }, [hasValidScenario, updateByPath, getValueByPath]);
+
+  // Update module settings
+  const updateModuleSettings = useCallback((moduleName, updates) => {
+    if (!hasValidScenario()) return false;
+    
+    return updateByPath(['settings', 'modules', moduleName], {
+      ...getValueByPath(['settings', 'modules', moduleName], {}),
+      ...updates
+    });
+  }, [hasValidScenario, updateByPath, getValueByPath]);
 
   // Provide context values
   const value = {
+    // State
     scenarioData,
     scenarioList,
-    settings: scenarioData?.settings || null,
-    results: scenarioData?.simulation || null,
     loading,
     selectedLocation,
+    
+    // Location selection
     setSelectedLocation,
+    
+    // API operations
     initializeScenario,
     getScenario,
     getAllScenarios,
-    updateScenario,
+    saveScenario,
     deleteScenario,
+    
+    // Utility checks
+    hasValidScenario,
+    
+    // Core data operations
+    getValueByPath,
+    updateByPath,
+    updateByFunction,
+    arrayOperations,
+    
+    // Shorthand operations
+    updateScenarioMeta,
+    updateSettings,
+    updateModuleSettings
   };
 
   return (

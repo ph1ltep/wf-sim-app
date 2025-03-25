@@ -1,60 +1,124 @@
-// src/components/inputs/CostInputs.jsx
+// src/components/modules/CostModule.jsx
 import React, { useEffect, useState } from 'react';
-import { Typography, Form, InputNumber, Select, Card, Divider, Tabs, Button } from 'antd';
+import { Typography, Card, Divider, Tabs, Button, Alert, Space } from 'antd';
 import { InfoCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import { Form, InputNumber, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { getAllOEMContracts } from '../../api/oemContracts';
 
 const { Title } = Typography;
 const { Option } = Select;
 
-const CostInputs = () => {
-  const { settings, updateModuleParameters } = useScenario();
-  const [form] = Form.useForm();
+// Define validation schema
+const costSchema = yup.object({
+  annualBaseOM: yup
+    .number()
+    .required('Annual base O&M cost is required')
+    .min(0, 'Must be positive'),
+  
+  escalationRate: yup
+    .number()
+    .required('Escalation rate is required')
+    .min(0, 'Must be positive')
+    .max(10, 'Must be less than 10%'),
+  
+  escalationDistribution: yup
+    .string()
+    .required('Escalation distribution is required')
+    .oneOf(['Normal', 'Lognormal', 'Triangular', 'Uniform'], 'Invalid distribution type'),
+  
+  oemTerm: yup
+    .number()
+    .required('OEM term is required')
+    .min(0, 'Must be positive')
+    .integer('Must be an integer'),
+  
+  failureEventProbability: yup
+    .number()
+    .required('Failure event probability is required')
+    .min(0, 'Must be positive')
+    .max(100, 'Must be less than 100%'),
+  
+  failureEventCost: yup
+    .number()
+    .required('Failure event cost is required')
+    .min(0, 'Must be positive')
+}).required();
+
+const CostModule = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('routine');
   const [oemContracts, setOEMContracts] = useState([]);
   const [loadingContracts, setLoadingContracts] = useState(false);
-// src/components/inputs/CostInputs.jsx (continued)
-  // Only render if settings are loaded
-  if (!settings || !settings.modules || !settings.modules.cost) {
-    return <div>Loading settings...</div>;
-  }
-
-  const costParams = settings.modules.cost;
-
-  // Fetch OEM contracts on component mount
+  
+  // Use our enhanced context
+  const { 
+    getValueByPath,
+    updateModuleSettings
+  } = useScenario();
+  
+  // Get cost module data from context
+  const costModuleData = getValueByPath(['settings', 'modules', 'cost'], {});
+  
+  // Initialize React Hook Form
+  const { 
+    control, 
+    handleSubmit, 
+    formState: { errors, dirtyFields },
+    reset
+  } = useForm({
+    resolver: yupResolver(costSchema),
+    defaultValues: {
+      annualBaseOM: costModuleData.annualBaseOM || 5000000,
+      escalationRate: costModuleData.escalationRate || 2,
+      escalationDistribution: costModuleData.escalationDistribution || 'Normal',
+      oemTerm: costModuleData.oemTerm || 5,
+      failureEventProbability: costModuleData.failureEventProbability || 5,
+      failureEventCost: costModuleData.failureEventCost || 200000
+    }
+  });
+  
+  // Reset form when costModuleData changes
   useEffect(() => {
-    const fetchOEMContracts = async () => {
-      try {
-        setLoadingContracts(true);
-        const response = await getAllOEMContracts();
-        
-        if (response.success && response.data) {
-          setOEMContracts(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching OEM contracts:', error);
-      } finally {
-        setLoadingContracts(false);
-      }
-    };
+    reset({
+      annualBaseOM: costModuleData.annualBaseOM || 5000000,
+      escalationRate: costModuleData.escalationRate || 2,
+      escalationDistribution: costModuleData.escalationDistribution || 'Normal',
+      oemTerm: costModuleData.oemTerm || 5,
+      failureEventProbability: costModuleData.failureEventProbability || 5,
+      failureEventCost: costModuleData.failureEventCost || 200000
+    });
+  }, [costModuleData, reset]);
+  
+  // Form submission handler
+  const onSubmit = (data) => {
+    // Only include fields that have changed
+    const updates = {};
+    Object.keys(dirtyFields).forEach(key => {
+      updates[key] = data[key];
+    });
     
-    fetchOEMContracts();
-  }, []);
-
-  const handleValuesChange = (changedValues, allValues) => {
-    // Only update if we have actual changed values
-    if (Object.keys(changedValues).length > 0) {
-      updateModuleParameters('cost', allValues);
+    if (Object.keys(updates).length > 0) {
+      updateModuleSettings('cost', updates);
     }
   };
-
+  
   // Navigate to OEM Contracts page
   const goToOEMContracts = () => {
     navigate('/config/scenario/oemcontracts');
   };
-
+  
+  // Handle tab change
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    
+    // Save any changes when switching tabs
+    handleSubmit(onSubmit)();
+  };
+  
   // Define tabs items
   const tabItems = [
     {
@@ -64,44 +128,65 @@ const CostInputs = () => {
         <Card title="Base O&M Costs">
           <Form.Item
             label="Annual Base O&M Cost (USD/year)"
-            name="annualBaseOM"
-            rules={[{ required: true, message: 'Please input annual base O&M cost!' }]}
+            validateStatus={errors.annualBaseOM ? 'error' : ''}
+            help={errors.annualBaseOM?.message}
           >
-            <InputNumber 
-              min={0} 
-              step={100000} 
-              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={value => value.replace(/\$\s?|(,*)/g, '')}
-              style={{ width: '100%' }}
+            <Controller
+              name="annualBaseOM"
+              control={control}
+              render={({ field }) => (
+                <InputNumber 
+                  {...field}
+                  min={0} 
+                  step={100000} 
+                  formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  style={{ width: '100%' }}
+                />
+              )}
             />
           </Form.Item>
           
           <Form.Item
             label="O&M Cost Escalation Rate (%/year)"
-            name="escalationRate"
-            rules={[{ required: true, message: 'Please input escalation rate!' }]}
+            validateStatus={errors.escalationRate ? 'error' : ''}
+            help={errors.escalationRate?.message}
           >
-            <InputNumber 
-              min={0} 
-              max={10} 
-              step={0.1} 
-              formatter={value => `${value}%`}
-              parser={value => value.replace('%', '')}
-              style={{ width: '100%' }}
+            <Controller
+              name="escalationRate"
+              control={control}
+              render={({ field }) => (
+                <InputNumber 
+                  {...field}
+                  min={0} 
+                  max={10} 
+                  step={0.1} 
+                  formatter={value => `${value}%`}
+                  parser={value => value.replace('%', '')}
+                  style={{ width: '100%' }}
+                />
+              )}
             />
           </Form.Item>
           
           <Form.Item
             label="Escalation Distribution"
-            name="escalationDistribution"
+            validateStatus={errors.escalationDistribution ? 'error' : ''}
+            help={errors.escalationDistribution?.message}
             tooltip="Distribution type for the escalation rate uncertainty"
           >
-            <Select>
-              <Option value="Normal">Normal</Option>
-              <Option value="Lognormal">Lognormal</Option>
-              <Option value="Triangular">Triangular</Option>
-              <Option value="Uniform">Uniform</Option>
-            </Select>
+            <Controller
+              name="escalationDistribution"
+              control={control}
+              render={({ field }) => (
+                <Select {...field} style={{ width: '100%' }}>
+                  <Option value="Normal">Normal</Option>
+                  <Option value="Lognormal">Lognormal</Option>
+                  <Option value="Triangular">Triangular</Option>
+                  <Option value="Uniform">Uniform</Option>
+                </Select>
+              )}
+            />
           </Form.Item>
         </Card>
       )
@@ -126,21 +211,23 @@ const CostInputs = () => {
           <p>Select an OEM contract to use for this scenario. OEM contracts define scope and cost during the warranty period.</p>
           
           <Form.Item
-            label="OEM Contract"
-            name="oemContractId"
-            tooltip="Selected OEM contract for this scenario"
+            label="OEM Term (Years)"
+            validateStatus={errors.oemTerm ? 'error' : ''}
+            help={errors.oemTerm?.message}
           >
-            <Select
-              placeholder="Select an OEM contract"
-              loading={loading}
-              allowClear
-            >
-              {oemContracts.map(contract => (
-                <Option key={contract.id} value={contract.id}>
-                  {contract.name} - {contract.fixedFee.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}{contract.isPerTurbine ? '/WTG' : ''}/year
-                </Option>
-              ))}
-            </Select>
+            <Controller
+              name="oemTerm"
+              control={control}
+              render={({ field }) => (
+                <InputNumber 
+                  {...field}
+                  min={0} 
+                  max={30}
+                  step={1}
+                  style={{ width: '100%' }}
+                />
+              )}
+            />
           </Form.Item>
           
           <Divider dashed />
@@ -158,29 +245,45 @@ const CostInputs = () => {
         <Card title="Failure Events">
           <Form.Item
             label="Failure Event Probability (%/year)"
-            name="failureEventProbability"
+            validateStatus={errors.failureEventProbability ? 'error' : ''}
+            help={errors.failureEventProbability?.message}
             tooltip="Annual probability of a failure event occurring"
           >
-            <InputNumber 
-              min={0} 
-              max={100} 
-              formatter={value => `${value}%`}
-              parser={value => value.replace('%', '')}
-              style={{ width: '100%' }}
+            <Controller
+              name="failureEventProbability"
+              control={control}
+              render={({ field }) => (
+                <InputNumber 
+                  {...field}
+                  min={0} 
+                  max={100} 
+                  formatter={value => `${value}%`}
+                  parser={value => value.replace('%', '')}
+                  style={{ width: '100%' }}
+                />
+              )}
             />
           </Form.Item>
           
           <Form.Item
             label="Failure Event Cost (USD per event)"
-            name="failureEventCost"
+            validateStatus={errors.failureEventCost ? 'error' : ''}
+            help={errors.failureEventCost?.message}
             tooltip="Average cost of each failure event"
           >
-            <InputNumber 
-              min={0} 
-              step={10000} 
-              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={value => value.replace(/\$\s?|(,*)/g, '')}
-              style={{ width: '100%' }}
+            <Controller
+              name="failureEventCost"
+              control={control}
+              render={({ field }) => (
+                <InputNumber 
+                  {...field}
+                  min={0} 
+                  step={10000} 
+                  formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  style={{ width: '100%' }}
+                />
+              )}
             />
           </Form.Item>
         </Card>
@@ -205,16 +308,24 @@ const CostInputs = () => {
       <Title level={2}>Cost Module Configuration</Title>
       <p>Configure the cost parameters for the wind farm simulation.</p>
 
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={costParams}
-        onValuesChange={handleValuesChange}
-      >
-        <Tabs defaultActiveKey="routine" items={tabItems} />
-      </Form>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={handleTabChange} 
+          items={tabItems} 
+        />
+        
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Space>
+            <Button onClick={() => reset()}>Reset</Button>
+            <Button type="primary" htmlType="submit">
+              Save Changes
+            </Button>
+          </Space>
+        </div>
+      </form>
     </div>
   );
 };
 
-export default CostInputs;
+export default CostModule;

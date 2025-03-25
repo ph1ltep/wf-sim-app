@@ -1,34 +1,38 @@
-// src/components/modules/ContractsModule.jsx - fix for missing updateModuleParameters
+// src/components/modules/ContractsModule.jsx
 import React, { useState, useEffect } from 'react';
-import { Typography, Form, Card, Button, Modal, Table, message, Alert, Space } from 'antd';
+import { Typography, Card, Button, Modal, Table, message, Alert, Space } from 'antd';
 import { PlusOutlined, ToolOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
-
-// Component imports
-import ContractForm from './Contracts/ContractForm';
-import { getOEMContractColumns } from './Contracts/contractColumns';
+import { useOEMContractsManager } from '../../hooks/useOEMContractsManager';
 import useOEMScopes from '../../hooks/useOEMScopes';
+import { getOEMContractColumns } from './Contracts/contractColumns';
+
+// Import the new ContractForm that uses React Hook Form
+import ContractForm from './Contracts/ContractForm';
 
 const { Title } = Typography;
 
 const ContractsModule = () => {
-  const [form] = Form.useForm();
   const [modalVisible, setModalVisible] = useState(false);
   const [formType, setFormType] = useState('add');
-  const [currentContract, setCurrentContract] = useState({});
+  const [currentContract, setCurrentContract] = useState(null);
   const [localLoading, setLocalLoading] = useState(false);
   const [error, setError] = useState(null);
   const [scopesFetched, setScopesFetched] = useState(false);
   
-  // Use the scenario context - get what we need
-  const { scenarioData, setScenarioData } = useScenario();
+  // Use our custom hooks
+  const { 
+    contracts, 
+    addContract, 
+    updateContract, 
+    deleteContract 
+  } = useOEMContractsManager();
   
   // Use custom hook to fetch OEM scopes
-  const { oemScopes, loading: loadingScopes, fetchOEMScopes } = useOEMScopes();
-  
-  // Get OEM contracts directly from scenarioData
-  const settings = scenarioData?.settings || {};
-  const oemContracts = settings?.modules?.contracts?.oemContracts || [];
+  const { 
+    oemScopes, 
+    loading: loadingScopes, 
+    fetchOEMScopes 
+  } = useOEMScopes();
   
   // Map OEM scopes for the form
   const mappedScopes = oemScopes.map(scope => ({
@@ -45,66 +49,30 @@ const ContractsModule = () => {
     }
   }, [fetchOEMScopes, scopesFetched]);
 
-  // Update the contracts in the local state
-  const updateContracts = (updatedContracts) => {
-    // Create a deep copy of the current scenarioData
-    const updatedScenario = JSON.parse(JSON.stringify(scenarioData));
-    
-    // Ensure the path exists
-    if (!updatedScenario.settings) updatedScenario.settings = {};
-    if (!updatedScenario.settings.modules) updatedScenario.settings.modules = {};
-    if (!updatedScenario.settings.modules.contracts) updatedScenario.settings.modules.contracts = {};
-    
-    // Update the contracts array
-    updatedScenario.settings.modules.contracts.oemContracts = updatedContracts;
-    
-    // Update the scenario data in context
-    setScenarioData(updatedScenario);
-  };
-
   // Handle opening the form modal for adding a new contract
   const handleAdd = () => {
-    form.resetFields();
-    
-    // Initialize with default values
-    form.setFieldsValue({
-      years: [1, 2, 3, 4, 5],
-      isPerTurbine: true,
-      fixedFee: 100000
-    });
-    
-    setCurrentContract({});
+    setCurrentContract(null);
     setFormType('add');
     setModalVisible(true);
   };
   
   // Handle opening the form modal for editing an existing contract
   const handleEdit = (record) => {
-    console.log("Editing contract:", record);
     setCurrentContract(record);
-    
-    form.setFieldsValue(record);
     setFormType('edit');
     setModalVisible(true);
   };
   
-  // Handle deleting a contract - only updates context, doesn't save to server
+  // Handle deleting a contract
   const handleDelete = (id) => {
     try {
       setLocalLoading(true);
       
-      if (!scenarioData || !scenarioData._id) {
-        message.error('No active scenario. Please create or load a scenario first.');
-        return;
+      const success = deleteContract(id);
+      
+      if (!success) {
+        message.error('Failed to remove contract');
       }
-      
-      // Filter out the contract to delete
-      const updatedContracts = oemContracts.filter(contract => contract.id !== id);
-      
-      // Update the contracts in the local state
-      updateContracts(updatedContracts);
-      
-      message.success('Contract removed - Remember to save the scenario to persist changes');
     } catch (error) {
       console.error('Error removing contract:', error);
       setError('Failed to remove contract: ' + (error.message || 'Unknown error'));
@@ -113,25 +81,16 @@ const ContractsModule = () => {
     }
   };
   
-  // Handle saving the form data - only updates context, doesn't save to server
-  const handleSave = async () => {
+  // Handle form submission
+  const handleFormSubmit = (data) => {
     try {
-      const values = await form.validateFields();
       setLocalLoading(true);
-      
-      if (!scenarioData || !scenarioData._id) {
-        message.error('No active scenario. Please create or load a scenario first.');
-        return;
-      }
       
       // Prepare the contract data
       const contractData = {
-        id: formType === 'add' ? `contract_${Date.now()}` : currentContract.id,
-        name: values.name,
-        years: values.years || [],
-        fixedFee: Number(values.fixedFee) || 0,
-        isPerTurbine: !!values.isPerTurbine,
-        oemScopeId: values.oemScopeId || null
+        ...(currentContract?.id ? { id: currentContract.id } : {}),
+        ...data,
+        fixedFee: Number(data.fixedFee) || 0
       };
       
       // If we have oemScopeId, get the name from the scopes list
@@ -144,24 +103,21 @@ const ContractsModule = () => {
       
       console.log("Contract data to save:", contractData);
       
-      // Create updated contracts array
-      let updatedContracts;
+      let success;
       
       if (formType === 'add') {
-        // Add the new contract to the array
-        updatedContracts = [...oemContracts, contractData];
+        // Add the new contract
+        success = addContract(contractData);
       } else {
         // Update the existing contract
-        updatedContracts = oemContracts.map(contract => 
-          contract.id === currentContract.id ? contractData : contract
-        );
+        success = updateContract(currentContract.id, contractData);
       }
       
-      // Update the contracts in the local state
-      updateContracts(updatedContracts);
-      
-      message.success(`Contract ${formType === 'add' ? 'added' : 'updated'} - Remember to save the scenario to persist changes`);
-      setModalVisible(false);
+      if (success) {
+        setModalVisible(false);
+      } else {
+        message.error('Failed to save contract');
+      }
     } catch (error) {
       console.error('Error saving contract:', error);
       setError('Failed to save contract: ' + (error.message || 'Unknown error'));
@@ -188,7 +144,7 @@ const ContractsModule = () => {
   const columns = getOEMContractColumns(handleEdit, handleDelete);
   
   // Check if there's an active scenario
-  const noScenario = !scenarioData || !scenarioData._id;
+  const noScenario = !contracts || contracts.length === undefined;
   
   return (
     <div>
@@ -253,7 +209,7 @@ const ContractsModule = () => {
       >
         <Table 
           columns={columns} 
-          dataSource={oemContracts} 
+          dataSource={contracts} 
           rowKey="id"
           pagination={{ pageSize: 10 }}
           loading={localLoading || loadingScopes}
@@ -264,22 +220,18 @@ const ContractsModule = () => {
       <Modal
         title={formType === 'add' ? 'Add OEM Contract' : 'Edit OEM Contract'}
         open={modalVisible}
-        onOk={handleSave}
         onCancel={handleCancel}
         width={800}
-        confirmLoading={localLoading}
-        footer={[
-          <Button key="cancel" onClick={handleCancel}>
-            Cancel
-          </Button>,
-          <Button key="save" type="primary" onClick={handleSave} loading={localLoading}>
-            Save
-          </Button>,
-        ]}
+        // Remove footer as React Hook Form will handle the submit button
+        footer={null}
       >
         <ContractForm
-          form={form}
+          defaultValues={currentContract}
           oemScopes={mappedScopes}
+          onSubmit={handleFormSubmit}
+          onCancel={handleCancel}
+          isLoading={localLoading}
+          formType={formType}
         />
       </Modal>
     </div>
