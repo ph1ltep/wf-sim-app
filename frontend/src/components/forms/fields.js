@@ -2,7 +2,7 @@
 import React from 'react';
 import { Controller } from 'react-hook-form';
 import { Form, Input, InputNumber, Select, Switch, Radio, Checkbox, DatePicker } from 'antd';
-import { InfoCircleOutlined } from '@ant-design/icons';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 /**
  * Base Field Component that wraps Ant Design Form.Item with React Hook Form Controller
@@ -21,16 +21,8 @@ export const Field = ({
   }) => {
     // Create Form.Item config
     const formItemProps = {
-      label: tooltip ? (
-        <span>
-          {label}
-          <InfoCircleOutlined 
-            style={{ marginLeft: 8 }} 
-            className="form-tooltip-icon"
-          />
-        </span>
-      ) : label,
-      tooltip,
+      label,
+      tooltip, // Let Ant Design handle the tooltip icon
       validateStatus: error ? 'error' : '',
       help: error
     };
@@ -72,6 +64,7 @@ export const TextField = ({
   placeholder, 
   tooltip,
   dependencies,
+  style,
   ...rest 
 }) => (
   <Field
@@ -83,6 +76,7 @@ export const TextField = ({
     error={error}
     placeholder={placeholder}
     dependencies={dependencies}
+    style={{ ...style }}
     {...rest}
   />
 );
@@ -99,6 +93,7 @@ export const TextAreaField = ({
   placeholder, 
   tooltip,
   dependencies,
+  style,
   ...rest 
 }) => (
   <Field
@@ -111,9 +106,34 @@ export const TextAreaField = ({
     placeholder={placeholder}
     rows={rows}
     dependencies={dependencies}
+    style={{ ...style }}
     {...rest}
   />
 );
+
+/**
+ * Get appropriate width for number field based on its parameters
+ */
+const getNumberFieldWidth = (min, max, step, precision, addonBefore, addonAfter) => {
+  // Base width for basic numeric input
+  let width = 120;
+  
+  // Add width for larger numbers
+  if (max !== undefined && max > 9999) {
+    width += 40; // Add more space for larger numbers
+  }
+  
+  // Add width for decimal precision
+  if (precision !== undefined && precision > 0) {
+    width += precision * 8; // Roughly 8px per decimal place
+  }
+  
+  // Add width for addons
+  if (addonBefore) width += 30;
+  if (addonAfter) width += 50;
+  
+  return width;
+};
 
 /**
  * Number Input field component with formatting options
@@ -134,33 +154,41 @@ export const NumberField = ({
   parser,
   tooltip,
   dependencies,
-  style = { width: '100%' },
+  style,
   ...rest 
-}) => (
-  <Field
-    name={name}
-    label={label}
-    tooltip={tooltip}
-    control={control}
-    component={InputNumber}
-    error={error}
-    min={min}
-    max={max}
-    step={step}
-    precision={precision}
-    addonBefore={addonBefore}
-    addonAfter={addonAfter}
-    prefix={prefix}
-    formatter={formatter}
-    parser={parser}
-    style={style}
-    dependencies={dependencies}
-    {...rest}
-  />
-);
+}) => {
+  // Calculate appropriate width if not explicitly provided
+  const calculatedWidth = getNumberFieldWidth(min, max, step, precision, addonBefore, addonAfter);
+  
+  // Default style with calculated width if no style provided
+  const defaultStyle = { width: calculatedWidth };
+  
+  return (
+    <Field
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      control={control}
+      component={InputNumber}
+      error={error}
+      min={min}
+      max={max}
+      step={step}
+      precision={precision}
+      addonBefore={addonBefore}
+      addonAfter={addonAfter}
+      prefix={prefix}
+      formatter={formatter}
+      parser={parser}
+      style={{ ...defaultStyle, ...style }}
+      dependencies={dependencies}
+      {...rest}
+    />
+  );
+};
 
 /**
- * Currency Input field component
+ * Currency Input field component that shows the currency from scenario context
  */
 export const CurrencyField = ({ 
   name, 
@@ -171,22 +199,38 @@ export const CurrencyField = ({
   step = 1000,
   tooltip,
   dependencies,
+  style,
+  currencyOverride,
   ...rest 
-}) => (
-  <NumberField
-    name={name}
-    label={label}
-    tooltip={tooltip}
-    control={control}
-    error={error}
-    min={min}
-    step={step}
-    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-    parser={value => value.replace(/\$\s?|(,*)/g, '')}
-    dependencies={dependencies}
-    {...rest}
-  />
-);
+}) => {
+  // Get currency code from scenario context
+  const { getValueByPath } = useScenario();
+  const localCurrency = getValueByPath(['settings', 'project', 'currency', 'local']) || 'USD';
+  
+  // Use provided currency override or fallback to context currency
+  const currency = currencyOverride || localCurrency;
+  
+  // Currency fields need more space due to formatting
+  const defaultStyle = { width: 180 }; // Increased to accommodate currency code addon
+  
+  return (
+    <NumberField
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      control={control}
+      error={error}
+      min={min}
+      step={step}
+      formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+      parser={value => value.replace(/\$\s?|(,*)/g, '')}
+      addonAfter={currency} // Display currency code
+      dependencies={dependencies}
+      style={{ ...defaultStyle, ...style }}
+      {...rest}
+    />
+  );
+};
 
 /**
  * Percentage Input field component
@@ -201,23 +245,29 @@ export const PercentageField = ({
   step = 1,
   tooltip,
   dependencies,
+  style,
   ...rest 
-}) => (
-  <NumberField
-    name={name}
-    label={label}
-    tooltip={tooltip}
-    control={control}
-    error={error}
-    min={min}
-    max={max}
-    step={step}
-    formatter={value => `${value}%`}
-    parser={value => value.replace('%', '')}
-    dependencies={dependencies}
-    {...rest}
-  />
-);
+}) => {
+  // Percentage fields can be relatively narrow
+  const defaultStyle = { width: 110 };
+  
+  return (
+    <NumberField
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      control={control}
+      error={error}
+      min={min}
+      max={max}
+      step={step}
+      addonAfter="%" // Display % as addon
+      dependencies={dependencies}
+      style={{ ...defaultStyle, ...style }}
+      {...rest}
+    />
+  );
+};
 
 /**
  * Select (dropdown) field component
@@ -232,27 +282,48 @@ export const SelectField = ({
   mode,
   tooltip,
   dependencies,
+  style,
   ...rest 
-}) => (
-  <Field
-    name={name}
-    label={label}
-    tooltip={tooltip}
-    control={control}
-    component={Select}
-    error={error}
-    placeholder={placeholder}
-    mode={mode}
-    dependencies={dependencies}
-    {...rest}
-  >
-    {options.map((option) => (
-      <Select.Option key={option.value} value={option.value}>
-        {option.label}
-      </Select.Option>
-    ))}
-  </Field>
-);
+}) => {
+  // Calculate appropriate width based on options
+  const getSelectWidth = () => {
+    if (mode === 'multiple' || mode === 'tags') {
+      return 250; // Multiple selections need more space
+    }
+    
+    // Calculate based on longest option
+    const maxLength = options.reduce((max, option) => {
+      const length = option.label ? option.label.toString().length : 0;
+      return Math.max(max, length);
+    }, 0);
+    
+    return Math.max(120, maxLength * 10); // At least 120px, or 10px per character
+  };
+  
+  const defaultStyle = { width: getSelectWidth() };
+  
+  return (
+    <Field
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      control={control}
+      component={Select}
+      error={error}
+      placeholder={placeholder}
+      mode={mode}
+      dependencies={dependencies}
+      style={{ ...defaultStyle, ...style }}
+      {...rest}
+    >
+      {options.map((option) => (
+        <Select.Option key={option.value} value={option.value}>
+          {option.label}
+        </Select.Option>
+      ))}
+    </Field>
+  );
+};
 
 /**
  * Switch field component
@@ -363,18 +434,23 @@ export const DateField = ({
   error,
   tooltip,
   dependencies,
-  style = { width: '100%' },
+  style,
   ...rest 
-}) => (
-  <Field
-    name={name}
-    label={label}
-    tooltip={tooltip}
-    control={control}
-    component={DatePicker}
-    error={error}
-    style={style}
-    dependencies={dependencies}
-    {...rest}
-  />
-);
+}) => {
+  // Date pickers need reasonable width for the calendar display
+  const defaultStyle = { width: 180 };
+  
+  return (
+    <Field
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      control={control}
+      component={DatePicker}
+      error={error}
+      style={{ ...defaultStyle, ...style }}
+      dependencies={dependencies}
+      {...rest}
+    />
+  );
+};

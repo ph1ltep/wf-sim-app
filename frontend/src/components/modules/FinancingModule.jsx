@@ -1,12 +1,10 @@
-// src/components/modules/FinancingModuleRefactored.jsx
-import React, { useState, useEffect } from 'react';
+// src/components/modules/FinancingModule.jsx
+import React from 'react';
 import { Typography, Alert } from 'antd';
-import { DollarOutlined, PercentageOutlined } from '@ant-design/icons';
 import * as yup from 'yup';
 
 // Import our new form components and hooks
 import { useScenarioForm } from '../../hooks/forms';
-import { Validation } from '../../utils/validation';
 import {
   Form,
   FormSection,
@@ -63,11 +61,10 @@ const FinancingModule = () => {
     control, 
     handleSubmit, 
     watch, 
-    reset,
-    setValue,
-    formState: { errors, isDirty, isSubmitting },
+    formState: { errors },
     onSubmitForm,
-    moduleData
+    getValueByPath,
+    scenarioData
   } = useScenarioForm({
     validationSchema: financingSchema,
     moduleName: 'financing',
@@ -90,25 +87,25 @@ const FinancingModule = () => {
             <FormCol span={12}>
               <CurrencyField
                 name="capex"
-                label="CAPEX Investment (USD)"
+                label="CAPEX Investment"
                 control={control}
                 error={errors.capex?.message}
                 tooltip="Upfront capital expenditure required for plant construction"
                 min={0}
                 step={1000000}
-                prefix={<DollarOutlined />}
+                style={{ width: 200 }}  // Large numbers need more space
               />
             </FormCol>
             <FormCol span={12}>
               <CurrencyField
                 name="devex"
-                label="DEVEX Investment (USD)"
+                label="DEVEX Investment"
                 control={control}
                 error={errors.devex?.message}
                 tooltip="Development expenditure incurred prior to construction"
                 min={0}
                 step={1000000}
-                prefix={<DollarOutlined />}
+                style={{ width: 200 }}  // Large numbers need more space
               />
             </FormCol>
           </FormRow>
@@ -118,12 +115,14 @@ const FinancingModule = () => {
         <FormSection title="Loan Parameters">
           <NumberField
             name="loanDuration"
-            label="Loan Duration / Loan Tenor (Years)"
+            label="Loan Duration / Loan Tenor"
             control={control}
             error={errors.loanDuration?.message}
             tooltip="Duration over which the loan is repaid"
             min={1}
             max={30}
+            addonAfter="Years"
+            style={{ width: 120 }}  // Small integers don't need much space
           />
         </FormSection>
 
@@ -167,6 +166,8 @@ const FinancingModule = () => {
                   error={errors.debtToEquityRatio?.message}
                   min={0}
                   step={0.1}
+                  precision={2}
+                  style={{ width: 110 }}  // Small ratios need less space
                 />
               </FormCol>
               <FormCol span={12}>
@@ -178,7 +179,8 @@ const FinancingModule = () => {
                   min={0}
                   max={20}
                   step={0.25}
-                  prefix={<PercentageOutlined />}
+                  precision={2}
+                  style={{ width: 130 }}  // Adjusted width for percentage with addon
                 />
               </FormCol>
             </FormRow>
@@ -196,6 +198,8 @@ const FinancingModule = () => {
                   min={0}
                   max={1}
                   step={0.05}
+                  precision={2}
+                  style={{ width: 110 }}  // Small ratios need less space
                 />
               </FormCol>
               <FormCol span={12}>
@@ -207,7 +211,8 @@ const FinancingModule = () => {
                   min={0}
                   max={20}
                   step={0.25}
-                  prefix={<PercentageOutlined />}
+                  precision={2}
+                  style={{ width: 130 }}  // Adjusted width for percentage with addon
                 />
               </FormCol>
             </FormRow>
@@ -218,12 +223,14 @@ const FinancingModule = () => {
         <FormSection title="Debt Service Requirements">
           <NumberField
             name="minimumDSCR"
-            label="Minimum DSCR (Debt Service Coverage Ratio)"
+            label="Minimum DSCR"
             control={control}
             error={errors.minimumDSCR?.message}
-            tooltip="Minimum acceptable ratio of cash flow to debt service"
+            tooltip="Minimum acceptable ratio of cash flow to debt service (Debt Service Coverage Ratio)"
             min={1}
             step={0.05}
+            precision={2}
+            style={{ width: 110 }}  // Small ratios need less space
           />
         </FormSection>
       </Form>
