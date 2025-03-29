@@ -36,9 +36,10 @@ import ScenarioList from './components/scenarios/ScenarioList';
 import './index.css';
 
 function App() {
+  const basename = process.env.REACT_APP_BASENAME || '/proxy/3000';
   return (
     <ScenarioProvider>
-      <Router basename="/proxy/3000">
+      <Router basename={baseline}>
         <Routes>
           <Route path="/" element={<MainLayout />}>
             {/* Default redirect to simulation config */}
