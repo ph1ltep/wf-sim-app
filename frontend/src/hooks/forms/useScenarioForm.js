@@ -17,6 +17,8 @@ import { message } from 'antd';
  * @param {string} options.successMessage - Success message text
  * @returns {Object} Form methods and state
  */
+// src/hooks/forms/useScenarioForm.js
+
 export const useScenarioForm = ({
     validationSchema,
     moduleName,
@@ -35,7 +37,8 @@ export const useScenarioForm = ({
         updateByPath,
         scenarioData,
         hasValidScenario,
-        updateFormDirtyState
+        updateFormDirtyState,
+        registerFormSubmitHandler
     } = useScenario();
 
     // Generate a unique form ID
@@ -118,8 +121,40 @@ export const useScenarioForm = ({
         ...options
     });
 
-    // Get isDirty from form state
-    const { formState: { isDirty }, reset } = methods;
+    // Now that methods is initialized, we can safely destructure it
+    const { formState: { isDirty }, handleSubmit } = methods;
+    
+    // Get the reset function separately to avoid the initialization error
+    const { reset } = methods;
+
+    // Create a submit function that can be called from context
+    const submitForm = useCallback(() => {
+        return handleSubmit(onSubmit)();
+    }, [handleSubmit, onSubmit]);
+    
+    // Create a custom reset function that properly resets to context values
+    const resetFormToContext = useCallback(() => {
+        console.log("Resetting form to context values");
+        
+        if (path) {
+            const contextData = getValueByPath(path, {});
+            const formData = transformBeforeLoad ? transformBeforeLoad(contextData) : contextData;
+            
+            // Use reset from methods
+            reset(formData);
+            
+            // Clear dirty state
+            updateFormDirtyState(false, formId);
+        }
+    }, [getValueByPath, path, reset, transformBeforeLoad, updateFormDirtyState, formId]);
+    
+    // Register the form's submit handler
+    useEffect(() => {
+        if (formId) {
+            const unregister = registerFormSubmitHandler(formId, submitForm);
+            return unregister; // Cleanup on unmount
+        }
+    }, [formId, submitForm, registerFormSubmitHandler]);
     
     // Update global dirty state when form state changes
     useEffect(() => {
@@ -132,7 +167,6 @@ export const useScenarioForm = ({
     }, [isDirty, formId, updateFormDirtyState]);
 
     // Update form values when moduleData changes
-    // We use reset directly from methods to avoid including the entire methods object in deps
     useEffect(() => {
         if (options.watchExternalChanges !== false && 
             moduleData && 
@@ -150,6 +184,8 @@ export const useScenarioForm = ({
         ...methods,
         moduleData,
         isScenarioValid: hasValidScenario(),
-        scenarioData
+        scenarioData,
+        onSubmitForm: submitForm,
+        reset: resetFormToContext // Replace the original reset with our custom one
     };
 };

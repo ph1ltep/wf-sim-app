@@ -5,14 +5,13 @@ import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sider from '../components/common/Sider';
 import { useBeforeUnloadProtection } from '../hooks/useNavigationProtection';
-import { useScenario } from '../contexts/ScenarioContext';
 
 const { Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const { loading, hasUnsavedChanges } = useScenario();
-
+  
+  // Use the beforeUnload protection
   useBeforeUnloadProtection();
 
   const toggleSider = () => {
@@ -21,11 +20,7 @@ const MainLayout = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header 
-        collapsed={collapsed} 
-        toggle={toggleSider} 
-        hasUnsavedChanges={hasUnsavedChanges} 
-      />
+      <Header collapsed={collapsed} toggle={toggleSider} />
       <Layout>
         <Sider collapsed={collapsed} />
         <Layout className="site-layout" style={{ padding: '0 24px 24px' }}>
@@ -40,11 +35,6 @@ const MainLayout = () => {
               position: 'relative',
             }}
           >
-            {loading && (
-              <div className="loading-overlay">
-                <div className="loading-spinner" />
-              </div>
-            )}
             <Outlet />
           </Content>
         </Layout>

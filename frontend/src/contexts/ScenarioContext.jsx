@@ -15,31 +15,91 @@ export const ScenarioProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [dirtyForms, setDirtyForms] = useState({});
+  
+  // Add a registry for form submit handlers
+  const [formSubmitHandlers, setFormSubmitHandlers] = useState({});
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {
     initializeScenario();
   }, []);
 
+  // Register a form's submit handler
+  const registerFormSubmitHandler = useCallback((formId, submitHandler) => {
+    console.log(`Registering submit handler for form: ${formId}`);
+    setFormSubmitHandlers(prev => ({
+      ...prev,
+      [formId]: submitHandler
+    }));
+    
+    // Return unregister function
+    return () => {
+      setFormSubmitHandlers(prev => {
+        const newHandlers = { ...prev };
+        delete newHandlers[formId];
+        return newHandlers;
+      });
+    };
+  }, []);
+
+  // Submit all dirty forms
+  const submitAllForms = useCallback(async () => {
+    console.log("Submitting all dirty forms");
+    console.log("Dirty forms:", dirtyForms);
+    console.log("Available handlers:", formSubmitHandlers);
+    
+    const promises = [];
+    
+    // Call submit handlers for all dirty forms
+    Object.entries(dirtyForms).forEach(([formId, isDirty]) => {
+      if (isDirty && formSubmitHandlers[formId]) {
+        console.log(`Submitting form: ${formId}`);
+        promises.push(formSubmitHandlers[formId]());
+      }
+    });
+    
+    // Wait for all submissions to complete
+    try {
+      await Promise.all(promises);
+      
+      // Clear all dirty flags
+      setDirtyForms({});
+      
+      return true;
+    } catch (error) {
+      console.error("Error submitting forms:", error);
+      return false;
+    }
+  }, [dirtyForms, formSubmitHandlers]);
+
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
     if (!formId) return;
     
+    // Handle the special 'all' case to clear all dirty states
+    if (formId === 'all') {
+      console.log("Clearing all form dirty states");
+      setDirtyForms({});
+      return;
+    }
+    
+    // For debugging
+    console.log(`Updating form dirty state: ${formId} => ${isDirty}`);
+    
     setDirtyForms(prev => {
-      // For debugging
-      //console.log('Updating dirty state:', formId, isDirty, prev);
-      return {
+      const newState = {
         ...prev,
         [formId]: isDirty
       };
+      console.log("New dirty forms state:", newState);
+      return newState;
     });
   }, []);
 
   // Check if any form is dirty
   const hasUnsavedChanges = useMemo(() => {
     const anyDirty = Object.values(dirtyForms).some(Boolean);
-    // For debugging
-    //console.log('Current dirty forms:', dirtyForms, 'Any dirty:', anyDirty);
+    console.log("Current dirty forms:", dirtyForms, "Any dirty:", anyDirty);
     return anyDirty;
   }, [dirtyForms]);
 
@@ -343,6 +403,10 @@ export const ScenarioProvider = ({ children }) => {
     getAllScenarios,
     saveScenario,
     deleteScenario,
+    
+    // Form submission management
+    registerFormSubmitHandler,
+    submitAllForms,
     
     // Utility checks
     hasValidScenario,

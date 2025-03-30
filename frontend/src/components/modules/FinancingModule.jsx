@@ -245,7 +245,7 @@ const FinancingModule = () => {
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <FormButtons
             onSubmit={onSubmitForm}
-            onReset={reset}
+            onReset={() => reset()} // Call as a function to avoid passing the function reference
             isDirty={isDirty}
           />
         </div>
