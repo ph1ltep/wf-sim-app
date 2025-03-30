@@ -1,10 +1,10 @@
 // src/components/general/SimulationSettings.jsx
-import React from 'react';
-import { Typography, Alert, Button, Tooltip } from 'antd';
+import React, { useMemo, useCallback } from 'react';
+import { Typography, Alert, Table, Tooltip } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import * as yup from 'yup';
 
-// Import our new form components and hooks
+// Import our form components and hooks
 import { useScenarioForm } from '../../hooks/forms';
 import {
   Form,
@@ -13,6 +13,8 @@ import {
   FormCol,
   NumberField
 } from '../../components/forms';
+import FormButtons from '../../components/forms/FormButtons';
+import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
 const { Title } = Typography;
 
@@ -30,80 +32,112 @@ const simulationSchema = yup.object({
     .required('Random seed is required')
     .integer('Must be an integer'),
   
-  probabilities: yup.object({
-    primary: yup
-      .number()
-      .required('Primary probability is required')
-      .min(1, 'Minimum 1')
-      .max(99, 'Maximum 99')
-      .test('between-bounds', 'Primary must be between Lower and Upper Bound', 
-        function(value) {
-          const { lowerBound, upperBound } = this.parent;
-          return !lowerBound || !upperBound || (value > lowerBound && value < upperBound);
-        }),
-    
-    lowerBound: yup
-      .number()
-      .required('Lower bound is required')
-      .min(1, 'Minimum 1')
-      .max(49, 'Maximum 49')
-      .test('between-extremes', 'Must be between Extreme Lower and Primary', 
-        function(value) {
-          const { extremeLower, primary } = this.parent;
-          return !extremeLower || !primary || (value > extremeLower && value < primary);
-        }),
-    
-    upperBound: yup
-      .number()
-      .required('Upper bound is required')
-      .min(51, 'Minimum 51')
-      .max(99, 'Maximum 99')
-      .test('between-extremes', 'Must be between Primary and Extreme Upper', 
-        function(value) {
-          const { primary, extremeUpper } = this.parent;
-          return !primary || !extremeUpper || (value > primary && value < extremeUpper);
-        }),
-    
-    extremeLower: yup
-      .number()
-      .required('Extreme lower is required')
-      .min(1, 'Minimum 1')
-      .max(20, 'Maximum 20')
-      .test('less-than-lower', 'Must be less than Lower Bound', 
-        function(value) {
-          const { lowerBound } = this.parent;
-          return !lowerBound || value < lowerBound;
-        }),
-    
-    extremeUpper: yup
-      .number()
-      .required('Extreme upper is required')
-      .min(80, 'Minimum 80')
-      .max(99, 'Maximum 99')
-      .test('greater-than-upper', 'Must be greater than Upper Bound', 
-        function(value) {
-          const { upperBound } = this.parent;
-          return !upperBound || value > upperBound;
-        })
-  }).required()
+  percentiles: yup
+    .array()
+    .of(
+      yup.object({
+        value: yup
+          .number()
+          .required('Percentile value is required')
+          .min(1, 'Minimum 1')
+          .max(99, 'Maximum 99')
+          .integer('Must be an integer'),
+        description: yup
+          .string()
+          .required('Description is required')
+          .oneOf(['primary', 'upper_bound', 'lower_bound', 'extreme_upper', 'extreme_lower'], 
+            'Invalid description')
+      })
+    )
+    .required('At least one percentile is required')
+    .test(
+      'has-primary',
+      'Must have exactly one primary percentile',
+      percentiles => percentiles && percentiles.filter(p => p.description === 'primary').length === 1
+    )
+    .test(
+      'percentiles-order',
+      'Percentiles must follow logical order (extreme_lower < lower_bound < primary < upper_bound < extreme_upper)',
+      percentiles => {
+        if (!percentiles || percentiles.length < 5) return true;
+        
+        // Extract values by description
+        const byDesc = percentiles.reduce((acc, p) => {
+          acc[p.description] = p.value;
+          return acc;
+        }, {});
+        
+        // Check order
+        return (
+          (!byDesc.extreme_lower || !byDesc.lower_bound || byDesc.extreme_lower < byDesc.lower_bound) &&
+          (!byDesc.lower_bound || !byDesc.primary || byDesc.lower_bound < byDesc.primary) &&
+          (!byDesc.primary || !byDesc.upper_bound || byDesc.primary < byDesc.upper_bound) &&
+          (!byDesc.upper_bound || !byDesc.extreme_upper || byDesc.upper_bound < byDesc.extreme_upper)
+        );
+      }
+    )
 }).required();
 
 const SimulationSettings = () => {
-  // Use our custom form hook with section="simulation" instead of moduleName
-  // simulation settings are directly under settings, not under modules
-  const { 
-    control, 
-    formState: { errors },
-    onSubmitForm,
-    isDirty,
-    reset,
-    scenarioData
-  } = useScenarioForm({
+  // Use our custom form hook with modulePath for simulation settings
+  const formMethods = useScenarioForm({
     validationSchema: simulationSchema,
     modulePath: ['settings', 'simulation'],
     showSuccessMessage: true,
     successMessage: 'Simulation settings saved successfully'
   });
+  
+  const { 
+    control, 
+    formState: { errors },
+    onSubmitForm,
+    isDirty,
+    scenarioData
+  } = formMethods;
+  
+  // Extract reset separately and wrap with useCallback to maintain stable reference
+  const handleReset = useCallback(() => {
+    if (typeof formMethods.reset === 'function') {
+      formMethods.reset();
+    }
+  }, [formMethods]);
+  
+  // Get percentiles data but don't use watch to avoid triggering renders
+  // Instead, access it directly from the form values
+  const percentiles = formMethods.getValues()?.percentiles || [];
+  
+  // Define description options for drop-down
+  const descriptionOptions = useMemo(() => [
+    { value: 'primary', label: 'Primary (e.g., P50)' },
+    { value: 'upper_bound', label: 'Upper Bound (e.g., P75)' },
+    { value: 'lower_bound', label: 'Lower Bound (e.g., P25)' },
+    { value: 'extreme_upper', label: 'Extreme Upper (e.g., P90)' },
+    { value: 'extreme_lower', label: 'Extreme Lower (e.g., P10)' }
+  ], []);
+
+  // Define columns for percentiles table
+  const percentileColumns = useMemo(() => [
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      render: (text) => {
+        const option = descriptionOptions.find(opt => opt.value === text);
+        return option ? option.label : text;
+      }
+    },
+    {
+      title: 'Value',
+      dataIndex: 'value',
+      key: 'value',
+      render: (value) => `P${value}`
+    },
+    {
+      title: 'Percentile Label',
+      key: 'label',
+      render: (_, record) => `P${record.value}`
+    }
+  ], [descriptionOptions]);
   
   // Check if we have an active scenario
   if (!scenarioData) {
@@ -121,7 +155,10 @@ const SimulationSettings = () => {
 
   return (
     <div>
-      <Title level={2}>Simulation Settings</Title>
+      <Title level={2}>
+        Simulation Settings
+        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
+      </Title>
       <p>Configure simulation parameters and probability levels for visualization.</p>
 
       {/* Custom Form component without built-in buttons */}
@@ -174,110 +211,54 @@ const SimulationSettings = () => {
           </FormRow>
         </FormSection>
 
-        <FormSection title="Probability Levels for Visualization" style={{ marginBottom: 24 }}>
-          <p>Configure which probability levels (P-values) to display in charts and results.</p>
+        <FormSection title="Percentiles for Visualization" style={{ marginBottom: 24 }}>
+          <p>Configure which percentiles (P-values) to display in charts and results.</p>
           
-          <FormRow>
-            <FormCol span={12}>
-              <NumberField
-                name="probabilities.primary"
-                label="Primary Probability (P-value)"
-                control={control}
-                error={errors.probabilities?.primary?.message}
-                tooltip="The main probability level to display (e.g., P50 for median values)"
-                min={1}
-                max={99}
-                step={1}
-                formatter={value => `P${value}`}
-                parser={value => value?.replace('P', '')}
-                style={{ width: 120 }}
-              />
-            </FormCol>
-          </FormRow>
+          {/* Display error message if there is an array-level validation error */}
+          {errors.percentiles && typeof errors.percentiles.message === 'string' && (
+            <Alert 
+              message="Percentile Configuration Error" 
+              description={errors.percentiles.message}
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
           
-          <FormRow>
-            <FormCol span={12}>
-              <NumberField
-                name="probabilities.lowerBound"
-                label="Lower Bound Probability"
-                control={control}
-                error={errors.probabilities?.lowerBound?.message}
-                tooltip="Middle lower percentile for uncertainty bands (e.g., P25)"
-                min={2}
-                max={49}
-                step={5}
-                formatter={value => `P${value}`}
-                parser={value => value?.replace('P', '')}
-                style={{ width: 120 }}
-              />
-            </FormCol>
-            <FormCol span={12}>
-              <NumberField
-                name="probabilities.upperBound"
-                label="Upper Bound Probability"
-                control={control}
-                error={errors.probabilities?.upperBound?.message}
-                tooltip="Middle upper percentile for uncertainty bands (e.g., P75)"
-                min={51}
-                max={98}
-                step={5}
-                formatter={value => `P${value}`}
-                parser={value => value?.replace('P', '')}
-                style={{ width: 120 }}
-              />
-            </FormCol>
-          </FormRow>
+          {/* Percentiles table */}
+          {Array.isArray(percentiles) && percentiles.length > 0 && (
+            <Table 
+              dataSource={percentiles} 
+              columns={percentileColumns}
+              rowKey={(record, index) => `percentile-${index}`}
+              pagination={false}
+              size="small"
+              style={{ marginBottom: 16 }}
+            />
+          )}
           
-          <FormRow>
-            <FormCol span={12}>
-              <NumberField
-                name="probabilities.extremeLower"
-                label="Extreme Lower Probability"
-                control={control}
-                error={errors.probabilities?.extremeLower?.message}
-                tooltip="Extreme lower percentile for optimistic scenarios (e.g., P10)"
-                min={1}
-                max={20}
-                step={5}
-                formatter={value => `P${value}`}
-                parser={value => value?.replace('P', '')}
-                style={{ width: 120 }}
-              />
-            </FormCol>
-            <FormCol span={12}>
-              <NumberField
-                name="probabilities.extremeUpper"
-                label="Extreme Upper Probability"
-                control={control}
-                error={errors.probabilities?.extremeUpper?.message}
-                tooltip="Extreme upper percentile for conservative scenarios (e.g., P90)"
-                min={80}
-                max={99}
-                step={5}
-                formatter={value => `P${value}`}
-                parser={value => value?.replace('P', '')}
-                style={{ width: 120 }}
-              />
-            </FormCol>
-          </FormRow>
+          <Alert
+            message="Percentile Definitions"
+            description={
+              <ul>
+                <li><strong>Primary:</strong> The main P-value for charts (typically P50)</li>
+                <li><strong>Upper/Lower Bound:</strong> Middle confidence interval (typically P75/P25)</li>
+                <li><strong>Extreme Upper/Lower:</strong> Wider confidence interval (typically P90/P10)</li>
+              </ul>
+            }
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
         </FormSection>
           
-        {/* Form Actions - Custom buttons */}
+        {/* Form Actions */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Button 
-            onClick={() => reset()} 
-            style={{ marginRight: 8 }}
-            disabled={!isDirty}
-          >
-            Reset
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={onSubmitForm}
-            disabled={!isDirty}
-          >
-            Save Changes
-          </Button>
+          <FormButtons
+            onSubmit={onSubmitForm}
+            onReset={handleReset}
+            isDirty={isDirty}
+          />
         </div>
       </Form>
     </div>

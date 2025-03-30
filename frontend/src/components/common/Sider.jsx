@@ -95,21 +95,21 @@ const Sider = ({ collapsed }) => {
   const handleMenuClick = (e) => {
     const targetPath = e.key;
     
-    console.log("=== MENU CLICK DEBUG ===");
-    console.log("Target path:", targetPath);
-    console.log("Current path:", location.pathname);
-    console.log("hasUnsavedChanges:", hasUnsavedChanges);
+    //console.log("=== MENU CLICK DEBUG ===");
+    //console.log("Target path:", targetPath);
+    //console.log("Current path:", location.pathname);
+    //console.log("hasUnsavedChanges:", hasUnsavedChanges);
     
     // Only do something if we're navigating to a different path
     if (targetPath !== location.pathname) {
       // Check if we have unsaved changes
       if (hasUnsavedChanges) {
-        console.log("Showing custom confirmation modal");
+        //console.log("Showing custom confirmation modal");
         setPendingNavigation(targetPath);
         setModalVisible(true);
       } else {
         // No unsaved changes, navigate directly
-        console.log("No unsaved changes, navigating directly to:", targetPath);
+        //console.log("No unsaved changes, navigating directly to:", targetPath);
         navigate(targetPath);
       }
     }

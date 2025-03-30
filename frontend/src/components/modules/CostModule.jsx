@@ -121,15 +121,16 @@ const CostModule = () => {
                 <FormCol span={12}>
                   <PercentageField
                     name="escalationRate"
-                    label="O&M Cost Escalation Rate (%/year)"
+                    label="O&M Cost Escalation Rate"
                     control={control}
                     error={errors.escalationRate?.message}
                     tooltip="Annual rate at which O&M costs increase"
                     min={0}
                     max={10}
                     step={0.1}
-                    precision={1}
-                    style={{ width: 130 }}
+                    precision={2}
+                    addonAfter="% Yearly"
+                    style={{ width: 150 }}
                   />
                 </FormCol>
                 <FormCol span={12}>
