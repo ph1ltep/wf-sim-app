@@ -1,5 +1,5 @@
 // src/hooks/forms/useScenarioForm.js
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { useAppForm } from './useAppForm';
 import { message } from 'antd';
@@ -34,15 +34,31 @@ export const useScenarioForm = ({
         updateSettings,
         updateByPath,
         scenarioData,
-        hasValidScenario
+        hasValidScenario,
+        updateFormDirtyState
     } = useScenario();
 
-    // Determine the correct path and value for the form
-    const path = modulePath || (moduleName ? ['settings', 'modules', moduleName] : null);
-    const moduleData = path ? getValueByPath(path, {}) : {};
+    // Generate a unique form ID
+    const formId = useMemo(() => 
+        modulePath ? modulePath.join('.') : 
+        moduleName ? `modules.${moduleName}` : 
+        'unknown',
+    [modulePath, moduleName]);
+
+    // Calculate path using useMemo to avoid recreating in dependencies
+    const path = useMemo(() => 
+        modulePath || (moduleName ? ['settings', 'modules', moduleName] : null),
+    [modulePath, moduleName]);
+
+    // Get module data using the calculated path
+    const moduleData = useMemo(() => 
+        path ? getValueByPath(path, {}) : {},
+    [path, getValueByPath]);
 
     // Transform data before loading into form if needed
-    const transformedData = transformBeforeLoad ? transformBeforeLoad(moduleData) : moduleData;
+    const transformedData = useMemo(() => 
+        transformBeforeLoad ? transformBeforeLoad(moduleData) : moduleData,
+    [moduleData, transformBeforeLoad]);
 
     // Create submit handler to update the scenario context
     const onSubmit = useCallback((data) => {
@@ -95,27 +111,43 @@ export const useScenarioForm = ({
     ]);
 
     // Initialize the form with the app form hook
-    const form = useAppForm({
+    const methods = useAppForm({
         validationSchema,
         defaultValues: transformedData,
         onSubmit,
         ...options
     });
 
-    // Update form values when moduleData changes
+    // Get isDirty from form state
+    const { formState: { isDirty }, reset } = methods;
+    
+    // Update global dirty state when form state changes
     useEffect(() => {
-        if (options.watchExternalChanges !== false && moduleData && Object.keys(moduleData).length > 0) {
+        updateFormDirtyState(isDirty, formId);
+        
+        // Clean up when component unmounts
+        return () => {
+            updateFormDirtyState(false, formId);
+        };
+    }, [isDirty, formId, updateFormDirtyState]);
+
+    // Update form values when moduleData changes
+    // We use reset directly from methods to avoid including the entire methods object in deps
+    useEffect(() => {
+        if (options.watchExternalChanges !== false && 
+            moduleData && 
+            Object.keys(moduleData).length > 0) {
             // Transform data before loading if needed
             const newData = transformBeforeLoad ? transformBeforeLoad(moduleData) : moduleData;
 
             // Only reset if there are meaningful differences to avoid infinite loops
-            form.reset(newData);
+            reset(newData);
         }
-    }, [moduleData, transformBeforeLoad, options.watchExternalChanges]); // Remove form.reset from dependencies
+    }, [moduleData, transformBeforeLoad, options.watchExternalChanges, reset]);
 
     // Return the form methods and additional helpers
     return {
-        ...form,
+        ...methods,
         moduleData,
         isScenarioValid: hasValidScenario(),
         scenarioData

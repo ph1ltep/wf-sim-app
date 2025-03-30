@@ -1,7 +1,8 @@
 // src/components/common/Sider.jsx
 import React, { useState } from 'react';
 import { Layout, Menu } from 'antd';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useNavigate } from '../../hooks/useNavigationProtection'; // Import our custom hook
 import {
   SettingOutlined,
   FormOutlined,
@@ -21,7 +22,7 @@ const { Sider: AntSider } = Layout;
 
 const Sider = ({ collapsed }) => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Use our protected navigate
   const [openKeys, setOpenKeys] = useState(['config']);
 
   // Extract the root path for default selection

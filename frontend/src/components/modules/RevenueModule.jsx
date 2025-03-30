@@ -16,6 +16,8 @@ import {
   PercentageField,
   SelectField
 } from '../../components/forms';
+import FormButtons from '../../components/forms/FormButtons';
+import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
 const { Title } = Typography;
 const { TabPane } = Tabs;
@@ -28,26 +30,26 @@ const revenueSchema = yup.object({
       .string()
       .required('Distribution type is required')
       .oneOf(['Fixed', 'Normal', 'Triangular', 'Uniform'], 'Invalid distribution type'),
-    
+
     mean: yup
       .number()
       .required('Mean energy production is required')
       .min(0, 'Must be positive'),
-    
+
     std: yup
       .number()
       .when('distribution', {
         is: 'Normal',
         then: schema => schema.required('Standard deviation is required').min(0, 'Must be positive')
       }),
-    
+
     min: yup
       .number()
       .when('distribution', {
         is: (dist) => ['Triangular', 'Uniform'].includes(dist),
         then: schema => schema.required('Minimum value is required').min(0, 'Must be positive')
       }),
-    
+
     max: yup
       .number()
       .when('distribution', {
@@ -55,21 +57,21 @@ const revenueSchema = yup.object({
         then: schema => schema.required('Maximum value is required').min(0, 'Must be positive')
       })
   }),
-  
+
   // Electricity Price
   electricityPrice: yup.object({
     type: yup
       .string()
       .required('Price type is required')
       .oneOf(['fixed', 'variable'], 'Invalid price type'),
-    
+
     value: yup
       .number()
       .when('type', {
         is: 'fixed',
         then: schema => schema.required('Price value is required').min(0, 'Must be positive')
       }),
-    
+
     distribution: yup
       .string()
       .when('type', {
@@ -78,26 +80,26 @@ const revenueSchema = yup.object({
           .oneOf(['Normal', 'Lognormal', 'Triangular', 'Uniform'], 'Invalid distribution type')
       })
   }),
-  
+
   // Revenue Degradation
   revenueDegradationRate: yup
     .number()
     .required('Revenue degradation rate is required')
     .min(0, 'Must be positive')
     .max(10, 'Must be less than 10%'),
-  
+
   // Downtime
   downtimePerEvent: yup.object({
     distribution: yup
       .string()
       .required('Downtime distribution is required')
       .oneOf(['Weibull', 'Lognormal', 'Exponential'], 'Invalid distribution type'),
-    
+
     scale: yup
       .number()
       .required('Scale parameter is required')
       .min(0, 'Must be positive'),
-    
+
     shape: yup
       .number()
       .when('distribution', {
@@ -105,27 +107,27 @@ const revenueSchema = yup.object({
         then: schema => schema.required('Shape parameter is required').min(0, 'Must be positive')
       })
   }),
-  
+
   // Wind Variability
   windVariabilityMethod: yup
     .string()
     .required('Wind variability method is required')
     .oneOf(['Default', 'Kaimal'], 'Invalid wind variability method'),
-  
+
   turbulenceIntensity: yup
     .number()
     .when('windVariabilityMethod', {
       is: 'Kaimal',
       then: schema => schema.required('Turbulence intensity is required').min(0, 'Must be positive').max(30, 'Must be less than 30%')
     }),
-  
+
   surfaceRoughness: yup
     .number()
     .when('windVariabilityMethod', {
       is: 'Kaimal',
       then: schema => schema.required('Surface roughness is required').min(0.001, 'Must be positive').max(1, 'Must be less than 1')
     }),
-  
+
   kaimalScale: yup
     .number()
     .when('windVariabilityMethod', {
@@ -136,10 +138,10 @@ const revenueSchema = yup.object({
 
 const RevenueModule = () => {
   const [activeTab, setActiveTab] = useState('production');
-  
+
   // Use our custom form hook
-  const { 
-    control, 
+  const {
+    control,
     watch,
     formState: { errors },
     onSubmitForm,
@@ -151,13 +153,13 @@ const RevenueModule = () => {
     showSuccessMessage: true,
     successMessage: 'Revenue settings saved successfully'
   });
-  
+
   // Watch values for conditional rendering
   const energyDistribution = watch('energyProduction.distribution');
   const priceType = watch('electricityPrice.type');
   const downtimeDistribution = watch('downtimePerEvent.distribution');
   const windMethod = watch('windVariabilityMethod');
-  
+
   // Handle tab change
   const handleTabChange = (key) => {
     setActiveTab(key);
@@ -165,12 +167,14 @@ const RevenueModule = () => {
 
   return (
     <div>
-      <Title level={2}>Revenue Module Configuration</Title>
+      <Title level={2}>Revenue Module Configuration
+        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
+      </Title>
       <p>Configure the revenue parameters for the wind farm simulation.</p>
 
       {/* Custom Form component without built-in buttons */}
-      <Form 
-        onSubmit={null} 
+      <Form
+        onSubmit={null}
         submitButtons={false}
       >
         <Tabs activeKey={activeTab} onChange={handleTabChange}>
@@ -204,7 +208,7 @@ const RevenueModule = () => {
                     control={control}
                     error={errors.energyProduction?.mean?.message}
                     tooltip="Expected average annual energy production"
-                    min={0} 
+                    min={0}
                     step={100}
                     style={{ width: 200 }}
                   />
@@ -221,7 +225,7 @@ const RevenueModule = () => {
                       control={control}
                       error={errors.energyProduction?.std?.message}
                       tooltip="Standard deviation for Normal distribution"
-                      min={0} 
+                      min={0}
                       step={10}
                       style={{ width: 200 }}
                     />
@@ -238,7 +242,7 @@ const RevenueModule = () => {
                       control={control}
                       error={errors.energyProduction?.min?.message}
                       tooltip="Minimum possible energy production"
-                      min={0} 
+                      min={0}
                       step={100}
                       style={{ width: 200 }}
                     />
@@ -250,7 +254,7 @@ const RevenueModule = () => {
                       control={control}
                       error={errors.energyProduction?.max?.message}
                       tooltip="Maximum possible energy production"
-                      min={0} 
+                      min={0}
                       step={100}
                       style={{ width: 200 }}
                     />
@@ -476,20 +480,11 @@ const RevenueModule = () => {
 
         {/* Form Actions - Single set of buttons for all tabs */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Button 
-            onClick={() => reset()} 
-            style={{ marginRight: 8 }}
-            disabled={!isDirty}
-          >
-            Reset
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={onSubmitForm}
-            disabled={!isDirty}
-          >
-            Save Changes
-          </Button>
+          <FormButtons
+            onSubmit={onSubmitForm}
+            onReset={reset}
+            isDirty={isDirty}
+          />
         </div>
       </Form>
     </div>

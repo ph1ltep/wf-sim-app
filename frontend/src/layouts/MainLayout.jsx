@@ -4,13 +4,16 @@ import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sider from '../components/common/Sider';
+import { useBeforeUnloadProtection } from '../hooks/useNavigationProtection';
 import { useScenario } from '../contexts/ScenarioContext';
 
 const { Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const { loading } = useScenario();
+  const { loading, hasUnsavedChanges } = useScenario();
+
+  useBeforeUnloadProtection();
 
   const toggleSider = () => {
     setCollapsed(!collapsed);
@@ -18,7 +21,11 @@ const MainLayout = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header collapsed={collapsed} toggle={toggleSider} />
+      <Header 
+        collapsed={collapsed} 
+        toggle={toggleSider} 
+        hasUnsavedChanges={hasUnsavedChanges} 
+      />
       <Layout>
         <Sider collapsed={collapsed} />
         <Layout className="site-layout" style={{ padding: '0 24px 24px' }}>

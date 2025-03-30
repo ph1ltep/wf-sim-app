@@ -1,5 +1,5 @@
 // src/contexts/ScenarioContext.jsx
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { message } from 'antd';
 import { produce } from 'immer';
 import { get, set, update, cloneDeep } from 'lodash';
@@ -14,11 +14,34 @@ export const ScenarioProvider = ({ children }) => {
   const [scenarioList, setScenarioList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [dirtyForms, setDirtyForms] = useState({});
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {
     initializeScenario();
   }, []);
+
+  // Function to update dirty state
+  const updateFormDirtyState = useCallback((isDirty, formId) => {
+    if (!formId) return;
+    
+    setDirtyForms(prev => {
+      // For debugging
+      //console.log('Updating dirty state:', formId, isDirty, prev);
+      return {
+        ...prev,
+        [formId]: isDirty
+      };
+    });
+  }, []);
+
+  // Check if any form is dirty
+  const hasUnsavedChanges = useMemo(() => {
+    const anyDirty = Object.values(dirtyForms).some(Boolean);
+    // For debugging
+    //console.log('Current dirty forms:', dirtyForms, 'Any dirty:', anyDirty);
+    return anyDirty;
+  }, [dirtyForms]);
 
   // =========== API Operations ===========
 
@@ -106,6 +129,10 @@ export const ScenarioProvider = ({ children }) => {
       
       if (response.success && response.data) {
         message.success('Scenario saved successfully');
+        
+        // Clear dirty state for all forms after successful save
+        setDirtyForms({});
+        
         return response.data;
       } else {
         message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
@@ -303,9 +330,12 @@ export const ScenarioProvider = ({ children }) => {
     scenarioList,
     loading,
     selectedLocation,
+    dirtyForms,
+    hasUnsavedChanges,
     
     // Location selection
     setSelectedLocation,
+    updateFormDirtyState,
     
     // API operations
     initializeScenario,

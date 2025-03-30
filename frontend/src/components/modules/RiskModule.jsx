@@ -14,6 +14,8 @@ import {
   CurrencyField,
   SwitchField
 } from '../../components/forms';
+import FormButtons from '../../components/forms/FormButtons';
+import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
 const { Title } = Typography;
 
@@ -22,21 +24,21 @@ const riskSchema = yup.object({
   insuranceEnabled: yup
     .boolean()
     .required('Insurance enabled selection is required'),
-  
+
   insurancePremium: yup
     .number()
     .when('insuranceEnabled', {
       is: true,
       then: schema => schema.required('Insurance premium is required').min(0, 'Must be positive')
     }),
-  
+
   insuranceDeductible: yup
     .number()
     .when('insuranceEnabled', {
       is: true,
       then: schema => schema.required('Insurance deductible is required').min(0, 'Must be positive')
     }),
-  
+
   reserveFunds: yup
     .number()
     .required('Reserve funds amount is required')
@@ -45,8 +47,8 @@ const riskSchema = yup.object({
 
 const RiskModule = () => {
   // Use our custom form hook
-  const { 
-    control, 
+  const {
+    control,
     watch,
     formState: { errors },
     onSubmitForm,
@@ -58,18 +60,20 @@ const RiskModule = () => {
     showSuccessMessage: true,
     successMessage: 'Risk mitigation settings saved successfully'
   });
-  
+
   // Watch insurance enabled for conditional rendering
   const insuranceEnabled = watch('insuranceEnabled');
 
   return (
     <div>
-      <Title level={2}>Risk Mitigation Configuration</Title>
+      <Title level={2}>Risk Mitigation Configuration
+        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
+      </Title>
       <p>Configure risk mitigation strategies for the wind farm project.</p>
 
       {/* Custom Form component without built-in buttons */}
-      <Form 
-        onSubmit={null} 
+      <Form
+        onSubmit={null}
         submitButtons={false}
       >
         <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
@@ -84,7 +88,7 @@ const RiskModule = () => {
               />
             </FormCol>
           </FormRow>
-          
+
           {insuranceEnabled && (
             <FormRow>
               <FormCol span={12}>
@@ -134,20 +138,11 @@ const RiskModule = () => {
 
         {/* Form Actions - Custom buttons */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Button 
-            onClick={() => reset()} 
-            style={{ marginRight: 8 }}
-            disabled={!isDirty}
-          >
-            Reset
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={onSubmitForm}
-            disabled={!isDirty}
-          >
-            Save Changes
-          </Button>
+          <FormButtons
+            onSubmit={onSubmitForm}
+            onReset={reset}
+            isDirty={isDirty}
+          />
         </div>
       </Form>
     </div>

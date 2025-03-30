@@ -1,6 +1,6 @@
 // src/components/modules/FinancingModule.jsx
 import React from 'react';
-import { Typography, Alert, Button } from 'antd';
+import { Typography, Alert } from 'antd';
 import * as yup from 'yup';
 
 // Import our new form components and hooks
@@ -15,6 +15,8 @@ import {
   PercentageField,
   RadioGroupField
 } from '../../components/forms';
+import FormButtons from '../../components/forms/FormButtons';
+import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
 const { Title } = Typography;
 
@@ -57,9 +59,9 @@ const financingSchema = yup.object({
 
 const FinancingModule = () => {
   // Use our custom form hook
-  const { 
-    control, 
-    watch, 
+  const {
+    control,
+    watch,
     formState: { errors },
     onSubmitForm,
     isDirty,
@@ -70,18 +72,20 @@ const FinancingModule = () => {
     showSuccessMessage: true,
     successMessage: 'Financing settings saved successfully'
   });
-  
+
   // Watch fields for conditional rendering
   const financingModel = watch('model');
-  
+
   return (
     <div>
-      <Title level={2}>Financing Module Configuration</Title>
+      <Title level={2}>Financing Module Configuration
+        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
+      </Title>
       <p>Configure the financial parameters and investment structure for the wind farm project.</p>
 
       {/* Custom Form component without built-in buttons */}
-      <Form 
-        onSubmit={null} 
+      <Form
+        onSubmit={null}
         submitButtons={false}
       >
         {/* Investment Section */}
@@ -144,8 +148,8 @@ const FinancingModule = () => {
 
           <Alert
             message={
-              financingModel === 'Balance-Sheet' 
-                ? "Balance-Sheet Model" 
+              financingModel === 'Balance-Sheet'
+                ? "Balance-Sheet Model"
                 : "Project-Finance Model"
             }
             description={
@@ -157,7 +161,7 @@ const FinancingModule = () => {
             showIcon
             style={{ marginBottom: 16, marginTop: 16 }}
           />
-          
+
           {/* Balance Sheet Model Fields - show only when Balance-Sheet is selected */}
           {financingModel === 'Balance-Sheet' && (
             <FormRow>
@@ -239,20 +243,11 @@ const FinancingModule = () => {
 
         {/* Form Actions - Custom buttons */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Button 
-            onClick={() => reset()} 
-            style={{ marginRight: 8 }}
-            disabled={!isDirty}
-          >
-            Reset
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={onSubmitForm}
-            disabled={!isDirty}
-          >
-            Save Changes
-          </Button>
+          <FormButtons
+            onSubmit={onSubmitForm}
+            onReset={reset}
+            isDirty={isDirty}
+          />
         </div>
       </Form>
     </div>

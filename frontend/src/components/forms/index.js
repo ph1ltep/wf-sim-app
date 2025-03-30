@@ -25,6 +25,7 @@ export const Form = ({
   formInstance,
   layout = 'vertical',
   requiredMark = true,
+  submitButtons, // Destructure this prop so it doesn't get passed to DOM
   ...rest
 }) => {
   return (
@@ -40,7 +41,7 @@ export const Form = ({
       
       {children}
       
-      {onSubmit && (
+      {onSubmit && submitButtons !== false && (
         <FormActions
           onSubmit={onSubmit}
           onCancel={onCancel}
