@@ -39,7 +39,7 @@ function App() {
   const basename = process.env.REACT_APP_BASENAME || '/proxy/3000';
   return (
     <ScenarioProvider>
-      <Router basename={baseline}>
+      <Router basename={basename}>
         <Routes>
           <Route path="/" element={<MainLayout />}>
             {/* Default redirect to simulation config */}

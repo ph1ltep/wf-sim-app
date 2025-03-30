@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: 'https://code-server.fthome.org', // Replace with your actual code-server URL
+  origin: 'http://localhost:27017', //'https://code-server.fthome.org', // Replace with your actual code-server URL
   credentials: true, // If you’re using cookies or authentication
 }));
 app.use(express.json());

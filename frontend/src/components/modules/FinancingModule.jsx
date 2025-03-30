@@ -1,6 +1,6 @@
 // src/components/modules/FinancingModule.jsx
 import React from 'react';
-import { Typography, Alert } from 'antd';
+import { Typography, Alert, Button } from 'antd';
 import * as yup from 'yup';
 
 // Import our new form components and hooks
@@ -59,12 +59,11 @@ const FinancingModule = () => {
   // Use our custom form hook
   const { 
     control, 
-    handleSubmit, 
     watch, 
     formState: { errors },
     onSubmitForm,
-    getValueByPath,
-    scenarioData
+    isDirty,
+    reset
   } = useScenarioForm({
     validationSchema: financingSchema,
     moduleName: 'financing',
@@ -80,7 +79,11 @@ const FinancingModule = () => {
       <Title level={2}>Financing Module Configuration</Title>
       <p>Configure the financial parameters and investment structure for the wind farm project.</p>
 
-      <Form onSubmit={onSubmitForm}>
+      {/* Custom Form component without built-in buttons */}
+      <Form 
+        onSubmit={null} 
+        submitButtons={false}
+      >
         {/* Investment Section */}
         <FormSection title="Investment Parameters">
           <FormRow>
@@ -233,6 +236,24 @@ const FinancingModule = () => {
             style={{ width: 110 }}  // Small ratios need less space
           />
         </FormSection>
+
+        {/* Form Actions - Custom buttons */}
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Button 
+            onClick={() => reset()} 
+            style={{ marginRight: 8 }}
+            disabled={!isDirty}
+          >
+            Reset
+          </Button>
+          <Button 
+            type="primary" 
+            onClick={onSubmitForm}
+            disabled={!isDirty}
+          >
+            Save Changes
+          </Button>
+        </div>
       </Form>
     </div>
   );

@@ -1,15 +1,24 @@
 // src/components/modules/RevenueModule.jsx
 import React, { useState, useEffect } from 'react';
-import { Typography, Card, Tabs, Radio, Space, Button } from 'antd';
+import { Typography, Tabs, Button, Alert } from 'antd';
 import { PercentageOutlined } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Form, InputNumber, Select } from 'antd';
+
+// Import our new form components and hooks
+import { useScenarioForm } from '../../hooks/forms';
+import {
+  Form,
+  FormSection,
+  FormRow,
+  FormCol,
+  NumberField,
+  RadioGroupField,
+  PercentageField,
+  SelectField
+} from '../../components/forms';
 
 const { Title } = Typography;
-const { Option } = Select;
+const { TabPane } = Tabs;
 
 // Define validation schema
 const revenueSchema = yup.object({
@@ -128,495 +137,361 @@ const revenueSchema = yup.object({
 const RevenueModule = () => {
   const [activeTab, setActiveTab] = useState('production');
   
-  // Use our enhanced context
-  const { 
-    getValueByPath,
-    updateModuleSettings
-  } = useScenario();
-  
-  // Get revenue module data from context
-  const revenueData = getValueByPath(['settings', 'modules', 'revenue'], {});
-  
-  // Initialize state for conditional rendering
-  const [priceType, setPriceType] = useState(revenueData.electricityPrice?.type || 'fixed');
-  const [energyDistribution, setEnergyDistribution] = useState(revenueData.energyProduction?.distribution || 'Normal');
-  const [downtimeDistribution, setDowntimeDistribution] = useState(revenueData.downtimePerEvent?.distribution || 'Weibull');
-  const [windMethod, setWindMethod] = useState(revenueData.windVariabilityMethod || 'Default');
-
-  // Initialize React Hook Form
+  // Use our custom form hook
   const { 
     control, 
-    handleSubmit, 
     watch,
-    formState: { errors, isDirty },
+    formState: { errors },
+    onSubmitForm,
+    isDirty,
     reset
-  } = useForm({
-    resolver: yupResolver(revenueSchema),
-    defaultValues: {
-      energyProduction: {
-        distribution: revenueData.energyProduction?.distribution || 'Normal',
-        mean: revenueData.energyProduction?.mean || 1000,
-        std: revenueData.energyProduction?.std || 100,
-        min: revenueData.energyProduction?.min,
-        max: revenueData.energyProduction?.max
-      },
-      electricityPrice: {
-        type: revenueData.electricityPrice?.type || 'fixed',
-        value: revenueData.electricityPrice?.value || 50,
-        distribution: revenueData.electricityPrice?.distribution || 'Normal'
-      },
-      revenueDegradationRate: revenueData.revenueDegradationRate || 0.5,
-      downtimePerEvent: {
-        distribution: revenueData.downtimePerEvent?.distribution || 'Weibull',
-        scale: revenueData.downtimePerEvent?.scale || 24,
-        shape: revenueData.downtimePerEvent?.shape || 1.5
-      },
-      windVariabilityMethod: revenueData.windVariabilityMethod || 'Default',
-      turbulenceIntensity: revenueData.turbulenceIntensity || 10,
-      surfaceRoughness: revenueData.surfaceRoughness || 0.03,
-      kaimalScale: revenueData.kaimalScale || 8.1
-    }
+  } = useScenarioForm({
+    validationSchema: revenueSchema,
+    moduleName: 'revenue',
+    showSuccessMessage: true,
+    successMessage: 'Revenue settings saved successfully'
   });
   
   // Watch values for conditional rendering
-  const watchPriceType = watch('electricityPrice.type');
-  const watchEnergyDistribution = watch('energyProduction.distribution');
-  const watchDowntimeDistribution = watch('downtimePerEvent.distribution');
-  const watchWindMethod = watch('windVariabilityMethod');
-  
-  // Update state values when form values change
-  useEffect(() => {
-    setPriceType(watchPriceType);
-    setEnergyDistribution(watchEnergyDistribution);
-    setDowntimeDistribution(watchDowntimeDistribution);
-    setWindMethod(watchWindMethod);
-  }, [watchPriceType, watchEnergyDistribution, watchDowntimeDistribution, watchWindMethod]);
-  
-  // Reset form when revenueData changes
-  useEffect(() => {
-    reset({
-      energyProduction: {
-        distribution: revenueData.energyProduction?.distribution || 'Normal',
-        mean: revenueData.energyProduction?.mean || 1000,
-        std: revenueData.energyProduction?.std || 100,
-        min: revenueData.energyProduction?.min,
-        max: revenueData.energyProduction?.max
-      },
-      electricityPrice: {
-        type: revenueData.electricityPrice?.type || 'fixed',
-        value: revenueData.electricityPrice?.value || 50,
-        distribution: revenueData.electricityPrice?.distribution || 'Normal'
-      },
-      revenueDegradationRate: revenueData.revenueDegradationRate || 0.5,
-      downtimePerEvent: {
-        distribution: revenueData.downtimePerEvent?.distribution || 'Weibull',
-        scale: revenueData.downtimePerEvent?.scale || 24,
-        shape: revenueData.downtimePerEvent?.shape || 1.5
-      },
-      windVariabilityMethod: revenueData.windVariabilityMethod || 'Default',
-      turbulenceIntensity: revenueData.turbulenceIntensity || 10,
-      surfaceRoughness: revenueData.surfaceRoughness || 0.03,
-      kaimalScale: revenueData.kaimalScale || 8.1
-    });
-  }, [revenueData, reset]);
-  
-  // Form submission handler
-  const onSubmit = (data) => {
-    // Update revenue module settings
-    updateModuleSettings('revenue', data);
-  };
+  const energyDistribution = watch('energyProduction.distribution');
+  const priceType = watch('electricityPrice.type');
+  const downtimeDistribution = watch('downtimePerEvent.distribution');
+  const windMethod = watch('windVariabilityMethod');
   
   // Handle tab change
   const handleTabChange = (key) => {
     setActiveTab(key);
-    
-    // Save any changes when switching tabs
-    handleSubmit(onSubmit)();
   };
-
-  // Define tabs items
-  const tabItems = [
-    {
-      key: 'production',
-      label: 'Energy Production',
-      children: (
-        <Card title="Energy Production Parameters">
-          <Form.Item
-            label="Energy Production Distribution"
-            validateStatus={errors.energyProduction?.distribution ? 'error' : ''}
-            help={errors.energyProduction?.distribution?.message}
-          >
-            <Controller
-              name="energyProduction.distribution"
-              control={control}
-              render={({ field }) => (
-                <Select {...field} style={{ width: '100%' }}>
-                  <Option value="Fixed">Fixed</Option>
-                  <Option value="Normal">Normal</Option>
-                  <Option value="Triangular">Triangular</Option>
-                  <Option value="Uniform">Uniform</Option>
-                </Select>
-              )}
-            />
-          </Form.Item>
-          
-          <Form.Item
-            label="Mean Energy Production (MWh/year)"
-            validateStatus={errors.energyProduction?.mean ? 'error' : ''}
-            help={errors.energyProduction?.mean?.message}
-          >
-            <Controller
-              name="energyProduction.mean"
-              control={control}
-              render={({ field }) => (
-                <InputNumber 
-                  {...field}
-                  min={0} 
-                  step={100} 
-                  style={{ width: '100%' }} 
-                />
-              )}
-            />
-          </Form.Item>
-          
-          {energyDistribution === 'Normal' && (
-            <Form.Item
-              label="Standard Deviation (MWh/year)"
-              validateStatus={errors.energyProduction?.std ? 'error' : ''}
-              help={errors.energyProduction?.std?.message}
-            >
-              <Controller
-                name="energyProduction.std"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber 
-                    {...field}
-                    min={0} 
-                    step={10} 
-                    style={{ width: '100%' }} 
-                  />
-                )}
-              />
-            </Form.Item>
-          )}
-          
-          {['Triangular', 'Uniform'].includes(energyDistribution) && (
-            <>
-              <Form.Item
-                label="Minimum (MWh/year)"
-                validateStatus={errors.energyProduction?.min ? 'error' : ''}
-                help={errors.energyProduction?.min?.message}
-              >
-                <Controller
-                  name="energyProduction.min"
-                  control={control}
-                  render={({ field }) => (
-                    <InputNumber 
-                      {...field}
-                      min={0} 
-                      step={100} 
-                      style={{ width: '100%' }} 
-                    />
-                  )}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Maximum (MWh/year)"
-                validateStatus={errors.energyProduction?.max ? 'error' : ''}
-                help={errors.energyProduction?.max?.message}
-              >
-                <Controller
-                  name="energyProduction.max"
-                  control={control}
-                  render={({ field }) => (
-                    <InputNumber 
-                      {...field}
-                      min={0} 
-                      step={100} 
-                      style={{ width: '100%' }} 
-                    />
-                  )}
-                />
-              </Form.Item>
-            </>
-          )}
-          
-          <Form.Item
-            label="Revenue Degradation Rate (%/year)"
-            validateStatus={errors.revenueDegradationRate ? 'error' : ''}
-            help={errors.revenueDegradationRate?.message}
-            tooltip="Annual rate at which revenue decreases due to aging equipment"
-          >
-            <Controller
-              name="revenueDegradationRate"
-              control={control}
-              render={({ field }) => (
-                <InputNumber
-                  {...field}
-                  prefix={<PercentageOutlined />}
-                  min={0}
-                  max={10}
-                  step={0.1}
-                  formatter={value => `${value}%`}
-                  parser={value => value.replace('%', '')}
-                  style={{ width: '100%' }}
-                />
-              )}
-            />
-          </Form.Item>
-        </Card>
-      )
-    },
-    {
-      key: 'price',
-      label: 'Electricity Price',
-      children: (
-        <Card title="Electricity Price Parameters">
-          <Form.Item
-            label="Price Type"
-            validateStatus={errors.electricityPrice?.type ? 'error' : ''}
-            help={errors.electricityPrice?.type?.message}
-          >
-            <Controller
-              name="electricityPrice.type"
-              control={control}
-              render={({ field }) => (
-                <Radio.Group {...field}>
-                  <Radio value="fixed">Fixed (PPA)</Radio>
-                  <Radio value="variable">Variable (Market)</Radio>
-                </Radio.Group>
-              )}
-            />
-          </Form.Item>
-          
-          {priceType === 'fixed' ? (
-            <Form.Item
-              label="Electricity Price (USD/MWh)"
-              validateStatus={errors.electricityPrice?.value ? 'error' : ''}
-              help={errors.electricityPrice?.value?.message}
-            >
-              <Controller
-                name="electricityPrice.value"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber
-                    {...field}
-                    min={0}
-                    step={1}
-                    formatter={value => `$ ${value}`}
-                    parser={value => value.replace('$ ', '')}
-                    style={{ width: '100%' }}
-                  />
-                )}
-              />
-            </Form.Item>
-          ) : (
-            <>
-              <Form.Item
-                label="Price Distribution"
-                validateStatus={errors.electricityPrice?.distribution ? 'error' : ''}
-                help={errors.electricityPrice?.distribution?.message}
-              >
-                <Controller
-                  name="electricityPrice.distribution"
-                  control={control}
-                  render={({ field }) => (
-                    <Select {...field} style={{ width: '100%' }}>
-                      <Option value="Normal">Normal</Option>
-                      <Option value="Lognormal">Lognormal</Option>
-                      <Option value="Triangular">Triangular</Option>
-                      <Option value="Uniform">Uniform</Option>
-                    </Select>
-                  )}
-                />
-              </Form.Item>
-              
-              <p>Additional distribution parameters will be available in a future version.</p>
-            </>
-          )}
-        </Card>
-      )
-    },
-    {
-      key: 'downtime',
-      label: 'Downtime',
-      children: (
-        <Card title="Downtime Parameters">
-          <Form.Item
-            label="Downtime Distribution"
-            validateStatus={errors.downtimePerEvent?.distribution ? 'error' : ''}
-            help={errors.downtimePerEvent?.distribution?.message}
-          >
-            <Controller
-              name="downtimePerEvent.distribution"
-              control={control}
-              render={({ field }) => (
-                <Select {...field} style={{ width: '100%' }}>
-                  <Option value="Weibull">Weibull</Option>
-                  <Option value="Lognormal">Lognormal</Option>
-                  <Option value="Exponential">Exponential</Option>
-                </Select>
-              )}
-            />
-          </Form.Item>
-          
-          <Form.Item
-            label="Scale Parameter (hours)"
-            validateStatus={errors.downtimePerEvent?.scale ? 'error' : ''}
-            help={errors.downtimePerEvent?.scale?.message}
-            tooltip="For Weibull: Scale parameter; For Lognormal: Median value"
-          >
-            <Controller
-              name="downtimePerEvent.scale"
-              control={control}
-              render={({ field }) => (
-                <InputNumber 
-                  {...field}
-                  min={0} 
-                  step={1} 
-                  style={{ width: '100%' }} 
-                />
-              )}
-            />
-          </Form.Item>
-          
-          {['Weibull', 'Lognormal'].includes(downtimeDistribution) && (
-            <Form.Item
-              label="Shape Parameter"
-              validateStatus={errors.downtimePerEvent?.shape ? 'error' : ''}
-              help={errors.downtimePerEvent?.shape?.message}
-              tooltip="For Weibull: Shape parameter; For Lognormal: Sigma parameter"
-            >
-              <Controller
-                name="downtimePerEvent.shape"
-                control={control}
-                render={({ field }) => (
-                  <InputNumber 
-                    {...field}
-                    min={0} 
-                    step={0.1} 
-                    style={{ width: '100%' }} 
-                  />
-                )}
-              />
-            </Form.Item>
-          )}
-        </Card>
-      )
-    },
-    {
-      key: 'wind',
-      label: 'Wind Variability',
-      children: (
-        <Card title="Wind Variability Simulation Method">
-          <Form.Item
-            label="Method"
-            validateStatus={errors.windVariabilityMethod ? 'error' : ''}
-            help={errors.windVariabilityMethod?.message}
-          >
-            <Controller
-              name="windVariabilityMethod"
-              control={control}
-              render={({ field }) => (
-                <Radio.Group {...field}>
-                  <Radio value="Default">Default</Radio>
-                  <Radio value="Kaimal">Industry Standard (Kaimal/IEC 61400-1)</Radio>
-                </Radio.Group>
-              )}
-            />
-          </Form.Item>
-          
-          {windMethod === 'Kaimal' && (
-            <>
-              <Form.Item
-                label="Turbulence Intensity (%)"
-                validateStatus={errors.turbulenceIntensity ? 'error' : ''}
-                help={errors.turbulenceIntensity?.message}
-                tooltip="Percentage of mean wind speed"
-              >
-                <Controller
-                  name="turbulenceIntensity"
-                  control={control}
-                  render={({ field }) => (
-                    <InputNumber 
-                      {...field}
-                      min={0} 
-                      max={30} 
-                      step={1} 
-                      style={{ width: '100%' }} 
-                    />
-                  )}
-                />
-              </Form.Item>
-              
-              <Form.Item
-                label="Surface Roughness Length (m)"
-                validateStatus={errors.surfaceRoughness ? 'error' : ''}
-                help={errors.surfaceRoughness?.message}
-                tooltip="Characteristic of the terrain"
-              >
-                <Controller
-                  name="surfaceRoughness"
-                  control={control}
-                  render={({ field }) => (
-                    <InputNumber 
-                      {...field}
-                      min={0.001} 
-                      max={1} 
-                      step={0.01} 
-                      style={{ width: '100%' }} 
-                    />
-                  )}
-                />
-              </Form.Item>
-              
-              <Form.Item
-                label="Kaimal Scale Parameter (m)"
-                validateStatus={errors.kaimalScale ? 'error' : ''}
-                help={errors.kaimalScale?.message}
-              >
-                <Controller
-                  name="kaimalScale"
-                  control={control}
-                  render={({ field }) => (
-                    <InputNumber 
-                      {...field}
-                      min={1} 
-                      max={20} 
-                      step={0.1} 
-                      style={{ width: '100%' }} 
-                    />
-                  )}
-                />
-              </Form.Item>
-            </>
-          )}
-        </Card>
-      )
-    }
-  ];
 
   return (
     <div>
       <Title level={2}>Revenue Module Configuration</Title>
       <p>Configure the revenue parameters for the wind farm simulation.</p>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={handleTabChange} 
-          items={tabItems} 
-        />
-        
+      {/* Custom Form component without built-in buttons */}
+      <Form 
+        onSubmit={null} 
+        submitButtons={false}
+      >
+        <Tabs activeKey={activeTab} onChange={handleTabChange}>
+          {/* Energy Production Tab */}
+          <TabPane tab="Energy Production" key="production">
+            <FormSection title="Energy Production Parameters">
+              <FormRow>
+                <FormCol span={12}>
+                  <SelectField
+                    name="energyProduction.distribution"
+                    label="Energy Production Distribution"
+                    control={control}
+                    error={errors.energyProduction?.distribution?.message}
+                    tooltip="The statistical distribution used to model energy production variability"
+                    options={[
+                      { value: 'Fixed', label: 'Fixed' },
+                      { value: 'Normal', label: 'Normal' },
+                      { value: 'Triangular', label: 'Triangular' },
+                      { value: 'Uniform', label: 'Uniform' }
+                    ]}
+                    style={{ width: 150 }}
+                  />
+                </FormCol>
+              </FormRow>
+
+              <FormRow>
+                <FormCol span={12}>
+                  <NumberField
+                    name="energyProduction.mean"
+                    label="Mean Energy Production (MWh/year)"
+                    control={control}
+                    error={errors.energyProduction?.mean?.message}
+                    tooltip="Expected average annual energy production"
+                    min={0} 
+                    step={100}
+                    style={{ width: 200 }}
+                  />
+                </FormCol>
+              </FormRow>
+
+              {/* Conditional fields based on distribution type */}
+              {energyDistribution === 'Normal' && (
+                <FormRow>
+                  <FormCol span={12}>
+                    <NumberField
+                      name="energyProduction.std"
+                      label="Standard Deviation (MWh/year)"
+                      control={control}
+                      error={errors.energyProduction?.std?.message}
+                      tooltip="Standard deviation for Normal distribution"
+                      min={0} 
+                      step={10}
+                      style={{ width: 200 }}
+                    />
+                  </FormCol>
+                </FormRow>
+              )}
+
+              {['Triangular', 'Uniform'].includes(energyDistribution) && (
+                <FormRow>
+                  <FormCol span={12}>
+                    <NumberField
+                      name="energyProduction.min"
+                      label="Minimum (MWh/year)"
+                      control={control}
+                      error={errors.energyProduction?.min?.message}
+                      tooltip="Minimum possible energy production"
+                      min={0} 
+                      step={100}
+                      style={{ width: 200 }}
+                    />
+                  </FormCol>
+                  <FormCol span={12}>
+                    <NumberField
+                      name="energyProduction.max"
+                      label="Maximum (MWh/year)"
+                      control={control}
+                      error={errors.energyProduction?.max?.message}
+                      tooltip="Maximum possible energy production"
+                      min={0} 
+                      step={100}
+                      style={{ width: 200 }}
+                    />
+                  </FormCol>
+                </FormRow>
+              )}
+
+              <FormRow>
+                <FormCol span={12}>
+                  <PercentageField
+                    name="revenueDegradationRate"
+                    label="Revenue Degradation Rate (%/year)"
+                    control={control}
+                    error={errors.revenueDegradationRate?.message}
+                    tooltip="Annual rate at which revenue decreases due to aging equipment"
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    precision={1}
+                    style={{ width: 130 }}
+                  />
+                </FormCol>
+              </FormRow>
+            </FormSection>
+          </TabPane>
+
+          {/* Electricity Price Tab */}
+          <TabPane tab="Electricity Price" key="price">
+            <FormSection title="Electricity Price Parameters">
+              <FormRow>
+                <FormCol span={24}>
+                  <RadioGroupField
+                    name="electricityPrice.type"
+                    label="Price Type"
+                    control={control}
+                    error={errors.electricityPrice?.type?.message}
+                    options={[
+                      { value: 'fixed', label: 'Fixed (PPA)' },
+                      { value: 'variable', label: 'Variable (Market)' }
+                    ]}
+                  />
+                </FormCol>
+              </FormRow>
+
+              {/* Conditional fields based on price type */}
+              {priceType === 'fixed' && (
+                <FormRow>
+                  <FormCol span={12}>
+                    <NumberField
+                      name="electricityPrice.value"
+                      label="Electricity Price (USD/MWh)"
+                      control={control}
+                      error={errors.electricityPrice?.value?.message}
+                      tooltip="Fixed price per MWh of electricity"
+                      min={0}
+                      step={1}
+                      addonBefore="$"
+                      style={{ width: 150 }}
+                    />
+                  </FormCol>
+                </FormRow>
+              )}
+
+              {priceType === 'variable' && (
+                <FormRow>
+                  <FormCol span={12}>
+                    <SelectField
+                      name="electricityPrice.distribution"
+                      label="Price Distribution"
+                      control={control}
+                      error={errors.electricityPrice?.distribution?.message}
+                      tooltip="Statistical distribution for variable electricity prices"
+                      options={[
+                        { value: 'Normal', label: 'Normal' },
+                        { value: 'Lognormal', label: 'Lognormal' },
+                        { value: 'Triangular', label: 'Triangular' },
+                        { value: 'Uniform', label: 'Uniform' }
+                      ]}
+                      style={{ width: 150 }}
+                    />
+                  </FormCol>
+                  <FormCol span={12}>
+                    <Alert
+                      message="Feature in Development"
+                      description="Additional distribution parameters will be available in a future version."
+                      type="info"
+                      showIcon
+                    />
+                  </FormCol>
+                </FormRow>
+              )}
+            </FormSection>
+          </TabPane>
+
+          {/* Downtime Tab */}
+          <TabPane tab="Downtime" key="downtime">
+            <FormSection title="Downtime Parameters">
+              <FormRow>
+                <FormCol span={12}>
+                  <SelectField
+                    name="downtimePerEvent.distribution"
+                    label="Downtime Distribution"
+                    control={control}
+                    error={errors.downtimePerEvent?.distribution?.message}
+                    tooltip="Statistical distribution for downtime duration"
+                    options={[
+                      { value: 'Weibull', label: 'Weibull' },
+                      { value: 'Lognormal', label: 'Lognormal' },
+                      { value: 'Exponential', label: 'Exponential' }
+                    ]}
+                    style={{ width: 150 }}
+                  />
+                </FormCol>
+              </FormRow>
+
+              <FormRow>
+                <FormCol span={12}>
+                  <NumberField
+                    name="downtimePerEvent.scale"
+                    label="Scale Parameter (hours)"
+                    control={control}
+                    error={errors.downtimePerEvent?.scale?.message}
+                    tooltip={`For Weibull: Scale parameter; For Lognormal: Median value; For Exponential: Mean value`}
+                    min={0}
+                    step={1}
+                    style={{ width: 150 }}
+                  />
+                </FormCol>
+
+                {/* Shape parameter only for Weibull and Lognormal */}
+                {['Weibull', 'Lognormal'].includes(downtimeDistribution) && (
+                  <FormCol span={12}>
+                    <NumberField
+                      name="downtimePerEvent.shape"
+                      label="Shape Parameter"
+                      control={control}
+                      error={errors.downtimePerEvent?.shape?.message}
+                      tooltip={`For Weibull: Shape parameter; For Lognormal: Sigma parameter`}
+                      min={0}
+                      step={0.1}
+                      precision={1}
+                      style={{ width: 150 }}
+                    />
+                  </FormCol>
+                )}
+              </FormRow>
+            </FormSection>
+          </TabPane>
+
+          {/* Wind Variability Tab */}
+          <TabPane tab="Wind Variability" key="wind">
+            <FormSection title="Wind Variability Simulation Method">
+              <FormRow>
+                <FormCol span={24}>
+                  <RadioGroupField
+                    name="windVariabilityMethod"
+                    label="Method"
+                    control={control}
+                    error={errors.windVariabilityMethod?.message}
+                    options={[
+                      { value: 'Default', label: 'Default' },
+                      { value: 'Kaimal', label: 'Industry Standard (Kaimal/IEC 61400-1)' }
+                    ]}
+                  />
+                </FormCol>
+              </FormRow>
+
+              {/* Kaimal-specific parameters */}
+              {windMethod === 'Kaimal' && (
+                <>
+                  <FormRow>
+                    <FormCol span={12}>
+                      <PercentageField
+                        name="turbulenceIntensity"
+                        label="Turbulence Intensity (%)"
+                        control={control}
+                        error={errors.turbulenceIntensity?.message}
+                        tooltip="Percentage of mean wind speed"
+                        min={0}
+                        max={30}
+                        step={1}
+                        precision={1}
+                        style={{ width: 130 }}
+                      />
+                    </FormCol>
+                  </FormRow>
+
+                  <FormRow>
+                    <FormCol span={12}>
+                      <NumberField
+                        name="surfaceRoughness"
+                        label="Surface Roughness Length (m)"
+                        control={control}
+                        error={errors.surfaceRoughness?.message}
+                        tooltip="Characteristic of the terrain"
+                        min={0.001}
+                        max={1}
+                        step={0.01}
+                        precision={3}
+                        style={{ width: 150 }}
+                      />
+                    </FormCol>
+                    <FormCol span={12}>
+                      <NumberField
+                        name="kaimalScale"
+                        label="Kaimal Scale Parameter (m)"
+                        control={control}
+                        error={errors.kaimalScale?.message}
+                        tooltip="Scale parameter for the Kaimal spectral model"
+                        min={1}
+                        max={20}
+                        step={0.1}
+                        precision={1}
+                        style={{ width: 150 }}
+                      />
+                    </FormCol>
+                  </FormRow>
+                </>
+              )}
+            </FormSection>
+          </TabPane>
+        </Tabs>
+
+        {/* Form Actions - Single set of buttons for all tabs */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Space>
-            <Button onClick={() => reset()}>Reset</Button>
-            <Button type="primary" htmlType="submit" disabled={!isDirty}>
-              Save Changes
-            </Button>
-          </Space>
+          <Button 
+            onClick={() => reset()} 
+            style={{ marginRight: 8 }}
+            disabled={!isDirty}
+          >
+            Reset
+          </Button>
+          <Button 
+            type="primary" 
+            onClick={onSubmitForm}
+            disabled={!isDirty}
+          >
+            Save Changes
+          </Button>
         </div>
-      </form>
+      </Form>
     </div>
   );
 };

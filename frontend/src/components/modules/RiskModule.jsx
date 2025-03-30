@@ -1,11 +1,19 @@
 // src/components/modules/RiskModule.jsx
-import React, { useEffect } from 'react';
-import { Typography, Card, Divider, Row, Col, Space, Button } from 'antd';
-import { useScenario } from '../../contexts/ScenarioContext';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
+import React from 'react';
+import { Typography, Button } from 'antd';
 import * as yup from 'yup';
-import { Form, InputNumber, Switch } from 'antd';
+
+// Import our new form components and hooks
+import { useScenarioForm } from '../../hooks/forms';
+import {
+  Form,
+  FormSection,
+  FormRow,
+  FormCol,
+  NumberField,
+  CurrencyField,
+  SwitchField
+} from '../../components/forms';
 
 const { Title } = Typography;
 
@@ -36,161 +44,112 @@ const riskSchema = yup.object({
 }).required();
 
 const RiskModule = () => {
-  // Use our enhanced context
-  const { 
-    getValueByPath,
-    updateModuleSettings
-  } = useScenario();
-  
-  // Get risk module data from context
-  const riskData = getValueByPath(['settings', 'modules', 'risk'], {});
-  
-  // Initialize React Hook Form
+  // Use our custom form hook
   const { 
     control, 
-    handleSubmit, 
     watch,
-    formState: { errors, isDirty },
+    formState: { errors },
+    onSubmitForm,
+    isDirty,
     reset
-  } = useForm({
-    resolver: yupResolver(riskSchema),
-    defaultValues: {
-      insuranceEnabled: riskData.insuranceEnabled || false,
-      insurancePremium: riskData.insurancePremium || 50000,
-      insuranceDeductible: riskData.insuranceDeductible || 10000,
-      reserveFunds: riskData.reserveFunds || 0
-    }
+  } = useScenarioForm({
+    validationSchema: riskSchema,
+    moduleName: 'risk',
+    showSuccessMessage: true,
+    successMessage: 'Risk mitigation settings saved successfully'
   });
   
   // Watch insurance enabled for conditional rendering
   const insuranceEnabled = watch('insuranceEnabled');
-  
-  // Reset form when riskData changes
-  useEffect(() => {
-    reset({
-      insuranceEnabled: riskData.insuranceEnabled || false,
-      insurancePremium: riskData.insurancePremium || 50000,
-      insuranceDeductible: riskData.insuranceDeductible || 10000,
-      reserveFunds: riskData.reserveFunds || 0
-    });
-  }, [riskData, reset]);
-  
-  // Form submission handler
-  const onSubmit = (data) => {
-    // Update risk module settings
-    updateModuleSettings('risk', data);
-  };
 
   return (
     <div>
       <Title level={2}>Risk Mitigation Configuration</Title>
       <p>Configure risk mitigation strategies for the wind farm project.</p>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Card title="Insurance Coverage" style={{ marginBottom: 24 }}>
-          <Form.Item
-            name="insuranceEnabled"
-            label="Enable Insurance Coverage"
-            validateStatus={errors.insuranceEnabled ? 'error' : ''}
-            help={errors.insuranceEnabled?.message}
-          >
-            <Controller
-              name="insuranceEnabled"
-              control={control}
-              render={({ field: { onChange, value, ref } }) => (
-                <Switch 
-                  checked={value} 
-                  onChange={onChange}
-                  ref={ref}
-                />
-              )}
-            />
-          </Form.Item>
+      {/* Custom Form component without built-in buttons */}
+      <Form 
+        onSubmit={null} 
+        submitButtons={false}
+      >
+        <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
+          <FormRow>
+            <FormCol span={12}>
+              <SwitchField
+                name="insuranceEnabled"
+                label="Enable Insurance Coverage"
+                control={control}
+                error={errors.insuranceEnabled?.message}
+                tooltip="Toggle insurance coverage on/off"
+              />
+            </FormCol>
+          </FormRow>
           
           {insuranceEnabled && (
-            <Row gutter={24}>
-              <Col span={12}>
-                <Form.Item
+            <FormRow>
+              <FormCol span={12}>
+                <CurrencyField
+                  name="insurancePremium"
                   label="Insurance Premium (USD/year)"
-                  validateStatus={errors.insurancePremium ? 'error' : ''}
-                  help={errors.insurancePremium?.message}
-                >
-                  <Controller
-                    name="insurancePremium"
-                    control={control}
-                    render={({ field }) => (
-                      <InputNumber
-                        {...field}
-                        min={0}
-                        step={10000}
-                        formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                        style={{ width: '100%' }}
-                      />
-                    )}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="Insurance Deductible per Event (USD)"
-                  validateStatus={errors.insuranceDeductible ? 'error' : ''}
-                  help={errors.insuranceDeductible?.message}
-                  tooltip="Only costs exceeding the deductible are covered by insurance"
-                >
-                  <Controller
-                    name="insuranceDeductible"
-                    control={control}
-                    render={({ field }) => (
-                      <InputNumber
-                        {...field}
-                        min={0}
-                        step={5000}
-                        formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                        style={{ width: '100%' }}
-                      />
-                    )}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          )}
-        </Card>
-
-        <Card title="Reserve Funds">
-          <Form.Item
-            label="Reserve Funds (USD)"
-            validateStatus={errors.reserveFunds ? 'error' : ''}
-            help={errors.reserveFunds?.message}
-            tooltip="Cash reserves to smooth out adverse cash flow events"
-          >
-            <Controller
-              name="reserveFunds"
-              control={control}
-              render={({ field }) => (
-                <InputNumber
-                  {...field}
+                  control={control}
+                  error={errors.insurancePremium?.message}
+                  tooltip="Annual cost of insurance coverage"
                   min={0}
-                  step={100000}
-                  formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                  style={{ width: '100%' }}
+                  step={10000}
+                  style={{ width: 200 }}
                 />
-              )}
-            />
-          </Form.Item>
-        </Card>
+              </FormCol>
+              <FormCol span={12}>
+                <CurrencyField
+                  name="insuranceDeductible"
+                  label="Insurance Deductible per Event (USD)"
+                  control={control}
+                  error={errors.insuranceDeductible?.message}
+                  tooltip="Only costs exceeding the deductible are covered by insurance"
+                  min={0}
+                  step={5000}
+                  style={{ width: 200 }}
+                />
+              </FormCol>
+            </FormRow>
+          )}
+        </FormSection>
 
+        <FormSection title="Reserve Funds">
+          <FormRow>
+            <FormCol span={12}>
+              <CurrencyField
+                name="reserveFunds"
+                label="Reserve Funds (USD)"
+                control={control}
+                error={errors.reserveFunds?.message}
+                tooltip="Cash reserves to smooth out adverse cash flow events"
+                min={0}
+                step={100000}
+                style={{ width: 200 }}
+              />
+            </FormCol>
+          </FormRow>
+        </FormSection>
+
+        {/* Form Actions - Custom buttons */}
         <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <Space>
-            <Button onClick={() => reset()}>Reset</Button>
-            <Button type="primary" htmlType="submit" disabled={!isDirty}>
-              Save Changes
-            </Button>
-          </Space>
+          <Button 
+            onClick={() => reset()} 
+            style={{ marginRight: 8 }}
+            disabled={!isDirty}
+          >
+            Reset
+          </Button>
+          <Button 
+            type="primary" 
+            onClick={onSubmitForm}
+            disabled={!isDirty}
+          >
+            Save Changes
+          </Button>
         </div>
-      </form>
+      </Form>
     </div>
   );
 };
