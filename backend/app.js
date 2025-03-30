@@ -8,11 +8,27 @@ const { connectDB } = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://code-server.fthome.org';
 
 // Middleware
+const allowedOrigins = [
+  'https://code-server.fthome.org',
+  'http://172.31.149.129:3000',  // Add your development frontend URL
+  'http://localhost:3000'        // Also allow localhost for local development
+];
+
 app.use(cors({
-  origin: 'http://localhost:27017', //'https://code-server.fthome.org', // Replace with your actual code-server URL
-  credentials: true, // If you’re using cookies or authentication
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
 }));
 app.use(express.json());
 
