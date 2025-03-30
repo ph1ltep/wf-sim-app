@@ -91,7 +91,7 @@ export const ScenarioProvider = ({ children }) => {
         ...prev,
         [formId]: isDirty
       };
-      console.log("New dirty forms state:", newState);
+      //console.log("New dirty forms state:", newState);
       return newState;
     });
   }, []);
@@ -99,7 +99,7 @@ export const ScenarioProvider = ({ children }) => {
   // Check if any form is dirty
   const hasUnsavedChanges = useMemo(() => {
     const anyDirty = Object.values(dirtyForms).some(Boolean);
-    console.log("Current dirty forms:", dirtyForms, "Any dirty:", anyDirty);
+    //console.log("Current dirty forms:", dirtyForms, "Any dirty:", anyDirty);
     return anyDirty;
   }, [dirtyForms]);
 
