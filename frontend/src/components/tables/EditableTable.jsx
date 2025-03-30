@@ -1,7 +1,7 @@
 // src/components/tables/EditableTable.jsx
 import React, { useState, useCallback } from 'react';
-import { Table, Button, Modal, Form, Alert } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Alert, Popconfirm } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 /**
@@ -142,10 +142,46 @@ const EditableTable = ({
         dataSource, arrayOperations, path, rowKey, idPrefix
     ]);
 
-    // Prepare action column if not provided
-    const finalColumns = [...columns];
+    // Prepare final columns - replace any actions column with our handlers
+    const finalColumns = columns.map(column => {
+        // Check if this is an actions column (has 'actions' key)
+        if (column.key === 'actions') {
+            // Create a new actions column that uses our handlers
+            return {
+                ...column,
+                render: (_, record) => {
+                    // Replace the render function to use our handlers
+                    return column.render ? column.render(
+                        _, 
+                        record, 
+                        { 
+                            handleEdit: () => handleEdit(record), 
+                            handleDelete: () => handleDelete(record[rowKey]) 
+                        }
+                    ) : (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                            <Button
+                                type="text"
+                                icon={<EditOutlined />}
+                                onClick={() => handleEdit(record)}
+                            />
+                            <Popconfirm
+                                title={`Are you sure you want to delete this ${itemName.toLowerCase()}?`}
+                                onConfirm={() => handleDelete(record[rowKey])}
+                                okText="Yes"
+                                cancelText="No"
+                            >
+                                <Button type="text" danger icon={<DeleteOutlined />} />
+                            </Popconfirm>
+                        </div>
+                    );
+                }
+            };
+        }
+        return column;
+    });
 
-    // Render modal form items
+    // Render form items
     const renderFormItems = () => {
         if (!formSchema || !Array.isArray(formSchema)) {
             return <div>No form schema provided</div>;
@@ -153,7 +189,7 @@ const EditableTable = ({
 
         return formSchema.map((item, index) => (
             <Form.Item
-                key={item.name || `form-item-${index}`} // Ensure each item has a unique key
+                key={item.name || `form-item-${index}`}
                 name={item.name}
                 label={item.label}
                 rules={item.rules}

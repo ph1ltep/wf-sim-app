@@ -1,7 +1,7 @@
 // src/hooks/forms/useScenarioForm.js
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { useAppForm } from './useAppForm';
@@ -18,6 +18,7 @@ import { useAppForm } from './useAppForm';
  * @param {Function} options.transformBeforeLoad - Transform scenario data before loading into form
  * @param {boolean} options.showSuccessMessage - Whether to show success message
  * @param {string} options.successMessage - Success message text
+ * @param {boolean} options.skipRegistration - Skip form handler registration (for problematic components)
  * @returns {Object} Form methods and state
  */
 export const useScenarioForm = ({
@@ -29,6 +30,7 @@ export const useScenarioForm = ({
     transformBeforeLoad,
     showSuccessMessage = true,
     successMessage = 'Changes saved successfully',
+    skipRegistration = false,
     ...options
 }) => {
     // Get scenario context
@@ -135,16 +137,49 @@ export const useScenarioForm = ({
         return handleSubmit(onSubmit)();
     }, [handleSubmit, onSubmit]);
 
-    // Stabilize the registerFormSubmitHandler reference using useRef
-    const registerHandlerRef = useRef(registerFormSubmitHandler);
+    // Store submitForm in a ref to maintain stability
+    const submitFormRef = useRef(submitForm);
+    
+    // Keep the ref updated with the latest submitForm
     useEffect(() => {
-        registerHandlerRef.current = registerFormSubmitHandler;
-    }, [registerFormSubmitHandler]);
+        submitFormRef.current = submitForm;
+    }, [submitForm]);
+
+    // Use a more stable registration approach - only register once
+    useLayoutEffect(() => {
+        // Skip registration if requested
+        if (skipRegistration) return;
+
+        let isActive = true;
+        let unregister = null;
+        
+        if (isActive && generatedFormId) {
+            // Register only once per component mount
+            console.log(`Initial registration for form: ${generatedFormId}`);
+            unregister = registerFormSubmitHandler(generatedFormId, () => submitFormRef.current());
+        }
+        
+        // Clean up registration only on unmount
+        return () => {
+            isActive = false;
+            if (unregister) {
+                unregister();
+            }
+        };
+    }, [generatedFormId, registerFormSubmitHandler, skipRegistration]);
+
+    // Update global dirty state when form state changes - use generatedFormId
+    useEffect(() => {
+        updateFormDirtyState(isDirty, generatedFormId);
+
+        // Clean up when component unmounts
+        return () => {
+            updateFormDirtyState(false, generatedFormId);
+        };
+    }, [isDirty, generatedFormId, updateFormDirtyState]);
 
     // Create a custom reset function that properly resets to context values
     const resetFormToContext = useCallback(() => {
-        console.log("Resetting form to context values");
-
         if (path) {
             const contextData = getValueByPath(path, {});
             const formData = transformBeforeLoad ? transformBeforeLoad(contextData) : contextData;
@@ -157,30 +192,7 @@ export const useScenarioForm = ({
         }
     }, [getValueByPath, path, reset, transformBeforeLoad, updateFormDirtyState, generatedFormId]);
 
-    // Use a more stable registration effect
-    useEffect(() => {
-        if (generatedFormId) {
-            console.log(`Registering submit handler for form: ${generatedFormId}`);
-            // Use the ref to avoid dependency on the function itself
-            const unregister = registerHandlerRef.current(generatedFormId, submitForm);
-            return () => {
-                console.log(`Unregistering submit handler for form: ${generatedFormId}`);
-                if (unregister) unregister();
-            };
-        }
-    }, [generatedFormId, submitForm]); // Removed registerFormSubmitHandler from deps
-
-    // Update global dirty state when form state changes - use generatedFormId
-    useEffect(() => {
-        updateFormDirtyState(isDirty, generatedFormId);
-
-        // Clean up when component unmounts
-        return () => {
-            updateFormDirtyState(false, generatedFormId);
-        };
-    }, [isDirty, generatedFormId, updateFormDirtyState]);
-
-    // Update form values when moduleData changes
+    // Update form values when moduleData changes (but only if explicitly watching for changes)
     useEffect(() => {
         if (options.watchExternalChanges !== false &&
             moduleData &&
@@ -203,6 +215,3 @@ export const useScenarioForm = ({
         reset: resetFormToContext // Replace the original reset with our custom one
     };
 };
-
-// We'll need the useAppForm hook as well - this is just a placeholder reference
-// as I assume it's defined elsewhere in your codebase

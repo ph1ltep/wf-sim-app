@@ -16,7 +16,7 @@ import FormButtons from '../../components/forms/FormButtons';
 import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
 // Import our table components
-import { EditableTable, createTextColumn } from '../../components/tables';
+import { EditableTable, createTextColumn, createActionsColumn } from '../../components/tables';
 
 const { Title } = Typography;
 
@@ -34,16 +34,6 @@ const simulationSchema = yup.object({
     .required('Random seed is required')
     .integer('Must be an integer')
 }).required();
-
-// Define percentile columns outside the component
-const percentileColumns = [
-  createTextColumn('description', 'Description'),
-  createTextColumn('value', 'Value'),
-  createTextColumn(null, 'Percentile Label', {
-    key: 'label',
-    render: (_, record) => `P${record.value}`
-  })
-];
 
 // Define form schema outside the component
 const percentileFormSchema = [
@@ -70,7 +60,7 @@ const percentileFormSchema = [
 ];
 
 const SimulationSettings = () => {
-  // Use our custom form hook with a hardcoded formId to prevent registration issues
+  // Use skipRegistration for this problematic component
   const {
     control,
     formState: { errors },
@@ -81,10 +71,38 @@ const SimulationSettings = () => {
   } = useScenarioForm({
     validationSchema: simulationSchema,
     modulePath: ['settings', 'simulation'],
-    formId: 'simulation-settings', // Add this explicit formId
+    formId: 'simulation-settings',
+    skipRegistration: true, // Skip the complex registration process
     showSuccessMessage: true,
     successMessage: 'Simulation settings saved successfully'
   });
+
+  // Define percentile columns including actions column
+  const percentileColumns = [
+    createTextColumn('description', 'Description'),
+    createTextColumn('value', 'Value', {
+      sorter: (a, b) => b.value - a.value, // Sort by value (larger first)
+    }),
+    createTextColumn(null, 'Percentile Label', {
+      key: 'label',
+      render: (_, record) => `P${record.value}`
+    }),
+    // We need to explicitly include the actions column since EditableTable doesn't add it automatically
+    createActionsColumn(
+      (record) => {
+        // Empty function as editing is handled by the EditableTable through its modal
+        // but we need to provide a function for the button to show up
+      }, 
+      (id) => {
+        // Empty function as deletion is handled by the EditableTable component
+        // but we need to provide a function for the button to show up
+      },
+      {
+        width: 100,
+        confirmTitle: 'Are you sure you want to delete this percentile?'
+      }
+    )
+  ];
 
   // Check if we have an active scenario
   if (!scenarioData) {
@@ -151,12 +169,24 @@ const SimulationSettings = () => {
         >
           <p>Configure which percentiles (P-values) to display in charts and results.</p>
           
-          {/* Use a simplified version of the EditableTable */}
+          {/* Use EditableTable with proper sorting */}
           <EditableTable
             columns={percentileColumns}
             path={['settings', 'simulation', 'percentiles']}
             formSchema={percentileFormSchema}
             itemName="Percentile"
+            rowKey="id"
+            idPrefix="percentile"
+            transformBeforeSave={(values) => ({
+              ...values,
+              // Ensure value is numeric
+              value: typeof values.value === 'string' ? parseInt(values.value, 10) : values.value
+            })}
+            tableProps={{
+              defaultSortOrder: 'descend',
+              sortDirections: ['descend', 'ascend'],
+              showSorterTooltip: false
+            }}
           />
           
           <Alert
@@ -178,7 +208,7 @@ const SimulationSettings = () => {
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <FormButtons
             onSubmit={onSubmitForm}
-            onReset={() => reset}
+            onReset={() => reset()}
             isDirty={isDirty}
           />
         </div>

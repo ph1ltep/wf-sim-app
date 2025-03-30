@@ -1,5 +1,5 @@
 // src/contexts/ScenarioContext.jsx
-import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import { produce } from 'immer';
 import { get, set, update, cloneDeep } from 'lodash';
@@ -16,45 +16,42 @@ export const ScenarioProvider = ({ children }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [dirtyForms, setDirtyForms] = useState({});
   
-  // Add a registry for form submit handlers
-  const [formSubmitHandlers, setFormSubmitHandlers] = useState({});
+  // Use a ref for form handlers instead of state
+  const formSubmitHandlersRef = useRef({});
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {
     initializeScenario();
   }, []);
 
-  // Register a form's submit handler
+  // Register a form's submit handler - using ref approach
   const registerFormSubmitHandler = useCallback((formId, submitHandler) => {
-    console.log(`Registering submit handler for form: ${formId}`);
-    setFormSubmitHandlers(prev => ({
-      ...prev,
-      [formId]: submitHandler
-    }));
+    // Only log when the handler actually changes
+    if (formSubmitHandlersRef.current[formId] !== submitHandler) {
+      console.log(`Registering submit handler for form: ${formId}`);
+      formSubmitHandlersRef.current[formId] = submitHandler;
+    }
     
     // Return unregister function
     return () => {
-      setFormSubmitHandlers(prev => {
-        const newHandlers = { ...prev };
-        delete newHandlers[formId];
-        return newHandlers;
-      });
+      console.log(`Unregistering submit handler for form: ${formId}`);
+      delete formSubmitHandlersRef.current[formId];
     };
   }, []);
 
-  // Submit all dirty forms
+  // Submit all dirty forms - use the ref instead of state
   const submitAllForms = useCallback(async () => {
     console.log("Submitting all dirty forms");
     console.log("Dirty forms:", dirtyForms);
-    console.log("Available handlers:", formSubmitHandlers);
+    console.log("Available handlers:", Object.keys(formSubmitHandlersRef.current));
     
     const promises = [];
     
     // Call submit handlers for all dirty forms
     Object.entries(dirtyForms).forEach(([formId, isDirty]) => {
-      if (isDirty && formSubmitHandlers[formId]) {
+      if (isDirty && formSubmitHandlersRef.current[formId]) {
         console.log(`Submitting form: ${formId}`);
-        promises.push(formSubmitHandlers[formId]());
+        promises.push(formSubmitHandlersRef.current[formId]());
       }
     });
     
@@ -70,7 +67,7 @@ export const ScenarioProvider = ({ children }) => {
       console.error("Error submitting forms:", error);
       return false;
     }
-  }, [dirtyForms, formSubmitHandlers]);
+  }, [dirtyForms]);
 
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
@@ -84,14 +81,13 @@ export const ScenarioProvider = ({ children }) => {
     }
     
     // For debugging
-    console.log(`Updating form dirty state: ${formId} => ${isDirty}`);
+    // console.log(`Updating form dirty state: ${formId} => ${isDirty}`);
     
     setDirtyForms(prev => {
       const newState = {
         ...prev,
         [formId]: isDirty
       };
-      //console.log("New dirty forms state:", newState);
       return newState;
     });
   }, []);
@@ -99,7 +95,6 @@ export const ScenarioProvider = ({ children }) => {
   // Check if any form is dirty
   const hasUnsavedChanges = useMemo(() => {
     const anyDirty = Object.values(dirtyForms).some(Boolean);
-    //console.log("Current dirty forms:", dirtyForms, "Any dirty:", anyDirty);
     return anyDirty;
   }, [dirtyForms]);
 
@@ -395,6 +390,7 @@ export const ScenarioProvider = ({ children }) => {
     
     // Location selection
     setSelectedLocation,
+    updateSelectedLocation: setSelectedLocation,
     updateFormDirtyState,
     
     // API operations
