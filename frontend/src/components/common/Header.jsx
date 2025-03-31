@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Layout, Button, Typography, Space, Spin, Table, Tooltip, message } from 'antd';
+import { Layout, Button, Typography, Space, Modal, Spin, Table, Tooltip, message } from 'antd';
+import PropTypes from 'prop-types';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   PlayCircleOutlined,
   SaveOutlined,
   UploadOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { useScenarioForm } from '../../hooks/forms';
@@ -17,6 +19,12 @@ import moment from 'moment';
 const { Header: AntHeader } = Layout;
 const { Title } = Typography;
 
+/**
+ * Header component that contains main application actions and navigation controls
+ * @param {Object} props
+ * @param {boolean} props.collapsed - Whether the sidebar is collapsed
+ * @param {function} props.toggle - Function to toggle sidebar collapse state
+ */
 const Header = ({ collapsed, toggle }) => {
   const {
     scenarioData,
@@ -252,7 +260,12 @@ const Header = ({ collapsed, toggle }) => {
 
       {/* Load Modal */}
       <Modal
-        title="Load Scenario"
+        title={
+          <Space>
+            <UploadOutlined />
+            Load Scenario
+          </Space>
+        }
         open={loadModalVisible}
         onCancel={() => setLoadModalVisible(false)}
         width={800}
@@ -308,6 +321,13 @@ const Header = ({ collapsed, toggle }) => {
       />
     </>
   );
+};
+
+Header.propTypes = {
+  /** Whether the sidebar is collapsed */
+  collapsed: PropTypes.bool.isRequired,
+  /** Function to toggle sidebar collapse state */
+  toggle: PropTypes.func.isRequired
 };
 
 export default Header;
