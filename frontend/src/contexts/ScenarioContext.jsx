@@ -168,21 +168,59 @@ export const ScenarioProvider = ({ children }) => {
     }
   }, []);
 
+  // Update the saveScenario function in ScenarioContext.jsx
   const saveScenario = useCallback(async () => {
-    if (!scenarioData || !scenarioData._id) {
+    if (!scenarioData) {
       message.error('No scenario to save');
       return null;
     }
 
     try {
       setLoading(true);
-      const response = await api.put(`/scenarios/${scenarioData._id}`, {
+
+      const payload = {
         name: scenarioData.name,
         description: scenarioData.description,
         settings: scenarioData.settings
-      });
+      };
+
+      let response;
+
+      // Check if this scenario is already saved in the database (has an _id and exists in scenarioList)
+      const scenarioExists = scenarioData._id &&
+        scenarioList.some(scenario => scenario._id === scenarioData._id);
+
+      if (scenarioExists) {
+        // Update existing scenario
+        console.log('Updating existing scenario:', scenarioData._id);
+        response = await api.put(`/scenarios/${scenarioData._id}`, payload);
+      } else {
+        // Create new scenario
+        console.log('Creating new scenario');
+        response = await api.post('/scenarios', payload);
+      }
 
       if (response.success && response.data) {
+        // Update the local state with the saved/updated scenario
+        setScenarioData(prevData => ({
+          ...prevData,
+          _id: response.data._id, // Update the ID in case this was a new scenario
+          updatedAt: response.data.updatedAt
+        }));
+
+        // If this was a new scenario, add it to the scenarioList
+        if (!scenarioExists) {
+          setScenarioList(prevList => [
+            {
+              _id: response.data._id,
+              name: scenarioData.name,
+              description: scenarioData.description,
+              updatedAt: response.data.updatedAt
+            },
+            ...prevList
+          ]);
+        }
+
         message.success('Scenario saved successfully');
 
         // Clear dirty state for all forms after successful save
@@ -194,13 +232,13 @@ export const ScenarioProvider = ({ children }) => {
         return null;
       }
     } catch (err) {
-      message.error('Failed to save scenario');
-      console.error(err);
+      message.error('Failed to save scenario: ' + (err.response?.data?.error || err.message));
+      console.error('Save scenario error:', err);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [scenarioData]);
+  }, [scenarioData, scenarioList]);
 
   const deleteScenario = useCallback(async (id) => {
     try {

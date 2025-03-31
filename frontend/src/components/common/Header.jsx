@@ -1,6 +1,6 @@
 // src/components/common/Header.jsx
 import React, { useState } from 'react';
-import { Layout, Button, Typography, Space, Modal, Input, Form, Spin } from 'antd';
+import { Layout, Button, Typography, Space, Modal, Input, Form, Spin, List, Avatar } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -8,11 +8,12 @@ import {
   SaveOutlined,
   UploadOutlined,
   ReloadOutlined,
+  FileOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 const { Header: AntHeader } = Layout;
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const Header = ({ collapsed, toggle }) => {
   const {
@@ -21,6 +22,7 @@ const Header = ({ collapsed, toggle }) => {
     initializeScenario,
     saveScenario,
     getAllScenarios,
+    getScenario,
     updateScenarioMeta
   } = useScenario();
 
@@ -28,6 +30,7 @@ const Header = ({ collapsed, toggle }) => {
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [scenarioList, setScenarioList] = useState([]);
   const [loadingScenarios, setLoadingScenarios] = useState(false);
+  const [selectedScenarioId, setSelectedScenarioId] = useState(null);
   const [form] = Form.useForm();
 
   // Handle opening the save modal
@@ -75,10 +78,16 @@ const Header = ({ collapsed, toggle }) => {
     setLoadModalVisible(true);
   };
 
+  // Handle loading a scenario
+  const handleLoadScenario = async (id) => {
+    await getScenario(id);
+    setLoadModalVisible(false);
+    setSelectedScenarioId(null);
+  };
+
   // Handle running a simulation
   const handleRunSimulation = async () => {
     // This would call an API to run the simulation
-    // For now, we'll just log to console
     console.log('Running simulation with scenario:', scenarioData);
     // In a real implementation, you would call your simulation API here
   };
@@ -158,36 +167,70 @@ const Header = ({ collapsed, toggle }) => {
         </Form>
       </Modal>
 
-      {/* Load Modal - would be improved with a proper scenario selector component */}
+      {/* Load Modal - improved with a proper scenario selector component */}
       <Modal
         title="Load Scenario"
         open={loadModalVisible}
         onCancel={() => setLoadModalVisible(false)}
-        footer={null}
+        footer={[
+          <Button key="cancel" onClick={() => setLoadModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button 
+            key="load" 
+            type="primary" 
+            disabled={!selectedScenarioId}
+            onClick={() => handleLoadScenario(selectedScenarioId)}
+            loading={loading}
+          >
+            Load Selected
+          </Button>
+        ]}
       >
         {loadingScenarios ? (
-          <Spin />
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <Spin />
+            <div style={{ marginTop: '10px' }}>Loading scenarios...</div>
+          </div>
         ) : (
           <div>
             {scenarioList.length > 0 ? (
-              <ul>
-                {scenarioList.map(scenario => (
-                  <li key={scenario._id}>
-                    <Button
-                      type="link"
-                      onClick={() => {
-                        // This would load the selected scenario
-                        setLoadModalVisible(false);
-                      }}
-                    >
-                      {scenario.name}
-                    </Button>
-                    {scenario.description && <p>{scenario.description}</p>}
-                  </li>
-                ))}
-              </ul>
+              <List
+                itemLayout="horizontal"
+                dataSource={scenarioList}
+                renderItem={scenario => (
+                  <List.Item 
+                    onClick={() => setSelectedScenarioId(scenario._id)}
+                    style={{ 
+                      cursor: 'pointer', 
+                      padding: '8px', 
+                      backgroundColor: selectedScenarioId === scenario._id ? '#f0f8ff' : 'transparent',
+                      border: selectedScenarioId === scenario._id ? '1px solid #1890ff' : '1px solid transparent',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <List.Item.Meta
+                      avatar={<Avatar icon={<FileOutlined />} />}
+                      title={scenario.name}
+                      description={
+                        <div>
+                          {scenario.description && <Text>{scenario.description}</Text>}
+                          <div>
+                            <Text type="secondary">
+                              Last updated: {new Date(scenario.updatedAt).toLocaleString()}
+                            </Text>
+                          </div>
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
             ) : (
-              <p>No saved scenarios found.</p>
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <p>No saved scenarios found.</p>
+                <Button type="primary" onClick={initializeScenario}>Create New Scenario</Button>
+              </div>
             )}
           </div>
         )}
