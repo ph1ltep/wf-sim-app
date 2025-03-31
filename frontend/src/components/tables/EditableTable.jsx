@@ -24,10 +24,10 @@ const EditableTable = ({
     columns,
     path,
     formFields,
-    
+
     // Validation
     validationSchema = null,
-    
+
     // Optional configuration
     keyField = null,
     itemName = 'Item',
@@ -37,14 +37,14 @@ const EditableTable = ({
     addButtonText = `Add ${itemName}`,
     showAddButton = true,
     tableSize = 'small',
-    autoActions = true, 
+    autoActions = true,
 
     // Table specific props
     pagination = false,
 
     // Additional behaviors
     transformBeforeSave = null,
-    
+
     // Error handling
     errorText = null,
 
@@ -106,7 +106,7 @@ const EditableTable = ({
 
         // Get the ID for deletion
         const id = record[rowKey];
-        
+
         // Make sure we have an ID
         if (id === undefined) {
             console.error(`Row is missing the key field '${rowKey}':`, record);
@@ -118,7 +118,7 @@ const EditableTable = ({
         try {
             const success = arrayOperations(path, 'remove', null, id);
             console.log(`Delete operation for ${id} success:`, success);
-            
+
             if (!success) {
                 setOperationError("Failed to delete item");
             }
@@ -129,6 +129,7 @@ const EditableTable = ({
     }, [arrayOperations, path, rowKey, hasValidScenario]);
 
     // Handle form submission (save data)
+    // Inside EditableTable.jsx, update the onSubmit function:
     const onSubmit = useCallback(async (data) => {
         try {
             // Check if scenario is valid first
@@ -139,56 +140,52 @@ const EditableTable = ({
 
             setOperationError(null);
 
-            // Check for duplicate key values when using a keyField
-            if (keyField && data[keyField] !== undefined) {
-                // Get the value for the key field
-                const keyValue = data[keyField];
-                
-                // For editing, make sure we're not comparing against ourselves
-                const isDuplicate = dataSource.some(item => 
-                    item[keyField] === keyValue && 
-                    (!editingItem || item[keyField] !== editingItem[keyField])
-                );
-                
-                if (isDuplicate) {
-                    setOperationError(`A ${itemName.toLowerCase()} with ${keyField} "${keyValue}" already exists. This value must be unique.`);
-                    return;
+            // Transform data if needed
+            let dataToSave = transformBeforeSave ? transformBeforeSave(data) : data;
+
+            // Handle key field for new items
+            if (!editingItem) {
+                if (keyField) {
+                    // When using keyField, check for duplicates
+                    const keyValue = dataToSave[keyField];
+                    if (keyValue === undefined) {
+                        setOperationError(`${keyField} is required`);
+                        return;
+                    }
+
+                    const isDuplicate = dataSource.some(item =>
+                        item[keyField] === keyValue
+                    );
+
+                    if (isDuplicate) {
+                        setOperationError(`A ${itemName.toLowerCase()} with ${keyField} "${keyValue}" already exists`);
+                        return;
+                    }
+                } else {
+                    // When not using keyField, generate a unique _key
+                    dataToSave = {
+                        ...dataToSave,
+                        _key: `${idPrefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                    };
                 }
             }
 
-            // Transform data if needed
-            let dataToSave = data;
-            if (transformBeforeSave) {
-                dataToSave = transformBeforeSave(data, editingItem);
-            }
+            console.log('EditableTable: Starting operation', {
+                type: editingItem ? 'update' : 'add',
+                data: dataToSave
+            });
 
             let success;
             if (editingItem) {
                 // Get the ID for updating
-                const id = editingItem[rowKey];
-                
-                if (id === undefined) {
-                    throw new Error(`Editing item missing key field (${rowKey})`);
-                }
-                
-                // Update existing item
+                const id = editingItem[keyField || rowKey];
                 success = arrayOperations(path, 'update', dataToSave, id);
-                console.log(`Update operation for ${id} success:`, success);
             } else {
-                // Add new item - generate a key if needed
-                const newItem = { ...dataToSave };
-                
-                // If not using keyField or no key value was provided, generate one
-                if (!keyField || newItem[rowKey] === undefined) {
-                    newItem[rowKey] = `${idPrefix}_${Date.now()}`;
-                }
-                
-                success = arrayOperations(path, 'add', newItem);
-                console.log(`Add operation success:`, success);
+                success = arrayOperations(path, 'add', dataToSave);
             }
 
-            // Close modal on success
             if (success) {
+                console.log(`EditableTable: ${editingItem ? 'Update' : 'Add'} operation completed for ${itemName}`);
                 setModalVisible(false);
             } else {
                 setOperationError("Operation failed, please try again");
@@ -198,18 +195,26 @@ const EditableTable = ({
             setOperationError(`Error: ${error.message || "Failed to save"}`);
         }
     }, [
-        dataSource, editingItem, transformBeforeSave,
-        arrayOperations, path, rowKey, keyField, idPrefix, hasValidScenario, itemName
+        dataSource,
+        editingItem,
+        transformBeforeSave,
+        arrayOperations,
+        path,
+        rowKey,
+        keyField,
+        idPrefix,
+        hasValidScenario,
+        itemName
     ]);
 
     // Use exactly the columns provided - don't filter anything
     const finalColumns = [...columns];
-    
+
     // Add actions column if auto-actions is enabled and no existing actions column
     if (autoActions) {
         // Check if an actions column already exists
         const hasActionsColumn = finalColumns.some(col => col.key === 'actions' || col.dataIndex === 'actions');
-        
+
         if (!hasActionsColumn) {
             // Add actions column
             finalColumns.push({
@@ -218,15 +223,15 @@ const EditableTable = ({
                 width: 120,
                 render: (_, record) => (
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <Button 
-                            type="text" 
-                            icon={<EditOutlined />} 
+                        <Button
+                            type="text"
+                            icon={<EditOutlined />}
                             onClick={() => handleEdit(record)}
                         />
-                        <Button 
-                            type="text" 
-                            danger 
-                            icon={<DeleteOutlined />} 
+                        <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
                             onClick={() => handleDelete(record)}
                         />
                     </div>
@@ -291,22 +296,22 @@ const EditableTable = ({
                         if (!keyField && field.name === '_key') {
                             return null;
                         }
-                        
+
                         // Pass the control prop to each field component
-                        return React.cloneElement(field, { 
+                        return React.cloneElement(field, {
                             key: field.name,
                             control,
                             error: errors[field.name]?.message
                         });
                     })}
-                    
+
                     {operationError && (
-                        <Alert 
-                            message="Error" 
-                            description={operationError} 
-                            type="error" 
-                            showIcon 
-                            style={{ marginBottom: 16 }} 
+                        <Alert
+                            message="Error"
+                            description={operationError}
+                            type="error"
+                            showIcon
+                            style={{ marginBottom: 16 }}
                         />
                     )}
                 </Form>

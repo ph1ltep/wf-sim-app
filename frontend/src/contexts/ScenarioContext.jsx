@@ -107,7 +107,7 @@ export const ScenarioProvider = ({ children }) => {
         name: 'New Scenario',
         description: 'Default configuration scenario'
       });
-      
+
       if (response.success && response.data) {
         setScenarioData(response.data);
         message.success('Scenario initialized successfully');
@@ -271,77 +271,77 @@ export const ScenarioProvider = ({ children }) => {
   }, [hasValidScenario]);
 
   // Array operations with paths
+  // Inside ScenarioContext.jsx, update the arrayOperations function
+
   const arrayOperations = useCallback((path, operation, item, itemId = null) => {
     if (!hasValidScenario()) return false;
 
-    setScenarioData(produce(draft => {
-      // Ensure the path exists
-      const pathParts = typeof path === 'string' ? path.split('.') : path;
-      let current = draft;
+    try {
+      setScenarioData(produce(draft => {
+        const array = get(draft, path);
 
-      // Build the path if it doesn't exist
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        const part = pathParts[i];
-        if (current[part] === undefined) {
-          // If the next part is a number, create an array, otherwise an object
-          const nextPart = pathParts[i + 1];
-          current[part] = !isNaN(parseInt(nextPart)) ? [] : {};
-        }
-        current = current[part];
-      }
-
-      // Get the array at the path
-      const lastPart = pathParts[pathParts.length - 1];
-      if (current[lastPart] === undefined) {
-        current[lastPart] = [];
-      }
-
-      const array = current[lastPart];
-
-      // Ensure we have an array
-      if (!Array.isArray(array)) {
-        console.warn('Path does not point to an array:', path);
-        return false;
-      }
-
-      // Perform the operation
-      switch (operation) {
-        case 'add':
-          array.push(item);
-          break;
-        case 'update':
-          if (itemId === null) return false;
-
-          const index = array.findIndex(i =>
-            (i.id && i.id === itemId) || (i._id && i._id === itemId)
-          );
-
-          if (index >= 0) {
-            array[index] = { ...array[index], ...item };
-          }
-          break;
-        case 'remove':
-          if (itemId === null) return false;
-
-          const removeIndex = array.findIndex(i =>
-            (i.id && i.id === itemId) || (i._id && i._id === itemId)
-          );
-
-          if (removeIndex >= 0) {
-            array.splice(removeIndex, 1);
-          }
-          break;
-        case 'replace':
-          // Replace the entire array
-          current[lastPart] = item;
-          break;
-        default:
-          console.warn(`Unknown array operation: ${operation}`);
+        if (!Array.isArray(array)) {
+          console.warn('Path does not point to an array:', path);
           return false;
-      }
-    }));
+        }
 
-    return true;
+        switch (operation) {
+          case 'update':
+            if (itemId === null) return false;
+
+            const index = array.findIndex(i => {
+              const itemValue = String(i.value || i.id || i._id);
+              const searchValue = String(itemId);
+              return itemValue === searchValue;
+            });
+
+            if (index >= 0) {
+              const oldValue = { ...array[index] };
+              array[index] = { ...array[index], ...item };
+              console.log('ScenarioContext: Update details', {
+                index,
+                oldValue,
+                newValue: array[index]
+              });
+            } else {
+              console.warn('ScenarioContext: Item not found for update:', itemId);
+              return false;
+            }
+            break;
+
+          case 'add':
+            array.push(item);
+            break;
+
+          case 'remove':
+            if (itemId === null) return false;
+
+            const removeIndex = array.findIndex(i => {
+              const itemValue = String(i.value || i.id || i._id);
+              const searchValue = String(itemId);
+              return itemValue === searchValue;
+            });
+
+            if (removeIndex >= 0) {
+              array.splice(removeIndex, 1);
+            }
+            break;
+
+          case 'replace':
+            set(draft, path, item);
+            break;
+
+          default:
+            console.warn(`Unknown array operation: ${operation}`);
+            return false;
+        }
+      }));
+
+      return true;
+    } catch (error) {
+      console.error('Array operation error:', error);
+      return false;
+    }
   }, [hasValidScenario]);
 
   // =========== Shorthand Functions for Common Operations ===========

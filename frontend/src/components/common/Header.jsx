@@ -1,13 +1,13 @@
 // src/components/common/Header.jsx
 import React, { useState } from 'react';
 import { Layout, Button, Typography, Space, Modal, Input, Form, Spin } from 'antd';
-import { 
-  MenuFoldOutlined, 
-  MenuUnfoldOutlined, 
+import {
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   PlayCircleOutlined,
-  SaveOutlined, 
+  SaveOutlined,
   UploadOutlined,
-  ReloadOutlined
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
@@ -15,14 +15,15 @@ const { Header: AntHeader } = Layout;
 const { Title } = Typography;
 
 const Header = ({ collapsed, toggle }) => {
-  const { 
+  const {
     scenarioData,
     loading,
     initializeScenario,
-    updateScenario,
-    getAllScenarios
+    saveScenario,
+    getAllScenarios,
+    updateScenarioMeta
   } = useScenario();
-  
+
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [scenarioList, setScenarioList] = useState([]);
@@ -44,17 +45,22 @@ const Header = ({ collapsed, toggle }) => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      
-      // Update the scenario with new name and description
-      await updateScenario(scenarioData._id, {
+
+      // First update the scenario metadata
+      updateScenarioMeta({
         name: values.name,
         description: values.description
       });
-      
-      setSaveModalVisible(false);
-      form.resetFields();
+
+      // Then save to the database
+      const result = await saveScenario();
+
+      if (result) {
+        setSaveModalVisible(false);
+        form.resetFields();
+      }
     } catch (error) {
-      console.error('Validation failed:', error);
+      console.error('Error saving scenario:', error);
     }
   };
 
@@ -92,29 +98,29 @@ const Header = ({ collapsed, toggle }) => {
           </Title>
         </div>
         <Space>
-          <Button 
-            type="primary" 
-            icon={<PlayCircleOutlined />} 
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
             onClick={handleRunSimulation}
             loading={loading}
           >
             Run Simulation
           </Button>
-          <Button 
-            icon={<SaveOutlined />} 
+          <Button
+            icon={<SaveOutlined />}
             onClick={handleOpenSaveModal}
             disabled={loading || !scenarioData}
           >
             Save Scenario
           </Button>
-          <Button 
+          <Button
             icon={<UploadOutlined />}
             onClick={handleOpenLoadModal}
             disabled={loading}
           >
             Load Scenario
           </Button>
-          <Button 
+          <Button
             icon={<ReloadOutlined />}
             onClick={initializeScenario}
             disabled={loading}
@@ -144,8 +150,8 @@ const Header = ({ collapsed, toggle }) => {
             name="description"
             label="Description"
           >
-            <Input.TextArea 
-              placeholder="Optional description" 
+            <Input.TextArea
+              placeholder="Optional description"
               rows={4}
             />
           </Form.Item>
@@ -167,8 +173,8 @@ const Header = ({ collapsed, toggle }) => {
               <ul>
                 {scenarioList.map(scenario => (
                   <li key={scenario._id}>
-                    <Button 
-                      type="link" 
+                    <Button
+                      type="link"
                       onClick={() => {
                         // This would load the selected scenario
                         setLoadModalVisible(false);

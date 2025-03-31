@@ -134,6 +134,7 @@ export const useScenarioForm = ({
 
     // Create a submit function that can be called from context
     const submitForm = useCallback(() => {
+        console.log('useScenarioForm: Starting form submission');
         return handleSubmit(onSubmit)();
     }, [handleSubmit, onSubmit]);
 
