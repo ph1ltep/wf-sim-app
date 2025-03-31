@@ -1,22 +1,24 @@
 // src/components/general/SimulationSettings.jsx
 import React from 'react';
-import { Typography, Alert, InputNumber, Input } from 'antd';
+import { Typography, Alert } from 'antd';
 import * as yup from 'yup';
 
-// Import our form components and hooks
+// Import custom form components and hooks
 import { useScenarioForm } from '../../hooks/forms';
 import {
   Form,
   FormSection,
   FormRow,
   FormCol,
-  NumberField
+  NumberField,
+  TextField,
+  PercentileField  // Import the new PercentileField
 } from '../../components/forms';
 import FormButtons from '../../components/forms/FormButtons';
 import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
 
-// Import our table components
-import { EditableTable, createTextColumn, createActionsColumn } from '../../components/tables';
+// Import EditableTable and column helpers
+import { EditableTable, createTextColumn } from '../../components/tables';
 
 const { Title } = Typography;
 
@@ -35,32 +37,52 @@ const simulationSchema = yup.object({
     .integer('Must be an integer')
 }).required();
 
-// Define form schema outside the component
-const percentileFormSchema = [
-  {
-    name: 'value',
-    label: 'Percentile Value',
-    rules: [{ required: true, message: 'Please enter a percentile value' }],
-    render: () => (
-      <InputNumber 
-        min={1} 
-        max={99} 
-        style={{ width: '100%' }}
-      />
-    )
-  },
-  {
-    name: 'description',
-    label: 'Description',
-    rules: [{ required: true, message: 'Please enter a description' }],
-    render: () => (
-      <Input style={{ width: '100%' }} />
-    )
-  }
+// Define validation schema for percentiles
+const percentileSchema = yup.object({
+  value: yup
+    .number()
+    .required('Percentile value is required')
+    .min(1, 'Must be at least 1')
+    .max(99, 'Must be at most 99')
+    .integer('Must be an integer'),
+  
+  description: yup
+    .string()
+    .required('Description is required')
+}).required();
+
+// Define percentile columns
+const percentileColumns = [
+  createTextColumn('description', 'Description'),
+  createTextColumn('value', 'Percentile', {
+    render: (value) => `P${value}`  // Format the display with P prefix
+  }),
+  createTextColumn(null, 'Type', {
+    key: 'description',
+    render: (_, record) => record.description.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+  })
+];
+
+// Define form fields for percentiles using custom components
+const percentileFormFields = [
+  <PercentileField
+    name="value"
+    label="Percentile Value"
+    min={1}
+    max={99}
+    step={1}
+    tooltip="Enter a value between 1 and 99"
+  />,
+  <TextField
+    name="description"
+    label="Description"
+    placeholder="E.g., primary, upper_bound"
+    tooltip="Used to identify the role of this percentile in visualizations"
+  />
 ];
 
 const SimulationSettings = () => {
-  // Use skipRegistration for this problematic component
+  // Use our custom form hook
   const {
     control,
     formState: { errors },
@@ -72,37 +94,9 @@ const SimulationSettings = () => {
     validationSchema: simulationSchema,
     modulePath: ['settings', 'simulation'],
     formId: 'simulation-settings',
-    skipRegistration: true, // Skip the complex registration process
     showSuccessMessage: true,
     successMessage: 'Simulation settings saved successfully'
   });
-
-  // Define percentile columns including actions column
-  const percentileColumns = [
-    createTextColumn('description', 'Description'),
-    createTextColumn('value', 'Value', {
-      sorter: (a, b) => b.value - a.value, // Sort by value (larger first)
-    }),
-    createTextColumn(null, 'Percentile Label', {
-      key: 'label',
-      render: (_, record) => `P${record.value}`
-    }),
-    // We need to explicitly include the actions column since EditableTable doesn't add it automatically
-    createActionsColumn(
-      (record) => {
-        // Empty function as editing is handled by the EditableTable through its modal
-        // but we need to provide a function for the button to show up
-      }, 
-      (id) => {
-        // Empty function as deletion is handled by the EditableTable component
-        // but we need to provide a function for the button to show up
-      },
-      {
-        width: 100,
-        confirmTitle: 'Are you sure you want to delete this percentile?'
-      }
-    )
-  ];
 
   // Check if we have an active scenario
   if (!scenarioData) {
@@ -169,33 +163,23 @@ const SimulationSettings = () => {
         >
           <p>Configure which percentiles (P-values) to display in charts and results.</p>
           
-          {/* Use EditableTable with proper sorting */}
+          {/* Updated EditableTable component with our new PercentileField */}
           <EditableTable
             columns={percentileColumns}
             path={['settings', 'simulation', 'percentiles']}
-            formSchema={percentileFormSchema}
+            formFields={percentileFormFields}
+            validationSchema={percentileSchema}
+            keyField="value"
             itemName="Percentile"
-            rowKey="id"
-            idPrefix="percentile"
-            transformBeforeSave={(values) => ({
-              ...values,
-              // Ensure value is numeric
-              value: typeof values.value === 'string' ? parseInt(values.value, 10) : values.value
-            })}
-            tableProps={{
-              defaultSortOrder: 'descend',
-              sortDirections: ['descend', 'ascend'],
-              showSorterTooltip: false
-            }}
           />
           
           <Alert
             message="Percentile Definitions"
             description={
               <ul>
-                <li><strong>Primary:</strong> The main P-value for charts (typically P50)</li>
-                <li><strong>Upper/Lower Bound:</strong> Middle confidence interval (typically P75/P25)</li>
-                <li><strong>Extreme Upper/Lower:</strong> Wider confidence interval (typically P90/P10)</li>
+                <li><strong>Primary (P50):</strong> The main P-value for charts (typically median)</li>
+                <li><strong>Upper/Lower Bound (P75/P25):</strong> Middle confidence interval</li>
+                <li><strong>Extreme Upper/Lower (P90/P10):</strong> Wider confidence interval</li>
               </ul>
             }
             type="info"

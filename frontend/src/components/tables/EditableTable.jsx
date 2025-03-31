@@ -1,44 +1,50 @@
 // src/components/tables/EditableTable.jsx
 import React, { useState, useCallback } from 'react';
-import { Table, Button, Modal, Form, Alert, Popconfirm } from 'antd';
+import { Table, Button, Modal, Alert } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { useScenario } from '../../contexts/ScenarioContext';
 
+// Import the Form component and custom fields
+import { Form } from '../forms';
+
 /**
- * EditableTable - Handles all CRUD operations internally
+ * EditableTable - Handles all CRUD operations using custom form fields
  * 
  * @param {Object[]} columns - Table column definitions
  * @param {string[]} path - Path to the data in scenario context
- * @param {Object} formSchema - Form definition for add/edit modal
- * @param {string} itemName - Name of the item (for modal titles)
- * @param {Function} validate - Custom validation function before save
- * @param {Function} transformBeforeSave - Transform data before saving
- * @param {Object} modalProps - Additional props for the modal
- * @param {Object} tableProps - Additional props for the table
+ * @param {Object[]} formFields - Array of field definitions using custom fields
+ * @param {Object} validationSchema - Yup validation schema for the form
+ * @param {string} keyField - Name of the field to use as the unique key
  */
 const EditableTable = ({
     // Required props
     columns,
     path,
-    formSchema,
-
+    formFields,
+    
+    // Validation
+    validationSchema = null,
+    
     // Optional configuration
+    keyField = null,
     itemName = 'Item',
-    rowKey = 'id',
     idPrefix = itemName.toLowerCase().replace(/\s+/g, '_'),
 
     // Customization
     addButtonText = `Add ${itemName}`,
     showAddButton = true,
     tableSize = 'small',
+    autoActions = true, 
 
     // Table specific props
     pagination = false,
 
-    // Validation & transformation
-    validate = null,
+    // Additional behaviors
     transformBeforeSave = null,
-
+    
     // Error handling
     errorText = null,
 
@@ -46,171 +52,201 @@ const EditableTable = ({
     modalProps = {},
     tableProps = {}
 }) => {
+    // Determine the actual row key to use
+    const rowKey = keyField || '_key';
+
     // Get data and operations from context
-    const { getValueByPath, arrayOperations } = useScenario();
+    const { getValueByPath, arrayOperations, hasValidScenario } = useScenario();
     const dataSource = getValueByPath(path, []);
 
-    // Form and modal state
-    const [form] = Form.useForm();
+    // Modal state
     const [modalVisible, setModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [operationError, setOperationError] = useState(null);
+
+    // Initialize form with React Hook Form
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { errors, isSubmitting }
+    } = useForm({
+        resolver: validationSchema ? yupResolver(validationSchema) : undefined
+    });
 
     // Handle adding new item
     const handleAdd = useCallback(() => {
-        // Reset form and open modal
-        form.resetFields();
         setEditingItem(null);
+        reset({});  // Clear the form
+        setOperationError(null);
         setModalVisible(true);
-    }, [form]);
+    }, [reset]);
 
     // Handle editing existing item
     const handleEdit = useCallback((record) => {
-        // Set form values and open modal
-        form.resetFields();
-        form.setFieldsValue(record);
+        // Check if scenario is valid first
+        if (!hasValidScenario()) {
+            setOperationError("Cannot edit: No active scenario");
+            return;
+        }
+
         setEditingItem(record);
+        reset(record);  // Set form values to record data
+        setOperationError(null);
         setModalVisible(true);
-    }, [form]);
+    }, [reset, hasValidScenario]);
 
     // Handle deleting item
-    const handleDelete = useCallback((id) => {
-        // Perform validation if needed
-        if (validate && typeof validate.beforeDelete === 'function') {
-            const canDelete = validate.beforeDelete(
-                dataSource.find(item => item[rowKey] === id),
-                dataSource
-            );
+    const handleDelete = useCallback((record) => {
+        // Check if scenario is valid first
+        if (!hasValidScenario()) {
+            setOperationError("Cannot delete: No active scenario");
+            return;
+        }
 
-            if (canDelete === false) {
-                return;
-            }
+        // Get the ID for deletion
+        const id = record[rowKey];
+        
+        // Make sure we have an ID
+        if (id === undefined) {
+            console.error(`Row is missing the key field '${rowKey}':`, record);
+            setOperationError(`Cannot delete: Item missing key field (${rowKey})`);
+            return;
         }
 
         // Delete the item
-        arrayOperations(path, 'remove', null, id);
-    }, [arrayOperations, path, dataSource, validate, rowKey]);
-
-    // Handle saving (add/update)
-    const handleSave = useCallback(async () => {
         try {
-            setLoading(true);
+            const success = arrayOperations(path, 'remove', null, id);
+            console.log(`Delete operation for ${id} success:`, success);
+            
+            if (!success) {
+                setOperationError("Failed to delete item");
+            }
+        } catch (error) {
+            console.error("Error deleting item:", error);
+            setOperationError(`Error: ${error.message || "Failed to delete item"}`);
+        }
+    }, [arrayOperations, path, rowKey, hasValidScenario]);
 
-            // Validate form
-            const values = await form.validateFields();
+    // Handle form submission (save data)
+    const onSubmit = useCallback(async (data) => {
+        try {
+            // Check if scenario is valid first
+            if (!hasValidScenario()) {
+                setOperationError("Cannot save: No active scenario");
+                return;
+            }
 
-            // Perform custom validation if provided
-            if (validate && typeof validate.beforeSave === 'function') {
-                const validationResult = await validate.beforeSave(
-                    values,
-                    editingItem,
-                    dataSource
+            setOperationError(null);
+
+            // Check for duplicate key values when using a keyField
+            if (keyField && data[keyField] !== undefined) {
+                // Get the value for the key field
+                const keyValue = data[keyField];
+                
+                // For editing, make sure we're not comparing against ourselves
+                const isDuplicate = dataSource.some(item => 
+                    item[keyField] === keyValue && 
+                    (!editingItem || item[keyField] !== editingItem[keyField])
                 );
-
-                if (validationResult === false) {
-                    setLoading(false);
+                
+                if (isDuplicate) {
+                    setOperationError(`A ${itemName.toLowerCase()} with ${keyField} "${keyValue}" already exists. This value must be unique.`);
                     return;
                 }
             }
 
             // Transform data if needed
-            let dataToSave = values;
+            let dataToSave = data;
             if (transformBeforeSave) {
-                dataToSave = transformBeforeSave(values, editingItem);
+                dataToSave = transformBeforeSave(data, editingItem);
             }
 
+            let success;
             if (editingItem) {
+                // Get the ID for updating
+                const id = editingItem[rowKey];
+                
+                if (id === undefined) {
+                    throw new Error(`Editing item missing key field (${rowKey})`);
+                }
+                
                 // Update existing item
-                arrayOperations(path, 'update', dataToSave, editingItem[rowKey]);
+                success = arrayOperations(path, 'update', dataToSave, id);
+                console.log(`Update operation for ${id} success:`, success);
             } else {
-                // Add new item with generated ID
-                arrayOperations(path, 'add', {
-                    ...dataToSave,
-                    [rowKey]: dataToSave[rowKey] || `${idPrefix}_${Date.now()}`
-                });
+                // Add new item - generate a key if needed
+                const newItem = { ...dataToSave };
+                
+                // If not using keyField or no key value was provided, generate one
+                if (!keyField || newItem[rowKey] === undefined) {
+                    newItem[rowKey] = `${idPrefix}_${Date.now()}`;
+                }
+                
+                success = arrayOperations(path, 'add', newItem);
+                console.log(`Add operation success:`, success);
             }
 
-            // Close modal
-            setModalVisible(false);
+            // Close modal on success
+            if (success) {
+                setModalVisible(false);
+            } else {
+                setOperationError("Operation failed, please try again");
+            }
         } catch (error) {
-            console.error('Validation failed:', error);
-        } finally {
-            setLoading(false);
+            console.error('Save error:', error);
+            setOperationError(`Error: ${error.message || "Failed to save"}`);
         }
     }, [
-        form, validate, transformBeforeSave, editingItem,
-        dataSource, arrayOperations, path, rowKey, idPrefix
+        dataSource, editingItem, transformBeforeSave,
+        arrayOperations, path, rowKey, keyField, idPrefix, hasValidScenario, itemName
     ]);
 
-    // Prepare final columns - replace any actions column with our handlers
-    const finalColumns = columns.map(column => {
-        // Check if this is an actions column (has 'actions' key)
-        if (column.key === 'actions') {
-            // Create a new actions column that uses our handlers
-            return {
-                ...column,
-                render: (_, record) => {
-                    // Replace the render function to use our handlers
-                    return column.render ? column.render(
-                        _, 
-                        record, 
-                        { 
-                            handleEdit: () => handleEdit(record), 
-                            handleDelete: () => handleDelete(record[rowKey]) 
-                        }
-                    ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
-                            <Button
-                                type="text"
-                                icon={<EditOutlined />}
-                                onClick={() => handleEdit(record)}
-                            />
-                            <Popconfirm
-                                title={`Are you sure you want to delete this ${itemName.toLowerCase()}?`}
-                                onConfirm={() => handleDelete(record[rowKey])}
-                                okText="Yes"
-                                cancelText="No"
-                            >
-                                <Button type="text" danger icon={<DeleteOutlined />} />
-                            </Popconfirm>
-                        </div>
-                    );
-                }
-            };
+    // Use exactly the columns provided - don't filter anything
+    const finalColumns = [...columns];
+    
+    // Add actions column if auto-actions is enabled and no existing actions column
+    if (autoActions) {
+        // Check if an actions column already exists
+        const hasActionsColumn = finalColumns.some(col => col.key === 'actions' || col.dataIndex === 'actions');
+        
+        if (!hasActionsColumn) {
+            // Add actions column
+            finalColumns.push({
+                title: 'Actions',
+                key: 'actions',
+                width: 120,
+                render: (_, record) => (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button 
+                            type="text" 
+                            icon={<EditOutlined />} 
+                            onClick={() => handleEdit(record)}
+                        />
+                        <Button 
+                            type="text" 
+                            danger 
+                            icon={<DeleteOutlined />} 
+                            onClick={() => handleDelete(record)}
+                        />
+                    </div>
+                )
+            });
         }
-        return column;
-    });
-
-    // Render form items
-    const renderFormItems = () => {
-        if (!formSchema || !Array.isArray(formSchema)) {
-            return <div>No form schema provided</div>;
-        }
-
-        return formSchema.map((item, index) => (
-            <Form.Item
-                key={item.name || `form-item-${index}`}
-                name={item.name}
-                label={item.label}
-                rules={item.rules}
-                dependencies={item.dependencies}
-                tooltip={item.tooltip}
-            >
-                {item.render(form, editingItem)}
-            </Form.Item>
-        ));
-    };
+    }
 
     return (
         <div className="editable-table">
-            {/* Error message if provided */}
-            {errorText && (
+            {/* Error messages */}
+            {(errorText || operationError) && (
                 <Alert
                     message="Error"
-                    description={errorText}
+                    description={operationError || errorText}
                     type="error"
                     showIcon
                     style={{ marginBottom: 16 }}
+                    closable
+                    onClose={() => setOperationError(null)}
                 />
             )}
 
@@ -242,20 +278,41 @@ const EditableTable = ({
                 title={editingItem ? `Edit ${itemName}` : `Add ${itemName}`}
                 open={modalVisible}
                 onCancel={() => setModalVisible(false)}
-                onOk={handleSave}
-                confirmLoading={loading}
+                onOk={handleSubmit(onSubmit)}
+                confirmLoading={isSubmitting}
                 {...modalProps}
             >
                 <Form
-                    form={form}
-                    layout="vertical"
+                    onSubmit={handleSubmit(onSubmit)}
+                    submitButtons={false}
                 >
-                    {renderFormItems()}
+                    {formFields.map(field => {
+                        // Skip internal key field from form if it's auto-generated
+                        if (!keyField && field.name === '_key') {
+                            return null;
+                        }
+                        
+                        // Pass the control prop to each field component
+                        return React.cloneElement(field, { 
+                            key: field.name,
+                            control,
+                            error: errors[field.name]?.message
+                        });
+                    })}
+                    
+                    {operationError && (
+                        <Alert 
+                            message="Error" 
+                            description={operationError} 
+                            type="error" 
+                            showIcon 
+                            style={{ marginBottom: 16 }} 
+                        />
+                    )}
                 </Form>
             </Modal>
         </div>
     );
 };
-//tets
-export default EditableTable;
 
+export default EditableTable;

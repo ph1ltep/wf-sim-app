@@ -11,7 +11,7 @@ const getDefaultSettings = async (platformType = 'geared') => {
     // Get default failure models
     const failureModels = await getDefaultFailureModels(platformType);
     
-    // Default settings
+    // Default settings - structured exactly like the Scenario schema
     return {
       general: {
         projectName: 'Wind Farm Project',
@@ -55,7 +55,7 @@ const getDefaultSettings = async (platformType = 'geared') => {
           failureEventProbability: 5,
           failureEventCost: 200000,
           adjustments: [],
-          failureModels: failureModels
+          failureModels: failureModels // Add the dynamically generated failure models
         },
         revenue: {
           energyProduction: {
@@ -92,13 +92,14 @@ const getDefaultSettings = async (platformType = 'geared') => {
       simulation: {
         iterations: 10000,
         seed: 42,
-        probabilities: {
-          primary: 50,
-          upperBound: 75,
-          lowerBound: 25,
-          extremeUpper: 90,
-          extremeLower: 10
-        }
+        // Percentiles as an array matching the schema definition
+        percentiles: [
+          { value: 50, description: 'primary' },
+          { value: 75, description: 'upper_bound' },
+          { value: 25, description: 'lower_bound' },
+          { value: 90, description: 'extreme_upper' },
+          { value: 10, description: 'extreme_lower' }
+        ]
       },
       metrics: {
         totalMW: 70,

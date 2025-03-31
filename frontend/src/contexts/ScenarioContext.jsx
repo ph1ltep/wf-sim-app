@@ -15,7 +15,7 @@ export const ScenarioProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [dirtyForms, setDirtyForms] = useState({});
-  
+
   // Use a ref for form handlers instead of state
   const formSubmitHandlersRef = useRef({});
 
@@ -31,7 +31,7 @@ export const ScenarioProvider = ({ children }) => {
       console.log(`Registering submit handler for form: ${formId}`);
       formSubmitHandlersRef.current[formId] = submitHandler;
     }
-    
+
     // Return unregister function
     return () => {
       console.log(`Unregistering submit handler for form: ${formId}`);
@@ -44,9 +44,9 @@ export const ScenarioProvider = ({ children }) => {
     console.log("Submitting all dirty forms");
     console.log("Dirty forms:", dirtyForms);
     console.log("Available handlers:", Object.keys(formSubmitHandlersRef.current));
-    
+
     const promises = [];
-    
+
     // Call submit handlers for all dirty forms
     Object.entries(dirtyForms).forEach(([formId, isDirty]) => {
       if (isDirty && formSubmitHandlersRef.current[formId]) {
@@ -54,14 +54,14 @@ export const ScenarioProvider = ({ children }) => {
         promises.push(formSubmitHandlersRef.current[formId]());
       }
     });
-    
+
     // Wait for all submissions to complete
     try {
       await Promise.all(promises);
-      
+
       // Clear all dirty flags
       setDirtyForms({});
-      
+
       return true;
     } catch (error) {
       console.error("Error submitting forms:", error);
@@ -72,17 +72,17 @@ export const ScenarioProvider = ({ children }) => {
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
     if (!formId) return;
-    
+
     // Handle the special 'all' case to clear all dirty states
     if (formId === 'all') {
       console.log("Clearing all form dirty states");
       setDirtyForms({});
       return;
     }
-    
+
     // For debugging
     // console.log(`Updating form dirty state: ${formId} => ${isDirty}`);
-    
+
     setDirtyForms(prev => {
       const newState = {
         ...prev,
@@ -126,7 +126,7 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await api.get(`/scenarios/${id}`);
-      
+
       if (response.success && response.data) {
         setScenarioData(response.data);
         message.success('Scenario loaded successfully');
@@ -148,7 +148,7 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await api.get(`/scenarios?page=${page}&limit=${limit}`);
-      
+
       if (response.success && response.data && response.data.scenarios) {
         setScenarioList(response.data.scenarios);
         return {
@@ -173,7 +173,7 @@ export const ScenarioProvider = ({ children }) => {
       message.error('No scenario to save');
       return null;
     }
-    
+
     try {
       setLoading(true);
       const response = await api.put(`/scenarios/${scenarioData._id}`, {
@@ -181,13 +181,13 @@ export const ScenarioProvider = ({ children }) => {
         description: scenarioData.description,
         settings: scenarioData.settings
       });
-      
+
       if (response.success && response.data) {
         message.success('Scenario saved successfully');
-        
+
         // Clear dirty state for all forms after successful save
         setDirtyForms({});
-        
+
         return response.data;
       } else {
         message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
@@ -206,13 +206,13 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await api.delete(`/scenarios/${id}`);
-      
+
       if (response.success) {
         if (scenarioData && scenarioData._id === id) {
           setScenarioData(null);
           initializeScenario();
         }
-        
+
         setScenarioList(prev => prev.filter(scenario => scenario._id !== id));
         message.success('Scenario deleted successfully');
         return true;
@@ -249,36 +249,36 @@ export const ScenarioProvider = ({ children }) => {
   // Update a value by path
   const updateByPath = useCallback((path, value) => {
     if (!hasValidScenario()) return false;
-    
+
     setScenarioData(produce(draft => {
       set(draft, path, value);
     }));
-    
+
     return true;
   }, [hasValidScenario]);
 
   // Update a value by applying a function to it
   const updateByFunction = useCallback((path, updateFn) => {
     if (!hasValidScenario()) return false;
-    
+
     setScenarioData(produce(draft => {
       const currentValue = get(draft, path);
       const newValue = updateFn(currentValue);
       set(draft, path, newValue);
     }));
-    
+
     return true;
   }, [hasValidScenario]);
 
   // Array operations with paths
   const arrayOperations = useCallback((path, operation, item, itemId = null) => {
     if (!hasValidScenario()) return false;
-    
+
     setScenarioData(produce(draft => {
       // Ensure the path exists
       const pathParts = typeof path === 'string' ? path.split('.') : path;
       let current = draft;
-      
+
       // Build the path if it doesn't exist
       for (let i = 0; i < pathParts.length - 1; i++) {
         const part = pathParts[i];
@@ -289,21 +289,21 @@ export const ScenarioProvider = ({ children }) => {
         }
         current = current[part];
       }
-      
+
       // Get the array at the path
       const lastPart = pathParts[pathParts.length - 1];
       if (current[lastPart] === undefined) {
         current[lastPart] = [];
       }
-      
+
       const array = current[lastPart];
-      
+
       // Ensure we have an array
       if (!Array.isArray(array)) {
         console.warn('Path does not point to an array:', path);
         return false;
       }
-      
+
       // Perform the operation
       switch (operation) {
         case 'add':
@@ -311,22 +311,22 @@ export const ScenarioProvider = ({ children }) => {
           break;
         case 'update':
           if (itemId === null) return false;
-          
-          const index = array.findIndex(i => 
+
+          const index = array.findIndex(i =>
             (i.id && i.id === itemId) || (i._id && i._id === itemId)
           );
-          
+
           if (index >= 0) {
             array[index] = { ...array[index], ...item };
           }
           break;
         case 'remove':
           if (itemId === null) return false;
-          
-          const removeIndex = array.findIndex(i => 
+
+          const removeIndex = array.findIndex(i =>
             (i.id && i.id === itemId) || (i._id && i._id === itemId)
           );
-          
+
           if (removeIndex >= 0) {
             array.splice(removeIndex, 1);
           }
@@ -340,7 +340,7 @@ export const ScenarioProvider = ({ children }) => {
           return false;
       }
     }));
-    
+
     return true;
   }, [hasValidScenario]);
 
@@ -349,19 +349,19 @@ export const ScenarioProvider = ({ children }) => {
   // Update basic scenario properties
   const updateScenarioMeta = useCallback((updates) => {
     if (!hasValidScenario()) return false;
-    
+
     setScenarioData(produce(draft => {
       if (updates.name !== undefined) draft.name = updates.name;
       if (updates.description !== undefined) draft.description = updates.description;
     }));
-    
+
     return true;
   }, [hasValidScenario]);
 
   // Update any section of settings
   const updateSettings = useCallback((section, updates) => {
     if (!hasValidScenario()) return false;
-    
+
     return updateByPath(['settings', section], {
       ...getValueByPath(['settings', section], {}),
       ...updates
@@ -371,7 +371,7 @@ export const ScenarioProvider = ({ children }) => {
   // Update module settings
   const updateModuleSettings = useCallback((moduleName, updates) => {
     if (!hasValidScenario()) return false;
-    
+
     return updateByPath(['settings', 'modules', moduleName], {
       ...getValueByPath(['settings', 'modules', moduleName], {}),
       ...updates
@@ -387,32 +387,32 @@ export const ScenarioProvider = ({ children }) => {
     selectedLocation,
     dirtyForms,
     hasUnsavedChanges,
-    
+
     // Location selection
     setSelectedLocation,
     updateSelectedLocation: setSelectedLocation,
     updateFormDirtyState,
-    
+
     // API operations
     initializeScenario,
     getScenario,
     getAllScenarios,
     saveScenario,
     deleteScenario,
-    
+
     // Form submission management
     registerFormSubmitHandler,
     submitAllForms,
-    
+
     // Utility checks
     hasValidScenario,
-    
+
     // Core data operations
     getValueByPath,
     updateByPath,
     updateByFunction,
     arrayOperations,
-    
+
     // Shorthand operations
     updateScenarioMeta,
     updateSettings,
