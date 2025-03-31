@@ -1,19 +1,21 @@
-// src/components/common/Header.jsx
 import React, { useState } from 'react';
-import { Layout, Button, Typography, Space, Modal, Input, Form, Spin, List, Avatar, message } from 'antd';
+import { Layout, Button, Typography, Space, Spin, Table, Tooltip, message } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   PlayCircleOutlined,
   SaveOutlined,
   UploadOutlined,
-  ReloadOutlined,
-  FileOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenarioForm } from '../../hooks/forms';
+import { TextField } from '../forms/fields';
+import { ConfirmationModal, FormModal } from '../modals';
+import moment from 'moment';
 
 const { Header: AntHeader } = Layout;
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const Header = ({ collapsed, toggle }) => {
   const {
@@ -21,66 +23,110 @@ const Header = ({ collapsed, toggle }) => {
     loading,
     initializeScenario,
     saveScenario,
+    updateScenario,
     getAllScenarios,
     getScenario,
     updateScenarioMeta,
-    hasUnsavedChanges
+    hasUnsavedChanges,
+    isNewScenario
   } = useScenario();
 
+  // Modal visibility states
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
+  const [newConfirmVisible, setNewConfirmVisible] = useState(false);
+  
+  // Load modal state
   const [scenarioList, setScenarioList] = useState([]);
   const [loadingScenarios, setLoadingScenarios] = useState(false);
   const [selectedScenarioId, setSelectedScenarioId] = useState(null);
-  const [form] = Form.useForm();
 
-  // Handle opening the save modal
-  const handleOpenSaveModal = () => {
-    if (scenarioData) {
-      form.setFieldsValue({
-        name: scenarioData.name || 'New Scenario',
-        description: scenarioData.description || ''
-      });
+  // Save form using scenario form hook
+  const {
+    form: saveForm,
+    onSubmitForm: handleSaveSubmit,
+    isDirty: saveFormDirty,
+    loading: saveLoading
+  } = useScenarioForm({
+    defaultValues: {
+      name: scenarioData?.name || 'New Scenario',
+      description: scenarioData?.description || ''
+    },
+    onSubmit: async (values) => {
+      try {
+        // Update metadata
+        updateScenarioMeta(values);
+        
+        // Save or update
+        const result = isNewScenario() ? 
+          await saveScenario() : 
+          await updateScenario();
+
+        if (result) {
+          setSaveModalVisible(false);
+          return result;
+        }
+      } catch (error) {
+        console.error('Error saving scenario:', error);
+        throw error;
+      }
     }
+  });
+
+  // Load modal columns
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text, record) => (
+        <div>
+          <div>{text}</div>
+          <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+            {record.settings?.general?.projectName || 'No project name'}
+          </Typography.Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+    },
+    {
+      title: 'Project Size',
+      key: 'totalMW',
+      render: (_, record) => `${record.settings?.metrics?.totalMW || 0} MW`,
+    },
+    {
+      title: 'Last Modified',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (date) => moment(date).format('YYYY-MM-DD HH:mm'),
+      sorter: (a, b) => moment(a.updatedAt).unix() - moment(b.updatedAt).unix(),
+    },
+  ];
+
+  // Handle opening save modal
+  const handleOpenSaveModal = () => {
+    saveForm.reset({
+      name: scenarioData?.name || 'New Scenario',
+      description: scenarioData?.description || ''
+    });
     setSaveModalVisible(true);
   };
 
-  // Handle saving the scenario
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields();
-
-      // First update the scenario metadata
-      updateScenarioMeta({
-        name: values.name,
-        description: values.description
-      });
-
-      // Then save to the database
-      const result = await saveScenario();
-
-      if (result) {
-        setSaveModalVisible(false);
-        form.resetFields();
-      }
-    } catch (error) {
-      console.error('Error saving scenario:', error);
-      message.error('Failed to save scenario');
-    }
-  };
-
-  // Handle opening the load modal
+  // Handle opening load modal
   const handleOpenLoadModal = async () => {
     try {
       setLoadingScenarios(true);
       const result = await getAllScenarios();
       
-      console.log('Scenarios load result:', result);
-      
       if (result && result.scenarios) {
         setScenarioList(result.scenarios);
       } else {
-        message.warning('No scenarios found or error loading scenarios');
+        message.warning('No saved scenarios found');
         setScenarioList([]);
       }
     } catch (error) {
@@ -94,51 +140,42 @@ const Header = ({ collapsed, toggle }) => {
   };
 
   // Handle loading a scenario
-  const handleLoadScenario = async (id) => {
+  const handleLoadScenario = async () => {
+    if (!selectedScenarioId) return;
+
     try {
-      console.log('Attempting to load scenario with ID:', id);
-      const loadedScenario = await getScenario(id);
-      
-      console.log('Loaded scenario details:', loadedScenario);
+      const loadedScenario = await getScenario(selectedScenarioId);
       
       if (loadedScenario) {
         setLoadModalVisible(false);
         setSelectedScenarioId(null);
         message.success('Scenario loaded successfully');
-      } else {
-        message.error('Failed to load the selected scenario');
       }
     } catch (error) {
       console.error('Error loading scenario:', error);
-      message.error('An error occurred while loading the scenario');
+      message.error('Failed to load the selected scenario');
     }
   };
 
-  // Handle creating a new scenario (in-memory only)
+  // Handle new scenario
   const handleNewScenario = () => {
-    // Show a confirmation if there are unsaved changes
     if (hasUnsavedChanges) {
-      Modal.confirm({
-        title: 'Create New Scenario',
-        content: 'You have unsaved changes. Are you sure you want to create a new scenario? Any unsaved changes will be lost.',
-        onOk() {
-          // Reset the scenario context without saving to DB
-          initializeScenario();
-        },
-        okText: 'Create New Scenario',
-        cancelText: 'Cancel'
-      });
+      setNewConfirmVisible(true);
     } else {
-      // If no unsaved changes, initialize directly
-      initializeScenario();
+      createNewScenario();
     }
   };
 
-  // Handle running a simulation
-  const handleRunSimulation = async () => {
-    // This would call an API to run the simulation
-    console.log('Running simulation with scenario:', scenarioData);
-    // In a real implementation, you would call your simulation API here
+  // Handle actual scenario creation
+  const createNewScenario = async () => {
+    try {
+      await initializeScenario();
+      message.success('New scenario created');
+      setNewConfirmVisible(false);
+    } catch (error) {
+      console.error('Error creating new scenario:', error);
+      message.error('Failed to create new scenario');
+    }
   };
 
   return (
@@ -159,77 +196,75 @@ const Header = ({ collapsed, toggle }) => {
           <Button
             type="primary"
             icon={<PlayCircleOutlined />}
-            onClick={handleRunSimulation}
+            onClick={() => {}} // To be implemented
             loading={loading}
           >
             Run Simulation
           </Button>
-          <Button
-            icon={<SaveOutlined />}
-            onClick={handleOpenSaveModal}
-            disabled={loading || !scenarioData}
-          >
-            Save Scenario
-          </Button>
+          <Tooltip title={isNewScenario() ? "Save scenario" : "Save or update scenario"}>
+            <Button
+              icon={<SaveOutlined />}
+              onClick={handleOpenSaveModal}
+              disabled={loading || !scenarioData}
+            >
+              Save
+            </Button>
+          </Tooltip>
           <Button
             icon={<UploadOutlined />}
             onClick={handleOpenLoadModal}
             disabled={loading}
           >
-            Load Scenario
+            Load
           </Button>
           <Button
             icon={<ReloadOutlined />}
             onClick={handleNewScenario}
             disabled={loading}
           >
-            New Scenario
+            New
           </Button>
         </Space>
       </AntHeader>
 
       {/* Save Modal */}
-      <Modal
-        title="Save Scenario"
+      <FormModal
         open={saveModalVisible}
-        onOk={handleSave}
         onCancel={() => setSaveModalVisible(false)}
-        confirmLoading={loading}
+        title={isNewScenario() ? 'Save Scenario' : 'Save/Update Scenario'}
+        form={saveForm}
+        onSubmit={handleSaveSubmit}
+        isDirty={saveFormDirty}
+        loading={saveLoading}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="Scenario Name"
-            rules={[{ required: true, message: 'Please enter a name for the scenario' }]}
-          >
-            <Input placeholder="e.g., Base Case" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="Description"
-          >
-            <Input.TextArea
-              placeholder="Optional description"
-              rows={4}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <TextField
+          name="name"
+          label="Scenario Name"
+          rules={[{ required: true, message: 'Please enter scenario name' }]}
+        />
+        <TextField
+          name="description"
+          label="Description"
+          type="textarea"
+          rows={4}
+        />
+      </FormModal>
 
       {/* Load Modal */}
       <Modal
         title="Load Scenario"
         open={loadModalVisible}
         onCancel={() => setLoadModalVisible(false)}
+        width={800}
         footer={[
           <Button key="cancel" onClick={() => setLoadModalVisible(false)}>
             Cancel
           </Button>,
-          <Button 
-            key="load" 
-            type="primary" 
+          <Button
+            key="load"
+            type="primary"
             disabled={!selectedScenarioId}
-            onClick={() => handleLoadScenario(selectedScenarioId)}
+            onClick={handleLoadScenario}
             loading={loading}
           >
             Load Selected
@@ -238,52 +273,39 @@ const Header = ({ collapsed, toggle }) => {
       >
         {loadingScenarios ? (
           <div style={{ textAlign: 'center', padding: '20px' }}>
-            <Spin />
+            <Spin size="large" />
             <div style={{ marginTop: '10px' }}>Loading scenarios...</div>
           </div>
         ) : (
-          <div>
-            {scenarioList.length > 0 ? (
-              <List
-                itemLayout="horizontal"
-                dataSource={scenarioList}
-                renderItem={scenario => (
-                  <List.Item 
-                    onClick={() => setSelectedScenarioId(scenario._id)}
-                    style={{ 
-                      cursor: 'pointer', 
-                      padding: '8px', 
-                      backgroundColor: selectedScenarioId === scenario._id ? '#f0f8ff' : 'transparent',
-                      border: selectedScenarioId === scenario._id ? '1px solid #1890ff' : '1px solid transparent',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    <List.Item.Meta
-                      avatar={<Avatar icon={<FileOutlined />} />}
-                      title={scenario.name}
-                      description={
-                        <div>
-                          {scenario.description && <Text>{scenario.description}</Text>}
-                          <div>
-                            <Text type="secondary">
-                              Last updated: {new Date(scenario.updatedAt).toLocaleString()}
-                            </Text>
-                          </div>
-                        </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <p>No saved scenarios found.</p>
-                <Button type="primary" onClick={initializeScenario}>Create New Scenario</Button>
-              </div>
-            )}
-          </div>
+          <Table
+            columns={columns}
+            dataSource={scenarioList}
+            rowKey="_id"
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
+              onChange: (selectedRowKeys) => setSelectedScenarioId(selectedRowKeys[0])
+            }}
+            onRow={(record) => ({
+              onClick: () => setSelectedScenarioId(record._id),
+              style: { cursor: 'pointer' }
+            })}
+            pagination={{ pageSize: 5 }}
+          />
         )}
       </Modal>
+
+      {/* New Scenario Confirmation */}
+      <ConfirmationModal
+        open={newConfirmVisible}
+        onConfirm={createNewScenario}
+        onCancel={() => setNewConfirmVisible(false)}
+        title="Create New Scenario"
+        content="You have unsaved changes that will be lost. Are you sure you want to create a new scenario?"
+        confirmText="Create New"
+        loading={loading}
+        type="warning"
+      />
     </>
   );
 };

@@ -100,10 +100,10 @@ export const ScenarioProvider = ({ children }) => {
   const initializeScenario = async () => {
     try {
       setLoading(true);
-      
+
       // Get default settings from the API
       const response = await getDefaults();
-      
+
       if (response.success && response.data) {
         // Create a scenario object without saving to DB
         const newScenario = {
@@ -115,7 +115,7 @@ export const ScenarioProvider = ({ children }) => {
             outputSim: null
           }
         };
-        
+
         setScenarioData(newScenario);
         message.success('New scenario initialized');
       } else {
@@ -267,15 +267,16 @@ export const ScenarioProvider = ({ children }) => {
         setScenarioData(updatedScenario);
 
         // Update the scenario in the list
-        setScenarioList(prevList => 
-          prevList.map(scenario => 
-            scenario._id === scenarioData._id 
+        setScenarioList(prevList =>
+          prevList.map(scenario =>
+            scenario._id === scenarioData._id
               ? { ...scenario, ...response.data }
               : scenario
           )
         );
 
         message.success('Scenario updated successfully');
+
 
         // Clear dirty state for all forms after successful update
         setDirtyForms({});
@@ -341,6 +342,13 @@ export const ScenarioProvider = ({ children }) => {
       return false;
     }
     return true;
+  }, [scenarioData]);
+
+  const isNewScenario = useCallback(() => {
+    // A scenario is new if:
+    // 1. We have scenarioData (valid scenario)
+    // 2. But it doesn't have an _id (never saved to db)
+    return scenarioData && !scenarioData._id;
   }, [scenarioData]);
 
   // Get a value by path
@@ -476,6 +484,7 @@ export const ScenarioProvider = ({ children }) => {
 
     // Utility checks
     hasValidScenario,
+    isNewScenario,
 
     // Core data operations
     getValueByPath,
