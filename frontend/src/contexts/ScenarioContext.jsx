@@ -193,8 +193,11 @@ export const ScenarioProvider = ({ children }) => {
         settings: scenarioData.settings
       };
 
+      console.log('Saving scenario with payload:', payload);
+
       // Create a new scenario in the database
       const response = await api.post('/scenarios', payload);
+      console.log('Save scenario response:', response);
 
       if (response.success && response.data) {
         // Update the local state with the saved scenario (now including _id)
@@ -206,6 +209,7 @@ export const ScenarioProvider = ({ children }) => {
         };
 
         setScenarioData(savedScenario);
+        console.log('Saved scenario:', savedScenario);
 
         // Add to scenario list
         setScenarioList(prevList => [
@@ -323,18 +327,6 @@ export const ScenarioProvider = ({ children }) => {
     }
   }, [scenarioData]);
 
-  // Function to update scenario metadata
-  const updateScenarioMeta = useCallback((updates) => {
-    if (!scenarioData) return false;
-
-    setScenarioData(produce(draft => {
-      if (updates.name !== undefined) draft.name = updates.name;
-      if (updates.description !== undefined) draft.description = updates.description;
-    }));
-
-    return true;
-  }, [scenarioData]);
-
   // Utility to check if we have a valid scenario
   const hasValidScenario = useCallback(() => {
     if (!scenarioData) {
@@ -343,6 +335,37 @@ export const ScenarioProvider = ({ children }) => {
     }
     return true;
   }, [scenarioData]);
+
+  // Function to update scenario metadata
+  const updateScenarioMeta = useCallback((updates) => {
+    if (!hasValidScenario()) {
+      console.error('Cannot update metadata: no valid scenario');
+      return false;
+    }
+
+    try {
+      if (!updates || typeof updates !== 'object') {
+        console.error('Invalid updates provided to updateScenarioMeta:', updates);
+        return false;
+      }
+
+      setScenarioData(produce(draft => {
+        // Only update if the properties exist in the updates object
+        if ('name' in updates && typeof updates.name === 'string') {
+          draft.name = updates.name;
+        }
+        if ('description' in updates && typeof updates.description === 'string') {
+          draft.description = updates.description || ''; // Allow empty string
+        }
+      }));
+
+      console.log('Successfully updated scenario metadata:', updates);
+      return true;
+    } catch (error) {
+      console.error('Error updating scenario metadata:', error);
+      return false;
+    }
+  }, [hasValidScenario]);
 
   const isNewScenario = useCallback(() => {
     // A scenario is new if:

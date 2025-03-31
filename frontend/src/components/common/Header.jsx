@@ -1,5 +1,7 @@
+// src/components/common/Header.jsx
 import React, { useState } from 'react';
 import { Layout, Button, Typography, Space, Modal, Spin, Table, Tooltip, message } from 'antd';
+import { useForm } from 'react-hook-form';
 import PropTypes from 'prop-types';
 import {
   MenuFoldOutlined,
@@ -8,23 +10,15 @@ import {
   SaveOutlined,
   UploadOutlined,
   ReloadOutlined,
-  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { useScenarioForm } from '../../hooks/forms';
-import { TextField } from '../forms/fields';
-import { ConfirmationModal, FormModal } from '../modals';
+import { Form, TextField } from '../forms';
+import { ConfirmationModal } from '../modals';
 import moment from 'moment';
 
 const { Header: AntHeader } = Layout;
 const { Title } = Typography;
 
-/**
- * Header component that contains main application actions and navigation controls
- * @param {Object} props
- * @param {boolean} props.collapsed - Whether the sidebar is collapsed
- * @param {function} props.toggle - Function to toggle sidebar collapse state
- */
 const Header = ({ collapsed, toggle }) => {
   const {
     scenarioData,
@@ -49,37 +43,75 @@ const Header = ({ collapsed, toggle }) => {
   const [loadingScenarios, setLoadingScenarios] = useState(false);
   const [selectedScenarioId, setSelectedScenarioId] = useState(null);
 
-  // Save form using scenario form hook
+  // Initialize save form
   const {
-    form: saveForm,
-    onSubmitForm: handleSaveSubmit,
-    isDirty: saveFormDirty,
-    loading: saveLoading
-  } = useScenarioForm({
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset
+  } = useForm({
     defaultValues: {
       name: scenarioData?.name || 'New Scenario',
       description: scenarioData?.description || ''
-    },
-    onSubmit: async (values) => {
-      try {
-        // Update metadata
-        updateScenarioMeta(values);
-        
-        // Save or update
-        const result = isNewScenario() ? 
-          await saveScenario() : 
-          await updateScenario();
-
-        if (result) {
-          setSaveModalVisible(false);
-          return result;
-        }
-      } catch (error) {
-        console.error('Error saving scenario:', error);
-        throw error;
-      }
     }
   });
+
+  // Handle save as (create new)
+  const handleSaveAs = async (data) => {
+    try {
+      // Update metadata in context first
+      const updated = await updateScenarioMeta({
+        name: data.name,
+        description: data.description
+      });
+      
+      if (!updated) {
+        message.error('Failed to update scenario metadata');
+        return;
+      }
+      
+      // Force save as new
+      const result = await saveScenario();
+      
+      if (result) {
+        // Refresh scenario list
+        const listResult = await getAllScenarios(1, 20); // Show more rows
+        if (listResult?.scenarios) {
+          setScenarioList(listResult.scenarios);
+        }
+        
+        setSaveModalVisible(false);
+        reset();
+        message.success('New scenario created successfully');
+        console.log('Created new scenario:', result);
+      } else {
+        message.error('Failed to create new scenario');
+      }
+    } catch (error) {
+      console.error('Error creating new scenario:', error);
+      message.error('Failed to create new scenario');
+    }
+  };
+
+  // Handle update existing
+  const handleUpdate = async (data) => {
+    try {
+      // Update metadata 
+      updateScenarioMeta(data);
+
+      // Update existing
+      const result = await updateScenario();
+      
+      if (result) {
+        setSaveModalVisible(false);
+        reset();
+        message.success('Scenario updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating scenario:', error);
+      message.error('Failed to update scenario');
+    }
+  };
 
   // Load modal columns
   const columns = [
@@ -118,7 +150,7 @@ const Header = ({ collapsed, toggle }) => {
 
   // Handle opening save modal
   const handleOpenSaveModal = () => {
-    saveForm.reset({
+    reset({
       name: scenarioData?.name || 'New Scenario',
       description: scenarioData?.description || ''
     });
@@ -129,7 +161,7 @@ const Header = ({ collapsed, toggle }) => {
   const handleOpenLoadModal = async () => {
     try {
       setLoadingScenarios(true);
-      const result = await getAllScenarios();
+      const result = await getAllScenarios(1, 20); // Fetch more scenarios per page
       
       if (result && result.scenarios) {
         setScenarioList(result.scenarios);
@@ -236,27 +268,57 @@ const Header = ({ collapsed, toggle }) => {
       </AntHeader>
 
       {/* Save Modal */}
-      <FormModal
+      <Modal
+        title="Save Scenario"
         open={saveModalVisible}
         onCancel={() => setSaveModalVisible(false)}
-        title={isNewScenario() ? 'Save Scenario' : 'Save/Update Scenario'}
-        form={saveForm}
-        onSubmit={handleSaveSubmit}
-        isDirty={saveFormDirty}
-        loading={saveLoading}
+        footer={null}
       >
-        <TextField
-          name="name"
-          label="Scenario Name"
-          rules={[{ required: true, message: 'Please enter scenario name' }]}
-        />
-        <TextField
-          name="description"
-          label="Description"
-          type="textarea"
-          rows={4}
-        />
-      </FormModal>
+        <Form
+          onSubmit={null}
+          submitButtons={false}
+        >
+          <TextField
+            name="name"
+            label="Scenario Name"
+            control={control}
+            error={errors.name?.message}
+            rules={{ required: 'Please enter a scenario name' }}
+          />
+          <TextField
+            name="description"
+            label="Description"
+            control={control}
+            error={errors.description?.message}
+            type="textarea" 
+            rows={4}
+          />
+
+          <div style={{ marginTop: 24, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setSaveModalVisible(false)}>
+                Cancel
+              </Button>
+              {!isNewScenario() && (
+                <Button
+                  type="primary"
+                  onClick={handleSubmit(handleUpdate)}
+                  loading={isSubmitting}
+                >
+                  Save
+                </Button>
+              )}
+              <Button
+                type="primary"
+                onClick={handleSubmit(handleSaveAs)}
+                loading={isSubmitting}
+              >
+                Save as New
+              </Button>
+            </Space>
+          </div>
+        </Form>
+      </Modal>
 
       {/* Load Modal */}
       <Modal
@@ -290,21 +352,31 @@ const Header = ({ collapsed, toggle }) => {
             <div style={{ marginTop: '10px' }}>Loading scenarios...</div>
           </div>
         ) : (
-          <Table
-            columns={columns}
-            dataSource={scenarioList}
-            rowKey="_id"
-            rowSelection={{
-              type: 'radio',
-              selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
-              onChange: (selectedRowKeys) => setSelectedScenarioId(selectedRowKeys[0])
-            }}
-            onRow={(record) => ({
-              onClick: () => setSelectedScenarioId(record._id),
-              style: { cursor: 'pointer' }
-            })}
-            pagination={{ pageSize: 5 }}
-          />
+                      <Table
+              columns={columns}
+              dataSource={scenarioList}
+              rowKey="_id"
+              size="small"
+              rowSelection={{
+                type: 'radio',
+                selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
+                onChange: (selectedRowKeys) => setSelectedScenarioId(selectedRowKeys[0])
+              }}
+              onRow={(record) => ({
+                onClick: () => setSelectedScenarioId(record._id),
+                style: { cursor: 'pointer' }
+              })}
+              pagination={{ 
+                pageSize: 10,
+                total: scenarioList.length,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} scenarios`
+              }}
+              style={{ 
+                marginTop: '12px',
+                maxHeight: '60vh',
+                overflowY: 'auto'
+              }}
+            />
         )}
       </Modal>
 
