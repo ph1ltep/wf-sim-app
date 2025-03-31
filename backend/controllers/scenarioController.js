@@ -11,7 +11,7 @@ const createScenario = async (req, res, next) => {
     // Get default settings from defaultsController
     const defaults = await defaultsController.getDefaultSettings();
     
-    // Create a scenario object with initial data but don't save it
+    // Create a scenario object with initial data
     const scenario = new Scenario({
       name,
       description,
@@ -30,9 +30,14 @@ const createScenario = async (req, res, next) => {
       };
     }
     
-    // Return the unsaved scenario with 201 Created status
+    // Save the scenario - turned off so it doesn't save to db automatically.
+    // await scenario.save();
+    
+    console.log(`[ScenarioController] Created new scenario: ${scenario.name} (ID: ${scenario._id})`);
+    
+    // Return the saved scenario
     res.status(201).json(formatSuccess({
-      _id: scenario._id, // This will be a temporary ID since we don't save
+      _id: scenario._id,
       name: scenario.name,
       description: scenario.description,
       settings: scenario.settings,
@@ -40,7 +45,7 @@ const createScenario = async (req, res, next) => {
     }, 'Scenario created successfully'));
     
   } catch (error) {
-    console.error('Error creating scenario:', error);
+    console.error('[ScenarioController] Error creating scenario:', error);
     next(error);
   }
 };
@@ -63,6 +68,8 @@ const getAllScenarios = async (req, res, next) => {
       .skip(skip)
       .limit(limit);
     
+    console.log(`[ScenarioController] Fetched ${scenarios.length} scenarios (Total: ${total}, Page: ${page})`);
+    
     // Transform scenarios to include only the selected fields
     const simplifiedScenarios = scenarios.map(scenario => {
       const { _id, name, description, createdAt, updatedAt } = scenario;
@@ -75,12 +82,11 @@ const getAllScenarios = async (req, res, next) => {
         settings: {
           general: scenario.settings?.general || null,
           project: scenario.settings?.project || null,
-          // Null out other settings
           modules: null,
           simulation: null,
           metrics: null
         },
-        simulation: null // Null out simulation data
+        simulation: null
       };
     });
     
@@ -94,7 +100,7 @@ const getAllScenarios = async (req, res, next) => {
       scenarios: simplifiedScenarios
     }));
   } catch (error) {
-    console.error('Error fetching scenarios:', error);
+    console.error('[ScenarioController] Error fetching scenarios:', error);
     next(error);
   }
 };
@@ -105,12 +111,14 @@ const getScenarioById = async (req, res, next) => {
     const scenario = await Scenario.findById(req.params.id);
     
     if (!scenario) {
+      console.log(`[ScenarioController] Scenario not found with ID: ${req.params.id}`);
       return res.status(404).json(formatError('Scenario not found'));
     }
     
+    console.log(`[ScenarioController] Retrieved scenario: ${scenario.name} (ID: ${scenario._id})`);
     res.json(formatSuccess(scenario));
   } catch (error) {
-    console.error('Error fetching scenario:', error);
+    console.error('[ScenarioController] Error fetching scenario:', error);
     next(error);
   }
 };
@@ -124,6 +132,7 @@ const updateScenario = async (req, res, next) => {
     const scenario = await Scenario.findById(req.params.id);
     
     if (!scenario) {
+      console.log(`[ScenarioController] Scenario not found for update: ${req.params.id}`);
       return res.status(404).json(formatError('Scenario not found'));
     }
     
@@ -139,6 +148,8 @@ const updateScenario = async (req, res, next) => {
     // Save changes
     await scenario.save();
     
+    console.log(`[ScenarioController] Updated scenario: ${scenario.name} (ID: ${scenario._id})`);
+    
     res.json(formatSuccess({
       _id: scenario._id,
       name: scenario.name,
@@ -146,7 +157,7 @@ const updateScenario = async (req, res, next) => {
       updatedAt: scenario.updatedAt
     }, 'Scenario updated successfully'));
   } catch (error) {
-    console.error('Error updating scenario:', error);
+    console.error('[ScenarioController] Error updating scenario:', error);
     next(error);
   }
 };
@@ -157,12 +168,15 @@ const deleteScenario = async (req, res, next) => {
     const scenario = await Scenario.findByIdAndDelete(req.params.id);
     
     if (!scenario) {
+      console.log(`[ScenarioController] Scenario not found for deletion: ${req.params.id}`);
       return res.status(404).json(formatError('Scenario not found'));
     }
     
+    console.log(`[ScenarioController] Deleted scenario: ${scenario.name} (ID: ${scenario._id})`);
+    
     res.json(formatSuccess(null, 'Scenario deleted successfully'));
   } catch (error) {
-    console.error('Error deleting scenario:', error);
+    console.error('[ScenarioController] Error deleting scenario:', error);
     next(error);
   }
 };
@@ -173,6 +187,7 @@ const compareScenarios = async (req, res, next) => {
     const { ids } = req.body;
     
     if (!ids || !Array.isArray(ids) || ids.length < 2) {
+      console.log('[ScenarioController] Invalid scenarios comparison request');
       return res.status(400).json(formatError('At least two scenario IDs are required for comparison'));
     }
     
@@ -180,11 +195,14 @@ const compareScenarios = async (req, res, next) => {
     const scenarios = await Scenario.find({ _id: { $in: ids } })
       .select('name simulation');
     
+    console.log(`[ScenarioController] Comparing ${scenarios.length} scenarios`);
+    
     if (scenarios.length !== ids.length) {
+      console.log(`[ScenarioController] Some scenarios not found. Requested: ${ids.length}, Found: ${scenarios.length}`);
       return res.status(404).json(formatError('One or more scenarios not found'));
     }
     
-    // Format for comparison - directly use new schema structure
+    // Format for comparison
     const comparison = scenarios.map(scenario => ({
       id: scenario._id,
       name: scenario.name,
@@ -196,7 +214,7 @@ const compareScenarios = async (req, res, next) => {
     
     res.json(formatSuccess(comparison));
   } catch (error) {
-    console.error('Error comparing scenarios:', error);
+    console.error('[ScenarioController] Error comparing scenarios:', error);
     next(error);
   }
 };

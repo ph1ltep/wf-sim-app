@@ -69,7 +69,6 @@ const PercentileSchema = new mongoose.Schema({
   value: { type: Number, required: true, min: 1, max: 99, default: 50 },
   description: { 
     type: String, 
-    enum: ['primary', 'upper_bound', 'lower_bound', 'extreme_upper', 'extreme_lower'],
     default: 'primary'
   },
   label: {

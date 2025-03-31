@@ -1,5 +1,6 @@
 // backend/controllers/defaultsController.js
 const { getDefaultFailureModels } = require('./failureModelController');
+const { formatSuccess } = require('../utils/responseFormatter');
 
 /**
  * Helper function to get default settings (for internal use)
@@ -134,24 +135,21 @@ const getDefaults = async (req, res) => {
     const platformType = req.query.platform || 'geared';
     
     // Get default settings using the helper function
-    const settings = await getDefaultSettings(platformType);
+    const defaults = await getDefaultSettings(platformType);
 
-    // Create the complete defaults object
-    const defaults = {
-      name: 'New Scenario',
-      description: 'Default configuration scenario',
-      settings,
-      // New structure - simulation is null/empty by default
-      simulation: {
-        inputSim: null,
-        outputSim: null
+    res.json({
+      success: true,
+      data: {
+        defaults,
+        count: 1
       }
-    };
-
-    res.json({ success: true, defaults });
+    });
   } catch (error) {
     console.error('Error getting default parameters:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 };
 

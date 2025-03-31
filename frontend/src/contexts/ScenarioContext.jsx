@@ -4,6 +4,7 @@ import { message } from 'antd';
 import { produce } from 'immer';
 import { get, set, update, cloneDeep } from 'lodash';
 import api from '../api/index';
+import { getDefaults } from '../api/defaults';
 
 const ScenarioContext = createContext();
 
@@ -80,9 +81,6 @@ export const ScenarioProvider = ({ children }) => {
       return;
     }
 
-    // For debugging
-    // console.log(`Updating form dirty state: ${formId} => ${isDirty}`);
-
     setDirtyForms(prev => {
       const newState = {
         ...prev,
@@ -98,19 +96,28 @@ export const ScenarioProvider = ({ children }) => {
     return anyDirty;
   }, [dirtyForms]);
 
-  // =========== API Operations ===========
-
+  // Initialize a new scenario in memory
   const initializeScenario = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/scenarios', {
-        name: 'New Scenario',
-        description: 'Default configuration scenario'
-      });
-
+      
+      // Get default settings from the API
+      const response = await getDefaults();
+      
       if (response.success && response.data) {
-        setScenarioData(response.data);
-        message.success('Scenario initialized successfully');
+        // Create a scenario object without saving to DB
+        const newScenario = {
+          name: 'New Scenario',
+          description: 'Default configuration scenario',
+          settings: response.data.defaults,
+          simulation: {
+            inputSim: null,
+            outputSim: null
+          }
+        };
+        
+        setScenarioData(newScenario);
+        message.success('New scenario initialized');
       } else {
         message.error('Failed to initialize scenario: ' + (response.error || 'Unknown error'));
       }
@@ -122,28 +129,7 @@ export const ScenarioProvider = ({ children }) => {
     }
   };
 
-  const getScenario = useCallback(async (id) => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/scenarios/${id}`);
-
-      if (response.success && response.data) {
-        setScenarioData(response.data);
-        message.success('Scenario loaded successfully');
-        return response.data;
-      } else {
-        message.error('Failed to load scenario: ' + (response.error || 'Unknown error'));
-        return null;
-      }
-    } catch (err) {
-      message.error('Failed to load scenario');
-      console.error(err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Get all scenarios
   const getAllScenarios = useCallback(async (page = 1, limit = 10) => {
     try {
       setLoading(true);
@@ -168,10 +154,94 @@ export const ScenarioProvider = ({ children }) => {
     }
   }, []);
 
-  // Update the saveScenario function in ScenarioContext.jsx
+  // Get a single scenario
+  const getScenario = useCallback(async (id) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/scenarios/${id}`);
+
+      if (response.success && response.data) {
+        setScenarioData(response.data);
+        message.success('Scenario loaded successfully');
+        return response.data;
+      } else {
+        message.error('Failed to load scenario: ' + (response.error || 'Unknown error'));
+        return null;
+      }
+    } catch (err) {
+      message.error('Failed to load scenario');
+      console.error(err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Save scenario to database
   const saveScenario = useCallback(async () => {
     if (!scenarioData) {
       message.error('No scenario to save');
+      return null;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        name: scenarioData.name || 'New Scenario',
+        description: scenarioData.description || '',
+        settings: scenarioData.settings
+      };
+
+      // Create a new scenario in the database
+      const response = await api.post('/scenarios', payload);
+
+      if (response.success && response.data) {
+        // Update the local state with the saved scenario (now including _id)
+        const savedScenario = {
+          ...scenarioData,
+          _id: response.data._id,
+          createdAt: response.data.createdAt,
+          updatedAt: response.data.updatedAt
+        };
+
+        setScenarioData(savedScenario);
+
+        // Add to scenario list
+        setScenarioList(prevList => [
+          {
+            _id: response.data._id,
+            name: savedScenario.name,
+            description: savedScenario.description,
+            createdAt: response.data.createdAt,
+            updatedAt: response.data.updatedAt
+          },
+          ...prevList
+        ]);
+
+        message.success('Scenario saved successfully');
+
+        // Clear dirty state for all forms after successful save
+        setDirtyForms({});
+
+        return savedScenario;
+      } else {
+        message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
+        return null;
+      }
+    } catch (err) {
+      message.error('Failed to save scenario: ' + (err.response?.data?.error || err.message));
+      console.error('Save scenario error:', err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [scenarioData]);
+
+  // Update an existing scenario in the database
+  const updateScenario = useCallback(async () => {
+    if (!scenarioData || !scenarioData._id) {
+      message.error('No saved scenario to update');
       return null;
     }
 
@@ -184,62 +254,47 @@ export const ScenarioProvider = ({ children }) => {
         settings: scenarioData.settings
       };
 
-      let response;
-
-      // Check if this scenario is already saved in the database (has an _id and exists in scenarioList)
-      const scenarioExists = scenarioData._id &&
-        scenarioList.some(scenario => scenario._id === scenarioData._id);
-
-      if (scenarioExists) {
-        // Update existing scenario
-        console.log('Updating existing scenario:', scenarioData._id);
-        response = await api.put(`/scenarios/${scenarioData._id}`, payload);
-      } else {
-        // Create new scenario
-        console.log('Creating new scenario');
-        response = await api.post('/scenarios', payload);
-      }
+      // Update the existing scenario in the database
+      const response = await api.put(`/scenarios/${scenarioData._id}`, payload);
 
       if (response.success && response.data) {
-        // Update the local state with the saved/updated scenario
-        setScenarioData(prevData => ({
-          ...prevData,
-          _id: response.data._id, // Update the ID in case this was a new scenario
+        // Update the local state with the updated scenario
+        const updatedScenario = {
+          ...scenarioData,
           updatedAt: response.data.updatedAt
-        }));
+        };
 
-        // If this was a new scenario, add it to the scenarioList
-        if (!scenarioExists) {
-          setScenarioList(prevList => [
-            {
-              _id: response.data._id,
-              name: scenarioData.name,
-              description: scenarioData.description,
-              updatedAt: response.data.updatedAt
-            },
-            ...prevList
-          ]);
-        }
+        setScenarioData(updatedScenario);
 
-        message.success('Scenario saved successfully');
+        // Update the scenario in the list
+        setScenarioList(prevList => 
+          prevList.map(scenario => 
+            scenario._id === scenarioData._id 
+              ? { ...scenario, ...response.data }
+              : scenario
+          )
+        );
 
-        // Clear dirty state for all forms after successful save
+        message.success('Scenario updated successfully');
+
+        // Clear dirty state for all forms after successful update
         setDirtyForms({});
 
-        return response.data;
+        return updatedScenario;
       } else {
-        message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
+        message.error('Failed to update scenario: ' + (response.error || 'Unknown error'));
         return null;
       }
     } catch (err) {
-      message.error('Failed to save scenario: ' + (err.response?.data?.error || err.message));
-      console.error('Save scenario error:', err);
+      message.error('Failed to update scenario: ' + (err.response?.data?.error || err.message));
+      console.error('Update scenario error:', err);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [scenarioData, scenarioList]);
+  }, [scenarioData]);
 
+  // Delete a scenario
   const deleteScenario = useCallback(async (id) => {
     try {
       setLoading(true);
@@ -267,7 +322,17 @@ export const ScenarioProvider = ({ children }) => {
     }
   }, [scenarioData]);
 
-  // =========== Data Operations Using Lodash & Immer ===========
+  // Function to update scenario metadata
+  const updateScenarioMeta = useCallback((updates) => {
+    if (!scenarioData) return false;
+
+    setScenarioData(produce(draft => {
+      if (updates.name !== undefined) draft.name = updates.name;
+      if (updates.description !== undefined) draft.description = updates.description;
+    }));
+
+    return true;
+  }, [scenarioData]);
 
   // Utility to check if we have a valid scenario
   const hasValidScenario = useCallback(() => {
@@ -295,22 +360,7 @@ export const ScenarioProvider = ({ children }) => {
     return true;
   }, [hasValidScenario]);
 
-  // Update a value by applying a function to it
-  const updateByFunction = useCallback((path, updateFn) => {
-    if (!hasValidScenario()) return false;
-
-    setScenarioData(produce(draft => {
-      const currentValue = get(draft, path);
-      const newValue = updateFn(currentValue);
-      set(draft, path, newValue);
-    }));
-
-    return true;
-  }, [hasValidScenario]);
-
   // Array operations with paths
-  // Inside ScenarioContext.jsx, update the arrayOperations function
-
   const arrayOperations = useCallback((path, operation, item, itemId = null) => {
     if (!hasValidScenario()) return false;
 
@@ -336,13 +386,8 @@ export const ScenarioProvider = ({ children }) => {
             if (index >= 0) {
               const oldValue = { ...array[index] };
               array[index] = { ...array[index], ...item };
-              console.log('ScenarioContext: Update details', {
-                index,
-                oldValue,
-                newValue: array[index]
-              });
             } else {
-              console.warn('ScenarioContext: Item not found for update:', itemId);
+              console.warn('Item not found for update:', itemId);
               return false;
             }
             break;
@@ -380,20 +425,6 @@ export const ScenarioProvider = ({ children }) => {
       console.error('Array operation error:', error);
       return false;
     }
-  }, [hasValidScenario]);
-
-  // =========== Shorthand Functions for Common Operations ===========
-
-  // Update basic scenario properties
-  const updateScenarioMeta = useCallback((updates) => {
-    if (!hasValidScenario()) return false;
-
-    setScenarioData(produce(draft => {
-      if (updates.name !== undefined) draft.name = updates.name;
-      if (updates.description !== undefined) draft.description = updates.description;
-    }));
-
-    return true;
   }, [hasValidScenario]);
 
   // Update any section of settings
@@ -436,6 +467,7 @@ export const ScenarioProvider = ({ children }) => {
     getScenario,
     getAllScenarios,
     saveScenario,
+    updateScenario,
     deleteScenario,
 
     // Form submission management
@@ -448,7 +480,6 @@ export const ScenarioProvider = ({ children }) => {
     // Core data operations
     getValueByPath,
     updateByPath,
-    updateByFunction,
     arrayOperations,
 
     // Shorthand operations

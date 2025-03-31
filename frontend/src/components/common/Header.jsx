@@ -1,6 +1,6 @@
 // src/components/common/Header.jsx
 import React, { useState } from 'react';
-import { Layout, Button, Typography, Space, Modal, Input, Form, Spin, List, Avatar } from 'antd';
+import { Layout, Button, Typography, Space, Modal, Input, Form, Spin, List, Avatar, message } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -23,7 +23,8 @@ const Header = ({ collapsed, toggle }) => {
     saveScenario,
     getAllScenarios,
     getScenario,
-    updateScenarioMeta
+    updateScenarioMeta,
+    hasUnsavedChanges
   } = useScenario();
 
   const [saveModalVisible, setSaveModalVisible] = useState(false);
@@ -37,7 +38,7 @@ const Header = ({ collapsed, toggle }) => {
   const handleOpenSaveModal = () => {
     if (scenarioData) {
       form.setFieldsValue({
-        name: scenarioData.name,
+        name: scenarioData.name || 'New Scenario',
         description: scenarioData.description || ''
       });
     }
@@ -64,25 +65,73 @@ const Header = ({ collapsed, toggle }) => {
       }
     } catch (error) {
       console.error('Error saving scenario:', error);
+      message.error('Failed to save scenario');
     }
   };
 
   // Handle opening the load modal
   const handleOpenLoadModal = async () => {
-    setLoadingScenarios(true);
-    const result = await getAllScenarios();
-    if (result && result.scenarios) {
-      setScenarioList(result.scenarios);
+    try {
+      setLoadingScenarios(true);
+      const result = await getAllScenarios();
+      
+      console.log('Scenarios load result:', result);
+      
+      if (result && result.scenarios) {
+        setScenarioList(result.scenarios);
+      } else {
+        message.warning('No scenarios found or error loading scenarios');
+        setScenarioList([]);
+      }
+    } catch (error) {
+      console.error('Error fetching scenarios:', error);
+      message.error('Failed to load scenarios');
+      setScenarioList([]);
+    } finally {
+      setLoadingScenarios(false);
+      setLoadModalVisible(true);
     }
-    setLoadingScenarios(false);
-    setLoadModalVisible(true);
   };
 
   // Handle loading a scenario
   const handleLoadScenario = async (id) => {
-    await getScenario(id);
-    setLoadModalVisible(false);
-    setSelectedScenarioId(null);
+    try {
+      console.log('Attempting to load scenario with ID:', id);
+      const loadedScenario = await getScenario(id);
+      
+      console.log('Loaded scenario details:', loadedScenario);
+      
+      if (loadedScenario) {
+        setLoadModalVisible(false);
+        setSelectedScenarioId(null);
+        message.success('Scenario loaded successfully');
+      } else {
+        message.error('Failed to load the selected scenario');
+      }
+    } catch (error) {
+      console.error('Error loading scenario:', error);
+      message.error('An error occurred while loading the scenario');
+    }
+  };
+
+  // Handle creating a new scenario (in-memory only)
+  const handleNewScenario = () => {
+    // Show a confirmation if there are unsaved changes
+    if (hasUnsavedChanges) {
+      Modal.confirm({
+        title: 'Create New Scenario',
+        content: 'You have unsaved changes. Are you sure you want to create a new scenario? Any unsaved changes will be lost.',
+        onOk() {
+          // Reset the scenario context without saving to DB
+          initializeScenario();
+        },
+        okText: 'Create New Scenario',
+        cancelText: 'Cancel'
+      });
+    } else {
+      // If no unsaved changes, initialize directly
+      initializeScenario();
+    }
   };
 
   // Handle running a simulation
@@ -131,7 +180,7 @@ const Header = ({ collapsed, toggle }) => {
           </Button>
           <Button
             icon={<ReloadOutlined />}
-            onClick={initializeScenario}
+            onClick={handleNewScenario}
             disabled={loading}
           >
             New Scenario
@@ -167,7 +216,7 @@ const Header = ({ collapsed, toggle }) => {
         </Form>
       </Modal>
 
-      {/* Load Modal - improved with a proper scenario selector component */}
+      {/* Load Modal */}
       <Modal
         title="Load Scenario"
         open={loadModalVisible}
