@@ -30,13 +30,15 @@ const Header = ({ collapsed, toggle }) => {
     getScenario,
     updateScenarioMeta,
     hasUnsavedChanges,
-    isNewScenario
+    isNewScenario,
+    submitAllForms
   } = useScenario();
 
   // Modal visibility states
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [newConfirmVisible, setNewConfirmVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Load modal state
   const [scenarioList, setScenarioList] = useState([]);
@@ -59,23 +61,23 @@ const Header = ({ collapsed, toggle }) => {
   // Handle save as (create new)
   const handleSaveAs = async (data) => {
     try {
-      // Update metadata in context first
-      const updated = await updateScenarioMeta({
+      setIsSaving(true);
+      
+      // First, submit all dirty forms to apply changes to context
+      if (hasUnsavedChanges) {
+        console.log("Submitting all forms before save");
+        await submitAllForms();
+      }
+      
+      // Save with the new metadata
+      const result = await saveScenario({
         name: data.name,
         description: data.description
       });
       
-      if (!updated) {
-        message.error('Failed to update scenario metadata');
-        return;
-      }
-      
-      // Force save as new
-      const result = await saveScenario();
-      
       if (result) {
         // Refresh scenario list
-        const listResult = await getAllScenarios(1, 20); // Show more rows
+        const listResult = await getAllScenarios(1, 50); // Show more rows
         if (listResult?.scenarios) {
           setScenarioList(listResult.scenarios);
         }
@@ -90,26 +92,40 @@ const Header = ({ collapsed, toggle }) => {
     } catch (error) {
       console.error('Error creating new scenario:', error);
       message.error('Failed to create new scenario');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Handle update existing
   const handleUpdate = async (data) => {
     try {
-      // Update metadata 
-      updateScenarioMeta(data);
-
-      // Update existing
-      const result = await updateScenario();
+      setIsSaving(true);
+      
+      // First, submit all dirty forms to apply changes to context
+      if (hasUnsavedChanges) {
+        console.log("Submitting all forms before update");
+        await submitAllForms();
+      }
+      
+      // Update with the new metadata
+      const result = await updateScenario({
+        name: data.name,
+        description: data.description
+      });
       
       if (result) {
         setSaveModalVisible(false);
         reset();
         message.success('Scenario updated successfully');
+      } else {
+        message.error('Failed to update scenario');
       }
     } catch (error) {
       console.error('Error updating scenario:', error);
       message.error('Failed to update scenario');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -161,7 +177,7 @@ const Header = ({ collapsed, toggle }) => {
   const handleOpenLoadModal = async () => {
     try {
       setLoadingScenarios(true);
-      const result = await getAllScenarios(1, 20); // Fetch more scenarios per page
+      const result = await getAllScenarios(1, 50); // Fetch more scenarios per page
       
       if (result && result.scenarios) {
         setScenarioList(result.scenarios);
@@ -303,7 +319,7 @@ const Header = ({ collapsed, toggle }) => {
                 <Button
                   type="primary"
                   onClick={handleSubmit(handleUpdate)}
-                  loading={isSubmitting}
+                  loading={isSubmitting || isSaving}
                 >
                   Save
                 </Button>
@@ -311,7 +327,7 @@ const Header = ({ collapsed, toggle }) => {
               <Button
                 type="primary"
                 onClick={handleSubmit(handleSaveAs)}
-                loading={isSubmitting}
+                loading={isSubmitting || isSaving}
               >
                 Save as New
               </Button>
@@ -352,31 +368,31 @@ const Header = ({ collapsed, toggle }) => {
             <div style={{ marginTop: '10px' }}>Loading scenarios...</div>
           </div>
         ) : (
-                      <Table
-              columns={columns}
-              dataSource={scenarioList}
-              rowKey="_id"
-              size="small"
-              rowSelection={{
-                type: 'radio',
-                selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
-                onChange: (selectedRowKeys) => setSelectedScenarioId(selectedRowKeys[0])
-              }}
-              onRow={(record) => ({
-                onClick: () => setSelectedScenarioId(record._id),
-                style: { cursor: 'pointer' }
-              })}
-              pagination={{ 
-                pageSize: 10,
-                total: scenarioList.length,
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} scenarios`
-              }}
-              style={{ 
-                marginTop: '12px',
-                maxHeight: '60vh',
-                overflowY: 'auto'
-              }}
-            />
+          <Table
+            columns={columns}
+            dataSource={scenarioList}
+            rowKey="_id"
+            size="small"
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
+              onChange: (selectedRowKeys) => setSelectedScenarioId(selectedRowKeys[0])
+            }}
+            onRow={(record) => ({
+              onClick: () => setSelectedScenarioId(record._id),
+              style: { cursor: 'pointer' }
+            })}
+            pagination={{ 
+              pageSize: 10,
+              total: scenarioList.length,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} scenarios`
+            }}
+            style={{ 
+              marginTop: '12px',
+              maxHeight: '60vh',
+              overflowY: 'auto'
+            }}
+          />
         )}
       </Modal>
 

@@ -178,7 +178,7 @@ export const ScenarioProvider = ({ children }) => {
   }, []);
 
   // Save scenario to database
-  const saveScenario = useCallback(async () => {
+  const saveScenario = useCallback(async (metadata = null) => {
     if (!scenarioData) {
       message.error('No scenario to save');
       return null;
@@ -188,8 +188,8 @@ export const ScenarioProvider = ({ children }) => {
       setLoading(true);
 
       const payload = {
-        name: scenarioData.name || 'New Scenario',
-        description: scenarioData.description || '',
+        name: metadata?.name || scenarioData.name || 'New Scenario',
+        description: metadata?.description || scenarioData.description || '',
         settings: scenarioData.settings
       };
 
@@ -203,6 +203,8 @@ export const ScenarioProvider = ({ children }) => {
         // Update the local state with the saved scenario (now including _id)
         const savedScenario = {
           ...scenarioData,
+          name: payload.name, // Use the payload values to ensure consistency
+          description: payload.description,
           _id: response.data._id,
           createdAt: response.data.createdAt,
           updatedAt: response.data.updatedAt
@@ -243,7 +245,7 @@ export const ScenarioProvider = ({ children }) => {
   }, [scenarioData]);
 
   // Update an existing scenario in the database
-  const updateScenario = useCallback(async () => {
+  const updateScenario = useCallback(async (metadata = null) => {
     if (!scenarioData || !scenarioData._id) {
       message.error('No saved scenario to update');
       return null;
@@ -253,8 +255,8 @@ export const ScenarioProvider = ({ children }) => {
       setLoading(true);
 
       const payload = {
-        name: scenarioData.name,
-        description: scenarioData.description,
+        name: metadata?.name || scenarioData.name,
+        description: metadata?.description || scenarioData.description,
         settings: scenarioData.settings
       };
 
@@ -265,6 +267,8 @@ export const ScenarioProvider = ({ children }) => {
         // Update the local state with the updated scenario
         const updatedScenario = {
           ...scenarioData,
+          name: payload.name, // Use the payload values to ensure consistency
+          description: payload.description,
           updatedAt: response.data.updatedAt
         };
 
@@ -274,13 +278,17 @@ export const ScenarioProvider = ({ children }) => {
         setScenarioList(prevList =>
           prevList.map(scenario =>
             scenario._id === scenarioData._id
-              ? { ...scenario, ...response.data }
+              ? {
+                ...scenario,
+                name: payload.name,
+                description: payload.description,
+                updatedAt: response.data.updatedAt
+              }
               : scenario
           )
         );
 
         message.success('Scenario updated successfully');
-
 
         // Clear dirty state for all forms after successful update
         setDirtyForms({});
