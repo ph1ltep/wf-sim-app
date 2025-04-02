@@ -8,6 +8,10 @@ import { getDefaults } from '../api/defaults';
 
 const ScenarioContext = createContext();
 
+// Add isModified state
+const [isModified, setIsModified] = useState(false);
+const originalDataRef = useRef(null);
+
 export const useScenario = () => useContext(ScenarioContext);
 
 export const ScenarioProvider = ({ children }) => {
@@ -251,7 +255,7 @@ export const ScenarioProvider = ({ children }) => {
           },
           ...prevList
         ]);
-
+        setIsModified(false);
         message.success('Scenario saved successfully');
         return savedScenario;
       } else {
@@ -310,7 +314,7 @@ export const ScenarioProvider = ({ children }) => {
               : scenario
           )
         );
-
+        setIsModified(false);
         message.success('Scenario updated successfully');
 
         // Clear dirty state for all forms after successful update
@@ -418,6 +422,9 @@ export const ScenarioProvider = ({ children }) => {
     setScenarioData(produce(draft => {
       set(draft, path, value);
     }));
+
+    // Mark as modified
+    setIsModified(true);
 
     return true;
   }, [hasValidScenario]);
