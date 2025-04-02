@@ -14,15 +14,22 @@
       "internalConsoleOptions": "neverOpen",
       "cwd": "${workspaceFolder}/backend"
     },
+    
     {
       "name": "Debug Frontend",
       "type": "chrome",
       "request": "launch",
-      "url": "https://code-server.fthome.org/proxy/3000",
+      "url": "http://172.31.149.129:3000/",
+      // "https://code-server.fthome.org/proxy/3000",
       "webRoot": "${workspaceFolder}/frontend",
       "sourceMapPathOverrides": {
         "webpack:///src/*": "${webRoot}/src/*"
-      }
+      },
+      "preLaunchTask": "Run Frontend",
+      "userDataDir": "${workspaceFolder}/.vscode/chrome",
+      "runtimeArgs": [
+        "--disable-web-security"
+      ]
     }
   ],
   "compounds": [

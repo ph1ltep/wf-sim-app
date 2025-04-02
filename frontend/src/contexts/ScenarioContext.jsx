@@ -40,7 +40,7 @@ export const ScenarioProvider = ({ children }) => {
     };
   }, []);
 
-  // Submit all dirty forms - handles everything internally
+  // In ScenarioContext.jsx, update the submitAllForms function:
   const submitAllForms = useCallback(async () => {
     // Check if there are any dirty forms that need submission
     const dirtyFormIds = Object.entries(dirtyForms)
@@ -49,7 +49,7 @@ export const ScenarioProvider = ({ children }) => {
 
     if (dirtyFormIds.length === 0) {
       console.log("No dirty forms to submit");
-      return true; // Return success if no forms need to be submitted
+      return { success: true, updatedData: scenarioData }; // Return current data if no dirty forms
     }
 
     console.log("Submitting dirty forms:", dirtyFormIds);
@@ -76,12 +76,14 @@ export const ScenarioProvider = ({ children }) => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       console.log("All forms submitted successfully");
-      return true;
+
+      // Important: Get the latest scenario data after all form submissions
+      return { success: true, updatedData: scenarioData };
     } catch (error) {
       console.error("Error submitting forms:", error);
-      return false;
+      return { success: false, updatedData: null };
     }
-  }, [dirtyForms]);
+  }, [dirtyForms, scenarioData]);
 
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
@@ -190,7 +192,6 @@ export const ScenarioProvider = ({ children }) => {
     }
   }, []);
 
-  // Save scenario to database
   const saveScenario = useCallback(async (metadata = null) => {
     if (!scenarioData) {
       message.error('No scenario to save');
@@ -201,19 +202,22 @@ export const ScenarioProvider = ({ children }) => {
       setLoading(true);
 
       // Step 1: Submit all forms first (it will only process dirty forms)
-      const formsSubmitted = await submitAllForms();
+      const { success: formsSubmitted, updatedData } = await submitAllForms();
 
       if (!formsSubmitted) {
         message.error('Failed to save form changes');
         return null;
       }
 
+      // Use updatedData instead of scenarioData
+      const dataToSave = updatedData || scenarioData;
+
       // Step 2: Prepare the payload with the updated context
       const payload = {
-        name: metadata?.name || scenarioData.name || 'New Scenario',
-        description: metadata?.description || scenarioData.description || '',
-        settings: scenarioData.settings,
-        simulation: scenarioData.simulation || {}
+        name: metadata?.name || dataToSave.name || 'New Scenario',
+        description: metadata?.description || dataToSave.description || '',
+        settings: dataToSave.settings,
+        simulation: dataToSave.simulation || {}
       };
 
       console.log('Saving complete scenario with payload:', payload);
