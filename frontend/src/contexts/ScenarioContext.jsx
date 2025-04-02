@@ -40,60 +40,48 @@ export const ScenarioProvider = ({ children }) => {
     };
   }, []);
 
-  // Submit all dirty forms
+  // Submit all dirty forms - handles everything internally
   const submitAllForms = useCallback(async () => {
-    console.log("Submitting all dirty forms");
-    console.log("Dirty forms:", dirtyForms);
+    // Check if there are any dirty forms that need submission
+    const dirtyFormIds = Object.entries(dirtyForms)
+      .filter(([_, isDirty]) => isDirty)
+      .map(([id]) => id);
+
+    if (dirtyFormIds.length === 0) {
+      console.log("No dirty forms to submit");
+      return true; // Return success if no forms need to be submitted
+    }
+
+    console.log("Submitting dirty forms:", dirtyFormIds);
     console.log("Available handlers:", Object.keys(formSubmitHandlersRef.current));
 
-    // Exit early if no dirty forms
-    if (Object.keys(dirtyForms).filter(id => dirtyForms[id]).length === 0) {
-      console.log("No dirty forms to submit");
-      return true;
-    }
+    try {
+      // Process forms sequentially for reliability
+      for (const formId of dirtyFormIds) {
+        if (formSubmitHandlersRef.current[formId]) {
+          console.log(`Submitting form: ${formId}`);
 
-    // Array to store results of each form submission
-    const results = [];
-
-    // Process forms sequentially to avoid race conditions
-    for (const [formId, isDirty] of Object.entries(dirtyForms)) {
-      if (isDirty && formSubmitHandlersRef.current[formId]) {
-        console.log(`Submitting form: ${formId}`);
-        try {
           // Call the form's submit handler and await its completion
-          const result = await formSubmitHandlersRef.current[formId]();
-          console.log(`Form ${formId} submitted successfully:`, result);
-          results.push({ formId, success: true, result });
-        } catch (error) {
-          console.error(`Form ${formId} submission error:`, error);
-          results.push({ formId, success: false, error });
+          await formSubmitHandlersRef.current[formId]();
+          console.log(`Form ${formId} submitted successfully`);
+        } else {
+          console.warn(`Handler not found for form: ${formId}`);
         }
       }
-    }
 
-    // Now we can log the results array which will be populated
-    console.log("Form submission results:", results);
-
-    // Wait a moment for state updates to propagate
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Check current context state after all submissions
-    console.log("Current context after form submissions:", scenarioData);
-
-    // Clear dirty states only if all submissions were successful
-    const allSuccessful = results.length > 0 && results.every(r => r.success);
-
-    if (allSuccessful) {
+      // Clear dirty state for all submitted forms
       setDirtyForms({});
+
+      // Brief delay to ensure state updates are applied
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      console.log("All forms submitted successfully");
       return true;
-    } else if (results.length === 0) {
-      console.log("No forms were submitted");
-      return true; // Return true if no forms needed to be submitted
-    } else {
-      console.error("Some form submissions failed");
+    } catch (error) {
+      console.error("Error submitting forms:", error);
       return false;
     }
-  }, [dirtyForms, scenarioData]);
+  }, [dirtyForms]);
 
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
@@ -212,7 +200,15 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Prepare the complete payload with the entire scenario data
+      // Step 1: Submit all forms first (it will only process dirty forms)
+      const formsSubmitted = await submitAllForms();
+
+      if (!formsSubmitted) {
+        message.error('Failed to save form changes');
+        return null;
+      }
+
+      // Step 2: Prepare the payload with the updated context
       const payload = {
         name: metadata?.name || scenarioData.name || 'New Scenario',
         description: metadata?.description || scenarioData.description || '',
@@ -222,14 +218,14 @@ export const ScenarioProvider = ({ children }) => {
 
       console.log('Saving complete scenario with payload:', payload);
 
-      // Create a new scenario in the database
+      // Step 3: Save to the database
       const response = await api.post('/scenarios', payload);
       console.log('Save scenario response:', response);
 
       if (response.success && response.data) {
-        // Update only the necessary fields while preserving the entire context
+        // Step 4: Update the local state with ID and metadata from response
         const savedScenario = {
-          ...scenarioData,  // Keep all existing context data
+          ...scenarioData,
           name: payload.name,
           description: payload.description,
           _id: response.data._id,
@@ -240,7 +236,7 @@ export const ScenarioProvider = ({ children }) => {
         setScenarioData(savedScenario);
         console.log('Saved scenario:', savedScenario);
 
-        // Add to scenario list
+        // Step 5: Update scenario list
         setScenarioList(prevList => [
           {
             _id: response.data._id,
@@ -253,10 +249,6 @@ export const ScenarioProvider = ({ children }) => {
         ]);
 
         message.success('Scenario saved successfully');
-
-        // Clear dirty state for all forms after successful save
-        setDirtyForms({});
-
         return savedScenario;
       } else {
         message.error('Failed to save scenario: ' + (response.error || 'Unknown error'));
@@ -269,7 +261,7 @@ export const ScenarioProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [scenarioData]);
+  }, [scenarioData, submitAllForms]);
 
   // Update an existing scenario in the database
   const updateScenario = useCallback(async (metadata = null) => {

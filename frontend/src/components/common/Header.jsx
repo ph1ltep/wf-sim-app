@@ -62,23 +62,7 @@ const Header = ({ collapsed, toggle }) => {
     try {
       setIsSaving(true);
 
-      // First, ensure all dirty forms are submitted to apply changes to context
-      if (hasUnsavedChanges) {
-        const formsSubmitted = await submitAllForms();
-
-        if (!formsSubmitted) {
-          message.error("Failed to apply all changes before saving");
-          setIsSaving(false);
-          return;
-        }
-
-        // Add a small delay to ensure context is updated
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      console.log("Context before saving:", scenarioData);
-
-      // Now save the scenario with updated metadata
+      // Simply call saveScenario with the metadata
       const result = await saveScenario({
         name: data.name,
         description: data.description
@@ -93,10 +77,6 @@ const Header = ({ collapsed, toggle }) => {
 
         setSaveModalVisible(false);
         reset();
-        message.success('New scenario created successfully');
-        console.log('Created new scenario:', result);
-      } else {
-        message.error('Failed to create new scenario');
       }
     } catch (error) {
       console.error('Error creating new scenario:', error);
