@@ -28,7 +28,6 @@ const Header = ({ collapsed, toggle }) => {
     updateScenario,
     getAllScenarios,
     getScenario,
-    updateScenarioMeta,
     hasUnsavedChanges,
     isNewScenario,
     submitAllForms
@@ -39,7 +38,7 @@ const Header = ({ collapsed, toggle }) => {
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [newConfirmVisible, setNewConfirmVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Load modal state
   const [scenarioList, setScenarioList] = useState([]);
   const [loadingScenarios, setLoadingScenarios] = useState(false);
@@ -62,26 +61,36 @@ const Header = ({ collapsed, toggle }) => {
   const handleSaveAs = async (data) => {
     try {
       setIsSaving(true);
-      
-      // First, submit all dirty forms to apply changes to context
+
+      // First, ensure all dirty forms are submitted to apply changes to context
       if (hasUnsavedChanges) {
-        console.log("Submitting all forms before save");
-        await submitAllForms();
+        const formsSubmitted = await submitAllForms();
+
+        if (!formsSubmitted) {
+          message.error("Failed to apply all changes before saving");
+          setIsSaving(false);
+          return;
+        }
+
+        // Add a small delay to ensure context is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      // Save with the new metadata
+
+      console.log("Context before saving:", scenarioData);
+
+      // Now save the scenario with updated metadata
       const result = await saveScenario({
         name: data.name,
         description: data.description
       });
-      
+
       if (result) {
         // Refresh scenario list
-        const listResult = await getAllScenarios(1, 50); // Show more rows
+        const listResult = await getAllScenarios(1, 50);
         if (listResult?.scenarios) {
           setScenarioList(listResult.scenarios);
         }
-        
+
         setSaveModalVisible(false);
         reset();
         message.success('New scenario created successfully');
@@ -101,19 +110,19 @@ const Header = ({ collapsed, toggle }) => {
   const handleUpdate = async (data) => {
     try {
       setIsSaving(true);
-      
+
       // First, submit all dirty forms to apply changes to context
       if (hasUnsavedChanges) {
         console.log("Submitting all forms before update");
         await submitAllForms();
       }
-      
+
       // Update with the new metadata
       const result = await updateScenario({
         name: data.name,
         description: data.description
       });
-      
+
       if (result) {
         setSaveModalVisible(false);
         reset();
@@ -178,7 +187,7 @@ const Header = ({ collapsed, toggle }) => {
     try {
       setLoadingScenarios(true);
       const result = await getAllScenarios(1, 50); // Fetch more scenarios per page
-      
+
       if (result && result.scenarios) {
         setScenarioList(result.scenarios);
       } else {
@@ -201,7 +210,7 @@ const Header = ({ collapsed, toggle }) => {
 
     try {
       const loadedScenario = await getScenario(selectedScenarioId);
-      
+
       if (loadedScenario) {
         setLoadModalVisible(false);
         setSelectedScenarioId(null);
@@ -252,7 +261,7 @@ const Header = ({ collapsed, toggle }) => {
           <Button
             type="primary"
             icon={<PlayCircleOutlined />}
-            onClick={() => {}} // To be implemented
+            onClick={() => { }} // To be implemented
             loading={loading}
           >
             Run Simulation
@@ -306,7 +315,7 @@ const Header = ({ collapsed, toggle }) => {
             label="Description"
             control={control}
             error={errors.description?.message}
-            type="textarea" 
+            type="textarea"
             rows={4}
           />
 
@@ -382,12 +391,12 @@ const Header = ({ collapsed, toggle }) => {
               onClick: () => setSelectedScenarioId(record._id),
               style: { cursor: 'pointer' }
             })}
-            pagination={{ 
+            pagination={{
               pageSize: 10,
               total: scenarioList.length,
               showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} scenarios`
             }}
-            style={{ 
+            style={{
               marginTop: '12px',
               maxHeight: '60vh',
               overflowY: 'auto'

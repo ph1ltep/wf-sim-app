@@ -40,35 +40,60 @@ export const ScenarioProvider = ({ children }) => {
     };
   }, []);
 
-  // Submit all dirty forms - use the ref instead of state
+  // Submit all dirty forms
   const submitAllForms = useCallback(async () => {
     console.log("Submitting all dirty forms");
     console.log("Dirty forms:", dirtyForms);
     console.log("Available handlers:", Object.keys(formSubmitHandlersRef.current));
 
-    const promises = [];
+    // Exit early if no dirty forms
+    if (Object.keys(dirtyForms).filter(id => dirtyForms[id]).length === 0) {
+      console.log("No dirty forms to submit");
+      return true;
+    }
 
-    // Call submit handlers for all dirty forms
-    Object.entries(dirtyForms).forEach(([formId, isDirty]) => {
+    // Array to store results of each form submission
+    const results = [];
+
+    // Process forms sequentially to avoid race conditions
+    for (const [formId, isDirty] of Object.entries(dirtyForms)) {
       if (isDirty && formSubmitHandlersRef.current[formId]) {
         console.log(`Submitting form: ${formId}`);
-        promises.push(formSubmitHandlersRef.current[formId]());
+        try {
+          // Call the form's submit handler and await its completion
+          const result = await formSubmitHandlersRef.current[formId]();
+          console.log(`Form ${formId} submitted successfully:`, result);
+          results.push({ formId, success: true, result });
+        } catch (error) {
+          console.error(`Form ${formId} submission error:`, error);
+          results.push({ formId, success: false, error });
+        }
       }
-    });
+    }
 
-    // Wait for all submissions to complete
-    try {
-      await Promise.all(promises);
+    // Now we can log the results array which will be populated
+    console.log("Form submission results:", results);
 
-      // Clear all dirty flags
+    // Wait a moment for state updates to propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Check current context state after all submissions
+    console.log("Current context after form submissions:", scenarioData);
+
+    // Clear dirty states only if all submissions were successful
+    const allSuccessful = results.length > 0 && results.every(r => r.success);
+
+    if (allSuccessful) {
       setDirtyForms({});
-
       return true;
-    } catch (error) {
-      console.error("Error submitting forms:", error);
+    } else if (results.length === 0) {
+      console.log("No forms were submitted");
+      return true; // Return true if no forms needed to be submitted
+    } else {
+      console.error("Some form submissions failed");
       return false;
     }
-  }, [dirtyForms]);
+  }, [dirtyForms, scenarioData]);
 
   // Function to update dirty state
   const updateFormDirtyState = useCallback((isDirty, formId) => {
@@ -187,23 +212,25 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
 
+      // Prepare the complete payload with the entire scenario data
       const payload = {
         name: metadata?.name || scenarioData.name || 'New Scenario',
         description: metadata?.description || scenarioData.description || '',
-        settings: scenarioData.settings
+        settings: scenarioData.settings,
+        simulation: scenarioData.simulation || {}
       };
 
-      console.log('Saving scenario with payload:', payload);
+      console.log('Saving complete scenario with payload:', payload);
 
       // Create a new scenario in the database
       const response = await api.post('/scenarios', payload);
       console.log('Save scenario response:', response);
 
       if (response.success && response.data) {
-        // Update the local state with the saved scenario (now including _id)
+        // Update only the necessary fields while preserving the entire context
         const savedScenario = {
-          ...scenarioData,
-          name: payload.name, // Use the payload values to ensure consistency
+          ...scenarioData,  // Keep all existing context data
+          name: payload.name,
           description: payload.description,
           _id: response.data._id,
           createdAt: response.data.createdAt,
