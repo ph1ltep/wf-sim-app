@@ -8,10 +8,6 @@ import { getDefaults } from '../api/defaults';
 
 const ScenarioContext = createContext();
 
-// Add isModified state
-const [isModified, setIsModified] = useState(false);
-const originalDataRef = useRef(null);
-
 export const useScenario = () => useContext(ScenarioContext);
 
 export const ScenarioProvider = ({ children }) => {
@@ -20,9 +16,11 @@ export const ScenarioProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [dirtyForms, setDirtyForms] = useState({});
-
+  const [isModified, setIsModified] = useState(false);
+  
   // Use a ref for form handlers instead of state
   const formSubmitHandlersRef = useRef({});
+  const originalDataRef = useRef(null);
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {

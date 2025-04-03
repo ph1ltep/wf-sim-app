@@ -1,80 +1,146 @@
 // src/components/config/ProjectSettings.jsx
-import React, { useEffect } from 'react';
-import { Typography, Form, Input, Button, Row, Col, DatePicker } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Typography, Alert } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
-import moment from 'moment';
+import { GlobalOutlined } from '@ant-design/icons';
 
-// Custom hook for project settings
-import useProjectSettings from '../../hooks/useProjectSettings';
+// Import context field components
+import {
+  FormSection,
+  FormRow,
+  FormCol,
+  TextField,
+  NumberField,
+  SelectField,
+  DateField,
+  PercentageField
+} from '../contextFields';
 
-// Component imports
+// Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
-import ProjectTimeline from './projectSettings/ProjectTimeline';
-import CurrencySettings from './projectSettings/CurrencySettings';
-import WindFarmSpecifications from './projectSettings/WindFarmSpecifications';
 import ProjectMetrics from './projectSettings/ProjectMetrics';
 
 const { Title } = Typography;
 
 const ProjectSettings = () => {
-  const { settings } = useScenario();
-  const [form] = Form.useForm();
-  
-  // Use the custom hook for project settings
-  const {
-    locations,
-    selectedLocation,
-    loadingLocations,
-    fieldsFromLocations,
-    calculatedMetrics,
-    handleLocationChange,
-    loadLocationDefaults,
-    handleValuesChange,
-    calculateDerivedValues
-  } = useProjectSettings();
+  // Base paths for different parts of project settings
+  const generalPath = ['settings', 'general'];
+  const windFarmPath = ['settings', 'project', 'windFarm'];
+  const currencyPath = ['settings', 'project', 'currency'];
 
-  // Initialize form values
+  // State for calculated metrics
+  const [calculatedMetrics, setCalculatedMetrics] = useState({
+    totalMW: 0,
+    grossAEP: 0,
+    netAEP: 0,
+    componentQuantities: {}
+  });
+
+  // Get scenario context
+  const { scenarioData, getValueByPath, selectedLocation, updateByPath } = useScenario();
+  
+  // State to track fields from locations
+  const [fieldsFromLocations, setFieldsFromLocations] = useState({
+    capacityFactor: false,
+    currency: false,
+    foreignCurrency: false,
+    exchangeRate: false
+  });
+
+  // Calculate metrics when relevant values change
   useEffect(() => {
-    if (settings && settings.general) {
-      // Get the general parameters
-      const generalParams = { ...settings.general };
+    if (scenarioData) {
+      const numWTGs = getValueByPath([...windFarmPath, 'numWTGs'], 0);
+      const mwPerWTG = getValueByPath([...windFarmPath, 'mwPerWTG'], 0);
+      const capacityFactor = getValueByPath([...windFarmPath, 'capacityFactor'], 0);
+      const curtailmentLosses = getValueByPath([...windFarmPath, 'curtailmentLosses'], 0);
+      const electricalLosses = getValueByPath([...windFarmPath, 'electricalLosses'], 0);
+      const wtgPlatformType = getValueByPath([...windFarmPath, 'wtgPlatformType'], 'geared');
       
-      // Get wind farm settings
-      const windFarmParams = settings.project?.windFarm || {};
+      const totalMW = numWTGs * mwPerWTG;
+      const grossAEP = totalMW * (capacityFactor / 100) * 8760;
       
-      // Get currency settings
-      const currencySettings = settings.project?.currency || {};
+      const afterCurtailment = grossAEP * (1 - curtailmentLosses / 100);
+      const netAEP = afterCurtailment * (1 - electricalLosses / 100);
       
-      // Parse the date if it exists
-      let startDate = generalParams.startDate ? moment(generalParams.startDate) : null;
-      
-      const initialValues = {
-        ...generalParams,
-        ...windFarmParams,
-        projectName: generalParams.projectName || 'Wind Farm Project',
-        startDate: startDate,
-        projectLife: generalParams.projectLife || 20,
-        currency: currencySettings.local || 'USD',
-        foreignCurrency: currencySettings.foreign || 'EUR',
-        exchangeRate: currencySettings.exchangeRate || 1.0
+      const componentQuantities = {
+        blades: numWTGs * 3,
+        bladeBearings: numWTGs * 3,
+        transformers: numWTGs,
+        gearboxes: wtgPlatformType === 'geared' ? numWTGs : 0,
+        generators: numWTGs,
+        converters: numWTGs,
+        mainBearings: numWTGs,
+        yawSystems: numWTGs,
       };
       
-      form.setFieldsValue(initialValues);
+      setCalculatedMetrics({
+        totalMW,
+        grossAEP,
+        netAEP,
+        componentQuantities
+      });
+      
+      // Update metrics in context
+      updateByPath(['settings', 'metrics'], {
+        totalMW,
+        grossAEP,
+        netAEP,
+        componentQuantities
+      });
     }
-  }, [form, settings]);
+  }, [scenarioData, getValueByPath, updateByPath]);
 
-  // Handle form reset
-  const handleReset = () => {
-    form.resetFields();
+  // Load location defaults
+  const loadLocationDefaults = () => {
+    if (!selectedLocation) return;
     
-    // Recalculate with reset values
-    const values = form.getFieldsValue();
-    calculateDerivedValues(values);
+    // Update capacity factor
+    updateByPath([...windFarmPath, 'capacityFactor'], selectedLocation.capacityFactor);
+    
+    // Update currency information
+    updateByPath([...currencyPath, 'local'], selectedLocation.currency);
+    updateByPath([...currencyPath, 'foreign'], selectedLocation.foreignCurrency);
+    updateByPath([...currencyPath, 'exchangeRate'], selectedLocation.exchangeRate);
+    
+    // Update revenue module values with location defaults
+    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'value'], 
+                 selectedLocation.energyPrice);
+    
+    // Update cost module values with location defaults
+    updateByPath(['settings', 'modules', 'cost', 'escalationRate'], 
+                 selectedLocation.inflationRate);
+    
+    // Mark fields as being from location defaults
+    setFieldsFromLocations({
+      capacityFactor: true,
+      currency: true,
+      foreignCurrency: true,
+      exchangeRate: true
+    });
   };
 
-  // If settings are not loaded yet, show loading indicator
-  if (!settings) {
-    return <div>Loading settings...</div>;
+  // Get currency options from currencyConstants
+  const currencyOptions = [
+    { value: 'USD', label: 'US Dollar (USD)' },
+    { value: 'EUR', label: 'Euro (EUR)' },
+    { value: 'GBP', label: 'British Pound (GBP)' },
+    { value: 'JPY', label: 'Japanese Yen (JPY)' },
+    { value: 'CNY', label: 'Chinese Yuan (CNY)' },
+    // More currencies would be here
+  ];
+
+  if (!scenarioData) {
+    return (
+      <div>
+        <Title level={2}>Project Specifics</Title>
+        <Alert 
+          message="No Active Scenario" 
+          description="Please create or load a scenario first." 
+          type="warning" 
+        />
+      </div>
+    );
   }
 
   return (
@@ -84,53 +150,167 @@ const ProjectSettings = () => {
 
       {/* Location selection */}
       <LocationSelector
-        locations={locations}
         selectedLocation={selectedLocation}
-        loading={loadingLocations}
-        onLocationChange={handleLocationChange}
         onLoadDefaults={loadLocationDefaults}
       />
 
-      <Form
-        form={form}
-        layout="vertical"
-        onValuesChange={handleValuesChange}
-      >
-        {/* Project Identification */}
-        <Form.Item
-          label="Project Name"
-          name="projectName"
-          rules={[{ required: true, message: 'Please input project name!' }]}
-        >
-          <Input placeholder="e.g., Windward Valley Wind Farm" />
-        </Form.Item>
-        
-        <Form.Item
-          label="Project Start Date"
-          name="startDate"
-        >
-          <DatePicker style={{ width: '100%' }} />
-        </Form.Item>
+      {/* Project Identification */}
+      <FormSection title="Project Identification">
+        <FormRow>
+          <FormCol span={16}>
+            <TextField
+              path={[...generalPath, 'projectName']}
+              label="Project Name"
+              tooltip="Name of the wind farm project"
+              placeholder="e.g., Windward Valley Wind Farm"
+            />
+          </FormCol>
+          <FormCol span={8}>
+            <DateField
+              path={[...generalPath, 'startDate']}
+              label="Project Start Date"
+            />
+          </FormCol>
+        </FormRow>
+      </FormSection>
       
-        {/* Project Timeline */}
-        <ProjectTimeline />
+      {/* Project Timeline */}
+      <FormSection title="Project Timeline">
+        <FormRow>
+          <FormCol span={8}>
+            <NumberField
+              path={[...generalPath, 'projectLife']}
+              label="Project Life (Years)"
+              tooltip="The total operational lifetime of the wind farm project"
+              min={1}
+              max={50}
+            />
+          </FormCol>
+        </FormRow>
+      </FormSection>
+      
+      {/* Currency Settings */}
+      <FormSection title="Currency Settings">
+        <FormRow>
+          <FormCol span={8}>
+            <SelectField
+              path={[...currencyPath, 'local']}
+              label={
+                fieldsFromLocations.currency ? 
+                <>Local Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
+                "Local Currency"
+              }
+              options={currencyOptions}
+            />
+          </FormCol>
+          <FormCol span={8}>
+            <SelectField
+              path={[...currencyPath, 'foreign']}
+              label={
+                fieldsFromLocations.foreignCurrency ? 
+                <>Foreign Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
+                "Foreign Currency"
+              }
+              options={currencyOptions}
+            />
+          </FormCol>
+          <FormCol span={8}>
+            <NumberField
+              path={[...currencyPath, 'exchangeRate']}
+              label={
+                fieldsFromLocations.exchangeRate ? 
+                <>Foreign/Local Exchange Rate <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
+                "Foreign/Local Exchange Rate"
+              }
+              tooltip="Enter rate as: 1 foreign currency = ? local currency"
+              min={0}
+              step={0.01}
+            />
+          </FormCol>
+        </FormRow>
+      </FormSection>
+      
+      {/* Wind Farm Specifications */}
+      <FormSection title="Wind Farm Specifications">
+        <FormRow>
+          <FormCol span={8}>
+            <NumberField
+              path={[...windFarmPath, 'numWTGs']}
+              label="Number of WTGs"
+              tooltip="Number of wind turbine generators in the project"
+              min={1}
+              step={1}
+            />
+          </FormCol>
+          <FormCol span={8}>
+            <NumberField
+              path={[...windFarmPath, 'mwPerWTG']}
+              label="Megawatts per WTG"
+              tooltip="Nameplate capacity of each wind turbine in megawatts"
+              min={0.1}
+              step={0.1}
+              precision={2}
+            />
+          </FormCol>
+          <FormCol span={8}>
+            <SelectField
+              path={[...windFarmPath, 'wtgPlatformType']}
+              label="WTG Platform Type"
+              tooltip="Type of wind turbine generator platform"
+              options={[
+                { value: 'geared', label: 'Geared' },
+                { value: 'direct-drive', label: 'Direct Drive' }
+              ]}
+            />
+          </FormCol>
+        </FormRow>
         
-        {/* Currency Settings */}
-        <CurrencySettings fieldsFromLocations={fieldsFromLocations} />
+        <FormRow>
+          <FormCol span={8}>
+            <PercentageField
+              path={[...windFarmPath, 'capacityFactor']}
+              label={
+                fieldsFromLocations.capacityFactor ? 
+                <>Capacity Factor <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
+                "Capacity Factor"
+              }
+              tooltip="Expected capacity factor as a percentage of nameplate capacity"
+              min={1}
+              max={60}
+              step={0.5}
+              precision={1}
+            />
+          </FormCol>
+        </FormRow>
         
-        {/* Wind Farm Specifications */}
-        <WindFarmSpecifications fieldsFromLocations={fieldsFromLocations} />
-        
-        {/* Project Metrics */}
-        <ProjectMetrics calculatedValues={calculatedMetrics} />
-
-        {/* Reset Button */}
-        <Row justify="end" style={{ marginTop: 16 }}>
-          <Col>
-            <Button onClick={handleReset}>Reset</Button>
-          </Col>
-        </Row>
-      </Form>
+        <FormRow>
+          <FormCol span={12}>
+            <PercentageField
+              path={[...windFarmPath, 'curtailmentLosses']}
+              label="Curtailment Losses"
+              tooltip="Energy losses due to grid curtailment or operational restrictions"
+              min={0}
+              max={30}
+              step={0.5}
+              precision={1}
+            />
+          </FormCol>
+          <FormCol span={12}>
+            <PercentageField
+              path={[...windFarmPath, 'electricalLosses']}
+              label="Electrical Losses"
+              tooltip="Energy losses in electrical systems, transformers, and transmission"
+              min={0}
+              max={15}
+              step={0.5}
+              precision={1}
+            />
+          </FormCol>
+        </FormRow>
+      </FormSection>
+      
+      {/* Project Metrics */}
+      <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>
   );
 };

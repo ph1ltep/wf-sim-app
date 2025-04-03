@@ -9,7 +9,7 @@ import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 
 // Import special components
-import EditableTable from './EditableTable';
+import EditableTable from '../tables/EditableTable';
 import DistributionField from './DistributionField';
 
 /**

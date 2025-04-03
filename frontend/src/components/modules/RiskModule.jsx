@@ -1,150 +1,224 @@
 // src/components/modules/RiskModule.jsx
 import React from 'react';
-import { Typography, Button } from 'antd';
-import * as yup from 'yup';
+import { Typography, Alert, Card, Tabs, Switch } from 'antd';
+import { SafetyOutlined, InsuranceOutlined, BankOutlined } from '@ant-design/icons';
+import { useScenario } from '../../contexts/ScenarioContext';
 
-// Import our new form components and hooks
-import { useScenarioForm } from '../../hooks/forms';
+// Import context field components
 import {
-  Form,
   FormSection,
   FormRow,
   FormCol,
   NumberField,
   CurrencyField,
-  SwitchField
-} from '../../components/forms';
-import FormButtons from '../../components/forms/FormButtons';
-import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
+  SwitchField,
+  PercentageField,
+  FormDivider
+} from '../contextFields';
 
 const { Title } = Typography;
-
-// Define validation schema
-const riskSchema = yup.object({
-  insuranceEnabled: yup
-    .boolean()
-    .required('Insurance enabled selection is required'),
-
-  insurancePremium: yup
-    .number()
-    .when('insuranceEnabled', {
-      is: true,
-      then: schema => schema.required('Insurance premium is required').min(0, 'Must be positive')
-    }),
-
-  insuranceDeductible: yup
-    .number()
-    .when('insuranceEnabled', {
-      is: true,
-      then: schema => schema.required('Insurance deductible is required').min(0, 'Must be positive')
-    }),
-
-  reserveFunds: yup
-    .number()
-    .required('Reserve funds amount is required')
-    .min(0, 'Must be positive')
-}).required();
+const { TabPane } = Tabs;
 
 const RiskModule = () => {
-  // Use our custom form hook
-  const {
-    control,
-    watch,
-    formState: { errors },
-    onSubmitForm,
-    isDirty,
-    reset
-  } = useScenarioForm({
-    validationSchema: riskSchema,
-    moduleName: 'risk',
-    showSuccessMessage: true,
-    successMessage: 'Risk mitigation settings saved successfully'
-  });
+  // Define base path for risk module
+  const basePath = ['settings', 'modules', 'risk'];
+  
+  // Get scenario data and context functions
+  const { scenarioData, getValueByPath } = useScenario();
 
-  // Watch insurance enabled for conditional rendering
-  const insuranceEnabled = watch('insuranceEnabled');
+  // Get insurance enabled state for conditional rendering
+  const insuranceEnabled = getValueByPath([...basePath, 'insuranceEnabled'], false);
+  
+  // Helper function to check if we have valid scenario
+  const hasValidScenario = () => scenarioData && scenarioData.settings?.modules?.risk;
+
+  if (!hasValidScenario()) {
+    return (
+      <div>
+        <Title level={2}>Risk Mitigation</Title>
+        <Alert 
+          message="No Active Scenario" 
+          description="Please create or load a scenario first." 
+          type="warning" 
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <Title level={2}>Risk Mitigation Configuration
-        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
-      </Title>
-      <p>Configure risk mitigation strategies for the wind farm project.</p>
-
-      {/* Custom Form component without built-in buttons */}
-      <Form
-        onSubmit={null}
-        submitButtons={false}
-      >
-        <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
-          <FormRow>
-            <FormCol span={12}>
-              <SwitchField
-                name="insuranceEnabled"
-                label="Enable Insurance Coverage"
-                control={control}
-                error={errors.insuranceEnabled?.message}
-                tooltip="Toggle insurance coverage on/off"
-              />
-            </FormCol>
-          </FormRow>
-
-          {insuranceEnabled && (
+      <Title level={2}>Risk Mitigation</Title>
+      <p>Configure risk mitigation strategies including insurance and reserve funds.</p>
+      
+      <Tabs defaultActiveKey="insurance" type="card">
+        <TabPane 
+          tab={
+            <span>
+              <InsuranceOutlined /> Insurance
+            </span>
+          } 
+          key="insurance"
+        >
+          <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
             <FormRow>
               <FormCol span={12}>
-                <CurrencyField
-                  name="insurancePremium"
-                  label="Insurance Premium (USD/year)"
-                  control={control}
-                  error={errors.insurancePremium?.message}
-                  tooltip="Annual cost of insurance coverage"
-                  min={0}
-                  step={10000}
-                  style={{ width: 200 }}
-                />
-              </FormCol>
-              <FormCol span={12}>
-                <CurrencyField
-                  name="insuranceDeductible"
-                  label="Insurance Deductible per Event (USD)"
-                  control={control}
-                  error={errors.insuranceDeductible?.message}
-                  tooltip="Only costs exceeding the deductible are covered by insurance"
-                  min={0}
-                  step={5000}
-                  style={{ width: 200 }}
+                <SwitchField
+                  path={[...basePath, 'insuranceEnabled']}
+                  label="Enable Insurance"
+                  tooltip="Enable or disable insurance coverage for the project"
                 />
               </FormCol>
             </FormRow>
-          )}
-        </FormSection>
-
-        <FormSection title="Reserve Funds">
-          <FormRow>
-            <FormCol span={12}>
-              <CurrencyField
-                name="reserveFunds"
-                label="Reserve Funds (USD)"
-                control={control}
-                error={errors.reserveFunds?.message}
-                tooltip="Cash reserves to smooth out adverse cash flow events"
-                min={0}
-                step={100000}
-                style={{ width: 200 }}
-              />
-            </FormCol>
-          </FormRow>
-        </FormSection>
-
-        {/* Form Actions - Custom buttons */}
-        <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <FormButtons
-            onSubmit={onSubmitForm}
-            onReset={() => reset()} // Call as a function to avoid passing the function reference
-            isDirty={isDirty}
-          />
-        </div>
-      </Form>
+            
+            {insuranceEnabled && (
+              <>
+                <FormDivider orientation="left">Insurance Parameters</FormDivider>
+                
+                <FormRow>
+                  <FormCol span={12}>
+                    <CurrencyField
+                      path={[...basePath, 'insurancePremium']}
+                      label="Insurance Premium"
+                      tooltip="Annual insurance premium cost"
+                      min={0}
+                      step={10000}
+                    />
+                  </FormCol>
+                  <FormCol span={12}>
+                    <CurrencyField
+                      path={[...basePath, 'insuranceDeductible']}
+                      label="Insurance Deductible"
+                      tooltip="Insurance deductible per event"
+                      min={0}
+                      step={1000}
+                    />
+                  </FormCol>
+                </FormRow>
+                
+                <FormRow>
+                  <FormCol span={12}>
+                    <PercentageField
+                      path={[...basePath, 'coverageLimit']}
+                      label="Coverage Limit (%)"
+                      tooltip="Maximum percentage of costs covered by insurance"
+                      min={0}
+                      max={100}
+                      step={5}
+                    />
+                  </FormCol>
+                  <FormCol span={12}>
+                    <CurrencyField
+                      path={[...basePath, 'annualCoverageCap']}
+                      label="Annual Coverage Cap"
+                      tooltip="Maximum insurance payout per year"
+                      min={0}
+                      step={100000}
+                    />
+                  </FormCol>
+                </FormRow>
+              </>
+            )}
+          </FormSection>
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <BankOutlined /> Reserve Funds
+            </span>
+          } 
+          key="reserves"
+        >
+          <FormSection title="Reserve Funds" style={{ marginBottom: 24 }}>
+            <FormRow>
+              <FormCol span={12}>
+                <CurrencyField
+                  path={[...basePath, 'reserveFunds']}
+                  label="Initial Reserve Funds"
+                  tooltip="Initial allocation for reserve funds"
+                  min={0}
+                  step={100000}
+                />
+              </FormCol>
+              <FormCol span={12}>
+                <PercentageField
+                  path={[...basePath, 'annualContribution']}
+                  label="Annual Contribution (%)"
+                  tooltip="Percentage of revenue allocated to reserve funds each year"
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  precision={2}
+                />
+              </FormCol>
+            </FormRow>
+            
+            <FormRow>
+              <FormCol span={12}>
+                <CurrencyField
+                  path={[...basePath, 'targetReserveLevel']}
+                  label="Target Reserve Level"
+                  tooltip="Target level for reserve funds"
+                  min={0}
+                  step={100000}
+                />
+              </FormCol>
+              <FormCol span={12}>
+                <NumberField
+                  path={[...basePath, 'minimumReserveCoverage']}
+                  label="Minimum Coverage (months)"
+                  tooltip="Minimum number of months of O&M costs covered by reserves"
+                  min={0}
+                  step={1}
+                  addonAfter="months"
+                />
+              </FormCol>
+            </FormRow>
+          </FormSection>
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <SafetyOutlined /> Other Mitigations
+            </span>
+          } 
+          key="other"
+        >
+          <FormSection title="Other Risk Mitigations" style={{ marginBottom: 24 }}>
+            <FormRow>
+              <FormCol span={12}>
+                <SwitchField
+                  path={[...basePath, 'performanceGuarantees']}
+                  label="Performance Guarantees"
+                  tooltip="Enable or disable performance guarantees"
+                />
+              </FormCol>
+              <FormCol span={12}>
+                <SwitchField
+                  path={[...basePath, 'contingencyBudget']}
+                  label="Contingency Budget"
+                  tooltip="Enable or disable contingency budget"
+                />
+              </FormCol>
+            </FormRow>
+            
+            <FormRow>
+              <FormCol span={12}>
+                <PercentageField
+                  path={[...basePath, 'contingencyPercentage']}
+                  label="Contingency Percentage"
+                  tooltip="Percentage of total costs allocated as contingency"
+                  min={0}
+                  max={30}
+                  step={0.5}
+                  precision={1}
+                />
+              </FormCol>
+            </FormRow>
+          </FormSection>
+        </TabPane>
+      </Tabs>
     </div>
   );
 };

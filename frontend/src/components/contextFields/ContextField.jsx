@@ -1,7 +1,7 @@
-// src/components/contextFields/ContextField.jsx
-import React from 'react';
+// src/contextFields/ContextField.jsx
+import React, { useState, useCallback } from 'react';
 import { Form } from 'antd';
-import { useFormField } from '../../hooks/useFormField';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 // Enhanced ContextField with validation
 export const ContextField = ({

@@ -1,255 +1,245 @@
 // src/components/modules/FinancingModule.jsx
-import React from 'react';
-import { Typography, Alert } from 'antd';
-import * as yup from 'yup';
+import React, { useState, useEffect } from 'react';
+import { Typography, Alert, Tabs, Card } from 'antd';
+import { DollarOutlined, BankOutlined, LineChartOutlined } from '@ant-design/icons';
+import { useScenario } from '../../contexts/ScenarioContext';
 
-// Import our new form components and hooks
-import { useScenarioForm } from '../../hooks/forms';
+// Import context field components
 import {
-  Form,
   FormSection,
   FormRow,
   FormCol,
   NumberField,
   CurrencyField,
+  SelectField,
+  RadioGroupField,
+  SwitchField,
   PercentageField,
-  RadioGroupField
-} from '../../components/forms';
-import FormButtons from '../../components/forms/FormButtons';
-import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
+  FormDivider
+} from '../contextFields';
 
 const { Title } = Typography;
-
-// Define validation schema using our helper
-const financingSchema = yup.object({
-  capex: yup.number().required('CAPEX is required').min(0, 'Must be positive'),
-  devex: yup.number().required('DEVEX is required').min(0, 'Must be positive'),
-  model: yup.string().required('Financing model is required')
-    .oneOf(['Balance-Sheet', 'Project-Finance'], 'Invalid financing model'),
-  loanDuration: yup.number().required('Loan duration is required')
-    .min(1, 'Must be at least 1 year')
-    .max(30, 'Must be less than 30 years')
-    .integer('Must be an integer'),
-  debtToEquityRatio: yup.number()
-    .when('model', {
-      is: 'Balance-Sheet',
-      then: (schema) => schema.required('Debt-to-Equity ratio is required').min(0, 'Must be positive'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-  debtToCapexRatio: yup.number()
-    .when('model', {
-      is: 'Project-Finance',
-      then: (schema) => schema.required('Debt-to-CAPEX ratio is required').min(0, 'Must be positive').max(1, 'Must be less than or equal to 1'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-  loanInterestRateBS: yup.number()
-    .when('model', {
-      is: 'Balance-Sheet',
-      then: (schema) => schema.required('Loan interest rate is required').min(0, 'Must be positive').max(20, 'Must be less than 20%'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-  loanInterestRatePF: yup.number()
-    .when('model', {
-      is: 'Project-Finance',
-      then: (schema) => schema.required('Loan interest rate is required').min(0, 'Must be positive').max(20, 'Must be less than 20%'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-  minimumDSCR: yup.number().required('Minimum DSCR is required').min(1, 'Must be at least 1')
-}).required();
+const { TabPane } = Tabs;
 
 const FinancingModule = () => {
-  // Use our custom form hook
-  const {
-    control,
-    watch,
-    formState: { errors },
-    onSubmitForm,
-    isDirty,
-    reset
-  } = useScenarioForm({
-    validationSchema: financingSchema,
-    moduleName: 'financing',
-    showSuccessMessage: true,
-    successMessage: 'Financing settings saved successfully'
-  });
+  // Define base path for financing module
+  const basePath = ['settings', 'modules', 'financing'];
+  
+  // Get scenario data
+  const { scenarioData, getValueByPath } = useScenario();
 
-  // Watch fields for conditional rendering
-  const financingModel = watch('model');
+  // Get financing model type for conditional rendering
+  const financingModel = getValueByPath([...basePath, 'model'], 'Balance-Sheet');
+  
+  // Helper function to check if we have valid scenario
+  const hasValidScenario = () => scenarioData && scenarioData.settings?.modules?.financing;
+
+  if (!hasValidScenario()) {
+    return (
+      <div>
+        <Title level={2}>Financing Module</Title>
+        <Alert 
+          message="No Active Scenario" 
+          description="Please create or load a scenario first." 
+          type="warning" 
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <Title level={2}>Financing Module Configuration
-        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
-      </Title>
-      <p>Configure the financial parameters and investment structure for the wind farm project.</p>
-
-      {/* Custom Form component without built-in buttons */}
-      <Form
-        onSubmit={null}
-        submitButtons={false}
-      >
-        {/* Investment Section */}
-        <FormSection title="Investment Parameters">
-          <FormRow>
-            <FormCol span={12}>
-              <CurrencyField
-                name="capex"
-                label="CAPEX Investment"
-                control={control}
-                error={errors.capex?.message}
-                tooltip="Upfront capital expenditure required for plant construction"
-                min={0}
-                step={1000000}
-                style={{ width: 200 }}  // Large numbers need more space
-              />
-            </FormCol>
-            <FormCol span={12}>
-              <CurrencyField
-                name="devex"
-                label="DEVEX Investment"
-                control={control}
-                error={errors.devex?.message}
-                tooltip="Development expenditure incurred prior to construction"
-                min={0}
-                step={1000000}
-                style={{ width: 200 }}  // Large numbers need more space
-              />
-            </FormCol>
-          </FormRow>
-        </FormSection>
-
-        {/* Loan Parameters */}
-        <FormSection title="Loan Parameters">
-          <NumberField
-            name="loanDuration"
-            label="Loan Duration / Loan Tenor"
-            control={control}
-            error={errors.loanDuration?.message}
-            tooltip="Duration over which the loan is repaid"
-            min={1}
-            max={30}
-            addonAfter="Years"
-            style={{ width: 120 }}  // Small integers don't need much space
-          />
-        </FormSection>
-
-        {/* Financing Model Section */}
-        <FormSection title="Financing Model">
-          <RadioGroupField
-            name="model"
-            control={control}
-            error={errors.model?.message}
-            options={[
-              { value: 'Balance-Sheet', label: 'Balance-Sheet' },
-              { value: 'Project-Finance', label: 'Project-Finance (Non-Recourse)' }
-            ]}
-            optionType="button"
-          />
-
-          <Alert
-            message={
-              financingModel === 'Balance-Sheet'
-                ? "Balance-Sheet Model"
-                : "Project-Finance Model"
-            }
-            description={
-              financingModel === 'Balance-Sheet'
-                ? "Financing is typically on the sponsor's balance sheet, with inputs such as Debt-to-Equity Ratio."
-                : "Financing is based on project cash flows, using a Debt-to-CAPEX Ratio with stricter DSCR requirements."
-            }
-            type="info"
-            showIcon
-            style={{ marginBottom: 16, marginTop: 16 }}
-          />
-
-          {/* Balance Sheet Model Fields - show only when Balance-Sheet is selected */}
-          {financingModel === 'Balance-Sheet' && (
+      <Title level={2}>Financing Module</Title>
+      <p>Configure investment parameters and financing structure for your wind farm project.</p>
+      
+      <Tabs defaultActiveKey="investment" type="card">
+        <TabPane 
+          tab={
+            <span>
+              <DollarOutlined /> Investment
+            </span>
+          } 
+          key="investment"
+        >
+          <FormSection title="Capital & Development Investment" style={{ marginBottom: 24 }}>
             <FormRow>
               <FormCol span={12}>
-                <NumberField
-                  name="debtToEquityRatio"
-                  label="Debt-to-Equity Ratio"
-                  control={control}
-                  error={errors.debtToEquityRatio?.message}
+                <CurrencyField
+                  path={[...basePath, 'capex']}
+                  label="CAPEX Investment"
+                  tooltip="Total capital expenditure for plant construction"
                   min={0}
-                  step={0.1}
-                  precision={2}
-                  style={{ width: 110 }}  // Small ratios need less space
+                  step={1000000}
                 />
               </FormCol>
               <FormCol span={12}>
-                <PercentageField
-                  name="loanInterestRateBS"
-                  label="Loan Interest Rate"
-                  control={control}
-                  error={errors.loanInterestRateBS?.message}
+                <CurrencyField
+                  path={[...basePath, 'devex']}
+                  label="DEVEX Investment"
+                  tooltip="Development expenditure incurred prior to construction"
                   min={0}
-                  max={20}
-                  step={0.25}
-                  precision={2}
-                  style={{ width: 130 }}  // Adjusted width for percentage with addon
+                  step={100000}
                 />
               </FormCol>
             </FormRow>
-          )}
-
-          {/* Project Finance Model Fields - show only when Project-Finance is selected */}
-          {financingModel === 'Project-Finance' && (
+          </FormSection>
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <BankOutlined /> Financing Structure
+            </span>
+          } 
+          key="financing"
+        >
+          <FormSection title="Financing Model" style={{ marginBottom: 24 }}>
+            <FormRow>
+              <FormCol span={12}>
+                <SelectField
+                  path={[...basePath, 'model']}
+                  label="Financing Model"
+                  tooltip="Determines how the project will be financed"
+                  options={[
+                    { value: 'Balance-Sheet', label: 'Balance-Sheet (Corporate)' },
+                    { value: 'Project-Finance', label: 'Project-Finance (Non-Recourse)' }
+                  ]}
+                />
+              </FormCol>
+              <FormCol span={12}>
+                <NumberField
+                  path={[...basePath, 'loanDuration']}
+                  label="Loan Duration / Tenor"
+                  tooltip="Duration of the loan in years"
+                  min={1}
+                  max={30}
+                  step={1}
+                  addonAfter="years"
+                />
+              </FormCol>
+            </FormRow>
+            
+            <FormDivider orientation="left">Financing Ratios</FormDivider>
+            
+            {financingModel === 'Balance-Sheet' ? (
+              <FormRow>
+                <FormCol span={12}>
+                  <NumberField
+                    path={[...basePath, 'debtToEquityRatio']}
+                    label="Debt-to-Equity Ratio"
+                    tooltip="Ratio of debt to equity financing"
+                    min={0}
+                    step={0.1}
+                    precision={2}
+                  />
+                </FormCol>
+                <FormCol span={12}>
+                  <PercentageField
+                    path={[...basePath, 'loanInterestRateBS']}
+                    label="Loan Interest Rate"
+                    tooltip="Annual interest rate for the loan"
+                    min={0}
+                    max={20}
+                    step={0.1}
+                    precision={2}
+                  />
+                </FormCol>
+              </FormRow>
+            ) : (
+              <FormRow>
+                <FormCol span={12}>
+                  <NumberField
+                    path={[...basePath, 'debtToCapexRatio']}
+                    label="Debt-to-CAPEX Ratio"
+                    tooltip="Ratio of debt to total CAPEX"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    precision={2}
+                  />
+                </FormCol>
+                <FormCol span={12}>
+                  <PercentageField
+                    path={[...basePath, 'loanInterestRatePF']}
+                    label="Loan Interest Rate"
+                    tooltip="Annual interest rate for the loan"
+                    min={0}
+                    max={20}
+                    step={0.1}
+                    precision={2}
+                  />
+                </FormCol>
+              </FormRow>
+            )}
+          </FormSection>
+          
+          <FormSection title="Debt Service Requirements" style={{ marginBottom: 24 }}>
             <FormRow>
               <FormCol span={12}>
                 <NumberField
-                  name="debtToCapexRatio"
-                  label="Debt-to-CAPEX Ratio"
-                  control={control}
-                  error={errors.debtToCapexRatio?.message}
-                  min={0}
-                  max={1}
+                  path={[...basePath, 'minimumDSCR']}
+                  label="Minimum DSCR"
+                  tooltip="Minimum Debt Service Coverage Ratio required by lenders"
+                  min={1}
                   step={0.05}
                   precision={2}
-                  style={{ width: 110 }}  // Small ratios need less space
+                />
+              </FormCol>
+            </FormRow>
+          </FormSection>
+        </TabPane>
+        
+        <TabPane 
+          tab={
+            <span>
+              <LineChartOutlined /> Return Targets
+            </span>
+          } 
+          key="returns"
+        >
+          <FormSection title="Return Targets" style={{ marginBottom: 24 }}>
+            <FormRow>
+              <FormCol span={12}>
+                <PercentageField
+                  path={[...basePath, 'equityIRRTarget']}
+                  label="Equity IRR Target"
+                  tooltip="Target Internal Rate of Return for equity investors"
+                  min={0}
+                  max={30}
+                  step={0.5}
+                  precision={1}
                 />
               </FormCol>
               <FormCol span={12}>
                 <PercentageField
-                  name="loanInterestRatePF"
-                  label="Loan Interest Rate"
-                  control={control}
-                  error={errors.loanInterestRatePF?.message}
+                  path={[...basePath, 'projectIRRTarget']}
+                  label="Project IRR Target"
+                  tooltip="Target Internal Rate of Return for the overall project"
                   min={0}
                   max={20}
-                  step={0.25}
-                  precision={2}
-                  style={{ width: 130 }}  // Adjusted width for percentage with addon
+                  step={0.5}
+                  precision={1}
                 />
               </FormCol>
             </FormRow>
-          )}
-        </FormSection>
-
-        {/* DSCR Requirements */}
-        <FormSection title="Debt Service Requirements">
-          <NumberField
-            name="minimumDSCR"
-            label="Minimum DSCR"
-            control={control}
-            error={errors.minimumDSCR?.message}
-            tooltip="Minimum acceptable ratio of cash flow to debt service (Debt Service Coverage Ratio)"
-            min={1}
-            step={0.05}
-            precision={2}
-            style={{ width: 110 }}  // Small ratios need less space
-          />
-        </FormSection>
-
-        {/* Form Actions - Custom buttons */}
-        <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <FormButtons
-            onSubmit={onSubmitForm}
-            onReset={() => reset()} // Call as a function to avoid passing the function reference
-            isDirty={isDirty}
-          />
-        </div>
-      </Form>
+            
+            <FormRow>
+              <FormCol span={12}>
+                <NumberField
+                  path={[...basePath, 'targetPaybackPeriod']}
+                  label="Target Payback Period"
+                  tooltip="Target number of years to recoup the initial investment"
+                  min={1}
+                  max={30}
+                  step={0.5}
+                  precision={1}
+                  addonAfter="years"
+                />
+              </FormCol>
+            </FormRow>
+          </FormSection>
+        </TabPane>
+      </Tabs>
     </div>
   );
 };
