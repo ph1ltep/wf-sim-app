@@ -4,6 +4,10 @@ import { Typography, Alert } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
 
+// Import project-specific components
+import LocationSelector from './projectSettings/LocationSelector';
+import ProjectMetrics from './projectSettings/ProjectMetrics';
+
 // Import context field components
 import {
   FormSection,
@@ -15,10 +19,6 @@ import {
   DateField,
   PercentageField
 } from '../contextFields';
-
-// Import project-specific components
-import LocationSelector from './projectSettings/LocationSelector';
-import ProjectMetrics from './projectSettings/ProjectMetrics';
 
 const { Title } = Typography;
 
@@ -37,7 +37,13 @@ const ProjectSettings = () => {
   });
 
   // Get scenario context
-  const { scenarioData, getValueByPath, selectedLocation, updateByPath } = useScenario();
+  const { 
+    scenarioData, 
+    getValueByPath, 
+    updateByPath, 
+    selectedLocation, 
+    getAllLocations 
+  } = useScenario();
   
   // State to track fields from locations
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
@@ -126,8 +132,10 @@ const ProjectSettings = () => {
     { value: 'EUR', label: 'Euro (EUR)' },
     { value: 'GBP', label: 'British Pound (GBP)' },
     { value: 'JPY', label: 'Japanese Yen (JPY)' },
+    { value: 'CHF', label: 'Swiss Franc (CHF)' },
     { value: 'CNY', label: 'Chinese Yuan (CNY)' },
-    // More currencies would be here
+    { value: 'CAD', label: 'Canadian Dollar (CAD)' },
+    { value: 'AUD', label: 'Australian Dollar (AUD)' },
   ];
 
   if (!scenarioData) {
@@ -163,12 +171,14 @@ const ProjectSettings = () => {
               label="Project Name"
               tooltip="Name of the wind farm project"
               placeholder="e.g., Windward Valley Wind Farm"
+              required
             />
           </FormCol>
           <FormCol span={8}>
             <DateField
               path={[...generalPath, 'startDate']}
               label="Project Start Date"
+              required
             />
           </FormCol>
         </FormRow>
@@ -184,6 +194,7 @@ const ProjectSettings = () => {
               tooltip="The total operational lifetime of the wind farm project"
               min={1}
               max={50}
+              required
             />
           </FormCol>
         </FormRow>
@@ -201,6 +212,7 @@ const ProjectSettings = () => {
                 "Local Currency"
               }
               options={currencyOptions}
+              required
             />
           </FormCol>
           <FormCol span={8}>
@@ -212,6 +224,7 @@ const ProjectSettings = () => {
                 "Foreign Currency"
               }
               options={currencyOptions}
+              required
             />
           </FormCol>
           <FormCol span={8}>
@@ -225,6 +238,7 @@ const ProjectSettings = () => {
               tooltip="Enter rate as: 1 foreign currency = ? local currency"
               min={0}
               step={0.01}
+              required
             />
           </FormCol>
         </FormRow>
@@ -240,6 +254,7 @@ const ProjectSettings = () => {
               tooltip="Number of wind turbine generators in the project"
               min={1}
               step={1}
+              required
             />
           </FormCol>
           <FormCol span={8}>
@@ -250,6 +265,7 @@ const ProjectSettings = () => {
               min={0.1}
               step={0.1}
               precision={2}
+              required
             />
           </FormCol>
           <FormCol span={8}>
@@ -261,6 +277,7 @@ const ProjectSettings = () => {
                 { value: 'geared', label: 'Geared' },
                 { value: 'direct-drive', label: 'Direct Drive' }
               ]}
+              required
             />
           </FormCol>
         </FormRow>
@@ -279,6 +296,7 @@ const ProjectSettings = () => {
               max={60}
               step={0.5}
               precision={1}
+              required
             />
           </FormCol>
         </FormRow>
