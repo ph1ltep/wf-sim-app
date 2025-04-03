@@ -1,7 +1,7 @@
 // src/components/config/OEMScopes.jsx
 import React from 'react';
-import { Typography, Card, Button } from 'antd';
-import { ToolOutlined } from '@ant-design/icons';
+import { Typography, Card, Alert, Button } from 'antd';
+import { ToolOutlined, ReloadOutlined } from '@ant-design/icons';
 
 // Custom hook for OEM scopes data management
 import useOEMScopes from '../../hooks/useOEMScopes';
@@ -17,10 +17,12 @@ import { renderScopeTags } from '../../utils/oemScopeUtils';
 const { Title } = Typography;
 
 const OEMScopes = () => {
-  // Use the custom hook for OEM scopes data and operations
+  // Use the custom hook for OEM scopes data management
   const { 
     oemScopes, 
     loading, 
+    error,
+    fetchScopes,
     createScope,
     updateScope,
     deleteScope,
@@ -58,13 +60,32 @@ const OEMScopes = () => {
     </OEMScopeTag>
   );
   
-  // Custom render function for expandable rows
-  const expandedRowRender = (record) => <OEMScopeDetails record={record} />;
+  // Header extra content with refresh button
+  const headerExtra = (
+    <Button 
+      icon={<ReloadOutlined />} 
+      onClick={fetchScopes}
+      loading={loading}
+    >
+      Refresh
+    </Button>
+  );
 
   return (
     <div>
       <Title level={2}>OEM Scope Definitions</Title>
       <p>Manage OEM scope definitions for wind farm maintenance contracts.</p>
+      
+      {error && (
+        <Alert
+          message="Error Loading OEM Scopes"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          closable
+        />
+      )}
       
       <Card 
         title={
@@ -73,6 +94,7 @@ const OEMScopes = () => {
             OEM Scope Definitions
           </span>
         }
+        extra={headerExtra}
         style={{ marginBottom: 24 }}
       >
         <DatabaseTable
@@ -85,10 +107,13 @@ const OEMScopes = () => {
           onUpdate={updateScope}
           onDelete={deleteScope}
           renderForm={renderOEMScopeForm}
-          pagination={{ pageSize: 10 }}
+          pagination={{ 
+            pageSize: 10,
+            showTotal: (total) => `Total ${total} OEM scopes`
+          }}
           addActions={true}
           expandable={{
-            expandedRowRender,
+            expandedRowRender: (record) => <OEMScopeDetails record={record} />,
           }}
         />
       </Card>

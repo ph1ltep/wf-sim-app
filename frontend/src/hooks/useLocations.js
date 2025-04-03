@@ -1,140 +1,183 @@
 // src/hooks/useLocations.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import { 
   getAllLocations, 
-  createLocation, 
-  updateLocation, 
-  deleteLocation 
+  getLocationById,
+  createLocation as apiCreateLocation, 
+  updateLocation as apiUpdateLocation, 
+  deleteLocation as apiDeleteLocation 
 } from '../api/locations';
 
 /**
  * Custom hook for managing location data and operations
+ * @returns {Object} Location data and operations
  */
 const useLocations = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Fetch all locations
-  const fetchLocations = async () => {
+  /**
+   * Fetch all locations
+   * @returns {Array} The fetched locations
+   */
+  const fetchLocations = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const response = await getAllLocations();
+      console.log('Locations API response:', response);
       
       if (response.success && response.data) {
-        // Transform data format - add key property for Table
-        const transformedData = response.data.map(location => ({
-          key: location._id,
-          ...location
-        }));
-        
-        setLocations(transformedData);
-        return transformedData;
+        // Make sure response.data is an array before mapping
+        if (Array.isArray(response.data)) {
+          // Transform data format - add key property for Table
+          const transformedData = response.data.map(location => ({
+            key: location._id,
+            ...location
+          }));
+          
+          setLocations(transformedData);
+          return transformedData;
+        } else {
+          console.error('API returned non-array data:', response.data);
+          throw new Error('Invalid data format received from API');
+        }
       } else {
-        throw new Error('Failed to fetch locations');
+        throw new Error(response.error || 'Failed to fetch locations');
       }
     } catch (error) {
-      message.error('Failed to fetch locations');
+      const errorMessage = error.message || 'Failed to fetch locations';
+      setError(errorMessage);
+      message.error(errorMessage);
       console.error('Error fetching locations:', error);
+      // Return empty array on error
+      setLocations([]);
       return [];
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
-  // Create a new location
-  const createNewLocation = async (data) => {
+  /**
+   * Create a new location
+   * @param {Object} data - Location data
+   * @returns {Object} Result with success flag and data
+   */
+  const createLocation = useCallback(async (data) => {
     try {
       setLoading(true);
-      const response = await createLocation(data);
+      setError(null);
       
-      const newLocation = {
-        key: response.data._id,
-        ...response.data
-      };
+      const response = await apiCreateLocation(data);
       
-      setLocations(prev => [...prev, newLocation]);
-      message.success('Location added successfully');
-      return { success: true, data: newLocation };
+      if (response.success && response.data) {
+        const newLocation = {
+          key: response.data._id,
+          ...response.data
+        };
+        
+        setLocations(prev => [...prev, newLocation]);
+        message.success('Location added successfully');
+        return { success: true, data: newLocation };
+      } else {
+        throw new Error(response.error || 'Failed to add location');
+      }
     } catch (error) {
-      handleError(error, 'Failed to add location');
-      return { success: false, error };
+      const errorMessage = error.message || 'Failed to add location';
+      setError(errorMessage);
+      message.error(errorMessage);
+      console.error('Error creating location:', error);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
-  // Update an existing location
-  const updateExistingLocation = async (id, data) => {
+  /**
+   * Update an existing location
+   * @param {string} id - Location ID
+   * @param {Object} data - Updated location data
+   * @returns {Object} Result with success flag and data
+   */
+  const updateLocation = useCallback(async (id, data) => {
     try {
       setLoading(true);
-      const response = await updateLocation(id, data);
+      setError(null);
       
-      const updatedLocation = {
-        key: id,
-        ...response.data
-      };
+      const response = await apiUpdateLocation(id, data);
       
-      setLocations(prev => {
-        const index = prev.findIndex(item => item.key === id);
-        if (index > -1) {
-          const updated = [...prev];
-          updated[index] = updatedLocation;
-          return updated;
-        }
-        return prev;
-      });
-      
-      message.success('Location updated successfully');
-      return { success: true, data: updatedLocation };
+      if (response.success && response.data) {
+        const updatedLocation = {
+          key: id,
+          ...response.data
+        };
+        
+        setLocations(prev => prev.map(item => 
+          item.key === id ? updatedLocation : item
+        ));
+        
+        message.success('Location updated successfully');
+        return { success: true, data: updatedLocation };
+      } else {
+        throw new Error(response.error || 'Failed to update location');
+      }
     } catch (error) {
-      handleError(error, 'Failed to update location');
-      return { success: false, error };
+      const errorMessage = error.message || 'Failed to update location';
+      setError(errorMessage);
+      message.error(errorMessage);
+      console.error('Error updating location:', error);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
-  // Delete a location
-  const deleteExistingLocation = async (id) => {
+  /**
+   * Delete a location
+   * @param {string} id - Location ID
+   * @returns {Object} Result with success flag
+   */
+  const deleteLocation = useCallback(async (id) => {
     try {
       setLoading(true);
-      await deleteLocation(id);
+      setError(null);
       
-      setLocations(prev => prev.filter(item => item.key !== id));
-      message.success('Location deleted successfully');
-      return { success: true };
+      const response = await apiDeleteLocation(id);
+      
+      if (response.success) {
+        setLocations(prev => prev.filter(item => item.key !== id));
+        message.success('Location deleted successfully');
+        return { success: true };
+      } else {
+        throw new Error(response.error || 'Failed to delete location');
+      }
     } catch (error) {
-      message.error('Failed to delete location');
+      const errorMessage = error.message || 'Failed to delete location';
+      setError(errorMessage);
+      message.error(errorMessage);
       console.error('Error deleting location:', error);
-      return { success: false, error };
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
-  };
-  
-  // Helper function to handle API errors
-  const handleError = (error, defaultMessage) => {
-    if (error.response?.status === 400) {
-      message.error(error.response?.data?.error || 'Validation failed. Please check your inputs.');
-    } else {
-      message.error(defaultMessage);
-      console.error(defaultMessage, error);
-    }
-  };
+  }, []);
   
   // Initialize data on mount
   useEffect(() => {
     fetchLocations();
-  }, []);
+  }, [fetchLocations]);
   
   return {
     locations,
     loading,
+    error,
     fetchLocations,
-    createLocation: createNewLocation,
-    updateLocation: updateExistingLocation,
-    deleteLocation: deleteExistingLocation
+    createLocation,
+    updateLocation,
+    deleteLocation
   };
 };
 
