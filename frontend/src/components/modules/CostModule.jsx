@@ -1,266 +1,266 @@
 // src/components/modules/CostModule.jsx
-import React, { useState } from 'react';
-import { Typography, Alert, Button, Tabs } from 'antd';
-import { ToolOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import * as yup from 'yup';
+import React, { useState, useEffect } from 'react';
+import { Typography, Form, Alert, Table, Button, Space, Tooltip } from 'antd';
+import { InfoCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useScenario } from '../../contexts/ScenarioContext';
 
-// Import our new form components and hooks
-import { useScenarioForm } from '../../hooks/forms';
+// Import context field components
 import {
-  Form,
-  FormSection,
-  FormRow,
-  FormCol,
+  TextField,
   NumberField,
   CurrencyField,
   PercentageField,
   SelectField,
-  FormDivider
-} from '../../components/forms';
-import FormButtons from '../../components/forms/FormButtons';
-import UnsavedChangesIndicator from '../forms/UnsavedChangesIndicator';
+  DistributionField,
+  FormSection,
+  FormRow,
+  FormCol,
+  EditableTable
+} from '../contextFields';
 
 const { Title } = Typography;
-const { TabPane } = Tabs;
-
-// Define validation schema
-const costSchema = yup.object({
-  annualBaseOM: yup.number()
-    .required('Annual base O&M cost is required')
-    .min(0, 'Must be positive'),
-
-  escalationRate: yup.number()
-    .required('Escalation rate is required')
-    .min(0, 'Must be positive')
-    .max(10, 'Must be less than 10%'),
-
-  escalationDistribution: yup.string()
-    .required('Escalation distribution is required')
-    .oneOf(['Normal', 'Lognormal', 'Triangular', 'Uniform'], 'Invalid distribution type'),
-
-  oemTerm: yup.number()
-    .required('OEM term is required')
-    .min(0, 'Must be positive')
-    .integer('Must be an integer'),
-
-  fixedOMFee: yup.number()
-    .required('Fixed O&M fee is required')
-    .min(0, 'Must be positive'),
-
-  failureEventProbability: yup.number()
-    .required('Failure event probability is required')
-    .min(0, 'Must be positive')
-    .max(100, 'Must be less than 100%'),
-
-  failureEventCost: yup.number()
-    .required('Failure event cost is required')
-    .min(0, 'Must be positive')
-}).required();
 
 const CostModule = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('routine');
+  // Get scenario data directly from context
+  const { scenarioData } = useScenario();
+  
+  // Define base path for cost module
+  const basePath = ['settings', 'modules', 'cost'];
+  
+  // Get values from context for conditional rendering
+  const oemTerm = scenarioData?.settings?.modules?.cost?.oemTerm || 0;
+  const projectLife = scenarioData?.settings?.general?.projectLife || 20;
+  
+  // Get the currency from scenario
+  const currency = scenarioData?.settings?.project?.currency?.local || 'USD';
 
-  // Use our custom form hook
-  const {
-    control,
-    formState: { errors },
-    onSubmitForm,
-    isDirty,
-    reset
-  } = useScenarioForm({
-    validationSchema: costSchema,
-    moduleName: 'cost',
-    showSuccessMessage: true,
-    successMessage: 'Cost settings saved successfully'
-  });
+  // Check if we have an active scenario
+  if (!scenarioData) {
+    return (
+      <div>
+        <Title level={2}>Cost Module</Title>
+        <Alert 
+          message="No Active Scenario" 
+          description="Please create or load a scenario first." 
+          type="warning" 
+        />
+      </div>
+    );
+  }
 
-  // Navigate to OEM Contracts page
-  const goToOEMContracts = () => {
-    navigate('/config/scenario/oemcontracts');
-  };
+  // Annual adjustment form fields for EditableTable
+  const annualAdjustmentFields = [
+    <NumberField
+      key="year"
+      label="Year"
+      path="year"
+      min={1}
+      max={projectLife}
+      required
+    />,
+    <CurrencyField
+      key="additionalOM"
+      label="Additional O&M Cost"
+      path="additionalOM"
+      currencyOverride={currency}
+    />,
+    <TextField
+      key="description"
+      label="Description"
+      path="description"
+      placeholder="Reason for adjustment"
+    />
+  ];
 
-  // Handle tab change
-  const handleTabChange = (key) => {
-    setActiveTab(key);
-  };
+  // Annual adjustment table columns
+  const annualAdjustmentColumns = [
+    {
+      title: 'Year',
+      dataIndex: 'year',
+      key: 'year',
+      sorter: (a, b) => a.year - b.year
+    },
+    {
+      title: 'Additional Cost',
+      dataIndex: 'additionalOM',
+      key: 'additionalOM',
+      render: value => `${currency} ${(value || 0).toLocaleString()}`
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description'
+    }
+  ];
+
+  // Major repair events table fields
+  const majorRepairFields = [
+    <NumberField
+      key="year"
+      label="Year"
+      path="year"
+      min={1}
+      max={projectLife}
+      required
+    />,
+    <CurrencyField
+      key="cost"
+      label="Cost"
+      path="cost"
+      currencyOverride={currency}
+      required
+    />,
+    <PercentageField
+      key="probability"
+      label="Probability"
+      path="probability"
+      min={0}
+      max={100}
+      step={1}
+    />
+  ];
+
+  // Major repair table columns
+  const majorRepairColumns = [
+    {
+      title: 'Year',
+      dataIndex: 'year',
+      key: 'year',
+      sorter: (a, b) => a.year - b.year
+    },
+    {
+      title: 'Cost',
+      dataIndex: 'cost',
+      key: 'cost',
+      render: value => `${currency} ${(value || 0).toLocaleString()}`
+    },
+    {
+      title: 'Probability',
+      dataIndex: 'probability',
+      key: 'probability',
+      render: value => `${value}%`
+    }
+  ];
 
   return (
     <div>
-      <Title level={2}>Cost Module Configuration
-        <UnsavedChangesIndicator isDirty={isDirty} onSave={onSubmitForm} />
-      </Title>
-      <p>Configure the cost parameters for the wind farm simulation.</p>
+      <Title level={2}>Cost Module</Title>
+      <p>Configure operation and maintenance costs for your wind farm project.</p>
 
-      {/* Custom Form component without built-in buttons */}
-      <Form
-        onSubmit={null}
-        submitButtons={false}
-      >
-        <Tabs activeKey={activeTab} onChange={handleTabChange}>
-          {/* Routine O&M Tab */}
-          <TabPane tab="Routine O&M" key="routine">
-            <FormSection title="Base O&M Costs">
-              <FormRow>
-                <FormCol span={12}>
-                  <CurrencyField
-                    name="annualBaseOM"
-                    label="Annual Base O&M Cost (USD/year)"
-                    control={control}
-                    error={errors.annualBaseOM?.message}
-                    tooltip="Annual baseline operation and maintenance cost"
-                    min={0}
-                    step={100000}
-                    style={{ width: 200 }}
-                  />
-                </FormCol>
-              </FormRow>
-
-              <FormRow>
-                <FormCol span={12}>
-                  <PercentageField
-                    name="escalationRate"
-                    label="O&M Cost Escalation Rate"
-                    control={control}
-                    error={errors.escalationRate?.message}
-                    tooltip="Annual rate at which O&M costs increase"
-                    min={0}
-                    max={10}
-                    step={0.1}
-                    precision={2}
-                    addonAfter="% Yearly"
-                    style={{ width: 150 }}
-                  />
-                </FormCol>
-                <FormCol span={12}>
-                  <SelectField
-                    name="escalationDistribution"
-                    label="Escalation Distribution"
-                    control={control}
-                    error={errors.escalationDistribution?.message}
-                    tooltip="Distribution type for the escalation rate uncertainty"
-                    options={[
-                      { value: 'Normal', label: 'Normal' },
-                      { value: 'Lognormal', label: 'Lognormal' },
-                      { value: 'Triangular', label: 'Triangular' },
-                      { value: 'Uniform', label: 'Uniform' }
-                    ]}
-                    style={{ width: 150 }}
-                  />
-                </FormCol>
-              </FormRow>
-            </FormSection>
-          </TabPane>
-
-          {/* OEM Contract Tab */}
-          <TabPane tab="OEM Contract" key="oem">
-            <FormSection
-              title={
-                <span>
-                  <ToolOutlined style={{ marginRight: 8 }} />
-                  OEM Contract Settings
-                </span>
-              }
-              extra={
-                <Button type="primary" onClick={goToOEMContracts}>
-                  Manage OEM Contracts
-                </Button>
-              }
-            >
-              <p>Select an OEM contract to use for this scenario. OEM contracts define scope and cost during the warranty period.</p>
-
-              <FormRow>
-                <FormCol span={12}>
-                  <NumberField
-                    name="oemTerm"
-                    label="OEM Term (Years)"
-                    control={control}
-                    error={errors.oemTerm?.message}
-                    tooltip="Duration of the OEM warranty period"
-                    min={0}
-                    max={30}
-                    step={1}
-                    style={{ width: 120 }}
-                  />
-                </FormCol>
-                <FormCol span={12}>
-                  <CurrencyField
-                    name="fixedOMFee"
-                    label="Fixed O&M Fee during OEM Term"
-                    control={control}
-                    error={errors.fixedOMFee?.message}
-                    tooltip="Annual fee paid to OEM during warranty period"
-                    min={0}
-                    step={50000}
-                    style={{ width: 200 }}
-                  />
-                </FormCol>
-              </FormRow>
-
-              <FormDivider dashed />
-
-              <p style={{ fontStyle: 'italic', color: 'rgba(0, 0, 0, 0.45)' }}>
-                To create or edit OEM contracts, click the "Manage OEM Contracts" button above.
-              </p>
-            </FormSection>
-          </TabPane>
-
-          {/* Failures Tab */}
-          <TabPane tab="Failures" key="failures">
-            <FormSection title="Failure Events">
-              <FormRow>
-                <FormCol span={12}>
-                  <PercentageField
-                    name="failureEventProbability"
-                    label="Failure Event Probability (%/year)"
-                    control={control}
-                    error={errors.failureEventProbability?.message}
-                    tooltip="Annual probability of a failure event occurring"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    precision={1}
-                    style={{ width: 130 }}
-                  />
-                </FormCol>
-                <FormCol span={12}>
-                  <CurrencyField
-                    name="failureEventCost"
-                    label="Failure Event Cost (USD per event)"
-                    control={control}
-                    error={errors.failureEventCost?.message}
-                    tooltip="Average cost of each failure event"
-                    min={0}
-                    step={10000}
-                    style={{ width: 200 }}
-                  />
-                </FormCol>
-              </FormRow>
-            </FormSection>
-          </TabPane>
-
-          {/* Major Repairs Tab */}
-          <TabPane tab="Major Repairs" key="major">
-            <FormSection title="Major Repairs / Overhauls">
-              <Alert
-                message="Feature Available in Future Version"
-                description="Configuration of deterministic or probabilistic major cost events (e.g., blade or gearbox replacements) will be added in an upcoming release."
-                type="info"
-                showIcon
+      <Form layout="vertical">
+        <FormSection title="Base O&M Costs" style={{ marginBottom: 24 }}>
+          <FormRow>
+            <FormCol span={12}>
+              <CurrencyField
+                path={[...basePath, 'annualBaseOM']}
+                label="Annual Base O&M Cost"
+                tooltip="Base annual operations and maintenance cost"
+                min={0}
+                step={10000}
+                currencyOverride={currency}
               />
-            </FormSection>
-          </TabPane>
-        </Tabs>
+            </FormCol>
+            <FormCol span={12}>
+              <PercentageField
+                path={[...basePath, 'escalationRate']}
+                label="O&M Cost Escalation Rate"
+                tooltip="Annual rate of increase in O&M costs"
+                min={0}
+                max={20}
+                step={0.1}
+              />
+            </FormCol>
+          </FormRow>
 
-        {/* Form Actions - Single set of buttons for all tabs */}
-        <div style={{ marginTop: 24, textAlign: 'right' }}>
-          <FormButtons
-            onSubmit={onSubmitForm}
-            onReset={() => reset()} // Call as a function to avoid passing the function reference
-            isDirty={isDirty}
+          <FormRow>
+            <FormCol span={12}>
+              <SelectField
+                path={[...basePath, 'escalationDistribution']}
+                label="Escalation Distribution"
+                tooltip="Statistical distribution for cost escalation"
+                options={[
+                  { value: 'Normal', label: 'Normal' },
+                  { value: 'Lognormal', label: 'Lognormal' },
+                  { value: 'Triangular', label: 'Triangular' },
+                  { value: 'Uniform', label: 'Uniform' }
+                ]}
+              />
+            </FormCol>
+          </FormRow>
+        </FormSection>
+
+        <FormSection title="OEM Contract" style={{ marginBottom: 24 }}>
+          <FormRow>
+            <FormCol span={12}>
+              <NumberField
+                path={[...basePath, 'oemTerm']}
+                label="OEM Term (Years)"
+                tooltip="Duration of OEM service contract"
+                min={0}
+                max={projectLife}
+                step={1}
+              />
+            </FormCol>
+            <FormCol span={12}>
+              <CurrencyField
+                path={[...basePath, 'fixedOMFee']}
+                label="Fixed O&M Fee during OEM Term"
+                tooltip="Annual fee paid during OEM contract period"
+                min={0}
+                step={10000}
+                currencyOverride={currency}
+                disabled={oemTerm <= 0}
+              />
+            </FormCol>
+          </FormRow>
+        </FormSection>
+
+        <FormSection title="Failure Events" style={{ marginBottom: 24 }}>
+          <FormRow>
+            <FormCol span={12}>
+              <PercentageField
+                path={[...basePath, 'failureEventProbability']}
+                label="Failure Event Probability"
+                tooltip="Annual probability of a failure event occurring"
+                min={0}
+                max={100}
+                step={0.1}
+              />
+            </FormCol>
+            <FormCol span={12}>
+              <CurrencyField
+                path={[...basePath, 'failureEventCost']}
+                label="Average Failure Event Cost"
+                tooltip="Average cost per failure event"
+                min={0}
+                step={10000}
+                currencyOverride={currency}
+              />
+            </FormCol>
+          </FormRow>
+        </FormSection>
+
+        <FormSection title="Major Repair Events" style={{ marginBottom: 24 }}>
+          <p>Schedule major repair or replacement events at specific years of the project lifetime.</p>
+          <EditableTable
+            path={[...basePath, 'majorRepairEvents']}
+            columns={majorRepairColumns}
+            formFields={majorRepairFields}
+            keyField="year"
+            itemName="Major Repair Event"
           />
-        </div>
+        </FormSection>
+
+        <FormSection title="Annual Cost Adjustments" style={{ marginBottom: 24 }}>
+          <p>Add specific cost adjustments for individual years (e.g., midlife overhauls, equipment upgrades).</p>
+          <EditableTable
+            path={[...basePath, 'adjustments']}
+            columns={annualAdjustmentColumns}
+            formFields={annualAdjustmentFields}
+            keyField="year"
+            itemName="Annual Adjustment"
+          />
+        </FormSection>
       </Form>
     </div>
   );
