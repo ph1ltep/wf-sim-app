@@ -1,14 +1,13 @@
 // src/hooks/useOEMScopes.js
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import {
-  getAllOEMScopes,
-  getOEMScopeById,
-  generateOEMScopeName,
-  createOEMScope as apiCreateScope,
-  updateOEMScope as apiUpdateScope,
-  deleteOEMScope as apiDeleteScope,
-  generateOEMScopeName as apiGenerateName
+import { 
+  getAllOEMScopes, 
+  getOEMScopeById, 
+  createOEMScope as apiCreateScope, 
+  updateOEMScope as apiUpdateScope, 
+  deleteOEMScope as apiDeleteScope, 
+  generateOEMScopeName as apiGenerateName 
 } from '../api/oemScopes';
 
 /**
@@ -20,7 +19,7 @@ const useOEMScopes = () => {
   const [loading, setLoading] = useState(false);
   const [generateNameLoading, setGenerateNameLoading] = useState(false);
   const [error, setError] = useState(null);
-
+  
   /**
    * Fetch all OEM scopes
    * @returns {Array} The fetched OEM scopes
@@ -29,18 +28,24 @@ const useOEMScopes = () => {
     try {
       setLoading(true);
       setError(null);
-
+      
       const response = await getAllOEMScopes();
-
+      
       if (response.success && response.data) {
-        // Transform data format - add key property for Table
-        const transformedData = response.data.map(scope => ({
-          key: scope._id,
-          ...scope
-        }));
-
-        setOEMScopes(transformedData);
-        return transformedData;
+        // Make sure response.data is an array before mapping
+        if (Array.isArray(response.data)) {
+          // Transform data format - add key property for Table
+          const transformedData = response.data.map(scope => ({
+            key: scope._id,
+            ...scope
+          }));
+          
+          setOEMScopes(transformedData);
+          return transformedData;
+        } else {
+          console.error('API returned non-array data:', response.data);
+          throw new Error('Invalid data format received from API');
+        }
       } else {
         throw new Error(response.error || 'Failed to fetch OEM scopes');
       }
@@ -49,12 +54,14 @@ const useOEMScopes = () => {
       setError(errorMessage);
       message.error(errorMessage);
       console.error('Error fetching OEM scopes:', error);
+      // Return empty array on error
+      setOEMScopes([]);
       return [];
     } finally {
       setLoading(false);
     }
   }, []);
-
+  
   /**
    * Create a new OEM scope
    * @param {Object} data - OEM scope data
@@ -64,30 +71,31 @@ const useOEMScopes = () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Prepare data - handle nested objects
-      const preparedData = {
+      
+      // Format the data before sending to API
+      const formattedData = {
         ...data,
-        correctiveMajorDetails: {
+        // Ensure correctiveMajorDetails exists if correctiveMajor is true
+        correctiveMajorDetails: data.correctiveMajor ? {
           tooling: data['correctiveMajorDetails.tooling'] || false,
           manpower: data['correctiveMajorDetails.manpower'] || false,
           parts: data['correctiveMajorDetails.parts'] || false
-        }
+        } : undefined
       };
-
-      // Remove flattened fields
-      delete preparedData['correctiveMajorDetails.tooling'];
-      delete preparedData['correctiveMajorDetails.manpower'];
-      delete preparedData['correctiveMajorDetails.parts'];
-
-      const response = await apiCreateScope(preparedData);
-
+      
+      // Remove the dotted properties as they're now in the nested object
+      delete formattedData['correctiveMajorDetails.tooling'];
+      delete formattedData['correctiveMajorDetails.manpower'];
+      delete formattedData['correctiveMajorDetails.parts'];
+      
+      const response = await apiCreateScope(formattedData);
+      
       if (response.success && response.data) {
         const newScope = {
           key: response.data._id,
           ...response.data
         };
-
+        
         setOEMScopes(prev => [...prev, newScope]);
         message.success('OEM scope added successfully');
         return { success: true, data: newScope };
@@ -104,7 +112,7 @@ const useOEMScopes = () => {
       setLoading(false);
     }
   }, []);
-
+  
   /**
    * Update an existing OEM scope
    * @param {string} id - OEM scope ID
@@ -115,34 +123,35 @@ const useOEMScopes = () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Prepare data - handle nested objects
-      const preparedData = {
+      
+      // Format the data before sending to API
+      const formattedData = {
         ...data,
-        correctiveMajorDetails: {
+        // Ensure correctiveMajorDetails exists if correctiveMajor is true
+        correctiveMajorDetails: data.correctiveMajor ? {
           tooling: data['correctiveMajorDetails.tooling'] || false,
           manpower: data['correctiveMajorDetails.manpower'] || false,
           parts: data['correctiveMajorDetails.parts'] || false
-        }
+        } : undefined
       };
-
-      // Remove flattened fields
-      delete preparedData['correctiveMajorDetails.tooling'];
-      delete preparedData['correctiveMajorDetails.manpower'];
-      delete preparedData['correctiveMajorDetails.parts'];
-
-      const response = await apiUpdateScope(id, preparedData);
-
+      
+      // Remove the dotted properties as they're now in the nested object
+      delete formattedData['correctiveMajorDetails.tooling'];
+      delete formattedData['correctiveMajorDetails.manpower'];
+      delete formattedData['correctiveMajorDetails.parts'];
+      
+      const response = await apiUpdateScope(id, formattedData);
+      
       if (response.success && response.data) {
         const updatedScope = {
           key: id,
           ...response.data
         };
-
-        setOEMScopes(prev => prev.map(item =>
+        
+        setOEMScopes(prev => prev.map(item => 
           item.key === id ? updatedScope : item
         ));
-
+        
         message.success('OEM scope updated successfully');
         return { success: true, data: updatedScope };
       } else {
@@ -158,7 +167,7 @@ const useOEMScopes = () => {
       setLoading(false);
     }
   }, []);
-
+  
   /**
    * Delete an OEM scope
    * @param {string} id - OEM scope ID
@@ -168,9 +177,9 @@ const useOEMScopes = () => {
     try {
       setLoading(true);
       setError(null);
-
+      
       const response = await apiDeleteScope(id);
-
+      
       if (response.success) {
         setOEMScopes(prev => prev.filter(item => item.key !== id));
         message.success('OEM scope deleted successfully');
@@ -188,63 +197,37 @@ const useOEMScopes = () => {
       setLoading(false);
     }
   }, []);
-
+  
   /**
-   * Generate a name for an OEM scope based on selected options
-   * @param {Object} data - OEM scope data
-   * @returns {Object} Result with success flag and generated name
+   * Generate a name for an OEM scope based on its features
+   * @param {Object} data - Scope feature data
+   * @returns {Object} Result with generated name
    */
-  // Updated generateName function in useOEMScopes.js
-  const generateName = useCallback(async (values) => {
+  const generateName = useCallback(async (data) => {
     try {
       setGenerateNameLoading(true);
-
-      // Log the values to identify any issues
-      console.log("Sending form values for name generation:", values);
-
-      // Create a clean object with only the boolean values
-      const cleanedValues = {
-        preventiveMaintenance: !!values.preventiveMaintenance,
-        bladeInspections: !!values.bladeInspections,
-        remoteMonitoring: !!values.remoteMonitoring,
-        remoteTechnicalSupport: !!values.remoteTechnicalSupport,
-        siteManagement: !!values.siteManagement,
-        technicianPercent: values.technicianPercent || 0,
-        correctiveMinor: !!values.correctiveMinor,
-        bladeIntegrityManagement: !!values.bladeIntegrityManagement,
-        craneCoverage: !!values.craneCoverage,
-        correctiveMajor: !!values.correctiveMajor,
-        // Add any other fields needed for name generation
-      };
-
-      const response = await generateOEMScopeName(cleanedValues);
-
+      
+      const response = await apiGenerateName(data);
+      
       if (response.success && response.name) {
         return { success: true, name: response.name };
       } else {
-        // Check the actual response structure
-        console.log("Name generation response:", response);
-        return {
-          success: false,
-          error: response.error || 'Name could not be generated'
-        };
+        throw new Error(response.error || 'Failed to generate name');
       }
     } catch (error) {
+      message.error('Failed to generate name');
       console.error('Error generating name:', error);
-      return {
-        success: false,
-        error: error.message || 'Error generating name'
-      };
+      return { success: false, name: null };
     } finally {
       setGenerateNameLoading(false);
     }
   }, []);
-
+  
   // Initialize data on mount
   useEffect(() => {
     fetchScopes();
   }, [fetchScopes]);
-
+  
   return {
     oemScopes,
     loading,
