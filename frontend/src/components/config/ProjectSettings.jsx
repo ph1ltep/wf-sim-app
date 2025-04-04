@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Alert } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
+import { getAllLocations } from '../../api/locations';
 
 // Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
@@ -37,14 +38,14 @@ const ProjectSettings = () => {
   });
 
   // Get scenario context
-  const { 
-    scenarioData, 
-    getValueByPath, 
-    updateByPath, 
-    selectedLocation, 
-    getAllLocations 
+  const {
+    scenarioData,
+    getValueByPath,
+    updateByPath,
+    selectedLocation,
+    updateSelectedLocation
   } = useScenario();
-  
+
   // State to track fields from locations
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
     capacityFactor: false,
@@ -52,6 +53,30 @@ const ProjectSettings = () => {
     foreignCurrency: false,
     exchangeRate: false
   });
+
+  // State for locations
+  const [locations, setLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
+  // Fetch locations
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        setLoadingLocations(true);
+        const response = await getAllLocations();
+
+        if (response.success && response.data) {
+          setLocations(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+      } finally {
+        setLoadingLocations(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
 
   // Calculate metrics when relevant values change
   useEffect(() => {
@@ -62,13 +87,13 @@ const ProjectSettings = () => {
       const curtailmentLosses = getValueByPath([...windFarmPath, 'curtailmentLosses'], 0);
       const electricalLosses = getValueByPath([...windFarmPath, 'electricalLosses'], 0);
       const wtgPlatformType = getValueByPath([...windFarmPath, 'wtgPlatformType'], 'geared');
-      
+
       const totalMW = numWTGs * mwPerWTG;
       const grossAEP = totalMW * (capacityFactor / 100) * 8760;
-      
+
       const afterCurtailment = grossAEP * (1 - curtailmentLosses / 100);
       const netAEP = afterCurtailment * (1 - electricalLosses / 100);
-      
+
       const componentQuantities = {
         blades: numWTGs * 3,
         bladeBearings: numWTGs * 3,
@@ -79,44 +104,61 @@ const ProjectSettings = () => {
         mainBearings: numWTGs,
         yawSystems: numWTGs,
       };
-      
-      setCalculatedMetrics({
+
+      const metrics = {
         totalMW,
         grossAEP,
         netAEP,
         componentQuantities
-      });
-      
-      // Update metrics in context
-      updateByPath(['settings', 'metrics'], {
-        totalMW,
-        grossAEP,
-        netAEP,
-        componentQuantities
-      });
+      };
+
+      setCalculatedMetrics(metrics);
+
+      // Only update the context if values have changed
+      const currentMetrics = getValueByPath(['settings', 'metrics'], {});
+      if (JSON.stringify(currentMetrics) !== JSON.stringify(metrics)) {
+        updateByPath(['settings', 'metrics'], metrics);
+      }
     }
-  }, [scenarioData, getValueByPath, updateByPath]);
+  }, [
+    getValueByPath,
+    updateByPath,
+    getValueByPath([...windFarmPath, 'numWTGs']),
+    getValueByPath([...windFarmPath, 'mwPerWTG']),
+    getValueByPath([...windFarmPath, 'capacityFactor']),
+    getValueByPath([...windFarmPath, 'curtailmentLosses']),
+    getValueByPath([...windFarmPath, 'electricalLosses']),
+    getValueByPath([...windFarmPath, 'wtgPlatformType'])
+  ]);
+
+  // Handle location selection change
+  const handleLocationChange = (locationId) => {
+    const locationData = locations.find(loc => loc._id === locationId);
+    if (locationData) {
+      updateSelectedLocation(locationData);
+    }
+  };
 
   // Load location defaults
   const loadLocationDefaults = () => {
     if (!selectedLocation) return;
-    
+
     // Update capacity factor
     updateByPath([...windFarmPath, 'capacityFactor'], selectedLocation.capacityFactor);
-    
+
     // Update currency information
     updateByPath([...currencyPath, 'local'], selectedLocation.currency);
     updateByPath([...currencyPath, 'foreign'], selectedLocation.foreignCurrency);
     updateByPath([...currencyPath, 'exchangeRate'], selectedLocation.exchangeRate);
-    
+
     // Update revenue module values with location defaults
-    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'value'], 
-                 selectedLocation.energyPrice);
-    
+    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'value'],
+      selectedLocation.energyPrice);
+
     // Update cost module values with location defaults
-    updateByPath(['settings', 'modules', 'cost', 'escalationRate'], 
-                 selectedLocation.inflationRate);
-    
+    updateByPath(['settings', 'modules', 'cost', 'escalationRate'],
+      selectedLocation.inflationRate);
+
     // Mark fields as being from location defaults
     setFieldsFromLocations({
       capacityFactor: true,
@@ -136,16 +178,26 @@ const ProjectSettings = () => {
     { value: 'CNY', label: 'Chinese Yuan (CNY)' },
     { value: 'CAD', label: 'Canadian Dollar (CAD)' },
     { value: 'AUD', label: 'Australian Dollar (AUD)' },
+    { value: 'KRW', label: 'South Korean Won (KRW)' },
+    { value: 'INR', label: 'Indian Rupee (INR)' },
+    { value: 'TWD', label: 'Taiwan Dollar (TWD)' },
+    { value: 'VND', label: 'Vietnamese Dong (VND)' },
+    { value: 'THB', label: 'Thai Baht (THB)' },
+    { value: 'MYR', label: 'Malaysian Ringgit (MYR)' },
+    { value: 'IDR', label: 'Indonesian Rupiah (IDR)' },
+    { value: 'PHP', label: 'Philippine Peso (PHP)' },
+    { value: 'NZD', label: 'New Zealand Dollar (NZD)' },
+    { value: 'SGD', label: 'Singapore Dollar (SGD)' }
   ];
 
   if (!scenarioData) {
     return (
       <div>
         <Title level={2}>Project Specifics</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -159,6 +211,9 @@ const ProjectSettings = () => {
       {/* Location selection */}
       <LocationSelector
         selectedLocation={selectedLocation}
+        locations={locations}
+        loading={loadingLocations}
+        onLocationChange={handleLocationChange}
         onLoadDefaults={loadLocationDefaults}
       />
 
@@ -183,7 +238,7 @@ const ProjectSettings = () => {
           </FormCol>
         </FormRow>
       </FormSection>
-      
+
       {/* Project Timeline */}
       <FormSection title="Project Timeline">
         <FormRow>
@@ -199,7 +254,7 @@ const ProjectSettings = () => {
           </FormCol>
         </FormRow>
       </FormSection>
-      
+
       {/* Currency Settings */}
       <FormSection title="Currency Settings">
         <FormRow>
@@ -207,9 +262,9 @@ const ProjectSettings = () => {
             <SelectField
               path={[...currencyPath, 'local']}
               label={
-                fieldsFromLocations.currency ? 
-                <>Local Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
-                "Local Currency"
+                fieldsFromLocations.currency ?
+                  <>Local Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Local Currency"
               }
               options={currencyOptions}
               required
@@ -219,9 +274,9 @@ const ProjectSettings = () => {
             <SelectField
               path={[...currencyPath, 'foreign']}
               label={
-                fieldsFromLocations.foreignCurrency ? 
-                <>Foreign Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
-                "Foreign Currency"
+                fieldsFromLocations.foreignCurrency ?
+                  <>Foreign Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Foreign Currency"
               }
               options={currencyOptions}
               required
@@ -231,9 +286,9 @@ const ProjectSettings = () => {
             <NumberField
               path={[...currencyPath, 'exchangeRate']}
               label={
-                fieldsFromLocations.exchangeRate ? 
-                <>Foreign/Local Exchange Rate <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
-                "Foreign/Local Exchange Rate"
+                fieldsFromLocations.exchangeRate ?
+                  <>Foreign/Local Exchange Rate <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Foreign/Local Exchange Rate"
               }
               tooltip="Enter rate as: 1 foreign currency = ? local currency"
               min={0}
@@ -243,7 +298,7 @@ const ProjectSettings = () => {
           </FormCol>
         </FormRow>
       </FormSection>
-      
+
       {/* Wind Farm Specifications */}
       <FormSection title="Wind Farm Specifications">
         <FormRow>
@@ -281,15 +336,15 @@ const ProjectSettings = () => {
             />
           </FormCol>
         </FormRow>
-        
+
         <FormRow>
           <FormCol span={8}>
             <PercentageField
               path={[...windFarmPath, 'capacityFactor']}
               label={
-                fieldsFromLocations.capacityFactor ? 
-                <>Capacity Factor <GlobalOutlined style={{ color: '#1890ff' }} /></> : 
-                "Capacity Factor"
+                fieldsFromLocations.capacityFactor ?
+                  <>Capacity Factor <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Capacity Factor"
               }
               tooltip="Expected capacity factor as a percentage of nameplate capacity"
               min={1}
@@ -300,7 +355,7 @@ const ProjectSettings = () => {
             />
           </FormCol>
         </FormRow>
-        
+
         <FormRow>
           <FormCol span={12}>
             <PercentageField
@@ -326,7 +381,7 @@ const ProjectSettings = () => {
           </FormCol>
         </FormRow>
       </FormSection>
-      
+
       {/* Project Metrics */}
       <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>

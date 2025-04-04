@@ -1,5 +1,5 @@
 // src/components/config/projectSettings/LocationSelector.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Row, Col, Select, Button, Tag } from 'antd';
 import { GlobalOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
@@ -9,12 +9,19 @@ const { Option } = Select;
  * Component for selecting location defaults
  */
 const LocationSelector = ({ 
-  locations, 
+  locations = [], 
+  loading = false,
   selectedLocation, 
-  loading, 
   onLocationChange, 
   onLoadDefaults 
 }) => {
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
+  
+  const handleLoadDefaults = () => {
+    onLoadDefaults();
+    setDefaultsLoaded(true);
+  };
+
   return (
     <Card 
       title={
@@ -24,9 +31,9 @@ const LocationSelector = ({
         </span>
       } 
       style={{ marginBottom: 24 }}
-      extra={selectedLocation && (
+      extra={selectedLocation && defaultsLoaded && (
         <Tag color="green" icon={<CheckCircleOutlined />}>
-          Using {selectedLocation.country} ({selectedLocation.countryCode.toUpperCase()})
+          Using {selectedLocation.country} ({selectedLocation.countryCode?.toUpperCase()})
         </Tag>
       )}
     >
@@ -35,14 +42,17 @@ const LocationSelector = ({
           <Select 
             placeholder="Select a location to load defaults"
             style={{ width: '100%' }}
-            onChange={onLocationChange}
+            onChange={(value) => {
+              onLocationChange(value);
+              setDefaultsLoaded(false); // Reset when location changes
+            }}
             loading={loading}
             disabled={loading || locations.length === 0}
             value={selectedLocation?._id}
           >
             {locations.map(location => (
               <Option key={location._id} value={location._id}>
-                {location.country} ({location.countryCode.toUpperCase()}) - {location.currency}
+                {location.country} ({location.countryCode?.toUpperCase()}) - {location.currency}
               </Option>
             ))}
           </Select>
@@ -50,7 +60,7 @@ const LocationSelector = ({
         <Col span={6}>
           <Button 
             type="primary" 
-            onClick={onLoadDefaults}
+            onClick={handleLoadDefaults}
             disabled={!selectedLocation || loading}
             loading={loading}
           >

@@ -1,37 +1,85 @@
 // src/components/config/projectSettings/ProjectMetrics.jsx
 import React from 'react';
-import { Card, Row, Col, Statistic, Divider } from 'antd';
+import { Card, Row, Col, Statistic, Divider, Table } from 'antd';
 
 /**
  * Component for displaying calculated project metrics
  */
 const ProjectMetrics = ({ calculatedValues }) => {
-  // Table styling for component quantities
-  const tableStyle = {
-    header: {
-      backgroundColor: '#f0f2f5',
-      padding: '12px 10px',
-      textAlign: 'left',
-      borderBottom: '1px solid #e8e8e8',
-      fontSize: '14px',
-      fontWeight: '500'
+  // Define table columns for component quantities
+  const columns = [
+    {
+      title: 'Component',
+      dataIndex: 'component',
+      key: 'component',
     },
-    cell: {
-      padding: '8px 10px',
-      borderBottom: '1px solid #e8e8e8',
-      fontSize: '14px'
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      align: 'right',
     },
-    cellRight: {
-      padding: '8px 10px',
-      borderBottom: '1px solid #e8e8e8',
-      fontSize: '14px',
-      textAlign: 'right',
-      fontWeight: '500'
-    }
-  };
+    {
+      title: 'Notes',
+      dataIndex: 'notes',
+      key: 'notes',
+    },
+  ];
+
+  // Create data source for the table
+  const dataSource = [
+    {
+      key: 'blades',
+      component: 'Blades',
+      quantity: calculatedValues.componentQuantities?.blades || 0,
+      notes: '3 per turbine',
+    },
+    {
+      key: 'bladeBearings',
+      component: 'Blade Bearings',
+      quantity: calculatedValues.componentQuantities?.bladeBearings || 0,
+      notes: '1 per blade',
+    },
+    {
+      key: 'transformers',
+      component: 'Transformers',
+      quantity: calculatedValues.componentQuantities?.transformers || 0,
+      notes: '1 per turbine',
+    },
+    {
+      key: 'gearboxes',
+      component: 'Gearboxes',
+      quantity: calculatedValues.componentQuantities?.gearboxes || 0,
+      notes: 'Only for geared turbines',
+    },
+    {
+      key: 'generators',
+      component: 'Generators',
+      quantity: calculatedValues.componentQuantities?.generators || 0,
+      notes: '1 per turbine',
+    },
+    {
+      key: 'converters',
+      component: 'Converters',
+      quantity: calculatedValues.componentQuantities?.converters || 0,
+      notes: '1 per turbine',
+    },
+    {
+      key: 'mainBearings',
+      component: 'Main Bearings/Shaft',
+      quantity: calculatedValues.componentQuantities?.mainBearings || 0,
+      notes: '1 per turbine (different type for geared/direct drive)',
+    },
+    {
+      key: 'yawSystems',
+      component: 'Yaw Systems',
+      quantity: calculatedValues.componentQuantities?.yawSystems || 0,
+      notes: '1 per turbine',
+    },
+  ];
 
   return (
-    <Card title="Calculated Project Metrics">
+    <Card title="Calculated Project Metrics" style={{ marginBottom: 24 }}>
       <Row gutter={24}>
         <Col span={8}>
           <Statistic
@@ -68,57 +116,13 @@ const ProjectMetrics = ({ calculatedValues }) => {
       
       <Divider orientation="left">Major Component Quantities</Divider>
       
-      <table className="component-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={tableStyle.header}>Component</th>
-            <th style={tableStyle.header}>Quantity</th>
-            <th style={tableStyle.header}>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={tableStyle.cell}>Blades</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.blades || 0}</td>
-            <td style={tableStyle.cell}>3 per turbine</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Blade Bearings</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.bladeBearings || 0}</td>
-            <td style={tableStyle.cell}>1 per blade</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Transformers</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.transformers || 0}</td>
-            <td style={tableStyle.cell}>1 per turbine</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Gearboxes</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.gearboxes || 0}</td>
-            <td style={tableStyle.cell}>Only for geared turbines</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Generators</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.generators || 0}</td>
-            <td style={tableStyle.cell}>1 per turbine</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Converters</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.converters || 0}</td>
-            <td style={tableStyle.cell}>1 per turbine</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Main Bearings/Shaft</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.mainBearings || 0}</td>
-            <td style={tableStyle.cell}>1 per turbine (different type for geared/direct drive)</td>
-          </tr>
-          <tr>
-            <td style={tableStyle.cell}>Yaw Systems</td>
-            <td style={tableStyle.cellRight}>{calculatedValues.componentQuantities?.yawSystems || 0}</td>
-            <td style={tableStyle.cell}>1 per turbine</td>
-          </tr>
-        </tbody>
-      </table>
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        pagination={false}
+        size="small"
+        bordered
+      />
     </Card>
   );
 };

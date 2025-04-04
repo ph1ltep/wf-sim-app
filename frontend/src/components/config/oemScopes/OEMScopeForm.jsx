@@ -1,13 +1,13 @@
 // src/components/config/oemScopes/OEMScopeForm.jsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Form, 
-  Input, 
-  Row, 
-  Col, 
-  Button, 
-  Checkbox, 
-  Divider, 
+import {
+  Form,
+  Input,
+  Row,
+  Col,
+  Button,
+  Checkbox,
+  Divider,
   Typography,
   InputNumber,
   Select
@@ -16,16 +16,15 @@ import {
 const { Text } = Typography;
 const { Option } = Select;
 
-const OEMScopeForm = ({ 
-  form, 
-  initialValues = {}, 
-  onGenerateName, 
-  generateNameLoading = false 
+const OEMScopeForm = ({
+  form,
+  initialValues = {},
+  onGenerateName
 }) => {
   const [correctiveMajorSelected, setCorrectiveMajorSelected] = useState(
     initialValues.correctiveMajor || false
   );
-  
+
   const [craneSelected, setCraneSelected] = useState(
     initialValues.craneCoverage || false
   );
@@ -33,27 +32,23 @@ const OEMScopeForm = ({
   // Set form values when initialValues changes
   useEffect(() => {
     if (Object.keys(initialValues).length > 0) {
-      console.log('Initial values for form:', initialValues);
-      
       // Create a clean form values object
       const formValues = {
         ...initialValues,
       };
-      
+
       // Handle nested correctiveMajorDetails properly
       if (initialValues.correctiveMajorDetails) {
         formValues['correctiveMajorDetails.tooling'] = !!initialValues.correctiveMajorDetails.tooling;
         formValues['correctiveMajorDetails.manpower'] = !!initialValues.correctiveMajorDetails.manpower;
         formValues['correctiveMajorDetails.parts'] = !!initialValues.correctiveMajorDetails.parts;
       }
-      
+
       // Ensure technician percent is set properly
-      formValues.technicianPercent = initialValues.technicianPercent !== undefined ? 
-        initialValues.technicianPercent : 
+      formValues.technicianPercent = initialValues.technicianPercent !== undefined ?
+        initialValues.technicianPercent :
         (initialValues.siteManagement ? 100 : 0);
-      
-      console.log('Setting form values:', formValues);
-      
+
       // Set form values
       form.setFieldsValue(formValues);
       setCorrectiveMajorSelected(initialValues.correctiveMajor || false);
@@ -66,26 +61,41 @@ const OEMScopeForm = ({
     }
   }, [form, initialValues]);
 
-  // Handle form value changes
+  // Updated handleValuesChange function in OEMScopeForm.jsx
   const handleValuesChange = (changedValues) => {
-    console.log('Form values changed:', changedValues);
-    
     // Check if correctiveMajor changed
     if ('correctiveMajor' in changedValues) {
       setCorrectiveMajorSelected(changedValues.correctiveMajor);
     }
-    
+
     // Check if craneCoverage changed
     if ('craneCoverage' in changedValues) {
       setCraneSelected(changedValues.craneCoverage);
     }
-    
+
     // If site management is toggled off, reset technician percent to 0
-    if ('siteManagement' in changedValues && changedValues.siteManagement === false) {
-      form.setFieldValue('technicianPercent', 0);
-    } else if ('siteManagement' in changedValues && changedValues.siteManagement === true) {
-      // If site management is toggled on, set technician percent to 100 (default)
-      form.setFieldValue('technicianPercent', 100);
+    if ('siteManagement' in changedValues) {
+      const siteManagementEnabled = changedValues.siteManagement;
+      if (!siteManagementEnabled) {
+        // Use setTimeout to avoid direct state mutation during render
+        setTimeout(() => {
+          form.setFieldsValue({ technicianPercent: 0 });
+        }, 0);
+      } else {
+        // If site management is toggled on, set technician percent to 100 (default)
+        setTimeout(() => {
+          form.setFieldsValue({ technicianPercent: 100 });
+        }, 0);
+      }
+    }
+  };
+
+  const handleGenerateName = () => {
+    try {
+      const values = form.getFieldsValue();
+      onGenerateName(values);
+    } catch (error) {
+      console.error("Error preparing data for name generation:", error);
     }
   };
 
@@ -106,18 +116,17 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Button 
-            onClick={onGenerateName} 
+          <Button
+            onClick={handleGenerateName}
             style={{ marginTop: 29 }}
-            loading={generateNameLoading}
           >
             Generate Name
           </Button>
         </Col>
       </Row>
-      
+
       <Divider orientation="left">Preventive Maintenance</Divider>
-      
+
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -136,9 +145,9 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
       </Row>
-      
+
       <Divider orientation="left">Remote Support</Divider>
-      
+
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -157,9 +166,9 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
       </Row>
-      
+
       <Divider orientation="left">Site Personnel</Divider>
-      
+
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -188,9 +197,9 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
       </Row>
-      
+
       <Divider orientation="left">Corrective Maintenance</Divider>
-      
+
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -209,7 +218,7 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
       </Row>
-      
+
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
@@ -228,7 +237,7 @@ const OEMScopeForm = ({
           </Form.Item>
         </Col>
       </Row>
-      
+
       {craneSelected && (
         <div style={{ marginLeft: 24, borderLeft: '1px solid #f0f0f0', paddingLeft: 12, marginBottom: 16 }}>
           <Text strong>Crane Coverage Details:</Text>
@@ -248,20 +257,20 @@ const OEMScopeForm = ({
                 name="craneFinancialCap"
                 tooltip="Maximum financial coverage per year"
               >
-                <InputNumber 
-                  min={0} 
-                  step={10000} 
+                <InputNumber
+                  min={0}
+                  step={10000}
                   formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                  placeholder="USD/year" 
-                  style={{ width: '100%' }} 
+                  placeholder="USD/year"
+                  style={{ width: '100%' }}
                 />
               </Form.Item>
             </Col>
           </Row>
         </div>
       )}
-      
+
       {correctiveMajorSelected && (
         <div style={{ marginLeft: 24, borderLeft: '1px solid #f0f0f0', paddingLeft: 12 }}>
           <Text strong>Major Component Details:</Text>
@@ -309,13 +318,13 @@ const OEMScopeForm = ({
                 name="majorFinancialCap"
                 tooltip="Maximum financial coverage per year"
               >
-                <InputNumber 
-                  min={0} 
-                  step={10000} 
+                <InputNumber
+                  min={0}
+                  step={10000}
                   formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                  placeholder="USD/year" 
-                  style={{ width: '100%' }} 
+                  placeholder="USD/year"
+                  style={{ width: '100%' }}
                 />
               </Form.Item>
             </Col>

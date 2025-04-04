@@ -1,6 +1,6 @@
 // src/components/config/OEMScopes.jsx
-import React from 'react';
-import { Typography, Card, Alert, Button } from 'antd';
+import React, { useState } from 'react';
+import { Typography, Card, Alert, Button, Modal, message } from 'antd';
 import { ToolOutlined, ReloadOutlined } from '@ant-design/icons';
 
 // Custom hook for OEM scopes data management
@@ -10,13 +10,14 @@ import useOEMScopes from '../../hooks/useOEMScopes';
 import DatabaseTable from '../tables/DatabaseTable';
 import OEMScopeForm from './oemScopes/OEMScopeForm';
 import OEMScopeDetails from './oemScopes/OEMScopeDetails';
-import OEMScopeTag from './oemScopes/OEMScopeTag';
 import { oemScopeColumns } from '../tables/columns';
 import { renderScopeTags } from '../../utils/oemScopeUtils';
 
 const { Title } = Typography;
 
 const OEMScopes = () => {
+  const [form] = Form.useForm();
+  
   // Use the custom hook for OEM scopes data management
   const { 
     oemScopes, 
@@ -35,30 +36,26 @@ const OEMScopes = () => {
       <OEMScopeForm
         form={form}
         initialValues={record || {}}
-        onGenerateName={() => handleGenerateName(form)}
-        generateNameLoading={loading}
+        onGenerateName={handleGenerateName}
       />
     );
   };
   
   // Handle generating a name based on form values
-  const handleGenerateName = async (form) => {
-    const values = form.getFieldsValue();
-    const result = await generateName(values);
-    if (result.success) {
-      form.setFieldsValue({ name: result.name });
+  const handleGenerateName = async (values) => {
+    try {
+      const result = await generateName(values);
+      if (result.success && result.name) {
+        form.setFieldsValue({ name: result.name });
+        message.success('Name generated successfully');
+      } else {
+        message.error('Failed to generate name: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error in handleGenerateName:', error);
+      message.error('Failed to generate name: ' + (error.message || 'Unknown error'));
     }
   };
-  
-  // Custom tag renderer for OEM scope tags
-  const tagRenderer = (tag) => (
-    <OEMScopeTag 
-      key={tag.id} 
-      color={tag.color}
-    >
-      {tag.content}
-    </OEMScopeTag>
-  );
   
   // Header extra content with refresh button
   const headerExtra = (
@@ -98,7 +95,7 @@ const OEMScopes = () => {
         style={{ marginBottom: 24 }}
       >
         <DatabaseTable
-          columns={oemScopeColumns(tagRenderer)}
+          columns={oemScopeColumns()}
           dataSource={oemScopes}
           rowKey="key"
           loading={loading}

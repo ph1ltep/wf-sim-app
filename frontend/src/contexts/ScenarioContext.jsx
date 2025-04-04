@@ -18,6 +18,7 @@ export const ScenarioProvider = ({ children }) => {
   const [dirtyForms, setDirtyForms] = useState({});
   const [isModified, setIsModified] = useState(false);
   
+  
   // Use a ref for form handlers instead of state
   const formSubmitHandlersRef = useRef({});
   const originalDataRef = useRef(null);

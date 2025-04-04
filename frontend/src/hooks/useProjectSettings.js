@@ -8,7 +8,14 @@ import { message } from 'antd';
  * Custom hook for managing project settings data and operations
  */
 const useProjectSettings = () => {
-  const { settings, updateModuleParameters, selectedLocation, updateSelectedLocation } = useScenario();
+  const { 
+    scenarioData, 
+    updateByPath, 
+    updateModuleParameters,
+    selectedLocation, 
+    updateSelectedLocation 
+  } = useScenario();
+  
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
@@ -17,6 +24,7 @@ const useProjectSettings = () => {
     foreignCurrency: false,
     exchangeRate: false
   });
+  
   const [calculatedMetrics, setCalculatedMetrics] = useState({
     totalMW: 0,
     grossAEP: 0,
@@ -65,7 +73,7 @@ const useProjectSettings = () => {
     
     setCalculatedMetrics(updatedValues);
     
-    // Return calculated values without updating module parameters
+    // Return calculated values
     return updatedValues;
   }, []);
   
@@ -128,12 +136,12 @@ const useProjectSettings = () => {
         exchangeRate: allValues.exchangeRate
       };
       
-      updateModuleParameters('scenario', currencyParams);
+      updateModuleParameters('currency', currencyParams);
     }
     
     // Calculate metrics and update
     const metrics = calculateDerivedValues(otherValues);
-    updateModuleParameters('projectMetrics', metrics);
+    updateModuleParameters('metrics', metrics);
     
     return metrics;
   }, [calculateDerivedValues, fieldsFromLocations, updateModuleParameters]);
@@ -167,7 +175,7 @@ const useProjectSettings = () => {
   }, [locations, updateSelectedLocation]);
   
   // Load location defaults
-  const loadLocationDefaults = useCallback(async (form) => {
+  const loadLocationDefaults = useCallback((form) => {
     if (!selectedLocation?._id) {
       message.warning('Please select a location first');
       return false;
@@ -198,17 +206,16 @@ const useProjectSettings = () => {
     
     // Recalculate derived values
     const metrics = calculateDerivedValues(formValues);
-    updateModuleParameters('projectMetrics', metrics);
+    updateModuleParameters('metrics', metrics);
 
     // Update scenario with currency information and location
-    const scenarioParams = { 
-      location: locationData.countryCode,
+    const currencyParams = { 
       currency: locationData.currency,
       foreignCurrency: locationData.foreignCurrency,
       exchangeRate: locationData.exchangeRate
     };
     
-    updateModuleParameters('scenario', scenarioParams);
+    updateModuleParameters('currency', currencyParams);
     
     // Mark fields as being from location defaults
     setFieldsFromLocations({
@@ -219,8 +226,8 @@ const useProjectSettings = () => {
     });
 
     // Update revenue module values with location defaults
-    if (settings?.modules?.revenue) {
-      const revenueParams = { ...settings.modules.revenue };
+    if (scenarioData?.settings?.modules?.revenue) {
+      const revenueParams = { ...scenarioData.settings.modules.revenue };
       
       // Update electricity price
       if (revenueParams.electricityPrice) {
@@ -232,8 +239,8 @@ const useProjectSettings = () => {
     }
 
     // Update cost module values with location defaults (inflation rate for escalation)
-    if (settings?.modules?.cost) {
-      const costParams = { ...settings.modules.cost };
+    if (scenarioData?.settings?.modules?.cost) {
+      const costParams = { ...scenarioData.settings.modules.cost };
       
       // Update escalation rate to match inflation rate
       costParams.escalationRate = locationData.inflationRate;
@@ -244,7 +251,7 @@ const useProjectSettings = () => {
 
     message.success(`Loaded defaults for ${locationData.country}`);
     return true;
-  }, [selectedLocation, calculateDerivedValues, settings, updateModuleParameters]);
+  }, [selectedLocation, calculateDerivedValues, scenarioData, updateModuleParameters]);
   
   // Initialize data on mount
   useEffect(() => {
@@ -253,19 +260,15 @@ const useProjectSettings = () => {
   
   // Calculate initial metrics when settings change
   useEffect(() => {
-    if (settings?.general) {
-      const formValues = {
-        ...settings.general,
-        ...settings.project?.windFarm
-      };
-      calculateDerivedValues(formValues);
+    if (scenarioData?.settings?.project?.windFarm) {
+      calculateDerivedValues(scenarioData.settings.project.windFarm);
     }
-  }, [settings, calculateDerivedValues]);
+  }, [scenarioData, calculateDerivedValues]);
   
   return {
     locations,
-    selectedLocation,
     loadingLocations,
+    selectedLocation,
     fieldsFromLocations,
     calculatedMetrics,
     handleLocationChange,
