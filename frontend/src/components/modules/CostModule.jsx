@@ -1,7 +1,12 @@
 // src/components/modules/CostModule.jsx
-import React, { useState, useEffect } from 'react';
-import { Typography, Form, Alert, Table, Button, Space, Tooltip } from 'antd';
-import { InfoCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React from 'react';
+import { Typography, Alert, Tabs } from 'antd';
+import {
+  DollarOutlined,
+  ToolOutlined,
+  WarningOutlined,
+  ScheduleOutlined
+} from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import context field components
@@ -23,14 +28,14 @@ const { Title } = Typography;
 const CostModule = () => {
   // Get scenario data directly from context
   const { scenarioData } = useScenario();
-  
+
   // Define base path for cost module
   const basePath = ['settings', 'modules', 'cost'];
-  
+
   // Get values from context for conditional rendering
   const oemTerm = scenarioData?.settings?.modules?.cost?.oemTerm || 0;
   const projectLife = scenarioData?.settings?.general?.projectLife || 20;
-  
+
   // Get the currency from scenario
   const currency = scenarioData?.settings?.project?.currency?.local || 'USD';
 
@@ -39,10 +44,10 @@ const CostModule = () => {
     return (
       <div>
         <Title level={2}>Cost Module</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -142,12 +147,15 @@ const CostModule = () => {
     }
   ];
 
-  return (
-    <div>
-      <Title level={2}>Cost Module</Title>
-      <p>Configure operation and maintenance costs for your wind farm project.</p>
-
-      <Form layout="vertical">
+  const tabItems = [
+    {
+      key: "baseOM",
+      label: (
+        <span>
+          <DollarOutlined /> Base O&M
+        </span>
+      ),
+      children: (
         <FormSection title="Base O&M Costs" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
@@ -188,7 +196,16 @@ const CostModule = () => {
             </FormCol>
           </FormRow>
         </FormSection>
-
+      )
+    },
+    {
+      key: "oemContract",
+      label: (
+        <span>
+          <ToolOutlined /> OEM Contract
+        </span>
+      ),
+      children: (
         <FormSection title="OEM Contract" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
@@ -214,7 +231,16 @@ const CostModule = () => {
             </FormCol>
           </FormRow>
         </FormSection>
-
+      )
+    },
+    {
+      key: "failureEvents",
+      label: (
+        <span>
+          <WarningOutlined /> Failure Events
+        </span>
+      ),
+      children: (
         <FormSection title="Failure Events" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
@@ -239,7 +265,16 @@ const CostModule = () => {
             </FormCol>
           </FormRow>
         </FormSection>
-
+      )
+    },
+    {
+      key: "majorRepairs",
+      label: (
+        <span>
+          <ScheduleOutlined /> Major Repairs
+        </span>
+      ),
+      children: (
         <FormSection title="Major Repair Events" style={{ marginBottom: 24 }}>
           <p>Schedule major repair or replacement events at specific years of the project lifetime.</p>
           <EditableTable
@@ -250,7 +285,16 @@ const CostModule = () => {
             itemName="Major Repair Event"
           />
         </FormSection>
-
+      )
+    },
+    {
+      key: "adjustments",
+      label: (
+        <span>
+          <DollarOutlined /> Annual Adjustments
+        </span>
+      ),
+      children: (
         <FormSection title="Annual Cost Adjustments" style={{ marginBottom: 24 }}>
           <p>Add specific cost adjustments for individual years (e.g., midlife overhauls, equipment upgrades).</p>
           <EditableTable
@@ -261,7 +305,16 @@ const CostModule = () => {
             itemName="Annual Adjustment"
           />
         </FormSection>
-      </Form>
+      )
+    }
+  ];
+
+  return (
+    <div>
+      <Title level={2}>Cost Module</Title>
+      <p>Configure operation and maintenance costs for your wind farm project.</p>
+
+      <Tabs defaultActiveKey="baseOM" items={tabItems} type="card" />
     </div>
   );
 };

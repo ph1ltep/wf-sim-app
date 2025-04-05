@@ -1,8 +1,8 @@
 // src/contexts/ScenarioContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
-import { message } from 'antd';
+import { message, Alert } from 'antd';
 import { produce } from 'immer';
-import { get, set, update, cloneDeep } from 'lodash';
+import { get, set } from 'lodash';
 import api from '../api/index';
 import { getDefaults } from '../api/defaults';
 
@@ -17,8 +17,8 @@ export const ScenarioProvider = ({ children }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [dirtyForms, setDirtyForms] = useState({});
   const [isModified, setIsModified] = useState(false);
-  
-  
+
+
   // Use a ref for form handlers instead of state
   const formSubmitHandlersRef = useRef({});
   const originalDataRef = useRef(null);
@@ -362,12 +362,29 @@ export const ScenarioProvider = ({ children }) => {
   }, [scenarioData]);
 
   // Utility to check if we have a valid scenario
-  const hasValidScenario = useCallback(() => {
+  const hasValidScenario = useCallback(async (autoInitialize = true) => {
     if (!scenarioData) {
-      message.error('No active scenario');
+      if (autoInitialize) {
+        await initializeScenario();
+        return !!scenarioData;
+      }
       return false;
     }
     return true;
+  }, [scenarioData, initializeScenario]);
+
+  // Add a standardized error component to the context
+  const ScenarioErrorComponent = useMemo(() => {
+    if (!scenarioData) {
+      return (
+        <Alert
+          message="No Active Scenario"
+          description="Please create a new scenario or load an existing one."
+          type="info"
+        />
+      );
+    }
+    return null;
   }, [scenarioData]);
 
   // Function to update scenario metadata
@@ -544,6 +561,7 @@ export const ScenarioProvider = ({ children }) => {
 
     // Utility checks
     hasValidScenario,
+    ScenarioErrorComponent,
     isNewScenario,
 
     // Core data operations

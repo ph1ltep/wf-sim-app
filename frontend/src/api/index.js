@@ -41,12 +41,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     console.log(`API Response (${response.config.url}):`, response.status, response.data);
-    
+
     // Check if the response data is already in our expected format
-    if (response.data && 
-        (response.data.success !== undefined || 
-         response.data.data !== undefined || 
-         response.data.error !== undefined)) {
+    if (response.data &&
+      (response.data.success !== undefined ||
+        response.data.data !== undefined ||
+        response.data.error !== undefined)) {
       // Response is already in our expected format
       return {
         ...response.data,
@@ -54,7 +54,7 @@ api.interceptors.response.use(
         statusText: response.statusText
       };
     }
-    
+
     // Otherwise transform response data to our standard format
     return {
       success: true,
@@ -67,14 +67,14 @@ api.interceptors.response.use(
     // Extract the error details and create a standardized error response
     let errorMessage = 'An unexpected error occurred';
     let errorDetails = null;
-    
+
     if (error.response) {
       // The request was made and the server responded with an error status
-      errorMessage = error.response.data?.error || 
-                    error.response.data?.message || 
-                    `Server error: ${error.response.status} ${error.response.statusText}`;
+      errorMessage = error.response.data?.error ||
+        error.response.data?.message ||
+        `Server error: ${error.response.status} ${error.response.statusText}`;
       errorDetails = error.response.data;
-      
+
       console.error('API Response Error:', {
         status: error.response.status,
         statusText: error.response.statusText,
@@ -93,7 +93,8 @@ api.interceptors.response.use(
       errorMessage = error.message || 'Error setting up the request';
       console.error('API Setup Error:', error.message);
     }
-    
+
+
     // Add network details for debugging
     if (error.config) {
       console.error('Failed request details:', {
@@ -102,7 +103,7 @@ api.interceptors.response.use(
         baseURL: error.config.baseURL
       });
     }
-    
+
     // Create a standardized error response
     const standardError = {
       success: false,
@@ -111,9 +112,9 @@ api.interceptors.response.use(
       status: error.response?.status || 0,
       statusText: error.response?.statusText || 'Unknown Error'
     };
-    
+
     console.error('Standardized error:', standardError);
-    
+
     // Return the error in our standard format
     return Promise.resolve(standardError);
   }

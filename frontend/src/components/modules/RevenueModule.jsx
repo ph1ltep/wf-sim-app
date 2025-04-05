@@ -1,6 +1,12 @@
 // src/components/modules/RevenueModule.jsx
 import React from 'react';
-import { Typography, Form, Alert } from 'antd';
+import { Typography, Alert, Tabs } from 'antd';
+import {
+  LineChartOutlined,
+  DollarOutlined,
+  FieldTimeOutlined,
+  ThunderboltOutlined
+} from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import context field components
@@ -23,14 +29,14 @@ const { Title } = Typography;
 const RevenueModule = () => {
   // Get scenario data directly from context
   const { scenarioData } = useScenario();
-  
+
   // Define base path for revenue module
   const basePath = ['settings', 'modules', 'revenue'];
-  
+
   // Get values from context for conditional rendering
   const electricityPriceType = scenarioData?.settings?.modules?.revenue?.electricityPrice?.type || 'fixed';
   const windVariabilityMethod = scenarioData?.settings?.modules?.revenue?.windVariabilityMethod || 'Default';
-  
+
   // Get the currency from scenario
   const currency = scenarioData?.settings?.project?.currency?.local || 'USD';
 
@@ -39,24 +45,27 @@ const RevenueModule = () => {
     return (
       <div>
         <Title level={2}>Revenue Module</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
   }
 
-  return (
-    <div>
-      <Title level={2}>Revenue Module</Title>
-      <p>Configure revenue parameters and energy production for your wind farm project.</p>
-
-      <Form layout="vertical">
+  const tabItems = [
+    {
+      key: "production",
+      label: (
+        <span>
+          <LineChartOutlined /> Energy Production
+        </span>
+      ),
+      children: (
         <FormSection title="Energy Production" style={{ marginBottom: 24 }}>
           <p>Configure the annual energy production and its variability.</p>
-          
+
           <DistributionField
             path={[...basePath, 'energyProduction']}
             label="Energy Production"
@@ -69,7 +78,16 @@ const RevenueModule = () => {
             ]}
           />
         </FormSection>
-
+      )
+    },
+    {
+      key: "price",
+      label: (
+        <span>
+          <DollarOutlined /> Electricity Price
+        </span>
+      ),
+      children: (
         <FormSection title="Electricity Price" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
@@ -113,9 +131,7 @@ const RevenueModule = () => {
               ]}
             />
           )}
-        </FormSection>
 
-        <FormSection title="Performance Degradation" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
               <PercentageField
@@ -129,10 +145,19 @@ const RevenueModule = () => {
             </FormCol>
           </FormRow>
         </FormSection>
-
+      )
+    },
+    {
+      key: "downtime",
+      label: (
+        <span>
+          <FieldTimeOutlined /> Downtime
+        </span>
+      ),
+      children: (
         <FormSection title="Downtime Configuration" style={{ marginBottom: 24 }}>
           <p>Configure the statistical distribution for downtime duration per failure event.</p>
-          
+
           <FormRow>
             <FormCol span={24}>
               <SelectField
@@ -169,7 +194,16 @@ const RevenueModule = () => {
             </FormCol>
           </FormRow>
         </FormSection>
-
+      )
+    },
+    {
+      key: "windVariability",
+      label: (
+        <span>
+          <ThunderboltOutlined /> Wind Variability
+        </span>
+      ),
+      children: (
         <FormSection title="Wind Variability Method" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol span={12}>
@@ -189,7 +223,7 @@ const RevenueModule = () => {
             <>
               <FormDivider title="Industry Standard Parameters" />
               <p>Additional parameters required for the Kaimal spectral model (IEC 61400-1).</p>
-              
+
               <FormRow>
                 <FormCol span={8}>
                   <PercentageField
@@ -224,7 +258,16 @@ const RevenueModule = () => {
             </>
           )}
         </FormSection>
-      </Form>
+      )
+    }
+  ];
+
+  return (
+    <div>
+      <Title level={2}>Revenue Module</Title>
+      <p>Configure revenue parameters and energy production for your wind farm project.</p>
+
+      <Tabs defaultActiveKey="production" items={tabItems} type="card" />
     </div>
   );
 };
