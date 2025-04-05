@@ -4,15 +4,15 @@ import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sider from '../components/common/Sider';
-import { useBeforeUnloadProtection } from '../hooks/useNavigationProtection';
+//import { useBeforeUnloadProtection } from '../hooks/useNavigationProtection';
 
 const { Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
-  
+
   // Use the beforeUnload protection
-  useBeforeUnloadProtection();
+  //useBeforeUnloadProtection();
 
   const toggleSider = () => {
     setCollapsed(!collapsed);

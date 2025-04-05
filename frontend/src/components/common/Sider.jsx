@@ -14,7 +14,6 @@ import {
   FundOutlined,
   WarningOutlined,
   GlobalOutlined,
-  EnvironmentOutlined,
   ToolOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
@@ -24,7 +23,7 @@ const { Sider: AntSider } = Layout;
 const Sider = ({ collapsed }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasUnsavedChanges, submitAllForms, updateFormDirtyState } = useScenario();
+  const { submitAllForms, updateFormDirtyState } = useScenario();
   const [openKeys, setOpenKeys] = useState(['config']);
   const [modalVisible, setModalVisible] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null);
@@ -32,7 +31,7 @@ const Sider = ({ collapsed }) => {
 
   // Extract the root path for default selection
   const selectedKey = location.pathname;
-  
+
   // Handle submenu open/close
   const onOpenChange = (keys) => {
     setOpenKeys(keys);
@@ -43,11 +42,11 @@ const Sider = ({ collapsed }) => {
     if (pendingNavigation) {
       console.log("Saving all form changes and navigating to:", pendingNavigation);
       setIsSaving(true);
-      
+
       try {
         // Submit all dirty forms to apply their values to the context
         const result = await submitAllForms();
-        
+
         if (result) {
           // Forms were successfully submitted
           message.success('Changes saved successfully');
@@ -55,7 +54,7 @@ const Sider = ({ collapsed }) => {
           // Something went wrong during form submission
           message.error('Some changes could not be saved');
         }
-        
+
         // Navigate regardless (we've done our best to save)
         navigate(pendingNavigation);
       } catch (error) {
@@ -63,7 +62,7 @@ const Sider = ({ collapsed }) => {
         message.error("Failed to save changes");
       } finally {
         setIsSaving(false);
-        setModalVisible(false);
+        //setModalVisible(false);
         setPendingNavigation(null);
       }
     }
@@ -73,13 +72,13 @@ const Sider = ({ collapsed }) => {
   const handleDiscardAndNavigate = () => {
     if (pendingNavigation) {
       console.log("Discarding changes and navigating to:", pendingNavigation);
-      
+
       // Clear all form dirty states
       updateFormDirtyState(false, 'all');
-      
+
       message.info('Changes discarded');
       navigate(pendingNavigation);
-      setModalVisible(false);
+      //setModalVisible(false);
       setPendingNavigation(null);
     }
   };
@@ -94,26 +93,26 @@ const Sider = ({ collapsed }) => {
   // Handle menu item click
   const handleMenuClick = (e) => {
     const targetPath = e.key;
-    
+
     //console.log("=== MENU CLICK DEBUG ===");
     //console.log("Target path:", targetPath);
     //console.log("Current path:", location.pathname);
     //console.log("hasUnsavedChanges:", hasUnsavedChanges);
-    
+    navigate(targetPath);
     // Only do something if we're navigating to a different path
-    if (targetPath !== location.pathname) {
-      // Check if we have unsaved changes
-      if (hasUnsavedChanges) {
-        //console.log("Showing custom confirmation modal");
-        setPendingNavigation(targetPath);
-        setModalVisible(true);
-      } else {
-        // No unsaved changes, navigate directly
-        //console.log("No unsaved changes, navigating directly to:", targetPath);
-        navigate(targetPath);
-      }
-    }
+    //if (targetPath !== location.pathname) {
+    // Check if we have unsaved changes
+    //  if (hasUnsavedChanges) {
+    //console.log("Showing custom confirmation modal");
+    //    setPendingNavigation(targetPath);
+    //setModalVisible(true);
+    //  } else {
+    // No unsaved changes, navigate directly
+    //console.log("No unsaved changes, navigating directly to:", targetPath);
+    //    navigate(targetPath);
+    //  }
   };
+
 
   // Define menu items using the new format
   const items = [
@@ -242,8 +241,8 @@ const Sider = ({ collapsed }) => {
 
   return (
     <>
-      <AntSider 
-        width={240} 
+      <AntSider
+        width={240}
         collapsed={collapsed}
         style={{
           overflow: 'auto',
