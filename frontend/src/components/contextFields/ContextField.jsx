@@ -44,7 +44,9 @@ export const ContextField = ({
 
   // Handle change with validation
   const handleChange = useCallback((newValue) => {
-    const validationResult = validate(newValue);
+    const actualValue = newValue && newValue.target ? newValue.target.value : newValue;
+
+    const validationResult = validate(actualValue);
 
     if (!validationResult.valid) {
       setError(validationResult.message);
@@ -55,7 +57,7 @@ export const ContextField = ({
 
     // Update context only with valid data
     if (hasValidScenario()) {
-      updateByPath(path, newValue);
+      updateByPath(path, actualValue);
     }
   }, [validate, path, updateByPath, hasValidScenario]);
 

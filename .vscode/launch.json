@@ -5,21 +5,25 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Backend",
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
       "program": "${workspaceFolder}/backend/server.js",
       "restart": true,
       "runtimeExecutable": "nodemon",
-      "runtimeArgs": ["--inspect"],
+      "runtimeArgs": [
+        "--inspect"
+      ],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "cwd": "${workspaceFolder}/backend"
     },
-    
     {
       "name": "Debug Frontend",
       "type": "chrome",
       "request": "launch",
-      "url": "http://172.31.149.129:3000/",
+      "url": "http://localhost:3000/",
+      // http://172.31.149.129:3000/,
       // "https://code-server.fthome.org/proxy/3000",
       "webRoot": "${workspaceFolder}/frontend",
       "sourceMapPathOverrides": {
@@ -35,7 +39,10 @@
   "compounds": [
     {
       "name": "Debug Full Stack",
-      "configurations": ["Debug Backend", "Debug Frontend"],
+      "configurations": [
+        "Debug Backend",
+        "Debug Frontend"
+      ],
       "preLaunchTask": "Terminate All Tasks",
       "presentation": {
         "hidden": false,
