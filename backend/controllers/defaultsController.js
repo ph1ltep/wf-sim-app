@@ -72,7 +72,7 @@ const getDefaultSettings = async (platformType = 'geared') => {
               type: 'fixed',
               timeSeriesMode: false,
               parameters: {
-                value: 1000
+                value: null
               }
             },
             data: []

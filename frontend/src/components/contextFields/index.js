@@ -11,6 +11,7 @@ import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 // Import special components
 import EditableTable from '../tables/EditableTable';
 import DistributionField from './DistributionField';
+import DistributionFieldV2 from './DistributionFieldV2';
 import PrimaryPercentileSelectField from './PrimaryPercentileSelectField';
 
 /**
@@ -35,6 +36,31 @@ const getNumberFieldWidth = (min, max, step, precision, addonBefore, addonAfter)
   if (addonAfter) width += 50;
 
   return width;
+};
+
+/**
+* Get appropriate width for text field based on its parameters
+* @param {number} minLength - Minimum expected text length
+* @param {number} maxLength - Maximum expected text length
+* @param {string} placeholder - Placeholder text
+* @param {boolean} hasAddon - Whether field has addon before/after
+* @returns {number} Calculated width in pixels
+*/
+const getTextFieldWidth = (minLength = 10, maxLength = 50, placeholder = '', hasAddon = false) => {
+  // Calculate based on expected content length
+  const contentLength = Math.max(
+    minLength,
+    Math.min(maxLength, placeholder ? placeholder.length : 0)
+  );
+
+  // Base calculation: ~8px per character + padding
+  let width = 24 + (contentLength * 8);
+
+  // Add width for addons
+  if (hasAddon) width += 40;
+
+  // Ensure reasonable bounds
+  return Math.max(120, Math.min(width, 400));
 };
 
 // Text Field
@@ -102,6 +128,12 @@ export const NumberField = ({
   // Default style with calculated width if no style provided
   const defaultStyle = { width: calculatedWidth };
 
+  // Default formatter: adds commas as thousand separators
+  const defaultFormatter = (value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  // Default parser: removes commas to convert back to a number
+  const defaultParser = (value) => value.replace(/,/g, '');
+
   return (
     <ContextField
       path={path}
@@ -115,8 +147,8 @@ export const NumberField = ({
       addonBefore={addonBefore}
       addonAfter={addonAfter}
       prefix={prefix}
-      formatter={formatter}
-      parser={parser}
+      formatter={formatter || defaultFormatter} // Use provided formatter or default
+      parser={parser || defaultParser}         // Use provided parser or default
       style={{ ...defaultStyle, ...style }}
       {...rest}
     />
@@ -132,6 +164,7 @@ export const CurrencyField = ({
   step = 1000,
   style,
   currencyOverride,
+  addonAfter,
   ...rest
 }) => {
   // Get currency code from scenario context
@@ -153,7 +186,7 @@ export const CurrencyField = ({
       step={step}
       formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
       parser={value => value.replace(/\$\s?|(,*)/g, '')}
-      addonAfter={currency} // Display currency code
+      addonAfter={`${currency}${addonAfter || ''}`} // Display currency code
       style={{ ...defaultStyle, ...style }}
       {...rest}
     />
@@ -381,6 +414,12 @@ export const SliderField = ({
   />
 );
 
+// Add Time Series support for distribution parameters
+export const createTimeSeriesDataPoint = (year, value) => ({
+  year,
+  value
+});
+
 // Export both individual components and the special components
 export {
   FormSection,
@@ -389,5 +428,7 @@ export {
   FormDivider,
   EditableTable,
   DistributionField,
-  PrimaryPercentileSelectField
+  DistributionFieldV2,
+  PrimaryPercentileSelectField,
+  getTextFieldWidth
 };

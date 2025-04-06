@@ -131,7 +131,7 @@ const DistributionTypeSchema = new mongoose.Schema({
     ],
     required: true
   },
-  timeSeriesMode: { type: boolean, default: false },
+  timeSeriesMode: { type: Boolean, default: false },
   parameters: {
     type: DistributionParametersSchema,
     required: true

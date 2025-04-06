@@ -91,10 +91,7 @@ Scenario
 │   │   ├── revenue
 │   │   │   ├── energyProduction     // Energy production configuration
 │   │   │   │   ├── distribution     // 'Fixed', 'Normal', 'Triangular', 'Uniform'
-│   │   │   │   ├── mean             // Mean production in MWh
-│   │   │   │   ├── std              // Standard deviation for Normal distribution
-│   │   │   │   ├── min              // Minimum for Triangular/Uniform distributions
-│   │   │   │   └── max              // Maximum for Triangular/Uniform distributions
+│   │   │   │   └── data[]           // Results (array of SimResultsSchema)
 │   │   │   ├── electricityPrice     // Electricity price configuration
 │   │   │   │   ├── distribution     // An object of type DistributionTypeSchema ('Fixed', 'Normal', 'Lognormal')
 │   │   │   │   └── data[]           // Results (array of SimResultsSchema)
