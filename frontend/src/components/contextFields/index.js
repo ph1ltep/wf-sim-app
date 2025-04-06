@@ -12,6 +12,8 @@ import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 import EditableTable from '../tables/EditableTable';
 import DistributionField from './DistributionField';
 import DistributionFieldV2 from './DistributionFieldV2';
+import DistributionPlot from './DistributionPlot';
+import DistributionInfoBox from './DistributionInfoBox';
 import PrimaryPercentileSelectField from './PrimaryPercentileSelectField';
 
 /**
@@ -429,6 +431,8 @@ export {
   EditableTable,
   DistributionField,
   DistributionFieldV2,
+  DistributionPlot,
+  DistributionInfoBox,
   PrimaryPercentileSelectField,
   getTextFieldWidth
 };

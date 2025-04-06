@@ -1,24 +1,27 @@
 // src/components/contextFields/DistributionFieldV2.jsx
 import React from 'react';
-import { Typography, Space, Divider } from 'antd';
+import { Typography, Space, Divider, Row, Col } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { SelectField, NumberField, CurrencyField, PercentageField, FormRow, FormCol } from './index';
+import DistributionPlot from './DistributionPlot';
+import DistributionInfoBox from './DistributionInfoBox';
 
 const { Title } = Typography;
 
 /**
  * A field component for managing distribution type and parameters
- * based on the new distribution structure: { type, parameters, timeSeriesMode }
  * 
  * @param {string[]} path - Path to the distribution object in the context
- * @param {string[]} defaultValuePath - Path to use for default value of value/mean/mode parameters
+ * @param {string[]} defaultValuePath - Path to use for default value
  * @param {string} label - Field label
  * @param {string} tooltip - Optional tooltip
  * @param {Object[]} options - Distribution type options
  * @param {boolean} showTitle - Whether to show a title
  * @param {string} titleLevel - Typography title level
- * @param {string} valueType - Type of value field ('number', 'currency', 'percentage')
+ * @param {string} valueType - Type of value field
  * @param {string} addonAfter - Text to display after value inputs
+ * @param {boolean} showVisualization - Whether to show visualization
+ * @param {boolean} showInfoBox - Whether to show distribution info
  * @param {Object} style - Additional styles
  */
 const DistributionFieldV2 = ({
@@ -42,6 +45,8 @@ const DistributionFieldV2 = ({
     valueType = 'number',
     addonAfter,
     compact = false,
+    showVisualization = false,
+    showInfoBox = false,
     style = {},
     step,
     ...rest
@@ -53,6 +58,9 @@ const DistributionFieldV2 = ({
     const typePath = [...path, 'type'];
     const parametersPath = [...path, 'parameters'];
     const currentType = getValueByPath(typePath, 'fixed');
+
+    // Get parameters for visualization
+    const parameters = getValueByPath(parametersPath, {});
 
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
@@ -95,23 +103,7 @@ const DistributionFieldV2 = ({
     const renderParameterFields = () => {
         switch (currentType) {
             case 'fixed':
-                return (
-                    <FormRow>
-                        <FormCol span={colSpan}>
-                            {renderValueField(
-                                [...parametersPath, 'value'],
-                                'Fixed Value',
-                                {
-                                    required: true,
-                                    tooltip: 'Exact value to use (no randomness)',
-                                    addonAfter: addonAfter,
-                                    defaultValue: defaultValue,
-                                    step: step
-                                }
-                            )}
-                        </FormCol>
-                    </FormRow>
-                );
+                return null; // Value field is already rendered separately
 
             case 'normal':
                 return (
@@ -369,6 +361,12 @@ const DistributionFieldV2 = ({
         }
     };
 
+    // Create distribution object for InfoBox
+    const distributionObject = {
+        type: currentType,
+        parameters: parameters
+    };
+
     return (
         <div className="distribution-field-v2" style={style}>
             {showTitle && (
@@ -381,13 +379,47 @@ const DistributionFieldV2 = ({
                     label={`Distribution Type`}
                     tooltip={tooltip}
                     options={options}
-                    //style={{ width: '100%' }}
                     {...rest}
                 />
 
+                {showInfoBox && (
+                    <DistributionInfoBox distribution={distributionObject} />
+                )}
+
                 <Divider style={{ margin: '8px 0' }} />
 
-                {renderParameterFields()}
+                <Row gutter={16} align="top">
+                    <Col span={showVisualization ? 12 : 24}>
+                        {/* Always render value field first */}
+                        <FormRow>
+                            <FormCol span={colSpan}>
+                                {renderValueField(
+                                    [...parametersPath, 'value'],
+                                    'Value',
+                                    {
+                                        tooltip: currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value',
+                                        addonAfter: addonAfter,
+                                        defaultValue: defaultValue,
+                                        step: step
+                                    }
+                                )}
+                            </FormCol>
+                        </FormRow>
+
+                        {/* Render other parameter fields based on selected distribution */}
+                        {currentType !== 'fixed' && renderParameterFields()}
+                    </Col>
+
+                    {showVisualization && (
+                        <Col span={12}>
+                            <DistributionPlot
+                                distributionType={currentType}
+                                parameters={parameters}
+                                addonAfter={addonAfter}
+                            />
+                        </Col>
+                    )}
+                </Row>
             </Space>
         </div>
     );
