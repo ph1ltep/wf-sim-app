@@ -22,6 +22,7 @@ const { Title } = Typography;
  * @param {string} addonAfter - Text to display after value inputs
  * @param {boolean} showVisualization - Whether to show visualization
  * @param {boolean} showInfoBox - Whether to show distribution info
+ * @param {string} infoBoxTitle - Optional title for the info box
  * @param {Object} style - Additional styles
  */
 const DistributionFieldV2 = ({
@@ -43,10 +44,12 @@ const DistributionFieldV2 = ({
     showTitle = true,
     titleLevel = 5,
     valueType = 'number',
+    valueName = null,
     addonAfter,
     compact = false,
     showVisualization = false,
     showInfoBox = false,
+    infoBoxTitle,
     style = {},
     step,
     ...rest
@@ -382,10 +385,6 @@ const DistributionFieldV2 = ({
                     {...rest}
                 />
 
-                {showInfoBox && (
-                    <DistributionInfoBox distribution={distributionObject} />
-                )}
-
                 <Divider style={{ margin: '8px 0' }} />
 
                 <Row gutter={16} align="top">
@@ -395,10 +394,11 @@ const DistributionFieldV2 = ({
                             <FormCol span={colSpan}>
                                 {renderValueField(
                                     [...parametersPath, 'value'],
-                                    'Value',
+                                    valueName || 'Value',
                                     {
                                         tooltip: currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value',
                                         addonAfter: addonAfter,
+
                                         defaultValue: defaultValue,
                                         step: step
                                     }
@@ -420,6 +420,13 @@ const DistributionFieldV2 = ({
                         </Col>
                     )}
                 </Row>
+                {/* This is the key change - conditionally render the DistributionInfoBox */}
+                {showInfoBox && (
+                    <DistributionInfoBox
+                        distribution={distributionObject}
+                        title={infoBoxTitle}
+                    />
+                )}
             </Space>
         </div>
     );

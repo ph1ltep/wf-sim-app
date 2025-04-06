@@ -8,8 +8,9 @@ const { Text, Paragraph } = Typography;
  * Component to display information about distribution types for wind energy applications
  * 
  * @param {Object} distribution - Distribution object with type and parameters
+ * @param {string} title - Optional title to override the default one
  */
-const DistributionInfoBox = ({ distribution }) => {
+const DistributionInfoBox = ({ distribution, title }) => {
     // If no distribution, return nothing
     if (!distribution || !distribution.type) {
         return null;
@@ -94,23 +95,20 @@ const DistributionInfoBox = ({ distribution }) => {
     return (
         <Alert
             type="info"
-            message={info.title}
+            message={title || info.title}
             description={
-                <Space direction="vertical" style={{ width: '100%' }}>
-                    <Paragraph>{info.description}</Paragraph>
-
-                    <Paragraph>
-                        <Text strong>Wind Energy Applications:</Text> {info.windApplications}
+                <div style={{ fontSize: '0.9em' }}>
+                    <Paragraph style={{ marginBottom: '4px' }}>{info.description}</Paragraph>
+                    <Paragraph style={{ marginBottom: '4px' }}>
+                        <Text strong>Applications:</Text> {info.windApplications}
                     </Paragraph>
-
-                    <Paragraph>
+                    <Paragraph style={{ marginBottom: '4px' }}>
                         <Text strong>Examples:</Text> {info.examples}
                     </Paragraph>
-
-                    <Paragraph>
-                        <Text strong>Suggested Parameters:</Text> {info.suggestedParams}
+                    <Paragraph style={{ marginBottom: '4px' }}>
+                        <Text strong>Parameters:</Text> {info.suggestedParams}
                     </Paragraph>
-                </Space>
+                </div>
             }
             showIcon
         />

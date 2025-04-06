@@ -60,7 +60,9 @@ const RevenueModule = () => {
                 defaultValuePath={['settings', 'metrics', 'netAEP']}
                 tooltip="Statistical distribution of the annual energy production"
                 showVisualization={true}
+                showInfoBox={true}
                 valueType="number"
+                valueName="Net AEP"
                 addonAfter="GWh/year"
                 step={1000.0}
                 options={[
@@ -93,7 +95,9 @@ const RevenueModule = () => {
                 tooltip="Fixed electricity price under PPA or other agreement"
                 addonAfter="/MWh"
                 valueType="currency"
+                valueName="Electricity Price"
                 showVisualization={true}
+                showInfoBox={true}
                 step={1.0}
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
@@ -102,19 +106,6 @@ const RevenueModule = () => {
                   { value: 'uniform', label: 'Uniform Distribution' }
                 ]}
                 showTitle={false}
-              />
-            </FormCol>
-          </FormRow>
-
-          <FormRow>
-            <FormCol >
-              <PercentageField
-                path={[...basePath, 'revenueDegradationRate']}
-                label="Annual Revenue Degradation Rate"
-                tooltip="Annual percentage decrease in energy production due to equipment aging"
-                min={0}
-                max={10}
-                step={0.1}
               />
             </FormCol>
           </FormRow>
@@ -136,9 +127,11 @@ const RevenueModule = () => {
               <DistributionFieldV2
                 path={[...basePath, 'downtimePerEvent', 'distribution']}
                 tooltip="Statistical distribution for downtime duration"
-                addonAfter="hours"
+                addonAfter="hours/event"
                 valueType="number"
+                valueName="Downtime Duration"
                 showVisualization={true}
+                showInfoBox={true}
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'weibull', label: 'Weibull Distribution' },
@@ -173,7 +166,7 @@ const RevenueModule = () => {
                 valueType="number"
                 valueName="Avg Wind Speed"
                 showInfoBox={true}
-                infoBoxTitle="Wind Variability Distribution"
+                //infoBoxTitle="Wind Variability Distribution"
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'weibull', label: 'Weibull Distribution' },
