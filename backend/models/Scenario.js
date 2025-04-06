@@ -41,17 +41,19 @@ const ScopeAllocationsSchema = new mongoose.Schema({
   correctiveMinor: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
   bladeIntegrityManagement: { type: ComponentAllocationSchema, default: () => ({ oem: 0.0, owner: 1.0 }) },
   craneCoverage: { type: CraneCoverageSchema, default: () => ({ oem: 0.0, owner: 1.0, eventCap: null, financialCap: null }) },
-  correctiveMajor: { type: MajorComponentCoverageSchema, default: () => ({
-    oem: 0.0,
-    owner: 1.0,
-    eventCap: null,
-    financialCap: null,
-    components: {
-      tooling: { oem: 0.0, owner: 1.0 },
-      manpower: { oem: 0.0, owner: 1.0 },
-      parts: { oem: 0.0, owner: 1.0 }
-    }
-  })}
+  correctiveMajor: {
+    type: MajorComponentCoverageSchema, default: () => ({
+      oem: 0.0,
+      owner: 1.0,
+      eventCap: null,
+      financialCap: null,
+      components: {
+        tooling: { oem: 0.0, owner: 1.0 },
+        manpower: { oem: 0.0, owner: 1.0 },
+        parts: { oem: 0.0, owner: 1.0 }
+      }
+    })
+  }
 });
 
 // Schema for Yearly Responsibility in Responsibility Matrix
@@ -67,13 +69,13 @@ const YearlyResponsibilitySchema = new mongoose.Schema({
 // Percentile Schema - representing a percentile configuration
 const PercentileSchema = new mongoose.Schema({
   value: { type: Number, required: true, min: 1, max: 99, default: 50 },
-  description: { 
-    type: String, 
+  description: {
+    type: String,
     default: 'primary'
   },
   label: {
     type: String,
-    get: function() {
+    get: function () {
       return `P${this.value}`;
     }
   }
@@ -87,6 +89,7 @@ const DataPointSchema = new mongoose.Schema({
 
 // Simulation Results Schema - for storing a percentile-based result set
 const SimResultsSchema = new mongoose.Schema({
+  name: { type: String, required: true },
   percentile: { type: PercentileSchema, required: true },
   data: { type: [DataPointSchema], default: [] }
 });
@@ -104,13 +107,13 @@ const FailureModelSchema = new mongoose.Schema({
   componentCount: { type: Number, default: 100 },
   assumedFailureRate: { type: Number, default: 0.01 },
   // Reference the imported schema (without unique constraints)
-  majorComponent: { 
+  majorComponent: {
     type: new mongoose.Schema(
       Object.assign({}, MajorComponentSchema.obj, {
         name: { type: String, required: true, trim: true } // Remove unique constraint
       })
-    ), 
-    required: true 
+    ),
+    required: true
   },
   historicalData: {
     type: {
@@ -133,7 +136,7 @@ const SettingsSchema = new mongoose.Schema({
     startDate: { type: Date },
     projectLife: { type: Number, default: 20 }
   },
-  
+
   // Project settings
   project: {
     // Wind Farm specifications
@@ -145,17 +148,17 @@ const SettingsSchema = new mongoose.Schema({
       curtailmentLosses: { type: Number, default: 0 },
       electricalLosses: { type: Number, default: 0 }
     },
-    
+
     // Currency settings
     currency: {
       local: { type: String, default: 'USD' },
       foreign: { type: String, default: 'EUR' },
       exchangeRate: { type: Number, default: 1.0 }
     },
-    
+
     location: { type: String }
   },
-  
+
   // Modules settings
   modules: {
     // Financing module
@@ -171,7 +174,7 @@ const SettingsSchema = new mongoose.Schema({
       equityInvestment: { type: Number },
       minimumDSCR: { type: Number, default: 1.3 }
     },
-    
+
     // Cost module
     cost: {
       annualBaseOM: { type: Number, default: 5000000 },
@@ -191,7 +194,7 @@ const SettingsSchema = new mongoose.Schema({
       // Changed to an array of FailureModelSchema
       failureModels: { type: [FailureModelSchema], default: [] }
     },
-    
+
     // Revenue module
     revenue: {
       energyProduction: {
@@ -218,7 +221,7 @@ const SettingsSchema = new mongoose.Schema({
       kaimalScale: { type: Number, default: 8.1 },
       adjustments: { type: [AdjustmentSchema], default: [] }
     },
-    
+
     // Risk module
     risk: {
       insuranceEnabled: { type: Boolean, default: false },
@@ -226,7 +229,7 @@ const SettingsSchema = new mongoose.Schema({
       insuranceDeductible: { type: Number, default: 10000 },
       reserveFunds: { type: Number, default: 0 }
     },
-    
+
     // Contracts module
     contracts: {
       oemContracts: [{
@@ -240,13 +243,13 @@ const SettingsSchema = new mongoose.Schema({
       }]
     }
   },
-  
+
   // Simulation settings
   simulation: {
     iterations: { type: Number, default: 10000 },
     seed: { type: Number, default: 42 },
-    percentiles: { 
-      type: [PercentileSchema], 
+    percentiles: {
+      type: [PercentileSchema],
       default: [
         { value: 50, description: 'primary' },
         { value: 75, description: 'upper_bound' },
@@ -257,7 +260,7 @@ const SettingsSchema = new mongoose.Schema({
     },
     primaryPercentileIndex: { type: Number, default: 50 } // Index pointing to the primary percentile in the array  
   },
-  
+
   // Project metrics
   metrics: {
     totalMW: { type: Number, default: 70 },
@@ -292,13 +295,13 @@ const InputSimSchema = new mongoose.Schema({
     dscr: { type: PercentileSchema, default: () => ({}) },
     netCashFlow: { type: PercentileSchema, default: () => ({}) }
   },
-  
+
   // Risk results
   risk: {
     failureRates: { type: PercentileSchema, default: () => ({}) },
     eventProbabilities: { type: PercentileSchema, default: () => ({}) }
   },
-  
+
   // Scope/responsibility matrix
   scope: {
     responsibilityMatrix: { type: [YearlyResponsibilitySchema], default: null }
@@ -327,7 +330,7 @@ const ScenarioSchema = new mongoose.Schema({
 });
 
 // Pre-save hook to update the 'updatedAt' field
-ScenarioSchema.pre('save', function(next) {
+ScenarioSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
