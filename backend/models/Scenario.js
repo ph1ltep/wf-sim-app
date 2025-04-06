@@ -215,7 +215,10 @@ const SettingsSchema = new mongoose.Schema({
         scale: { type: Number, default: 24 },
         shape: { type: Number, default: 1.5 }
       },
-      windVariabilityMethod: { type: String, enum: ['Default', 'Kaimal'], default: 'Default' },
+      windVariability: {
+        method: { type: String, enum: ['Default', 'Kaimal'], default: 'Default' },
+        distribution: { type: [SimResultsSchema], default: [] }
+      },
       turbulenceIntensity: { type: Number, default: 10 },
       surfaceRoughness: { type: Number, default: 0.03 },
       kaimalScale: { type: Number, default: 8.1 },
@@ -258,7 +261,7 @@ const SettingsSchema = new mongoose.Schema({
         { value: 10, description: 'extreme_lower' }
       ]
     },
-    primaryPercentileIndex: { type: Number, default: 50 } // Index pointing to the primary percentile in the array  
+    primaryPercentile: { type: Number, default: 50 } // Index pointing to the primary percentile in the array  
   },
 
   // Project metrics

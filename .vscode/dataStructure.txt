@@ -102,7 +102,9 @@ Scenario
 │   │   │   │   ├── distribution     // 'Weibull', 'Lognormal', 'Exponential'
 │   │   │   │   ├── scale            // Scale parameter
 │   │   │   │   └── shape            // Shape parameter
-│   │   │   ├── windVariabilityMethod // 'Default' or 'Kaimal'
+│   │   │   ├── windVariability      // Normalized multipliers
+│   │   │   │   ├── method           // 'Default' or 'Kaimal'
+│   │   │   │   └── distribution[]   // Normalized multipliers (array of SimResultsSchema)
 │   │   │   ├── turbulenceIntensity  // For Kaimal method
 │   │   │   ├── surfaceRoughness     // For Kaimal method
 │   │   │   ├── kaimalScale          // For Kaimal method
@@ -131,7 +133,7 @@ Scenario
 │   │   │   ├── value               // Numeric value (e.g., 50 for P50)
 │   │   │   ├── description         // Type (primary, upper_bound, etc.)
 │   │   │   └── label               // Generated label (e.g., "P50")
-│   │   └── primaryPercentileIndex  // Index of primary percentile in the array
+│   │   └── primaryPercentile       // Primary percentile value in the array (e.g., "50")
 │   └── metrics                     // Calculated project metrics
 │       ├── totalMW                 // Total project capacity in MW
 │       ├── grossAEP                // Gross annual energy production
