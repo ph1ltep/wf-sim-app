@@ -21,7 +21,7 @@ export const createActionsColumn = (handleEdit, handleDelete, options = {}) => {
     needsConfirm = true,
     confirmTitle = 'Are you sure you want to delete this item?'
   } = options;
-  
+
   return {
     title,
     key,
@@ -36,7 +36,7 @@ export const createActionsColumn = (handleEdit, handleDelete, options = {}) => {
             onClick={() => handleEdit(record)}
           />
         )}
-        
+
         {!hideDelete && handleDelete && (
           needsConfirm ? (
             <Popconfirm
@@ -78,7 +78,7 @@ export const createTextColumn = (dataIndex, title, options = {}) => {
     align = 'left',
     sorter = false
   } = options;
-  
+
   return {
     title: tooltip ? (
       <span>
@@ -94,13 +94,13 @@ export const createTextColumn = (dataIndex, title, options = {}) => {
     ellipsis,
     align,
     render,
-    sorter: sorter === true ? 
+    sorter: sorter === true ?
       (a, b) => {
         if (typeof a[dataIndex] === 'string') {
           return a[dataIndex].localeCompare(b[dataIndex]);
         }
         return a[dataIndex] - b[dataIndex];
-      } : 
+      } :
       sorter
   };
 };
@@ -124,7 +124,7 @@ export const createNumberColumn = (dataIndex, title, options = {}) => {
     align = 'right',
     sorter = true
   } = options;
-  
+
   return {
     title: tooltip ? (
       <span>
@@ -142,14 +142,14 @@ export const createNumberColumn = (dataIndex, title, options = {}) => {
       if (value === undefined || value === null) {
         return '-';
       }
-      
-      const formattedValue = typeof value === 'number' ? 
+
+      const formattedValue = typeof value === 'number' ?
         value.toLocaleString(undefined, {
           minimumFractionDigits: precision,
           maximumFractionDigits: precision
-        }) : 
+        }) :
         value;
-      
+
       return `${prefix}${formattedValue}${suffix}`;
     }),
     sorter: sorter ? (a, b) => a[dataIndex] - b[dataIndex] : false
@@ -184,7 +184,7 @@ export const createCurrencyColumn = (dataIndex, title, options = {}) => {
     currencyPosition = 'prefix',
     ...restOptions
   } = options;
-  
+
   return createNumberColumn(dataIndex, title, {
     precision: 2,
     prefix: currencyPosition === 'prefix' ? currency : '',
@@ -209,7 +209,7 @@ export const createTagColumn = (dataIndex, title, options = {}) => {
     colorMap = {},
     defaultColor = 'default'
   } = options;
-  
+
   return {
     title: tooltip ? (
       <span>
@@ -224,17 +224,17 @@ export const createTagColumn = (dataIndex, title, options = {}) => {
     width,
     render: render || ((value) => {
       if (value === undefined || value === null) return null;
-      
+
       // Handle array of tags
       if (Array.isArray(value)) {
         return (
           <Space size={[0, 4]} wrap>
             {value.map((tag, index) => {
               const tagValue = typeof tag === 'object' ? tag.name || tag.value || tag.label : tag;
-              const tagColor = typeof tag === 'object' && tag.color ? 
-                tag.color : 
+              const tagColor = typeof tag === 'object' && tag.color ?
+                tag.color :
                 colorMap[tagValue] || defaultColor;
-              
+
               return (
                 <Tag color={tagColor} key={index}>
                   {tagValue}
@@ -244,7 +244,7 @@ export const createTagColumn = (dataIndex, title, options = {}) => {
           </Space>
         );
       }
-      
+
       // Handle single tag
       const color = colorMap[value] || defaultColor;
       return <Tag color={color}>{value}</Tag>;
@@ -267,7 +267,7 @@ export const createCustomTagsColumn = (dataIndex, title, tagRenderer, options = 
     tooltip,
     getTagsFromRecord,
   } = options;
-  
+
   return {
     title: tooltip ? (
       <span>
@@ -282,9 +282,9 @@ export const createCustomTagsColumn = (dataIndex, title, tagRenderer, options = 
     width,
     render: (_, record) => {
       const tags = getTagsFromRecord ? getTagsFromRecord(record) : record[dataIndex] || [];
-      
+
       if (!tags || tags.length === 0) return null;
-      
+
       return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {tags.map((tag, index) => tagRenderer(tag, index, record))}
@@ -312,13 +312,13 @@ export const createBooleanColumn = (dataIndex, title, options = {}) => {
     falseColor = 'default',
     ...restOptions
   } = options;
-  
+
   return createTagColumn(dataIndex, title, {
     key,
     width,
     tooltip,
-    colorMap: { 
-      [true]: trueColor, 
+    colorMap: {
+      [true]: trueColor,
       [false]: falseColor,
       'true': trueColor,
       'false': falseColor,
@@ -351,14 +351,14 @@ export const createDateColumn = (dataIndex, title, options = {}) => {
     render,
     ...restOptions
   } = options;
-  
+
   return createTextColumn(dataIndex, title, {
     key,
     width,
     tooltip,
     render: render || ((value) => {
       if (!value) return '-';
-      
+
       // Use a date formatting library here if available
       // For now, just return the value or a simple format
       try {
@@ -376,6 +376,40 @@ export const createDateColumn = (dataIndex, title, options = {}) => {
 };
 
 /**
+ * Create a percentile column with P-prefix formatting
+ * @param {string} dataIndex Field name in the data source
+ * @param {string} title Column title
+ * @param {Object} options Configuration options
+ * @returns {Object} Column definition
+ */
+export const createPercentileColumn = (dataIndex, title, options = {}) => {
+  const {
+    key = dataIndex,
+    width,
+    tooltip,
+    align = 'center',
+    ...restOptions
+  } = options;
+
+  return {
+    title: tooltip ? (
+      <span>
+        {title}
+        <Tooltip title={tooltip}>
+          <InfoCircleOutlined style={{ marginLeft: 8 }} />
+        </Tooltip>
+      </span>
+    ) : title,
+    dataIndex,
+    key,
+    width,
+    align,
+    render: value => `P${value}`,
+    ...restOptions
+  };
+};
+
+/**
  * Create a nested property column
  * @param {string[]} path Path to the property in the record
  * @param {string} title Column title
@@ -386,12 +420,12 @@ export const createDateColumn = (dataIndex, title, options = {}) => {
 export const createNestedColumn = (path, title, columnCreator = createTextColumn, options = {}) => {
   const dataIndex = path[0];
   const key = path.join('.');
-  
+
   const baseColumn = columnCreator(dataIndex, title, {
     key,
     ...options
   });
-  
+
   // Override render function to handle nested property
   return {
     ...baseColumn,
@@ -401,12 +435,12 @@ export const createNestedColumn = (path, title, columnCreator = createTextColumn
         if (currentValue === undefined || currentValue === null) return null;
         currentValue = currentValue[segment];
       }
-      
+
       // Use the original render function with the resolved value
       if (baseColumn.render) {
         return baseColumn.render(currentValue, record);
       }
-      
+
       return currentValue;
     }
   };

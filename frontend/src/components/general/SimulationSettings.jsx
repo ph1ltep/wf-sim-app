@@ -1,8 +1,9 @@
 // src/components/general/SimulationSettings.jsx
 import React, { useState } from 'react';
-import { Typography, Alert, Button, Space } from 'antd';
+import { Typography, Alert, Button } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import EditableTable from '../../components/tables/EditableTable';
+import { createTextColumn, createPercentileColumn } from '../../components/tables/columns';
 
 // Import context field components
 import {
@@ -11,24 +12,16 @@ import {
   FormCol,
   NumberField,
   TextField,
-  PercentileField
+  PercentileField,
+  PrimaryPercentileSelectField
 } from '../contextFields';
 
 const { Title } = Typography;
 
 // Define percentile columns
 const percentileColumns = [
-  {
-    title: 'Description',
-    dataIndex: 'description',
-    key: 'description',
-  },
-  {
-    title: 'Percentile',
-    dataIndex: 'value',
-    key: 'value',
-    render: (value) => `P${value}`  // Format the display with P prefix
-  },
+  createTextColumn('description', 'Description'),
+  createPercentileColumn('value', 'Percentile'),
   {
     title: 'Type',
     key: 'type',
@@ -58,7 +51,7 @@ const percentileFormFields = [
 const SimulationSettings = () => {
   // Define base path for simulation settings
   const basePath = ['settings', 'simulation'];
-  
+
   // Get scenario data
   const { scenarioData, updateByPath } = useScenario();
   const [isModified, setIsModified] = useState(false);
@@ -68,10 +61,10 @@ const SimulationSettings = () => {
     return (
       <div>
         <Title level={2}>Simulation Settings</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -88,10 +81,10 @@ const SimulationSettings = () => {
       <Title level={2}>
         Simulation Settings
         {isModified && (
-          <Button 
-            type="primary" 
-            size="small" 
-            style={{ marginLeft: 16 }} 
+          <Button
+            type="primary"
+            size="small"
+            style={{ marginLeft: 16 }}
             onClick={handleSaveChanges}
           >
             Save Changes
@@ -129,12 +122,18 @@ const SimulationSettings = () => {
         </FormRow>
       </FormSection>
 
-      <FormSection 
-        title="Percentiles for Visualization" 
+      <FormSection
+        title="Percentiles for Visualization"
         style={{ marginBottom: 24 }}
       >
         <p>Configure which percentiles (P-values) to display in charts and results.</p>
-        
+
+        <FormRow>
+          <FormCol span={12}>
+            <PrimaryPercentileSelectField basePath={basePath} />
+          </FormCol>
+        </FormRow>
+
         {/* EditableTable component for percentiles */}
         <EditableTable
           columns={percentileColumns}
@@ -143,7 +142,7 @@ const SimulationSettings = () => {
           keyField="value"
           itemName="Percentile"
         />
-        
+
         <Alert
           message="Percentile Definitions"
           description={

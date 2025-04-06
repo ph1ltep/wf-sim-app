@@ -11,6 +11,7 @@ import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 // Import special components
 import EditableTable from '../tables/EditableTable';
 import DistributionField from './DistributionField';
+import PrimaryPercentileSelectField from './PrimaryPercentileSelectField';
 
 /**
  * Get appropriate width for number field based on its parameters
@@ -387,5 +388,6 @@ export {
   FormCol,
   FormDivider,
   EditableTable,
-  DistributionField
+  DistributionField,
+  PrimaryPercentileSelectField
 };
