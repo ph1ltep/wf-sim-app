@@ -94,6 +94,64 @@ const SimResultsSchema = new mongoose.Schema({
   data: { type: [DataPointSchema], default: [] }
 });
 
+// Schema for distribution parameters with mixed types
+const DistributionParametersSchema = new mongoose.Schema({
+  // Parameters that can be either number or time series
+  value: { type: mongoose.Schema.Types.Mixed },
+  scale: { type: mongoose.Schema.Types.Mixed },
+  min: { type: mongoose.Schema.Types.Mixed },
+  max: { type: mongoose.Schema.Types.Mixed },
+  meanWindSpeed: { type: mongoose.Schema.Types.Mixed },
+  stdDev: { type: mongoose.Schema.Types.Mixed },
+
+  // Parameters that remain as simple numbers
+  mode: { type: Number },
+  sigma: { type: Number },
+  shape: { type: Number },
+  lambda: { type: Number },
+  turbulenceIntensity: { type: Number },
+  roughnessLength: { type: Number },
+  hubHeight: { type: Number }
+});
+
+// Main DistributionTypeSchema 
+const DistributionTypeSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    enum: [
+      'normal',
+      'lognormal',
+      'triangular',
+      'uniform',
+      'weibull',
+      'exponential',
+      'poisson',
+      'fixed',
+      'kaimal'
+    ],
+    required: true
+  },
+  timeSeriesMode: { type: boolean, default: false },
+  parameters: {
+    type: DistributionParametersSchema,
+    required: true
+  }
+});
+
+// Validation function to check if a mixed field is either a number or an array of DataPointSchema
+DistributionParametersSchema.path('value').validate(function (value) {
+  return typeof value === 'number' || (Array.isArray(value) && value.every(v => v.year !== undefined && v.value !== undefined));
+}, 'Must be a number or an array of data points');
+
+// Apply similar validations to other mixed fields
+['scale', 'min', 'max', 'meanWindSpeed', 'stdDev'].forEach(field => {
+  DistributionParametersSchema.path(field).validate(function (value) {
+    return value === undefined || value === null ||
+      typeof value === 'number' ||
+      (Array.isArray(value) && value.every(v => v.year !== undefined && v.value !== undefined));
+  }, `${field} must be a number or an array of data points`);
+});
+
 // Schema for Adjustment
 const AdjustmentSchema = new mongoose.Schema({
   years: { type: [Number], required: true },

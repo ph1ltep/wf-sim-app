@@ -94,20 +94,15 @@ Scenario
 │   │   │   │   ├── min              // Minimum for Triangular/Uniform distributions
 │   │   │   │   └── max              // Maximum for Triangular/Uniform distributions
 │   │   │   ├── electricityPrice     // Electricity price configuration
-│   │   │   │   ├── type             // 'fixed' or 'variable'
-│   │   │   │   ├── value            // Price value for fixed type
-│   │   │   │   └── distribution     // Distribution type for variable price
+│   │   │   │   ├── distribution     // An object of type DistributionTypeSchema ('Fixed', 'Normal', 'Lognormal')
+│   │   │   │   └── data[]           // Results (array of SimResultsSchema)
 │   │   │   ├── revenueDegradationRate // Annual revenue degradation percentage
 │   │   │   ├── downtimePerEvent     // Downtime configuration
-│   │   │   │   ├── distribution     // 'Weibull', 'Lognormal', 'Exponential'
-│   │   │   │   ├── scale            // Scale parameter
-│   │   │   │   └── shape            // Shape parameter
-│   │   │   ├── windVariability      // Normalized multipliers
-│   │   │   │   ├── method           // 'Default' or 'Kaimal'
-│   │   │   │   └── distribution[]   // Normalized multipliers (array of SimResultsSchema)
-│   │   │   ├── turbulenceIntensity  // For Kaimal method
-│   │   │   ├── surfaceRoughness     // For Kaimal method
-│   │   │   ├── kaimalScale          // For Kaimal method
+│   │   │   │   ├── distribution     // An object of type DistributionTypeSchema ('Weibull', 'Lognormal', 'Exponential', 'Fixed')
+│   │   │   │   └── data[]           // Results (array of SimResultsSchema)
+│   │   │   ├── windVariability      // Wind variability configuration
+│   │   │   │   ├── distribution     // An object of type DistributionTypeSchema ('Weibull' or 'Fixed')
+│   │   │   │   └── data[]           // Results (array of SimResultsSchema)
 │   │   │   └── adjustments[]        // Revenue adjustments
 │   │   │       ├── years[]          // Array of years this adjustment applies to
 │   │   │       ├── amount           // Adjustment amount
