@@ -51,23 +51,26 @@ const RevenueModule = () => {
       ),
       children: (
         <FormSection title="Energy Production" style={{ marginBottom: 24 }}>
-          <p>Configure the annual energy production and its variability.</p>
+          <FormRow>
+            <FormCol span={12}>
+              <p>Configure the annual energy production and its variability.</p>
 
-          <DistributionFieldV2
-            path={[...basePath, 'energyProduction', 'distribution']}
-            defaultValuePath={['settings', 'metrics', 'netAEP']}
-            label="Energy Production"
-            tooltip="Statistical distribution of the annual energy production"
-            valueType="number"
-            addonAfter="GWh/year"
-            step={1000.0}
-            options={[
-              { value: 'fixed', label: 'Fixed Value' },
-              { value: 'normal', label: 'Normal Distribution' },
-              { value: 'triangular', label: 'Triangular Distribution' },
-              { value: 'uniform', label: 'Uniform Distribution' }
-            ]}
-          />
+              <DistributionFieldV2
+                path={[...basePath, 'energyProduction', 'distribution']}
+                defaultValuePath={['settings', 'metrics', 'netAEP']}
+                tooltip="Statistical distribution of the annual energy production"
+                valueType="number"
+                addonAfter="GWh/year"
+                step={1000.0}
+                options={[
+                  { value: 'fixed', label: 'Fixed Value' },
+                  { value: 'normal', label: 'Normal Distribution' },
+                  { value: 'triangular', label: 'Triangular Distribution' },
+                  { value: 'uniform', label: 'Uniform Distribution' }
+                ]}
+              />
+            </FormCol>
+          </FormRow>
         </FormSection>
       )
     },
@@ -125,10 +128,9 @@ const RevenueModule = () => {
       ),
       children: (
         <FormSection title="Downtime Configuration" style={{ marginBottom: 24 }}>
-          <p>Configure the statistical distribution for downtime duration per failure event.</p>
-
           <FormRow>
             <FormCol span={24}>
+              <p>Configure the statistical distribution for downtime duration per failure event.</p>
               <DistributionFieldV2
                 path={[...basePath, 'downtimePerEvent', 'distribution']}
                 tooltip="Statistical distribution for downtime duration"
@@ -156,18 +158,20 @@ const RevenueModule = () => {
       ),
       children: (
         <FormSection title="Wind Variability Method" style={{ marginBottom: 24 }}>
-          <p>Configure the statistical distribution for wind variability.</p>
           <FormRow>
-            <DistributionFieldV2
-              path={[...basePath, 'windVariability', 'distribution']}
-              tooltip="Method for simulating wind resource variability"
-              valueType="number"
-              options={[
-                { value: 'fixed', label: 'Fixed Value' },
-                { value: 'weibull', label: 'Weibull Distribution' },
-                { value: 'kaimal', label: 'Kaimal/IEC 61400-1 (Industry Standard)' }
-              ]}
-            />
+            <FormCol span={24}>
+              <p>Configure the statistical distribution for wind variability.</p>
+              <DistributionFieldV2
+                path={[...basePath, 'windVariability', 'distribution']}
+                tooltip="Method for simulating wind resource variability"
+                valueType="number"
+                options={[
+                  { value: 'fixed', label: 'Fixed Value' },
+                  { value: 'weibull', label: 'Weibull Distribution' },
+                  { value: 'kaimal', label: 'Kaimal/IEC 61400-1 (Industry Standard)' }
+                ]}
+              />
+            </FormCol>
           </FormRow>
         </FormSection>
       )
