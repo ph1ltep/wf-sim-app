@@ -11,7 +11,7 @@ const getDefaultSettings = async (platformType = 'geared') => {
   try {
     // Get default failure models
     const failureModels = await getDefaultFailureModels(platformType);
-    
+
     // Default settings - structured exactly like the Scenario schema
     return {
       general: {
@@ -49,8 +49,16 @@ const getDefaultSettings = async (platformType = 'geared') => {
         },
         cost: {
           annualBaseOM: 5000000,
-          escalationRate: 2,
-          escalationDistribution: 'Normal',
+          escalationRate: {
+            distribution: {
+              type: 'fixed',
+              timeSeriesMode: false,
+              parameters: {
+                value: 0.025
+              }
+            },
+            data: []
+          },
           oemTerm: 5,
           fixedOMFee: 4000000,
           failureEventProbability: 5,
@@ -60,24 +68,50 @@ const getDefaultSettings = async (platformType = 'geared') => {
         },
         revenue: {
           energyProduction: {
-            distribution: 'Normal',
-            mean: 1000,
-            std: 100
+            distribution: {
+              type: 'fixed',
+              timeSeriesMode: false,
+              parameters: {
+                value: 1000
+              }
+            },
+            data: []
           },
           electricityPrice: {
-            type: 'fixed',
-            value: 50
+            distribution: {
+              type: 'fixed',
+              timeSeriesMode: false,
+              parameters: {
+                value: 50
+              }
+            },
+            data: []
           },
           revenueDegradationRate: 0.5,
           downtimePerEvent: {
-            distribution: 'Weibull',
-            scale: 24,
-            shape: 1.5
+            distribution: {
+              type: 'weibull',
+              timeSeriesMode: false,
+              parameters: {
+                scale: 24,
+                shape: 1.5
+              }
+            },
+            data: []
           },
-          windVariabilityMethod: 'Default',
-          turbulenceIntensity: 10,
-          surfaceRoughness: 0.03,
-          kaimalScale: 8.1,
+          windVariability: {
+            distribution: {
+              type: 'kaimal',
+              timeSeriesMode: false,
+              parameters: {
+                meanWindSpeed: 10,
+                turbulenceIntensity: 10,
+                roughnessLength: 0.03,
+                kaimalScale: 8.1
+              }
+            },
+            data: []
+          },
           adjustments: []
         },
         risk: {
@@ -133,7 +167,7 @@ const getDefaults = async (req, res) => {
   try {
     // Get platform type from query parameter (default to 'geared')
     const platformType = req.query.platform || 'geared';
-    
+
     // Get default settings using the helper function
     const defaults = await getDefaultSettings(platformType);
 
@@ -146,14 +180,14 @@ const getDefaults = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting default parameters:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 };
 
-module.exports = { 
-  getDefaults, 
+module.exports = {
+  getDefaults,
   getDefaultSettings
 };
