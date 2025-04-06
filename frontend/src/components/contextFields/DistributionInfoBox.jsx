@@ -80,6 +80,13 @@ const DistributionInfoBox = ({ distribution, title }) => {
             windApplications: "Industry standard for modeling wind turbulence and its effect on turbine loads.",
             examples: "Wind turbulence modeling, load calculations, site-specific design adaptations.",
             suggestedParams: "Mean Wind Speed: Site average (5-10 m/s); Turbulence Intensity: 10-20% (Class A: 16%, Class B: 14%, Class C: 12%)."
+        },
+        gbm: {
+            title: "Geometric Brownian Motion",
+            description: "A continuous-time stochastic process where logarithmic returns follow Brownian motion with drift.",
+            windApplications: "Excellent for modeling price series and financial parameters that evolve over time.",
+            examples: "Electricity market prices, carbon credit values, variable tariffs, investment returns over time.",
+            suggestedParams: "Initial Value: Starting price; Drift: Annual growth rate (2-5%); Volatility: Annual standard deviation (15-30% for electricity prices)."
         }
     };
 

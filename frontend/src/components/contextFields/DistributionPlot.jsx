@@ -702,6 +702,84 @@ StdDev: ${stdDev.toFixed(2)} m/s`,
 
                 break;
             }
+            case 'gbm': {
+                const initialValue = getParam(params, 'initialValue', 100);
+                const drift = getParam(params, 'drift', 0.05);
+                const volatility = getParam(params, 'volatility', 0.2);
+                const timeStep = 1; // Annual step
+
+                // Create time points and paths
+                const years = 20; // Show 20 years of projection
+                const numPaths = 10; // Show multiple sample paths
+                const timePoints = Array.from({ length: years + 1 }, (_, i) => i);
+
+                // Create GBM paths
+                const paths = [];
+                for (let p = 0; p < numPaths; p++) {
+                    const path = [initialValue];
+                    let currentValue = initialValue;
+
+                    for (let t = 1; t <= years; t++) {
+                        // Generate increment using GBM formula
+                        const adjustedDrift = drift - (volatility * volatility) / 2;
+                        const randomComponent = volatility * Math.sqrt(timeStep) * jStat.normal.sample(0, 1);
+                        const growthFactor = Math.exp(adjustedDrift * timeStep + randomComponent);
+
+                        currentValue = currentValue * growthFactor;
+                        path.push(currentValue);
+                    }
+
+                    paths.push(path);
+                }
+
+                // Mean path - theoretical expectation
+                const meanPath = [initialValue];
+                for (let t = 1; t <= years; t++) {
+                    // E[S_t] = S_0 * e^(μt)
+                    meanPath.push(initialValue * Math.exp(drift * t));
+                }
+
+                title = 'Geometric Brownian Motion';
+
+                // Add sample paths
+                for (let p = 0; p < paths.length; p++) {
+                    data.push({
+                        x: timePoints,
+                        y: paths[p],
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: {
+                            color: 'rgba(49, 130, 189, 0.3)',
+                            width: 1
+                        },
+                        showlegend: false
+                    });
+                }
+
+                // Add mean expectation path
+                data.push({
+                    x: timePoints,
+                    y: meanPath,
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: {
+                        color: 'rgb(255, 0, 0)',
+                        width: 2,
+                        dash: 'dot'
+                    },
+                    name: 'Expected Value'
+                });
+
+                // Add parameter summary
+                annotations.push(createParameterLabel(
+                    years / 2,
+                    initialValue * 1.5,
+                    `Initial: ${initialValue.toFixed(2)}, Drift: ${(drift * 100).toFixed(1)}%, Volatility: ${(volatility * 100).toFixed(1)}%`,
+                    'center'
+                ));
+
+                break;
+            }
             default:
                 return;
         }

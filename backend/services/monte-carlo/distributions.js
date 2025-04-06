@@ -86,6 +86,15 @@ class DistributionFactory {
           getParam('hubHeight', 100)
         );
 
+      case 'gbm':
+        return this._createGBMDistribution(
+          getParam('initialValue', 100),
+          getParam('drift', 0.05),
+          getParam('volatility', 0.2),
+          getParam('timeStep', 1),
+          options
+        );
+
       default:
         throw new Error(`Unsupported distribution type: ${type}`);
     }
@@ -117,6 +126,44 @@ class DistributionFactory {
 
     return amplitude * Math.sqrt(spectralDensity);
   }
+
+  /**
+ * Creates a Geometric Brownian Motion distribution function
+ * @param {number} initialValue - Starting value (S0)
+ * @param {number} drift - Annual drift/growth rate (μ)
+ * @param {number} volatility - Annual volatility (σ)
+ * @param {number} timeStep - Time step in years (default: 1 year)
+ * @param {Object} options - Additional options including current year
+ * @returns {Function} A function that returns a GBM sample
+ */
+  static _createGBMDistribution(initialValue, drift, volatility, timeStep, options = {}) {
+    const currentYear = options.year || 1;
+    let currentValue = initialValue;
+
+    // If not the first year, calculate value at this point in time
+    if (currentYear > 1) {
+      // Calculate deterministic component up to current year
+      // S(t) = S0 * exp((μ - σ²/2) * t + σ * W(t))
+      // For deterministic path, we omit the random component
+      const deterministicDrift = drift - (volatility * volatility) / 2;
+      const timeElapsed = (currentYear - 1) * timeStep;
+      currentValue = initialValue * Math.exp(deterministicDrift * timeElapsed);
+    }
+
+    // Create normal distribution for the random component
+    const normalDist = random.normal(0, 1);
+
+    return () => {
+      // GBM formula: S(t+Δt) = S(t) * exp((μ - σ²/2) * Δt + σ * sqrt(Δt) * Z)
+      // where Z is a standard normal random variable
+      const adjustedDrift = drift - (volatility * volatility) / 2;
+      const randomComponent = volatility * Math.sqrt(timeStep) * normalDist();
+      const growthFactor = Math.exp(adjustedDrift * timeStep + randomComponent);
+
+      return currentValue * growthFactor;
+    };
+  }
+
 
   static calculatePercentiles(data, percentiles = [10, 50, 75, 90]) {
     if (!data || data.length === 0) {

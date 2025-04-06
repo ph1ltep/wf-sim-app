@@ -39,7 +39,8 @@ const DistributionFieldV2 = ({
         { value: 'weibull', label: 'Weibull Distribution' },
         { value: 'exponential', label: 'Exponential Distribution' },
         { value: 'poisson', label: 'Poisson Distribution' },
-        { value: 'kaimal', label: 'Kaimal Distribution' }
+        { value: 'kaimal', label: 'Kaimal Distribution' },
+        { value: 'gbm', label: 'Geometric Brownian Motion' },
     ],
     showTitle = true,
     titleLevel = 5,
@@ -358,7 +359,64 @@ const DistributionFieldV2 = ({
                         </FormCol>
                     </FormRow>
                 );
-
+            case 'gbm':
+                return (
+                    <FormRow>
+                        <FormCol span={colSpan}>
+                            {renderValueField(
+                                [...parametersPath, 'initialValue'],
+                                'Initial Value',
+                                {
+                                    required: true,
+                                    tooltip: 'Starting value at time zero',
+                                    addonAfter: addonAfter,
+                                    defaultValue: defaultValue || 100,
+                                    min: 0,
+                                    step: step || 1
+                                }
+                            )}
+                        </FormCol>
+                        <FormCol span={colSpan}>
+                            <PercentageField
+                                path={[...parametersPath, 'drift']}
+                                label="Drift (Annual)"
+                                tooltip="Annual growth rate"
+                                min={-20}
+                                max={20}
+                                step={0.1}
+                                precision={1}
+                                defaultValue={5}
+                                required
+                            />
+                        </FormCol>
+                        <FormCol span={colSpan}>
+                            <PercentageField
+                                path={[...parametersPath, 'volatility']}
+                                label="Volatility (Annual)"
+                                tooltip="Annual standard deviation as percentage"
+                                min={0}
+                                max={100}
+                                step={0.1}
+                                precision={1}
+                                defaultValue={20}
+                                required
+                            />
+                        </FormCol>
+                        <FormCol span={colSpan}>
+                            <NumberField
+                                path={[...parametersPath, 'timeStep']}
+                                label="Time Step"
+                                tooltip="Time increment in years (typically 1 for annual)"
+                                min={0.1}
+                                step={0.1}
+                                defaultValue={1}
+                                precision={1}
+                                addonAfter="years"
+                                required
+                            />
+                        </FormCol>
+                    </FormRow>
+                );
             default:
                 return null;
         }
