@@ -460,6 +460,10 @@ const DistributionFieldV2 = ({
                                 distributionType={currentType}
                                 parameters={parameters}
                                 addonAfter={addonAfter}
+                                showMean={true}
+                                showStdDev={true}
+                                showMarkers={true}
+                                showSummary={false}
                             />
                         </Col>
                     )}
