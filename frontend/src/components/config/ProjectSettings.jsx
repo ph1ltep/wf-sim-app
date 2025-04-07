@@ -152,8 +152,10 @@ const ProjectSettings = () => {
     updateByPath([...currencyPath, 'exchangeRate'], selectedLocation.exchangeRate);
 
     // Update revenue module values with location defaults
-    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'value'],
+    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'distribution', 'parameters', 'value'],
       selectedLocation.energyPrice);
+    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'distribution', 'parameters', 'drift'],
+      selectedLocation.inflationRate);
 
     // Update cost module values with location defaults
     updateByPath(['settings', 'modules', 'cost', 'escalationRate'],

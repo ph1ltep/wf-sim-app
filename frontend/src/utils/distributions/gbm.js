@@ -1,6 +1,5 @@
 // src/utils/distributions/gbm.js
 import * as jStat from 'jstat';
-import { PlotUtils } from '../plotUtils';
 import { DistributionBase } from './distributionBase';
 
 /**

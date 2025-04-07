@@ -15,7 +15,7 @@ export const Normal = {
     validate(parameters) {
         const issues = [];
 
-        if (parameters.mean === undefined || parameters.mean === null) {
+        if (parameters.value === undefined || parameters.value === null) {
             issues.push("Mean value is required");
         }
 
@@ -43,9 +43,9 @@ export const Normal = {
      * @returns {Object} Plot data
      */
     generatePlot(parameters, options) {
-        const mean = DistributionBase.helpers.getParam(parameters, 'mean', 0);
-        const stdDev = DistributionBase.helpers.getParam(parameters, 'stdDev', 1);
-        const value = DistributionBase.helpers.getParam(parameters, 'value', mean);
+        const mean = DistributionBase.helpers.getParam(parameters, 'value', 0);
+        const stdDev = mean * (DistributionBase.helpers.getParam(parameters, 'stdDev', 10.0) / 100);
+        const value = mean //DistributionBase.helpers.getParam(parameters, 'value', mean);
 
         // Generate x values
         const min = mean - 4 * stdDev;
@@ -128,7 +128,8 @@ export const Normal = {
      * @returns {number} Standard deviation
      */
     calculateStdDev(parameters) {
-        return DistributionBase.helpers.getParam(parameters, 'stdDev', 1);
+        const mean = DistributionBase.helpers.getParam(parameters, 'value', 0);
+        return mean * (DistributionBase.helpers.getParam(parameters, 'stdDev', 10.0) / 100);
     },
 
     /**
@@ -139,6 +140,12 @@ export const Normal = {
         return {
             name: 'Normal Distribution',
             description: 'Symmetric bell-shaped distribution defined by mean and standard deviation',
+            title: "Normal Distribution",
+            description: "Symmetric bell-shaped distribution defined by mean and standard deviation.",
+            windApplications: "Ideal for modeling natural variations with equal probabilities of being above or below the mean.",
+            examples: "Annual energy production, wind speed at hub height, component lifetimes, or operations costs.",
+            suggestedParams: "Mean: Central expected value; StdDev: ~10-15% of mean for energy production, ~5-10% for component lifetimes.",
+            axis: "The probability density shows how concentrated the distribution is at each point, with higher values indicating greater likelihood relative to other points(e.g., a density of 0.4 is twice as likely as 0.2).",
             parameters: [
                 {
                     name: 'mean',

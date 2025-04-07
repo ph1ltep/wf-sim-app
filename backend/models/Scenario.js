@@ -105,6 +105,7 @@ const DistributionParametersSchema = new mongoose.Schema({
   stdDev: { type: mongoose.Schema.Types.Mixed },
 
   // Parameters that remain as simple numbers
+  mu: { type: Number },
   mode: { type: Number },
   sigma: { type: Number },
   shape: { type: Number },

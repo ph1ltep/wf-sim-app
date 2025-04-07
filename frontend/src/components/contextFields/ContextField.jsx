@@ -10,6 +10,7 @@ export const ContextField = ({
   component: Component,
   tooltip,
   required,
+  disabled,
   validators = [], // Custom validators (will override built-ins if needed)
   ...rest
 }) => {
@@ -69,7 +70,7 @@ export const ContextField = ({
       help={error}
       required={required}
     >
-      <Component
+      <Component disabled={disabled}
         value={value}
         onChange={handleChange}
         status={error ? 'error' : undefined}

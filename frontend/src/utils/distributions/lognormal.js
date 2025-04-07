@@ -43,7 +43,7 @@ export const LogNormal = {
      * @returns {Object} Plot data
      */
     generatePlot(parameters, options) {
-        const mu = DistributionBase.helpers.getParam(parameters, 'mean', 0);
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
         const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 0.5);
 
         // Calculate mean for this distribution
@@ -145,7 +145,7 @@ export const LogNormal = {
      * @returns {number} Standard deviation
      */
     calculateStdDev(parameters) {
-        const mu = DistributionBase.helpers.getParam(parameters, 'mean', 0);
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
         const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 0.5);
 
         const variance = (Math.exp(sigma * sigma) - 1) * Math.exp(2 * mu + sigma * sigma);

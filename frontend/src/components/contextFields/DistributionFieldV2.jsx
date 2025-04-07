@@ -1,12 +1,16 @@
 // src/components/contextFields/DistributionFieldV2.jsx
 import React from 'react';
-import { Typography, Space, Divider, Row, Col } from 'antd';
+import { Alert, Typography, Space, Divider, Row, Col } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { SelectField, NumberField, CurrencyField, PercentageField, FormRow, FormCol } from './index';
 import DistributionPlot from './DistributionPlot';
 import DistributionInfoBox from './DistributionInfoBox';
+import { distributionTypes, DistributionUtils } from '../../utils/distributions';
+import * as jStat from 'jstat';
+import api from '../../api';
 
-const { Title } = Typography;
+
+const { Title, Text, Paragraph } = Typography;
 
 /**
  * A field component for managing distribution type and parameters
@@ -30,18 +34,7 @@ const DistributionFieldV2 = ({
     defaultValuePath,
     label,
     tooltip,
-    options = [
-        { value: 'fixed', label: 'Fixed Value' },
-        { value: 'normal', label: 'Normal Distribution' },
-        { value: 'lognormal', label: 'Lognormal Distribution' },
-        { value: 'triangular', label: 'Triangular Distribution' },
-        { value: 'uniform', label: 'Uniform Distribution' },
-        { value: 'weibull', label: 'Weibull Distribution' },
-        { value: 'exponential', label: 'Exponential Distribution' },
-        { value: 'poisson', label: 'Poisson Distribution' },
-        { value: 'kaimal', label: 'Kaimal Distribution' },
-        { value: 'gbm', label: 'Geometric Brownian Motion' },
-    ],
+    options = distributionTypes,
     showTitle = true,
     titleLevel = 5,
     valueType = 'number',
@@ -69,8 +62,17 @@ const DistributionFieldV2 = ({
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
 
+    // Get the distribution implementation dynamically
+    const distribution = DistributionUtils.getDistribution(currentType);
+
+    // Check if distribution exists and get metadata
+    const metadata = distribution ? distribution.getMetadata() : null;
+
     // Set column widths based on compact mode
     const colSpan = compact ? 200 : 150;
+
+    //const distribution = getDistribution(currentType);
+    //const metadata = distribution.getMetadata(currentType);
 
     // Helper function to render value field based on valueType
     const renderValueField = (valuePath, valueLabel, props = {}) => {
@@ -113,25 +115,13 @@ const DistributionFieldV2 = ({
                 return (
                     <FormRow>
                         <FormCol span={colSpan}>
-                            {renderValueField(
-                                [...parametersPath, 'mean'],
-                                'Mean',
-                                {
-                                    required: true,
-                                    tooltip: 'Average value in the normal distribution',
-                                    addonAfter: addonAfter,
-                                    defaultValue: defaultValue,
-                                    step: step
-                                }
-                            )}
-                        </FormCol>
-                        <FormCol span={colSpan}>
-                            <NumberField
+                            <PercentageField
                                 path={[...parametersPath, 'stdDev']}
+                                defaultValue={10.0}
                                 label="Standard Deviation"
                                 tooltip="Measure of dispersion"
-                                min={0}
-                                step={0.01}
+                                min={0.1}
+                                step={0.1}
                                 required
                             />
                         </FormCol>
@@ -143,13 +133,14 @@ const DistributionFieldV2 = ({
                     <FormRow>
                         <FormCol span={colSpan}>
                             {renderValueField(
-                                [...parametersPath, 'mean'],
+                                [...parametersPath, 'mu'],
                                 'Mu (Log-mean)',
                                 {
                                     required: true,
                                     tooltip: 'Mean of the logarithm of the variable',
-                                    defaultValue: defaultValue,
-                                    step: step
+                                    defaultValue: Math.log(defaultValue),
+                                    step: step,
+                                    disabled: false
                                 }
                             )}
                         </FormCol>
@@ -442,7 +433,7 @@ const DistributionFieldV2 = ({
                                     {
                                         tooltip: currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value',
                                         addonAfter: addonAfter,
-                                        requred: true,
+                                        required: true,
                                         defaultValue: defaultValue,
                                         step: step
                                     }
@@ -469,12 +460,37 @@ const DistributionFieldV2 = ({
                     )}
                 </Row>
                 {/* This is the key change - conditionally render the DistributionInfoBox */}
-                {showInfoBox && (
+                {showInfoBox &&
+                    <Alert
+                        type="info"
+                        message={infoBoxTitle}
+                        description={
+                            <div style={{ fontSize: '0.9em' }}>
+                                <Paragraph style={{ marginBottom: '12px' }}>{metadata.description}</Paragraph>
+                                <Paragraph style={{ marginBottom: '2px' }}>
+                                    <Text strong>Applications:</Text> {metadata.windApplications}
+                                </Paragraph>
+                                <Paragraph style={{ marginBottom: '2px' }}>
+                                    <Text strong>Examples:</Text> {metadata.examples}
+                                </Paragraph>
+                                <Paragraph style={{ marginBottom: '2px' }}>
+                                    <Text strong>Parameters:</Text> {metadata.suggestedParams}
+                                </Paragraph>
+                                <Paragraph style={{ marginBottom: '2px' }}>
+                                    <Text strong>Axis:</Text> {metadata.axis}
+                                </Paragraph>
+                            </div>
+                        }
+                        showIcon
+                    />
+
+
+                /*(
                     <DistributionInfoBox
                         distribution={distributionObject}
                         title={infoBoxTitle}
                     />
-                )}
+                )*/}
             </Space>
         </div>
     );

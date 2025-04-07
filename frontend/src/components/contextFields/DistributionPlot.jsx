@@ -68,10 +68,10 @@ const DistributionPlot = ({
                     pad: 4
                 },
                 xaxis: {
-                    title: plotInfo.xaxisTitle
+                    title: { text: plotInfo.xaxisTitle, standoff: 10 },
                 },
                 yaxis: {
-                    title: plotInfo.yaxisTitle
+                    title: { text: plotInfo.yaxisTitle, standoff: 30 }
                 },
                 annotations: plotInfo.annotations,
                 shapes: plotInfo.shapes,

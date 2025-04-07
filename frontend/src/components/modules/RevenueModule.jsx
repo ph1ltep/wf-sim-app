@@ -62,7 +62,7 @@ const RevenueModule = () => {
                 showVisualization={true}
                 showInfoBox={true}
                 valueType="number"
-                valueName="Net AEP"
+                valueName="Net AEP (mean)"
                 addonAfter="GWh/year"
                 step={1000.0}
                 options={[

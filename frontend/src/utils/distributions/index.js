@@ -24,6 +24,19 @@ const DISTRIBUTIONS = {
     gbm: GBM
 };
 
+export const distributionTypes = [
+    { value: 'fixed', label: 'Fixed Value' },
+    { value: 'normal', label: 'Normal Distribution' },
+    { value: 'lognormal', label: 'Lognormal Distribution' },
+    { value: 'triangular', label: 'Triangular Distribution' },
+    { value: 'uniform', label: 'Uniform Distribution' },
+    { value: 'weibull', label: 'Weibull Distribution' },
+    { value: 'exponential', label: 'Exponential Distribution' },
+    { value: 'poisson', label: 'Poisson Distribution' },
+    { value: 'kaimal', label: 'Kaimal Distribution' },
+    { value: 'gbm', label: 'Geometric Brownian Motion' },
+];
+
 /**
  * Distribution utilities
  */

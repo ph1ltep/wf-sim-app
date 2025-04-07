@@ -30,7 +30,8 @@ const DistributionInfoBox = ({ distribution, title }) => {
             description: "Symmetric bell-shaped distribution defined by mean and standard deviation.",
             windApplications: "Ideal for modeling natural variations with equal probabilities of being above or below the mean.",
             examples: "Annual energy production, wind speed at hub height, component lifetimes, or operations costs.",
-            suggestedParams: "Mean: Central expected value; StdDev: ~10-15% of mean for energy production, ~5-10% for component lifetimes."
+            suggestedParams: "Mean: Central expected value; StdDev: ~10-15% of mean for energy production, ~5-10% for component lifetimes.",
+            axis: "The probability density shows how concentrated the distribution is at each point, with higher values indicating greater likelihood relative to other points(e.g., a density of 0.4 is twice as likely as 0.2).",
         },
         lognormal: {
             title: "Lognormal Distribution",
@@ -96,7 +97,8 @@ const DistributionInfoBox = ({ distribution, title }) => {
         description: "No information available for this distribution type.",
         windApplications: "",
         examples: "",
-        suggestedParams: ""
+        suggestedParams: "",
+        axis: ""
     };
 
     return (
@@ -105,7 +107,7 @@ const DistributionInfoBox = ({ distribution, title }) => {
             message={title || info.title}
             description={
                 <div style={{ fontSize: '0.9em' }}>
-                    <Paragraph style={{ marginBottom: '4px' }}>{info.description}</Paragraph>
+                    <Paragraph style={{ marginBottom: '8px' }}>{info.description}</Paragraph>
                     <Paragraph style={{ marginBottom: '4px' }}>
                         <Text strong>Applications:</Text> {info.windApplications}
                     </Paragraph>
@@ -114,6 +116,9 @@ const DistributionInfoBox = ({ distribution, title }) => {
                     </Paragraph>
                     <Paragraph style={{ marginBottom: '4px' }}>
                         <Text strong>Parameters:</Text> {info.suggestedParams}
+                    </Paragraph>
+                    <Paragraph style={{ marginBottom: '4px' }}>
+                        <Text strong>Axis:</Text> {info.axis}
                     </Paragraph>
                 </div>
             }
