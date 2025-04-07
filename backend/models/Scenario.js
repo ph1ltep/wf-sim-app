@@ -111,7 +111,10 @@ const DistributionParametersSchema = new mongoose.Schema({
   lambda: { type: Number },
   turbulenceIntensity: { type: Number },
   roughnessLength: { type: Number },
-  hubHeight: { type: Number }
+  hubHeight: { type: Number },
+  drift: { type: Number },
+  volatility: { type: Number },
+  timeStep: { type: Number }
 });
 
 // Main DistributionTypeSchema 
@@ -127,7 +130,8 @@ const DistributionTypeSchema = new mongoose.Schema({
       'exponential',
       'poisson',
       'fixed',
-      'kaimal'
+      'kaimal',
+      'gbm'
     ],
     required: true
   },

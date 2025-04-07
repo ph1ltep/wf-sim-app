@@ -103,7 +103,8 @@ const RevenueModule = () => {
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'normal', label: 'Normal Distribution' },
                   { value: 'lognormal', label: 'Lognormal Distribution' },
-                  { value: 'uniform', label: 'Uniform Distribution' }
+                  { value: 'uniform', label: 'Uniform Distribution' },
+                  { value: 'gbm', label: 'Geometric Brownian Motion' }
                 ]}
                 showTitle={false}
               />

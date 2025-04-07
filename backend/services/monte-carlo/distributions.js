@@ -88,7 +88,7 @@ class DistributionFactory {
 
       case 'gbm':
         return this._createGBMDistribution(
-          getParam('initialValue', 100),
+          getParam('value', 100),
           getParam('drift', 0.05),
           getParam('volatility', 0.2),
           getParam('timeStep', 1),
@@ -142,20 +142,16 @@ class DistributionFactory {
 
     // If not the first year, calculate value at this point in time
     if (currentYear > 1) {
-      // Calculate deterministic component up to current year
-      // S(t) = S0 * exp((μ - σ²/2) * t + σ * W(t))
-      // For deterministic path, we omit the random component
-      const deterministicDrift = drift - (volatility * volatility) / 2;
+      // For deterministic path (expectation), we use: S(t) = S0 * exp(μt)
       const timeElapsed = (currentYear - 1) * timeStep;
-      currentValue = initialValue * Math.exp(deterministicDrift * timeElapsed);
+      currentValue = initialValue * Math.exp(drift * timeElapsed);
     }
 
     // Create normal distribution for the random component
     const normalDist = random.normal(0, 1);
 
     return () => {
-      // GBM formula: S(t+Δt) = S(t) * exp((μ - σ²/2) * Δt + σ * sqrt(Δt) * Z)
-      // where Z is a standard normal random variable
+      // GBM formula: S(t+Δt) = S(t) * exp((μ - σ²/2) * Δt + σ * √Δt * Z)
       const adjustedDrift = drift - (volatility * volatility) / 2;
       const randomComponent = volatility * Math.sqrt(timeStep) * normalDist();
       const growthFactor = Math.exp(adjustedDrift * timeStep + randomComponent);
@@ -163,7 +159,6 @@ class DistributionFactory {
       return currentValue * growthFactor;
     };
   }
-
 
   static calculatePercentiles(data, percentiles = [10, 50, 75, 90]) {
     if (!data || data.length === 0) {

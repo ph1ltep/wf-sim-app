@@ -1,7 +1,8 @@
 // src/components/contextFields/DistributionPlot.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import * as jStat from 'jstat';
+import { Alert } from 'antd';
 
 /**
  * Component to visualize different statistical distributions
@@ -20,9 +21,121 @@ const DistributionPlot = ({
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
 
-    useEffect(() => {
-        updateVisualization(distributionType, parameters);
+    // Validate parameters based on distribution type
+    const validationResult = useMemo(() => {
+        if (!distributionType || !parameters) {
+            return { isValid: false, message: "Distribution type or parameters missing" };
+        }
+
+        switch (distributionType) {
+            case 'fixed':
+                if (parameters.value === undefined || parameters.value === null) {
+                    return { isValid: false, message: "Fixed value is required" };
+                }
+                break;
+
+            case 'normal':
+                if (parameters.mean === undefined || parameters.mean === null) {
+                    return { isValid: false, message: "Mean value is required" };
+                }
+                if (parameters.stdDev === undefined || parameters.stdDev === null || parameters.stdDev <= 0) {
+                    return { isValid: false, message: "Standard deviation must be a positive number" };
+                }
+                break;
+
+            case 'lognormal':
+                if (parameters.mean === undefined || parameters.mean === null) {
+                    return { isValid: false, message: "Mu (log-mean) value is required" };
+                }
+                if (parameters.sigma === undefined || parameters.sigma === null || parameters.sigma <= 0) {
+                    return { isValid: false, message: "Sigma (log-std) must be a positive number" };
+                }
+                break;
+
+            case 'triangular':
+                if (parameters.min === undefined || parameters.min === null) {
+                    return { isValid: false, message: "Minimum value is required" };
+                }
+                if (parameters.mode === undefined || parameters.mode === null) {
+                    return { isValid: false, message: "Mode value is required" };
+                }
+                if (parameters.max === undefined || parameters.max === null) {
+                    return { isValid: false, message: "Maximum value is required" };
+                }
+                if (parameters.min > parameters.mode || parameters.mode > parameters.max) {
+                    return { isValid: false, message: "Triangle parameters must satisfy: min ≤ mode ≤ max" };
+                }
+                break;
+
+            case 'uniform':
+                if (parameters.min === undefined || parameters.min === null) {
+                    return { isValid: false, message: "Minimum value is required" };
+                }
+                if (parameters.max === undefined || parameters.max === null) {
+                    return { isValid: false, message: "Maximum value is required" };
+                }
+                if (parameters.min >= parameters.max) {
+                    return { isValid: false, message: "Maximum must be greater than minimum" };
+                }
+                break;
+
+            case 'weibull':
+                if (parameters.scale === undefined || parameters.scale === null || parameters.scale <= 0) {
+                    return { isValid: false, message: "Scale parameter must be positive" };
+                }
+                if (parameters.shape === undefined || parameters.shape === null || parameters.shape <= 0) {
+                    return { isValid: false, message: "Shape parameter must be positive" };
+                }
+                break;
+
+            case 'exponential':
+                if (parameters.lambda === undefined || parameters.lambda === null || parameters.lambda <= 0) {
+                    return { isValid: false, message: "Lambda parameter must be positive" };
+                }
+                break;
+
+            case 'poisson':
+                if (parameters.lambda === undefined || parameters.lambda === null || parameters.lambda <= 0) {
+                    return { isValid: false, message: "Lambda parameter must be positive" };
+                }
+                break;
+
+            case 'kaimal':
+                if (parameters.meanWindSpeed === undefined || parameters.meanWindSpeed === null || parameters.meanWindSpeed <= 0) {
+                    return { isValid: false, message: "Mean wind speed must be positive" };
+                }
+                if (parameters.turbulenceIntensity === undefined || parameters.turbulenceIntensity === null || parameters.turbulenceIntensity <= 0) {
+                    return { isValid: false, message: "Turbulence intensity must be positive" };
+                }
+                break;
+
+            case 'gbm':
+                if (parameters.value === undefined || parameters.value === null || parameters.value <= 0) {
+                    return { isValid: false, message: "Initial value must be positive" };
+                }
+                if (parameters.drift === undefined || parameters.drift === null) {
+                    return { isValid: false, message: "Drift parameter is required" };
+                }
+                if (parameters.volatility === undefined || parameters.volatility === null || parameters.volatility <= 0) {
+                    return { isValid: false, message: "Volatility must be positive" };
+                }
+                if (parameters.timeStep === undefined || parameters.timeStep === null || parameters.timeStep <= 0) {
+                    return { isValid: false, message: "Time step must be positive" };
+                }
+                break;
+
+            default:
+                return { isValid: false, message: `Unknown distribution type: ${distributionType}` };
+        }
+
+        return { isValid: true };
     }, [distributionType, parameters]);
+
+    useEffect(() => {
+        if (validationResult.isValid) {
+            updateVisualization(distributionType, parameters);
+        }
+    }, [distributionType, parameters, validationResult.isValid]);
 
     // Helper function to generate x values
     const generateXValues = (min, max, count = 100) => {
@@ -428,8 +541,7 @@ StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     (min + max) / 2,
                     peakY / 2,
-                    `Min: ${min}, Mode: ${mode}, Max: ${max}
-Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
+                    `Min: ${min}, Mode: ${mode}, Max: ${max} Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                     'center'
                 ));
 
@@ -480,8 +592,7 @@ Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     (min + max) / 2,
                     height / 2,
-                    `Min: ${min}, Max: ${max}
-Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
+                    `Min: ${min}, Max: ${max} Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                     'center'
                 ));
 
@@ -545,8 +656,7 @@ Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     scale,
                     peakY / 2,
-                    `Scale: ${scale.toFixed(2)}, Shape: ${shape.toFixed(2)}
-Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
+                    `Scale: ${scale.toFixed(2)}, Shape: ${shape.toFixed(2)} Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                     'center'
                 ));
 
@@ -596,8 +706,7 @@ Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     mean * 2,
                     peakY / 2,
-                    `λ: ${lambda.toFixed(2)}, Mean: ${mean.toFixed(2)}
-StdDev: ${stdDev.toFixed(2)}`,
+                    `λ: ${lambda.toFixed(2)}, Mean: ${mean.toFixed(2)} StdDev: ${stdDev.toFixed(2)}`,
                     'center'
                 ));
 
@@ -646,8 +755,7 @@ StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     lambda * 1.5,
                     Math.max(...yValues) / 2,
-                    `λ: ${lambda.toFixed(2)}
-Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
+                    `λ: ${lambda.toFixed(2)} Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                     'center'
                 ));
 
@@ -694,69 +802,88 @@ Mean: ${mean.toFixed(2)}, StdDev: ${stdDev.toFixed(2)}`,
                 annotations.push(createParameterLabel(
                     meanWindSpeed,
                     peakY / 2,
-                    `Mean: ${meanWindSpeed.toFixed(1)} m/s
-Turbulence Intensity: ${(turbulenceIntensity * 100).toFixed(1)}%
-StdDev: ${stdDev.toFixed(2)} m/s`,
+                    `Mean: ${meanWindSpeed.toFixed(1)} m/s Turbulence Intensity: ${(turbulenceIntensity * 100).toFixed(1)}% StdDev: ${stdDev.toFixed(2)} m/s`,
                     'center'
                 ));
 
                 break;
             }
             case 'gbm': {
-                const initialValue = getParam(params, 'initialValue', 100);
-                const drift = getParam(params, 'drift', 0.05);
-                const volatility = getParam(params, 'volatility', 0.2);
-                const timeStep = 1; // Annual step
+                // Get parameters, handling percentage inputs
+                const initialValue = getParam(params, 'value', 100);
+                const driftPercent = getParam(params, 'drift', 5);
+                const volatilityPercent = getParam(params, 'volatility', 20);
 
-                // Create time points and paths
-                const years = 20; // Show 20 years of projection
-                const numPaths = 10; // Show multiple sample paths
+                // Convert from percentage to decimal
+                const drift = driftPercent / 100;
+                const volatility = volatilityPercent / 100;
+                const timeStep = getParam(params, 'timeStep', 1);
+
+                // Time horizon for projection (years)
+                const years = 10;
                 const timePoints = Array.from({ length: years + 1 }, (_, i) => i);
 
-                // Create GBM paths
-                const paths = [];
+                // Calculate expected mean path: S(t) = S0 * exp(μt)
+                const meanPath = timePoints.map(t => initialValue * Math.exp(drift * t));
+
+                // Calculate standard deviation at each time point
+                // For GBM, the variance grows with: S0^2 * exp(2μt) * (exp(σ^2*t) - 1)
+                const stdDevPath = timePoints.map(t => {
+                    if (t === 0) return 0; // No variance at t=0
+                    const variance = initialValue * initialValue *
+                        Math.exp(2 * drift * t) *
+                        (Math.exp(volatility * volatility * t) - 1);
+                    return Math.sqrt(variance);
+                });
+
+                // Calculate confidence intervals
+                const upperCI_1sigma = timePoints.map((_, i) => meanPath[i] + stdDevPath[i]);
+                const lowerCI_1sigma = timePoints.map((_, i) => Math.max(0, meanPath[i] - stdDevPath[i]));
+                const upperCI_2sigma = timePoints.map((_, i) => meanPath[i] + 2 * stdDevPath[i]);
+                const lowerCI_2sigma = timePoints.map((_, i) => Math.max(0, meanPath[i] - 2 * stdDevPath[i]));
+
+                // Generate 5 sample paths for illustration
+                const numPaths = 5;
+                const samplePaths = [];
+
                 for (let p = 0; p < numPaths; p++) {
                     const path = [initialValue];
-                    let currentValue = initialValue;
+                    let value = initialValue;
 
                     for (let t = 1; t <= years; t++) {
-                        // Generate increment using GBM formula
                         const adjustedDrift = drift - (volatility * volatility) / 2;
                         const randomComponent = volatility * Math.sqrt(timeStep) * jStat.normal.sample(0, 1);
-                        const growthFactor = Math.exp(adjustedDrift * timeStep + randomComponent);
-
-                        currentValue = currentValue * growthFactor;
-                        path.push(currentValue);
+                        value = value * Math.exp(adjustedDrift * timeStep + randomComponent);
+                        path.push(value);
                     }
 
-                    paths.push(path);
-                }
-
-                // Mean path - theoretical expectation
-                const meanPath = [initialValue];
-                for (let t = 1; t <= years; t++) {
-                    // E[S_t] = S_0 * e^(μt)
-                    meanPath.push(initialValue * Math.exp(drift * t));
+                    samplePaths.push(path);
                 }
 
                 title = 'Geometric Brownian Motion';
 
-                // Add sample paths
-                for (let p = 0; p < paths.length; p++) {
-                    data.push({
-                        x: timePoints,
-                        y: paths[p],
-                        type: 'scatter',
-                        mode: 'lines',
-                        line: {
-                            color: 'rgba(49, 130, 189, 0.3)',
-                            width: 1
-                        },
-                        showlegend: false
-                    });
-                }
+                // Add confidence bands (filled area)
+                data.push({
+                    x: [...timePoints, ...timePoints.slice().reverse()],
+                    y: [...upperCI_2sigma, ...lowerCI_2sigma.slice().reverse()],
+                    fill: 'toself',
+                    fillcolor: 'rgba(0, 0, 255, 0.1)',
+                    line: { color: 'transparent' },
+                    name: '95% Confidence',
+                    showlegend: true
+                });
 
-                // Add mean expectation path
+                data.push({
+                    x: [...timePoints, ...timePoints.slice().reverse()],
+                    y: [...upperCI_1sigma, ...lowerCI_1sigma.slice().reverse()],
+                    fill: 'toself',
+                    fillcolor: 'rgba(0, 0, 255, 0.2)',
+                    line: { color: 'transparent' },
+                    name: '68% Confidence',
+                    showlegend: true
+                });
+
+                // Add expected path (mean)
                 data.push({
                     x: timePoints,
                     y: meanPath,
@@ -764,19 +891,50 @@ StdDev: ${stdDev.toFixed(2)} m/s`,
                     mode: 'lines',
                     line: {
                         color: 'rgb(255, 0, 0)',
-                        width: 2,
-                        dash: 'dot'
+                        width: 2
                     },
                     name: 'Expected Value'
                 });
 
-                // Add parameter summary
-                annotations.push(createParameterLabel(
-                    years / 2,
-                    initialValue * 1.5,
-                    `Initial: ${initialValue.toFixed(2)}, Drift: ${(drift * 100).toFixed(1)}%, Volatility: ${(volatility * 100).toFixed(1)}%`,
-                    'center'
-                ));
+                // Add sample paths
+                for (let p = 0; p < samplePaths.length; p++) {
+                    data.push({
+                        x: timePoints,
+                        y: samplePaths[p],
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: {
+                            color: 'rgba(0, 0, 0, 0.3)',
+                            width: 1
+                        },
+                        showlegend: p === 0,
+                        name: p === 0 ? 'Sample Paths' : undefined
+                    });
+                }
+
+                // Add annotations for drift and volatility
+                annotations.push({
+                    x: years / 2,
+                    y: meanPath[years] * 1.1,
+                    text: `Initial: ${initialValue.toFixed(2)}, Drift: ${driftPercent.toFixed(1)}%, Volatility: ${volatilityPercent.toFixed(1)}%`,
+                    showarrow: false,
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: 'rgba(0, 0, 0, 0.1)',
+                    borderwidth: 1,
+                    borderpad: 4,
+                    font: { size: 10 }
+                });
+
+                // Update layout for better time series display
+                title = 'Geometric Brownian Motion';
+                const xaxisTitle = 'Years';
+                const yaxisTitle = addonAfter ? `Value (${addonAfter})` : 'Value';
+                const showLegendFlag = true;
+                const legendSettings = {
+                    x: 0.05,
+                    y: 0.95,
+                    bgcolor: 'rgba(255, 255, 255, 0.5)'
+                };
 
                 break;
             }
@@ -784,6 +942,7 @@ StdDev: ${stdDev.toFixed(2)} m/s`,
                 return;
         }
 
+        // Set plot layout
         // Set plot layout
         const layout = {
             title: title,
@@ -794,23 +953,46 @@ StdDev: ${stdDev.toFixed(2)} m/s`,
                 l: 50,
                 r: 30,
                 b: 50,
-                t: 50,
+                t: 10,
                 pad: 4
             },
             xaxis: {
-                title: addonAfter ? `Value (${addonAfter})` : 'Value'
+                title: distributionType === 'gbm' ? 'Years' : (addonAfter ? `Value (${addonAfter})` : 'Value')
             },
             yaxis: {
-                title: 'Probability Density'
+                title: distributionType === 'gbm' ? (addonAfter ? `Value (${addonAfter})` : 'Value') : 'Probability Density'
             },
             annotations: annotations,
             shapes: shapes,
-            showlegend: false
+            showlegend: distributionType === 'gbm' ? true : false
         };
+
+        if (distributionType === 'gbm') {
+            layout.legend = {
+                x: 0.05,
+                y: 0.95,
+                bgcolor: 'rgba(255, 255, 255, 0.5)'
+            };
+        }
 
         setPlotData(data);
         setPlotLayout(layout);
     };
+
+
+
+    // If parameters are not valid, show a warning instead of the plot
+    if (!validationResult.isValid) {
+        return (
+            <Alert
+                message="Visualization not available"
+                description={validationResult.message || "Please provide all required parameters to visualize this distribution."}
+                type="warning"
+                showIcon
+                style={{ width: '100%', ...style }}
+            />
+        );
+    }
 
     return (
         <Plot

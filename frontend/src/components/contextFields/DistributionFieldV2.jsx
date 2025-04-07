@@ -363,20 +363,6 @@ const DistributionFieldV2 = ({
                 return (
                     <FormRow>
                         <FormCol span={colSpan}>
-                            {renderValueField(
-                                [...parametersPath, 'initialValue'],
-                                'Initial Value',
-                                {
-                                    required: true,
-                                    tooltip: 'Starting value at time zero',
-                                    addonAfter: addonAfter,
-                                    defaultValue: defaultValue || 100,
-                                    min: 0,
-                                    step: step || 1
-                                }
-                            )}
-                        </FormCol>
-                        <FormCol span={colSpan}>
                             <PercentageField
                                 path={[...parametersPath, 'drift']}
                                 label="Drift (Annual)"
@@ -456,7 +442,7 @@ const DistributionFieldV2 = ({
                                     {
                                         tooltip: currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value',
                                         addonAfter: addonAfter,
-
+                                        requred: true,
                                         defaultValue: defaultValue,
                                         step: step
                                     }
