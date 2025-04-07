@@ -122,19 +122,16 @@ export const Poisson = {
      */
     getMetadata() {
         return {
-            name: 'Poisson Distribution',
-            description: 'Discrete distribution modeling the number of events occurring in a fixed time interval',
+            name: "Poisson Distribution",
+            description: "Discrete distribution for the number of events in a fixed time interval.",
+            applications: "Models the frequency of rare, independent events over time.",
+            examples: "Number of lightning strikes, grid outages, major component failures per year, extreme weather events.",
             parameters: [
                 {
-                    name: 'lambda',
-                    description: 'Mean number of events per interval',
+                    name: "lambda",
+                    description: "Expected number of events per period (0.1-2 failures per turbine per year)",
                     required: true,
                     min: 0
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to lambda)',
-                    required: false
                 }
             ]
         };

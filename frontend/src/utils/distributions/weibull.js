@@ -197,25 +197,20 @@ export const Weibull = {
      */
     getMetadata() {
         return {
-            name: 'Weibull Distribution',
-            description: 'Versatile distribution commonly used in reliability and wind speed modeling',
+            name: "Weibull Distribution",
+            description: "Versatile distribution commonly used in reliability and wind speed modeling.",
+            applications: "The standard for modeling wind speed distributions and component reliability.",
+            examples: "Wind speed distributions, component failure rates, turbine lifetime modeling.",
             parameters: [
                 {
-                    name: 'scale',
-                    description: 'Scale parameter (controls the spread)',
-                    required: true,
-                    min: 0
+                    name: "scale",
+                    description: "6-12 for wind speeds (m/s)",
+                    required: true
                 },
                 {
-                    name: 'shape',
-                    description: 'Shape parameter (controls the distribution shape)',
-                    required: true,
-                    min: 0
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
+                    name: "shape",
+                    description: "1.5-2.5 for wind speeds (higher for less variability), 1.5-3.0 for component failures",
+                    required: true
                 }
             ]
         };

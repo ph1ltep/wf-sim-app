@@ -209,28 +209,25 @@ export const Triangular = {
      */
     getMetadata() {
         return {
-            name: 'Triangular Distribution',
-            description: 'Distribution defined by minimum, most likely (mode), and maximum values',
+            name: "Triangular Distribution",
+            description: "Simple distribution defined by minimum, maximum, and most likely values.",
+            applications: "Useful when data is limited but min, max, and most likely values are known from expert judgment.",
+            examples: "Construction costs, project timelines, capacity factors, seasonal energy output variations.",
             parameters: [
                 {
-                    name: 'min',
-                    description: 'Minimum possible value',
+                    name: "min",
+                    description: "Absolute minimum (e.g., 30% for capacity factor)",
                     required: true
                 },
                 {
-                    name: 'mode',
-                    description: 'Most likely value (peak of the triangle)',
+                    name: "mode",
+                    description: "Most likely value (e.g., 40% for capacity factor)",
                     required: true
                 },
                 {
-                    name: 'max',
-                    description: 'Maximum possible value',
+                    name: "max",
+                    description: "Maximum reasonable value (e.g., 50% for capacity factor)",
                     required: true
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
                 }
             ]
         };

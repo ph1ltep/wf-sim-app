@@ -158,24 +158,21 @@ export const LogNormal = {
      */
     getMetadata() {
         return {
-            name: 'Lognormal Distribution',
-            description: 'Skewed distribution where logarithm of the variable follows normal distribution',
+            name: "Lognormal Distribution",
+            description: "Skewed distribution where logarithm of the variable follows normal distribution.",
+            applications: "Good for modeling values that cannot be negative and have occasional large positive values.",
+            examples: "Repair costs, downtime duration, time between failures, component repair times.",
             parameters: [
                 {
-                    name: 'mean',
-                    description: 'Mu (logarithmic mean)',
+                    name: "mean",
+                    description: "Natural log of the expected value",
                     required: true
                 },
                 {
-                    name: 'sigma',
-                    description: 'Sigma (logarithmic standard deviation)',
+                    name: "sigma",
+                    description: "0.4-0.8 for repair costs, 0.3-0.6 for failure intervals",
                     required: true,
                     min: 0
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
                 }
             ]
         };

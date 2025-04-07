@@ -248,8 +248,10 @@ export const GBM = {
      */
     getMetadata() {
         return {
-            name: 'Geometric Brownian Motion',
-            description: 'A continuous-time stochastic process used to model stock prices, asset values, and prices over time',
+            name: "Geometric Brownian Motion",
+            description: "A continuous-time stochastic process where logarithmic returns follow Brownian motion with drift.",
+            applications: "Excellent for modeling price series and financial parameters that evolve over time.",
+            examples: "Electricity market prices, carbon credit values, variable tariffs, investment returns over time.",
             parameters: [
                 {
                     name: 'value',
@@ -258,13 +260,13 @@ export const GBM = {
                     min: 0
                 },
                 {
-                    name: 'drift',
-                    description: 'Annual growth rate (percentage)',
+                    name: "drift",
+                    description: "Annual growth rate (2-5%)",
                     required: true
                 },
                 {
-                    name: 'volatility',
-                    description: 'Annual volatility (percentage)',
+                    name: "volatility",
+                    description: "Annual standard deviation (15-30% for electricity prices)",
                     required: true,
                     min: 0
                 },

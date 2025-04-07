@@ -179,22 +179,22 @@ export const Kaimal = {
      */
     getMetadata() {
         return {
-            name: 'Kaimal Spectrum',
-            description: 'Wind turbulence model following IEC 61400 standards for wind turbine design',
+            name: "Kaimal Spectrum",
+            description: "Specialized model for wind turbulence following IEC 61400 standards.",
+            applications: "Industry standard for modeling wind turbulence and its effect on turbine loads.",
+            examples: "Wind turbulence modeling, load calculations, site-specific design adaptations.",
             parameters: [
                 {
-                    name: 'meanWindSpeed',
-                    description: 'Mean wind speed at hub height',
-                    required: true,
-                    min: 0,
-                    units: 'm/s'
+                    name: "meanWindSpeed",
+                    description: "Site average (5-10 m/s)",
+                    required: true
                 },
                 {
-                    name: 'turbulenceIntensity',
-                    description: 'Turbulence intensity (percentage)',
+                    name: "turbulenceIntensity",
+                    description: "10-20% (Class A: 16%, Class B: 14%, Class C: 12%)",
                     required: true,
                     min: 0,
-                    units: '%'
+                    max: 1
                 },
                 {
                     name: 'roughnessLength',

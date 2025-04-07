@@ -463,34 +463,41 @@ const DistributionFieldV2 = ({
                 {showInfoBox &&
                     <Alert
                         type="info"
-                        message={infoBoxTitle}
+                        message={metadata.name}  // Updated from infoBoxTitle to use metadata.name
                         description={
                             <div style={{ fontSize: '0.9em' }}>
-                                <Paragraph style={{ marginBottom: '12px' }}>{metadata.description}</Paragraph>
+                                <Paragraph style={{ marginBottom: '12px' }}>
+                                    {metadata.description}
+                                </Paragraph>
                                 <Paragraph style={{ marginBottom: '2px' }}>
-                                    <Text strong>Applications:</Text> {metadata.windApplications}
+                                    <Text strong>Applications:</Text> {metadata.applications}
                                 </Paragraph>
                                 <Paragraph style={{ marginBottom: '2px' }}>
                                     <Text strong>Examples:</Text> {metadata.examples}
                                 </Paragraph>
                                 <Paragraph style={{ marginBottom: '2px' }}>
-                                    <Text strong>Parameters:</Text> {metadata.suggestedParams}
+                                    <Text strong>Parameters:</Text>
+                                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                                        {metadata.parameters.map((param, index) => (
+                                            <li key={index}>
+                                                <Text code>{param.name}</Text>: {param.description}
+                                                {param.required && ' (required)'}
+                                                {param.min !== undefined && `, min: ${param.min}`}
+                                                {param.max !== undefined && `, max: ${param.max}`}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </Paragraph>
-                                <Paragraph style={{ marginBottom: '2px' }}>
-                                    <Text strong>Axis:</Text> {metadata.axis}
-                                </Paragraph>
+                                {metadata.axis && (
+                                    <Paragraph style={{ marginBottom: '2px' }}>
+                                        <Text strong>Axis:</Text> {metadata.axis}
+                                    </Paragraph>
+                                )}
                             </div>
                         }
                         showIcon
                     />
-
-
-                /*(
-                    <DistributionInfoBox
-                        distribution={distributionObject}
-                        title={infoBoxTitle}
-                    />
-                )*/}
+                }
             </Space>
         </div>
     );

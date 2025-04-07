@@ -141,19 +141,16 @@ export const Exponential = {
      */
     getMetadata() {
         return {
-            name: 'Exponential Distribution',
-            description: 'Distribution modeling time between independent events occurring at a constant rate',
+            name: "Exponential Distribution",
+            description: "Models time between independent events occurring at a constant rate.",
+            applications: "Used for random failure events with constant failure rates.",
+            examples: "Time between random equipment failures, maintenance visit intervals, grid outage events.",
             parameters: [
                 {
-                    name: 'lambda',
-                    description: 'Rate parameter (events per unit time)',
+                    name: "lambda",
+                    description: "Inverse of mean time between events (0.05-0.2 1/years for major components)",
                     required: true,
                     min: 0
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
                 }
             ]
         };

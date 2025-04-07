@@ -138,30 +138,22 @@ export const Normal = {
      */
     getMetadata() {
         return {
-            name: 'Normal Distribution',
-            description: 'Symmetric bell-shaped distribution defined by mean and standard deviation',
-            title: "Normal Distribution",
+            name: "Normal Distribution",
             description: "Symmetric bell-shaped distribution defined by mean and standard deviation.",
-            windApplications: "Ideal for modeling natural variations with equal probabilities of being above or below the mean.",
+            applications: "Ideal for modeling natural variations with equal probabilities of being above or below the mean.",
             examples: "Annual energy production, wind speed at hub height, component lifetimes, or operations costs.",
-            suggestedParams: "Mean: Central expected value; StdDev: ~10-15% of mean for energy production, ~5-10% for component lifetimes.",
-            axis: "The probability density shows how concentrated the distribution is at each point, with higher values indicating greater likelihood relative to other points(e.g., a density of 0.4 is twice as likely as 0.2).",
+            axis: "The probability density shows how concentrated the distribution is at each point, with higher values indicating greater likelihood relative to other points (e.g., a density of 0.4 is twice as likely as 0.2).",
             parameters: [
                 {
-                    name: 'mean',
-                    description: 'The average or expected value',
+                    name: "mean",
+                    description: "Central expected value",
                     required: true
                 },
                 {
-                    name: 'stdDev',
-                    description: 'Standard deviation (measure of spread)',
+                    name: "stdDev",
+                    description: "~10-15% of mean for energy production, ~5-10% for component lifetimes",
                     required: true,
                     min: 0
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
                 }
             ]
         };

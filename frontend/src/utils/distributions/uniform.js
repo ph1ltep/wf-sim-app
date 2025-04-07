@@ -155,23 +155,20 @@ export const Uniform = {
      */
     getMetadata() {
         return {
-            name: 'Uniform Distribution',
-            description: 'Distribution with equal probability across all values in a range',
+            name: "Uniform Distribution",
+            description: "Equal probability across all values in a defined range.",
+            applications: "Used when all values in a range are equally likely or when uncertainty is high.",
+            examples: "Energy price forecasts under high uncertainty, random component failures, initial bidding ranges.",
             parameters: [
                 {
-                    name: 'min',
-                    description: 'Minimum possible value',
+                    name: "min",
+                    description: "Lower bound (typically -20% of expected value for pricing)",
                     required: true
                 },
                 {
-                    name: 'max',
-                    description: 'Maximum possible value',
+                    name: "max",
+                    description: "Upper bound (typically +20% of expected value for pricing)",
                     required: true
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean)',
-                    required: false
                 }
             ]
         };

@@ -69,12 +69,14 @@ export const Fixed = {
      */
     getMetadata() {
         return {
-            name: 'Fixed Value',
-            description: 'A deterministic value with no randomness',
+            name: "Fixed Value",
+            description: "Uses a single deterministic value with no variability.",
+            applications: "Used for deterministic analysis, base case scenarios, or when uncertainty is accounted for separately.",
+            examples: "Fixed power purchase agreement (PPA) prices, guaranteed availability levels, or contractual performance metrics.",
             parameters: [
                 {
-                    name: 'value',
-                    description: 'The constant value',
+                    name: "value",
+                    description: "Set to the most likely or contractually agreed value",
                     required: true
                 }
             ]
