@@ -102,7 +102,7 @@ const RevenueModule = () => {
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'normal', label: 'Normal Distribution' },
-                  { value: 'lognormal', label: 'Lognormal Distribution' },
+                  //{ value: 'lognormal', label: 'Lognormal Distribution' },
                   { value: 'uniform', label: 'Uniform Distribution' },
                   { value: 'gbm', label: 'Geometric Brownian Motion' }
                 ]}
@@ -137,7 +137,7 @@ const RevenueModule = () => {
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'weibull', label: 'Weibull Distribution' },
                   { value: 'lognormal', label: 'Lognormal Distribution' },
-                  { value: 'exponential', label: 'Exponential Distribution' }
+                  //{ value: 'exponential', label: 'Exponential Distribution' }
                 ]}
               />
             </FormCol>
@@ -165,13 +165,13 @@ const RevenueModule = () => {
                 addonAfter="m/s"
                 step={0.1}
                 valueType="number"
-                valueName="Avg Wind Speed"
+                valueName="Wind Speed (mean)"
                 showInfoBox={true}
                 //infoBoxTitle="Wind Variability Distribution"
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'weibull', label: 'Weibull Distribution' },
-                  { value: 'kaimal', label: 'Kaimal/IEC 61400-1 (Industry Standard)' }
+                  //{ value: 'kaimal', label: 'Kaimal/IEC 61400-1 (Industry Standard)' }
                 ]}
               />
             </FormCol>

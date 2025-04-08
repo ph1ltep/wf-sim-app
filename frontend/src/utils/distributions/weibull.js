@@ -198,18 +198,23 @@ export const Weibull = {
     getMetadata() {
         return {
             name: "Weibull Distribution",
-            description: "Versatile distribution commonly used in reliability and wind speed modeling.",
-            applications: "The standard for modeling wind speed distributions and component reliability.",
-            examples: "Wind speed distributions, component failure rates, turbine lifetime modeling.",
+            description: "Versatile distribution commonly used in reliability, wind speed, and repair time modeling.",
+            applications: "The standard for modeling wind speed distributions, component reliability, and repair times, including delays from aging and parts scarcity.",
+            examples: "Wind speed distributions, component failure rates, turbine lifetime modeling, repair times for major components as turbines age.",
             parameters: [
                 {
+                    name: "mean",
+                    description: "Central expected value",
+                    required: true
+                },
+                {
                     name: "scale",
-                    description: "Time by which 63.2% of components fail (years), or wind speed at which 63.2% of measurements fall below (m/s)",
+                    description: "Time by which 63.2% of components fail (years), wind speed at which 63.2% of measurements fall below (m/s), or time (days) by which 63.2% of repairs are completed.",
                     required: true
                 },
                 {
                     name: "shape",
-                    description: "Controls the skewness and peakedness of the wind speeds (higher for less variability), or how failures evolve (<1 early, 1 random, or > 1 wear-out)",
+                    description: "Controls skewness and peakedness of wind speeds (higher for less variability), or failure/repair evolution (<1 early delays, 1 random, >1 wear-out or scarcity-driven).",
                     required: true
                 }
             ]

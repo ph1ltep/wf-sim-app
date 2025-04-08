@@ -58,16 +58,15 @@ const DistributionFieldV2 = ({
 
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
+    const value = getValueByPath([...parametersPath, 'value'], defaultValue);
 
     // Add this useEffect after getting defaultValue
     useEffect(() => {
         // Only initialize if value is undefined and we have a default value
-        if (parameters.value === undefined && defaultValue !== undefined) {
+        if (defaultValue !== undefined && defaultValue !== null && (value === undefined || value === null)) {
             updateByPath([...parametersPath, 'value'], defaultValue);
         }
     }, [defaultValue, parameters, parametersPath, updateByPath]);
-
-    const value = getValueByPath([...parametersPath, 'value'], defaultValue);
 
     // Get the distribution implementation dynamically
     const metadata = DistributionUtils.getMetadata(currentType);
@@ -141,10 +140,9 @@ const DistributionFieldV2 = ({
                                 'Mu (Log-mean)',
                                 {
                                     required: true,
-                                    tooltip: 'Mean of the logarithm of the variable',
-                                    defaultValue: Math.round(Math.log(value) * 100) / 100,
+                                    value: Math.round(Math.log(value) * 100) / 100,
                                     step: 0.01,
-                                    disabled: false
+                                    disabled: true
                                 }
                             )}
                         </FormCol>
@@ -218,6 +216,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Smallest possible value',
+                                    //defaultValue: Math.round(value * 0.9 * 100) / 100,
                                     addonAfter: addonAfter,
                                     step: step
                                 }
@@ -230,6 +229,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Largest possible value',
+                                    //defaultValue: Math.round(value * 1.1 * 100) / 100,
                                     addonAfter: addonAfter,
                                     step: step
                                 }
@@ -274,11 +274,25 @@ const DistributionFieldV2 = ({
                                 path={[...parametersPath, 'lambda']}
                                 label="Lambda"
                                 tooltip="Rate parameter of the exponential distribution"
-                                defaultValue={1 / defaultValue}
+                                value={1 / defaultValue}
                                 min={0}
                                 step={0.01}
                                 required
                             />
+                        </FormCol>
+                        <FormCol span={colSpan}>
+                            {renderValueField(
+                                [...parametersPath, 'lambda'],
+                                'Lambda',
+                                {
+                                    required: true,
+                                    tooltip: 'Rate parameter of the exponential distribution',
+                                    value: Math.round(1 / value * 100) / 100,
+                                    min: 0,
+                                    step: 0.01,
+                                    disabled: true
+                                }
+                            )}
                         </FormCol>
                     </FormRow>
                 );
@@ -301,17 +315,6 @@ const DistributionFieldV2 = ({
             case 'kaimal':
                 return (
                     <FormRow >
-                        <FormCol span={colSpan}>
-                            <NumberField
-                                path={[...parametersPath, 'meanWindSpeed']}
-                                label="Mean Wind Speed"
-                                tooltip="Average wind speed in m/s"
-                                min={0}
-                                step={0.01}
-                                addonAfter={'m/s'}
-                                required
-                            />
-                        </FormCol>
                         <FormCol span={colSpan}>
                             <PercentageField
                                 path={[...parametersPath, 'turbulenceIntensity']}

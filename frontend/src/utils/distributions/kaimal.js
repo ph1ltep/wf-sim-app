@@ -46,7 +46,7 @@ export const Kaimal = {
      */
     generatePlot(parameters, options) {
         // For Kaimal, we'll use normal approximation for visualization
-        const meanWindSpeed = DistributionBase.helpers.getParam(parameters, 'meanWindSpeed', 10);
+        const meanWindSpeed = DistributionBase.helpers.getParam(parameters, 'value', 10);
         const turbulenceIntensity = DistributionBase.helpers.getParam(parameters, 'turbulenceIntensity', 10) / 100;
         const roughnessLength = DistributionBase.helpers.getParam(parameters, 'roughnessLength', 0.03);
         const kaimalScale = DistributionBase.helpers.getParam(parameters, 'scale', 8.1);

@@ -82,8 +82,10 @@ const getDefaultSettings = async (platformType = 'geared') => {
               type: 'fixed',
               timeSeriesMode: false,
               parameters: {
-                value: null,
+                value: 50,
+                stdDev: 10,
                 timeStep: 1,
+                drift: 10,
               }
             },
             data: []
@@ -97,17 +99,20 @@ const getDefaultSettings = async (platformType = 'geared') => {
                 value: 90,
                 sigma: 0.3,
                 scale: 24,
-                shape: 1.5
+                shape: 1.5,
+                mu: Math.log(90)
               }
             },
             data: []
           },
           windVariability: {
             distribution: {
-              type: 'kaimal',
+              type: 'fixed',
               timeSeriesMode: false,
               parameters: {
-                meanWindSpeed: 10,
+                value: 7.5,
+                scale: 6.5,
+                shape: 2,
                 turbulenceIntensity: 10,
                 roughnessLength: 0.03,
                 kaimalScale: 8.1
