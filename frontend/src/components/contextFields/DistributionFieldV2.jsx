@@ -1,5 +1,5 @@
 // src/components/contextFields/DistributionFieldV2.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, Typography, Space, Divider, Row, Col } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { SelectField, NumberField, CurrencyField, PercentageField, FormRow, FormCol } from './index';
@@ -58,12 +58,16 @@ const DistributionFieldV2 = ({
 
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
+
+    // Add this useEffect after getting defaultValue
+    useEffect(() => {
+        // Only initialize if value is undefined and we have a default value
+        if (parameters.value === undefined && defaultValue !== undefined) {
+            updateByPath([...parametersPath, 'value'], defaultValue);
+        }
+    }, [defaultValue, parameters, parametersPath, updateByPath]);
+
     const value = getValueByPath([...parametersPath, 'value'], defaultValue);
-
-    //if (!defaultValue) {
-    //    updateByPath([...parametersPath, 'value'], defaultValue);
-    //};
-
 
     // Get the distribution implementation dynamically
     const metadata = DistributionUtils.getMetadata(currentType);
@@ -138,7 +142,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Mean of the logarithm of the variable',
-                                    value: Math.round(Math.log(value) * 100) / 100,
+                                    defaultValue: Math.round(Math.log(value) * 100) / 100,
                                     step: 0.01,
                                     disabled: false
                                 }
