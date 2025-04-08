@@ -9,6 +9,7 @@ import { Exponential } from './exponential';
 import { Poisson } from './poisson';
 import { Kaimal } from './kaimal';
 import { GBM } from './gbm';
+import { Gamma } from './gamma';
 
 // Map of distribution types to their implementations
 const DISTRIBUTIONS = {
@@ -21,7 +22,8 @@ const DISTRIBUTIONS = {
     exponential: Exponential,
     poisson: Poisson,
     kaimal: Kaimal,
-    gbm: GBM
+    gbm: GBM,
+    gamma: Gamma
 };
 
 export const distributionTypes = [
@@ -35,6 +37,7 @@ export const distributionTypes = [
     { value: 'poisson', label: 'Poisson Distribution' },
     { value: 'kaimal', label: 'Kaimal Distribution' },
     { value: 'gbm', label: 'Geometric Brownian Motion' },
+    { value: 'gamma', label: 'Gamma Distribution' },
 ];
 
 /**
@@ -151,5 +154,6 @@ export {
     Exponential,
     Poisson,
     Kaimal,
-    GBM
+    GBM,
+    Gamma
 };

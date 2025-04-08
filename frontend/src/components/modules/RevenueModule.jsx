@@ -68,7 +68,6 @@ const RevenueModule = () => {
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'normal', label: 'Normal Distribution' },
-                  { value: 'triangular', label: 'Triangular Distribution' },
                   { value: 'uniform', label: 'Uniform Distribution' }
                 ]}
               />
@@ -137,6 +136,7 @@ const RevenueModule = () => {
                   { value: 'fixed', label: 'Fixed Value' },
                   { value: 'weibull', label: 'Weibull Distribution' },
                   { value: 'lognormal', label: 'Lognormal Distribution' },
+                  { value: 'gamma', label: 'Gamma Distribution' }
                   //{ value: 'exponential', label: 'Exponential Distribution' }
                 ]}
               />

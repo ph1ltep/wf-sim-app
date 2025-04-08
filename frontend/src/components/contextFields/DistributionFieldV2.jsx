@@ -405,6 +405,34 @@ const DistributionFieldV2 = ({
                         </FormCol>
                     </FormRow>
                 );
+
+            case 'gamma':
+                return (
+                    <FormRow>
+                        <FormCol span={colSpan}>
+                            <NumberField
+                                path={[...parametersPath, 'scale']}
+                                label="Scale Parameter (β)"
+                                tooltip="Scale parameter of the Weibull distribution"
+                                min={0}
+                                step={0.1}
+                                defaultValue={1}
+                                required
+                            />
+                        </FormCol>
+                        <FormCol span={colSpan}>
+                            <NumberField
+                                path={[...parametersPath, 'shape']}
+                                label="Shape Parameter (α)"
+                                tooltip="Shape parameter of the Weibull distribution"
+                                min={0}
+                                step={0.1}
+                                defaultValue={2}
+                                required
+                            />
+                        </FormCol>
+                    </FormRow>
+                );
             default:
                 return null;
         }
