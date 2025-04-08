@@ -15,7 +15,7 @@ export const LogNormal = {
     validate(parameters) {
         const issues = [];
 
-        if (parameters.mean === undefined || parameters.mean === null) {
+        if (parameters.value === undefined || parameters.value === null) {
             issues.push("Mu (log-mean) value is required");
         }
 
@@ -28,7 +28,7 @@ export const LogNormal = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The lognormal distribution requires a mu (log-mean) parameter and a positive sigma (log-std) parameter."
             };
         }
@@ -165,6 +165,11 @@ export const LogNormal = {
             parameters: [
                 {
                     name: "mean",
+                    description: "The avarge expected value",
+                    required: true
+                },
+                {
+                    name: "mu",
                     description: "Natural log of the expected value",
                     required: true
                 },

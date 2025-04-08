@@ -14,7 +14,7 @@ export const DistributionBase = {
         /**
          * Validate parameters for this distribution
          * @param {Object} parameters - Distribution parameters
-         * @returns {Object} Validation result with isValid flag and messages
+         * @returns {Object} Validation result with isValid flag and messages[]
          */
         validate(parameters) {
             throw new Error('validate() method must be implemented by each distribution');

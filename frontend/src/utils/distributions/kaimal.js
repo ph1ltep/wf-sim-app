@@ -30,7 +30,7 @@ export const Kaimal = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The Kaimal distribution requires positive mean wind speed and turbulence intensity parameters."
             };
         }

@@ -28,7 +28,7 @@ export const Normal = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The normal distribution requires a mean and a positive standard deviation."
             };
         }

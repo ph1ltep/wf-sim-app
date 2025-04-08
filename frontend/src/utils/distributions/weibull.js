@@ -30,7 +30,7 @@ export const Weibull = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The Weibull distribution requires positive scale and shape parameters."
             };
         }
@@ -204,12 +204,12 @@ export const Weibull = {
             parameters: [
                 {
                     name: "scale",
-                    description: "6-12 for wind speeds (m/s)",
+                    description: "Time by which 63.2% of components fail (years), or wind speed at which 63.2% of measurements fall below (m/s)",
                     required: true
                 },
                 {
                     name: "shape",
-                    description: "1.5-2.5 for wind speeds (higher for less variability), 1.5-3.0 for component failures",
+                    description: "Controls the skewness and peakedness of the wind speeds (higher for less variability), or how failures evolve (<1 early, 1 random, or > 1 wear-out)",
                     required: true
                 }
             ]

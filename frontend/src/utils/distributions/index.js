@@ -63,7 +63,7 @@ export const DistributionUtils = {
         if (!distribution) {
             return {
                 isValid: false,
-                message: `Unknown distribution type: ${type}`,
+                message: [`Unknown distribution type: ${type}`],
                 details: `The distribution type "${type}" is not supported. Please choose from the available options.`
             };
         }
@@ -71,7 +71,7 @@ export const DistributionUtils = {
         if (!parameters) {
             return {
                 isValid: false,
-                message: "Parameters are required",
+                message: ["Parameters are required"],
                 details: "Please provide parameters for the distribution."
             };
         }
@@ -124,8 +124,21 @@ export const DistributionUtils = {
         });
 
         return metadata;
+    },
+
+    /**
+    * Get Metadata by type
+     * @param {string} type - Distribution type
+    * @returns {Object} Metadata implementation or null if not found
+    */
+    getMetadata(type) {
+        if (!type) return null;
+        const distribution = this.getDistribution(type);
+
+        return distribution.getMetadata();
     }
 };
+
 
 // Export individual distributions
 export {

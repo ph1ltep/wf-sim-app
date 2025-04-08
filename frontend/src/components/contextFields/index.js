@@ -10,10 +10,8 @@ import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 
 // Import special components
 import EditableTable from '../tables/EditableTable';
-import DistributionField from './DistributionField';
 import DistributionFieldV2 from './DistributionFieldV2';
 import DistributionPlot from './DistributionPlot';
-import DistributionInfoBox from './DistributionInfoBox';
 import PrimaryPercentileSelectField from './PrimaryPercentileSelectField';
 
 /**
@@ -429,10 +427,8 @@ export {
   FormCol,
   FormDivider,
   EditableTable,
-  DistributionField,
   DistributionFieldV2,
   DistributionPlot,
-  DistributionInfoBox,
   PrimaryPercentileSelectField,
   getTextFieldWidth
 };

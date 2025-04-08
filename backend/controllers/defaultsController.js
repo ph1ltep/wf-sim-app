@@ -91,9 +91,11 @@ const getDefaultSettings = async (platformType = 'geared') => {
           revenueDegradationRate: 0.5,
           downtimePerEvent: {
             distribution: {
-              type: 'weibull',
+              type: 'lognormal',
               timeSeriesMode: false,
               parameters: {
+                value: 90,
+                sigma: 0.3,
                 scale: 24,
                 shape: 1.5
               }

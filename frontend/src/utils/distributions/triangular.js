@@ -44,7 +44,7 @@ export const Triangular = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The triangular distribution requires minimum, mode, and maximum values that satisfy: min ≤ mode ≤ max."
             };
         }

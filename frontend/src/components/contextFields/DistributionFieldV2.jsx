@@ -4,10 +4,7 @@ import { Alert, Typography, Space, Divider, Row, Col } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { SelectField, NumberField, CurrencyField, PercentageField, FormRow, FormCol } from './index';
 import DistributionPlot from './DistributionPlot';
-import DistributionInfoBox from './DistributionInfoBox';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
-import * as jStat from 'jstat';
-import api from '../../api';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -49,7 +46,7 @@ const DistributionFieldV2 = ({
     ...rest
 }) => {
     // Get scenario context
-    const { getValueByPath } = useScenario();
+    const { getValueByPath, updateByPath } = useScenario();
 
     // Get current distribution type
     const typePath = [...path, 'type'];
@@ -61,12 +58,15 @@ const DistributionFieldV2 = ({
 
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
+    const value = getValueByPath([...parametersPath, 'value'], defaultValue);
+
+    //if (!defaultValue) {
+    //    updateByPath([...parametersPath, 'value'], defaultValue);
+    //};
+
 
     // Get the distribution implementation dynamically
-    const distribution = DistributionUtils.getDistribution(currentType);
-
-    // Check if distribution exists and get metadata
-    const metadata = distribution ? distribution.getMetadata() : null;
+    const metadata = DistributionUtils.getMetadata(currentType);
 
     // Set column widths based on compact mode
     const colSpan = compact ? 200 : 150;
@@ -138,8 +138,8 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Mean of the logarithm of the variable',
-                                    defaultValue: Math.log(defaultValue),
-                                    step: step,
+                                    value: Math.round(Math.log(value) * 100) / 100,
+                                    step: 0.01,
                                     disabled: false
                                 }
                             )}
@@ -169,6 +169,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Smallest possible value',
+                                    defaultValue: defaultValue * 0.9,
                                     addonAfter: addonAfter,
                                     step: step
                                 }
@@ -194,6 +195,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     tooltip: 'Largest possible value',
+                                    defaultValue: defaultValue * 1.1,
                                     addonAfter: addonAfter,
                                     step: step
                                 }
@@ -268,7 +270,9 @@ const DistributionFieldV2 = ({
                                 path={[...parametersPath, 'lambda']}
                                 label="Lambda"
                                 tooltip="Rate parameter of the exponential distribution"
+                                defaultValue={1 / defaultValue}
                                 min={0}
+                                step={0.01}
                                 required
                             />
                         </FormCol>
@@ -465,7 +469,7 @@ const DistributionFieldV2 = ({
                         type="info"
                         message={metadata.name}  // Updated from infoBoxTitle to use metadata.name
                         description={
-                            <div style={{ fontSize: '0.9em' }}>
+                            <div style={{ fontSize: '0.8em' }}>
                                 <Paragraph style={{ marginBottom: '12px' }}>
                                     {metadata.description}
                                 </Paragraph>

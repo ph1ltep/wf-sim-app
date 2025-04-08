@@ -16,13 +16,13 @@ export const Exponential = {
         if (parameters.lambda === undefined || parameters.lambda === null) {
             return {
                 isValid: false,
-                message: "Lambda parameter is required",
+                message: ["Lambda parameter is required"],
                 details: "The exponential distribution requires a lambda (rate) parameter."
             };
         } else if (parameters.lambda <= 0) {
             return {
                 isValid: false,
-                message: "Lambda parameter must be positive",
+                message: ["Lambda parameter must be positive"],
                 details: "The exponential distribution's lambda parameter must be greater than zero."
             };
         }

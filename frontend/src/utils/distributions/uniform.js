@@ -30,7 +30,7 @@ export const Uniform = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The uniform distribution requires minimum and maximum values, where maximum is greater than minimum."
             };
         }

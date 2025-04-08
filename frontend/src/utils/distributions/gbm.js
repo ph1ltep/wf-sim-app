@@ -39,7 +39,7 @@ export const GBM = {
         if (issues.length > 0) {
             return {
                 isValid: false,
-                message: issues[0],
+                message: issues,
                 details: "The Geometric Brownian Motion distribution requires a positive initial value, drift rate, positive volatility, and positive time step."
             };
         }
@@ -254,7 +254,7 @@ export const GBM = {
             examples: "Electricity market prices, carbon credit values, variable tariffs, investment returns over time.",
             parameters: [
                 {
-                    name: 'value',
+                    name: 'mean',
                     description: 'Initial value at t=0',
                     required: true,
                     min: 0

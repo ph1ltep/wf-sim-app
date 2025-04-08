@@ -16,7 +16,6 @@ import {
   CurrencyField,
   PercentageField,
   SelectField,
-  DistributionField,
   FormSection,
   FormRow,
   FormCol,

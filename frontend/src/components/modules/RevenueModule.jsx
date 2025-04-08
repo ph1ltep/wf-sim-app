@@ -95,7 +95,7 @@ const RevenueModule = () => {
                 tooltip="Fixed electricity price under PPA or other agreement"
                 addonAfter="/MWh"
                 valueType="currency"
-                valueName="Electricity Price"
+                valueName="Electricity Price (mean)"
                 showVisualization={true}
                 showInfoBox={true}
                 step={1.0}
@@ -128,9 +128,9 @@ const RevenueModule = () => {
               <DistributionFieldV2
                 path={[...basePath, 'downtimePerEvent', 'distribution']}
                 tooltip="Statistical distribution for downtime duration"
-                addonAfter="hours/event"
+                addonAfter="days/event"
                 valueType="number"
-                valueName="Downtime Duration"
+                valueName="Downtime Duration (mean)"
                 showVisualization={true}
                 showInfoBox={true}
                 options={[

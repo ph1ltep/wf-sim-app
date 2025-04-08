@@ -15,7 +15,7 @@ export const Fixed = {
         if (parameters.value === undefined || parameters.value === null) {
             return {
                 isValid: false,
-                message: "Fixed value is required",
+                message: ["Fixed value is required"],
                 details: "Please provide a fixed value for this distribution."
             };
         }

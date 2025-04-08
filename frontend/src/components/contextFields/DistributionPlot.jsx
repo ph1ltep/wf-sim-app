@@ -1,8 +1,10 @@
 // src/components/contextFields/DistributionPlot.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
-import { Alert } from 'antd';
+import { Typography, Alert } from 'antd';
 import { DistributionUtils } from '../../utils/distributions';
+
+const { Title, Text, Paragraph } = Typography;
 
 /**
  * Component to visualize different statistical distributions
@@ -99,8 +101,27 @@ const DistributionPlot = ({
     if (!validationResult.isValid) {
         return (
             <Alert
-                message={`Visualization not available: ${validationResult.message}`}
-                description={validationResult.details || "Please provide valid parameters to visualize this distribution."}
+                message="Visualization not available"
+                description={
+                    <div style={{ fontSize: '0.9em' }}>
+                        {validationResult.message.length > 0 ? (
+                            <>
+                                <ul style={{ margin: 0, paddingLeft: '30px' }}>
+                                    {validationResult.message.map((error, index) => (
+                                        <li key={index}>{error}</li>
+                                    ))}
+                                </ul>
+                            </>
+                        ) : (
+                            "Invalid parameters detected."
+                        )}
+                        {validationResult.details && (
+                            <Paragraph style={{ marginTop: '8px', marginBottom: 0 }}>
+                                <Text strong>Details:</Text> {validationResult.details}
+                            </Paragraph>
+                        )}
+                    </div>
+                }
                 type="warning"
                 showIcon
                 style={{ width: '100%', ...style }}

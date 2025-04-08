@@ -16,13 +16,13 @@ export const Poisson = {
         if (parameters.lambda === undefined || parameters.lambda === null) {
             return {
                 isValid: false,
-                message: "Lambda parameter is required",
+                message: ["Lambda parameter is required"],
                 details: "The Poisson distribution requires a lambda (mean) parameter."
             };
         } else if (parameters.lambda <= 0) {
             return {
                 isValid: false,
-                message: "Lambda parameter must be positive",
+                message: ["Lambda parameter must be positive"],
                 details: "The Poisson distribution's lambda parameter must be greater than zero."
             };
         }
