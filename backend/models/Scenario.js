@@ -2,6 +2,14 @@
 const mongoose = require('mongoose');
 const { MajorComponentSchema } = require('./MajorComponent');
 
+// Import schemas from DistributionSchemas.js
+const {
+  DataPointSchema,
+  PercentileSchema,
+  DistributionParametersSchema,
+  DistributionTypeSchema,
+  SimSettingsSchema
+} = require('./DistributionSchemas');
 
 // Schema for Component Allocation in Responsibility Matrix
 const ComponentAllocationSchema = new mongoose.Schema({
@@ -66,95 +74,11 @@ const YearlyResponsibilitySchema = new mongoose.Schema({
   isPerTurbine: { type: Boolean, default: false }
 });
 
-// Percentile Schema - representing a percentile configuration
-const PercentileSchema = new mongoose.Schema({
-  value: { type: Number, required: true, min: 1, max: 99, default: 50 },
-  description: {
-    type: String,
-    default: 'primary'
-  },
-  label: {
-    type: String,
-    get: function () {
-      return `P${this.value}`;
-    }
-  }
-});
-
 // Simulation Result Data Point Schema - for storing time series data
-const DataPointSchema = new mongoose.Schema({
-  year: { type: Number, required: true, min: 0 },
-  value: { type: Number, required: true }
-});
-
-// Simulation Results Schema - for storing a percentile-based result set
 const SimResultsSchema = new mongoose.Schema({
   name: { type: String, required: true },
   percentile: { type: PercentileSchema, required: true },
   data: { type: [DataPointSchema], default: [] }
-});
-
-// Schema for distribution parameters with mixed types
-const DistributionParametersSchema = new mongoose.Schema({
-  // Parameters that can be either number or time series
-  value: { type: mongoose.Schema.Types.Mixed },
-  scale: { type: mongoose.Schema.Types.Mixed },
-  min: { type: mongoose.Schema.Types.Mixed },
-  max: { type: mongoose.Schema.Types.Mixed },
-  meanWindSpeed: { type: mongoose.Schema.Types.Mixed },
-  stdDev: { type: mongoose.Schema.Types.Mixed },
-
-  // Parameters that remain as simple numbers
-  mu: { type: Number },
-  mode: { type: Number },
-  sigma: { type: Number },
-  shape: { type: Number },
-  lambda: { type: Number },
-  turbulenceIntensity: { type: Number },
-  roughnessLength: { type: Number },
-  hubHeight: { type: Number },
-  drift: { type: Number },
-  volatility: { type: Number },
-  timeStep: { type: Number }
-});
-
-// Main DistributionTypeSchema 
-const DistributionTypeSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: [
-      'normal',
-      'lognormal',
-      'triangular',
-      'uniform',
-      'weibull',
-      'exponential',
-      'poisson',
-      'fixed',
-      'kaimal',
-      'gbm'
-    ],
-    required: true
-  },
-  timeSeriesMode: { type: Boolean, default: false },
-  parameters: {
-    type: DistributionParametersSchema,
-    required: true
-  }
-});
-
-// Validation function to check if a mixed field is either a number or an array of DataPointSchema
-DistributionParametersSchema.path('value').validate(function (value) {
-  return typeof value === 'number' || (Array.isArray(value) && value.every(v => v.year !== undefined && v.value !== undefined));
-}, 'Must be a number or an array of data points');
-
-// Apply similar validations to other mixed fields
-['scale', 'min', 'max', 'meanWindSpeed', 'stdDev'].forEach(field => {
-  DistributionParametersSchema.path(field).validate(function (value) {
-    return value === undefined || value === null ||
-      typeof value === 'number' ||
-      (Array.isArray(value) && value.every(v => v.year !== undefined && v.value !== undefined));
-  }, `${field} must be a number or an array of data points`);
 });
 
 // Schema for Adjustment
@@ -261,25 +185,31 @@ const SettingsSchema = new mongoose.Schema({
     // Revenue module
     revenue: {
       energyProduction: {
-        distribution: { type: String, enum: ['Fixed', 'Normal', 'Triangular', 'Uniform'], default: 'Normal' },
-        mean: { type: Number, default: 1000 },
-        std: { type: Number, default: 100 },
-        min: { type: Number },
-        max: { type: Number }
+        distribution: {
+          type: DistributionTypeSchema, default: () => ({
+            type: 'Normal',
+            parameters: { mean: 1000, stdDev: 100 }
+          })
+        }
       },
       electricityPrice: {
-        type: { type: String, enum: ['fixed', 'variable'], default: 'fixed' },
-        value: { type: Number, default: 50 },
-        distribution: { type: String, enum: ['Normal', 'Lognormal', 'Triangular', 'Uniform'] }
+        distribution: {
+          type: DistributionTypeSchema, default: () => ({
+            type: 'Fixed',
+            parameters: { value: 50 }
+          })
+        }
       },
       revenueDegradationRate: { type: Number, default: 0.5 },
       downtimePerEvent: {
-        distribution: { type: String, enum: ['Weibull', 'Lognormal', 'Exponential'], default: 'Weibull' },
-        scale: { type: Number, default: 24 },
-        shape: { type: Number, default: 1.5 }
+        distribution: {
+          type: DistributionTypeSchema, default: () => ({
+            type: 'Weibull',
+            parameters: { scale: 24, shape: 1.5 }
+          })
+        }
       },
       windVariability: {
-        method: { type: String, enum: ['Default', 'Kaimal'], default: 'Default' },
         distribution: { type: [SimResultsSchema], default: [] }
       },
       turbulenceIntensity: { type: Number, default: 10 },
@@ -310,22 +240,8 @@ const SettingsSchema = new mongoose.Schema({
     }
   },
 
-  // Simulation settings
-  simulation: {
-    iterations: { type: Number, default: 10000 },
-    seed: { type: Number, default: 42 },
-    percentiles: {
-      type: [PercentileSchema],
-      default: [
-        { value: 50, description: 'primary' },
-        { value: 75, description: 'upper_bound' },
-        { value: 25, description: 'lower_bound' },
-        { value: 90, description: 'extreme_upper' },
-        { value: 10, description: 'extreme_lower' }
-      ]
-    },
-    primaryPercentile: { type: Number, default: 50 } // Index pointing to the primary percentile in the array  
-  },
+  // Simulation settings - use imported SimSettingsSchema
+  simulation: { type: SimSettingsSchema, default: () => ({}) },
 
   // Project metrics
   metrics: {
@@ -405,5 +321,13 @@ module.exports = {
   Scenario: mongoose.model('Scenario', ScenarioSchema),
   SettingsSchema,
   InputSimSchema,
-  OutputSimSchema
+  OutputSimSchema,
+  SimResultsSchema,
+  ComponentAllocationSchema,
+  CraneCoverageSchema,
+  MajorComponentCoverageSchema,
+  ScopeAllocationsSchema,
+  YearlyResponsibilitySchema,
+  AdjustmentSchema,
+  FailureModelSchema
 };
