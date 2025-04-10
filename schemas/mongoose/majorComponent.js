@@ -1,29 +1,17 @@
-// schemas/mongoose/majorComponent.js
 const mongoose = require('mongoose');
 const yupToMongoose = require('./generator');
 const MajorComponentSchemaYup = require('../yup/majorComponent');
 
-const MajorComponentSchema = yupToMongoose(MajorComponentSchemaYup, {
-    // Overrides for DB-specific features
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-        unique: true
-    },
-    description: {
-        type: String,
-        trim: true
-    },
-});
+// Generate Mongoose schema from Yup schema
+const MajorComponentSchema = yupToMongoose(MajorComponentSchemaYup);
 
-// Pre-save hook to update the 'updatedAt' field
+// Pre-save hook to update 'updatedAt'
 MajorComponentSchema.pre('save', function (next) {
     this.updatedAt = Date.now();
     next();
 });
 
-// Export both the model and the schema
+// Create Mongoose model and export with schema
 const MajorComponent = mongoose.model('MajorComponent', MajorComponentSchema);
 
 module.exports = {

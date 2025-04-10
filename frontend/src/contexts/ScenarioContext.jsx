@@ -9,8 +9,8 @@ import { getDefaults } from '../api/defaults';
 
 const ScenarioContext = createContext();
 
-const { validate } = require('../../../schemas/utils/validate'); // Adjust path if needed
-const { ScenarioSchema } = require('../../../schemas/yup/scenario');
+const { validate } = require('../utils/validate'); // Adjust path if needed
+const { ScenarioSchema } = require('schemas/yup/scenario');
 
 export const useScenario = () => useContext(ScenarioContext);
 

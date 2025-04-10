@@ -1,5 +1,5 @@
 // backend/controllers/scenarioController.js
-const { Scenario } = require('../models/Scenario');
+const { Scenario } = require('../../schemas/mongoose/scenario');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const defaultsController = require('./defaultsController');
 

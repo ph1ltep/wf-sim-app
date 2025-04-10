@@ -1,5 +1,5 @@
 // backend/controllers/failureModelController.js
-const { Scenario } = require('../models/Scenario');
+const { Scenario } = require('../../schemas/mongoose/scenario');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const { getComponents } = require('./majorComponentController');
 

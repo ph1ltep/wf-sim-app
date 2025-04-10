@@ -1,8 +1,8 @@
 // backend/controllers/distributionController.js
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const monteCarloV2 = require('../services/monte-carlo-v2');
-const validate = require('./utils/validate');
-const { ScenarioSchema } = require('../schemas/yup/scenario');
+//const validate = require('./utils/validate');
+const { ScenarioSchema } = require('../../schemas/yup/scenario');
 
 /**
  * Run a simulation of multiple distributions with the new Monte Carlo engine

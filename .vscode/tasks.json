@@ -52,7 +52,10 @@
     {
       "label": "Run Full Stack (No Debug)",
       "dependsOrder": "parallel",
-      "dependsOn": ["Run Backend", "Run Frontend"],
+      "dependsOn": [
+        "Run Backend",
+        "Run Frontend"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true

@@ -1,4 +1,3 @@
-// schemas/mongoose/distributionSchemas.js
 const mongoose = require('mongoose');
 const yupToMongoose = require('./generator');
 const {
@@ -11,36 +10,24 @@ const {
     SimRequestSchema: SimRequestSchemaYup,
     SimResponseSchema: SimResponseSchemaYup,
 } = require('../yup/distribution');
+const { SimResultsSchema: SimResultsSchemaYup } = require('../yup/scenario');
 
-// Mock SimResultsSchema (from Scenario.js) for consistency
-const SimResultsSchema = yupToMongoose(require('../yup/scenario').SimResultsSchema);
-
-// Generate Mongoose schemas with overrides
+// Generate Mongoose schemas from Yup schemas
 const DataPointSchema = yupToMongoose(DataPointSchemaYup);
-const PercentileSchema = yupToMongoose(PercentileSchemaYup, {
-    label: { type: String, get: function () { return `P${this.value}`; } }, // Add getter
-});
+const PercentileSchema = yupToMongoose(PercentileSchemaYup);
 const DistributionParametersSchema = yupToMongoose(DistributionParametersSchemaYup);
 const DistributionTypeSchema = yupToMongoose(DistributionTypeSchemaYup);
 const SimSettingsSchema = yupToMongoose(SimSettingsSchemaYup);
-const SimulationInfoSchema = yupToMongoose(SimulationInfoSchemaYup, {
-    results: { type: [SimResultsSchema], required: true, default: [] }, // Reference mock
-});
-const SimRequestSchema = yupToMongoose(SimRequestSchemaYup, {
-    distributions: {
-        type: [DistributionTypeSchema],
-        required: true,
-        validate: {
-            validator: function (distributions) {
-                return distributions && distributions.length > 0;
-            },
-            message: 'At least one distribution is required',
-        },
-    },
-});
+const SimResultsSchema = yupToMongoose(SimResultsSchemaYup);
+const SimulationInfoSchema = yupToMongoose(SimulationInfoSchemaYup);
+const SimRequestSchema = yupToMongoose(SimRequestSchemaYup);
 const SimResponseSchema = yupToMongoose(SimResponseSchemaYup);
 
-// Export models and schemas
+// Create Mongoose models
+const SimRequest = mongoose.model('SimRequest', SimRequestSchema);
+const SimResponse = mongoose.model('SimResponse', SimResponseSchema);
+
+// Export schemas and models
 module.exports = {
     DataPointSchema,
     PercentileSchema,
@@ -48,8 +35,9 @@ module.exports = {
     DistributionTypeSchema,
     SimSettingsSchema,
     SimulationInfoSchema,
-    SimRequest: mongoose.model('SimRequest', SimRequestSchema),
-    SimResponse: mongoose.model('SimResponse', SimResponseSchema),
+    SimRequest,
+    SimResponse,
     SimRequestSchema,
     SimResponseSchema,
+    SimResultsSchema, // Added for consistency
 };

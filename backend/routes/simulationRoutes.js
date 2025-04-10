@@ -1,20 +1,18 @@
 // backend/routes/simulationRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
-  runFullSimulation,
-  runInputSimulationOnly,
-  runOutputSimulationOnly
+const { validateMiddleware } = require('../utils/validate');
+const { SimRequestSchema } = require('../../schemas/yup/distribution'); // Assuming this schema exists
+const {
+  runSimulation,
+  getSimulationResults
 } = require('../controllers/simulationController');
-const validateSimulation = require('../middlewares/validateSimulation');
 
-// POST /api/simulate - Run full simulation
-router.post('/', validateSimulation, runFullSimulation);
+// POST /api/simulations - Run a simulation
+// Updated to use validateMiddleware with SimRequestSchema
+router.post('/', validateMiddleware(SimRequestSchema), runSimulation);
 
-// POST /api/simulate/input - Run only the input part of the simulation
-router.post('/input', validateSimulation, runInputSimulationOnly);
-
-// POST /api/simulate/output - Run only the output part of the simulation
-router.post('/output', validateSimulation, runOutputSimulationOnly);
+// GET /api/simulations/:id - Get simulation results
+router.get('/:id', getSimulationResults);
 
 module.exports = router;
