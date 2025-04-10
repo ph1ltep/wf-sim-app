@@ -137,8 +137,16 @@ const SettingsSchema = Yup.object().shape({
         }),
         cost: Yup.object().shape({
             annualBaseOM: Yup.number().default(5000000),
-            escalationRate: Yup.number().default(2),
-            escalationDistribution: Yup.string().oneOf(['Normal', 'Lognormal', 'Triangular', 'Uniform']).default('Normal'),
+            // Updated to be a DistributionTypeSchema of Fixed type (to match getDefaultSettings)
+            escalationRate: Yup.object().shape({
+                distribution: DistributionTypeSchema.default(() => ({
+                    type: 'Fixed',
+                    timeSeriesMode: false,
+                    parameters: { value: 0.025 } // Matches getDefaultSettings value
+                })),
+                data: Yup.array().default([])
+            }),
+            // Removed escalationDistribution as requested
             oemTerm: Yup.number().default(5),
             fixedOMFee: Yup.number().default(4000000),
             failureEventProbability: Yup.number().default(5),
@@ -154,21 +162,50 @@ const SettingsSchema = Yup.object().shape({
         }),
         revenue: Yup.object().shape({
             energyProduction: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({ type: 'Normal', parameters: { mean: 1000, stdDev: 100 } })),
+                distribution: DistributionTypeSchema.default(() => ({
+                    type: 'Normal',
+                    timeSeriesMode: false,
+                    parameters: { mean: 1000, stdDev: 10 } // Matches getDefaultSettings
+                })),
+                data: Yup.array().default([])
             }),
             electricityPrice: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({ type: 'Fixed', parameters: { value: 50 } })),
+                distribution: DistributionTypeSchema.default(() => ({
+                    type: 'Fixed',
+                    timeSeriesMode: false,
+                    parameters: { value: 50 } // Matches getDefaultSettings
+                })),
+                data: Yup.array().default([])
             }),
             revenueDegradationRate: Yup.number().default(0.5),
             downtimePerEvent: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({ type: 'Weibull', parameters: { scale: 24, shape: 1.5 } })),
+                distribution: DistributionTypeSchema.default(() => ({
+                    type: 'Lognormal', // Matches getDefaultSettings
+                    timeSeriesMode: false,
+                    parameters: {
+                        sigma: 0.3,
+                        mu: Math.log(90) // Matches getDefaultSettings
+                    }
+                })),
+                data: Yup.array().default([])
             }),
+            // Updated to use GBM type
             windVariability: Yup.object().shape({
-                distribution: Yup.array().of(SimResultsSchema).default([]),
+                distribution: DistributionTypeSchema.default(() => ({
+                    type: 'GBM', // Changed to GBM type
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 7.5, // From getDefaultSettings
+                        drift: 0.02,
+                        volatility: 0.1,
+                        timeStep: 1
+                    }
+                })),
+                data: Yup.array().default([])
             }),
-            turbulenceIntensity: Yup.number().default(10),
-            surfaceRoughness: Yup.number().default(0.03),
-            kaimalScale: Yup.number().default(8.1),
+            turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
+            surfaceRoughness: Yup.number().default(0.03), // Matches getDefaultSettings
+            kaimalScale: Yup.number().default(8.1), // Matches getDefaultSettings
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
         }),
         risk: Yup.object().shape({
@@ -189,20 +226,30 @@ const SettingsSchema = Yup.object().shape({
             })).default([]),
         }),
     }),
-    simulation: SimSettingsSchema.default(() => ({})),
+    simulation: Yup.object().shape({
+        iterations: Yup.number().default(10000), // Matches getDefaultSettings
+        seed: Yup.number().default(42), // Matches getDefaultSettings
+        percentiles: Yup.array().of(PercentileSchema).default(() => [
+            { value: 50, description: 'primary' },
+            { value: 75, description: 'upper_bound' },
+            { value: 25, description: 'lower_bound' },
+            { value: 10, description: 'extreme_lower' },
+            { value: 90, description: 'extreme_upper' }
+        ]), // Matches getDefaultSettings
+    }),
     metrics: Yup.object().shape({
-        totalMW: Yup.number().default(70),
-        grossAEP: Yup.number().default(214032),
-        netAEP: Yup.number().default(214032),
+        totalMW: Yup.number().default(70), // Matches getDefaultSettings
+        grossAEP: Yup.number().default(214032), // Matches getDefaultSettings
+        netAEP: Yup.number().default(214032), // Matches getDefaultSettings
         componentQuantities: Yup.object().shape({
-            blades: Yup.number().default(60),
-            bladeBearings: Yup.number().default(60),
-            transformers: Yup.number().default(20),
-            gearboxes: Yup.number().default(20),
-            generators: Yup.number().default(20),
-            converters: Yup.number().default(20),
-            mainBearings: Yup.number().default(20),
-            yawSystems: Yup.number().default(20),
+            blades: Yup.number().default(60), // Matches getDefaultSettings
+            bladeBearings: Yup.number().default(60), // Matches getDefaultSettings
+            transformers: Yup.number().default(20), // Matches getDefaultSettings
+            gearboxes: Yup.number().default(20), // Platform-specific logic in controller
+            generators: Yup.number().default(20), // Matches getDefaultSettings
+            converters: Yup.number().default(20), // Matches getDefaultSettings
+            mainBearings: Yup.number().default(20), // Matches getDefaultSettings
+            yawSystems: Yup.number().default(20), // Matches getDefaultSettings
         }),
     }),
 }).default(() => ({}));
