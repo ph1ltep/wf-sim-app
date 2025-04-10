@@ -10,7 +10,7 @@ const {
     SimulationInfoSchema: SimulationInfoSchemaYup,
     SimRequestSchema: SimRequestSchemaYup,
     SimResponseSchema: SimResponseSchemaYup,
-} = require('../yup/distributionSchemas');
+} = require('../yup/distribution');
 
 // Mock SimResultsSchema (from Scenario.js) for consistency
 const SimResultsSchema = yupToMongoose(require('../yup/scenario').SimResultsSchema);

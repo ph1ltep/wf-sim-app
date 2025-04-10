@@ -1,3 +1,6 @@
+// frontend/src/utils/validate.js
+const Yup = require('yup');
+
 const validateField = async (schema, fieldName, value) => {
     try {
         await schema.validateAt(fieldName, { [fieldName]: value });
@@ -7,4 +10,13 @@ const validateField = async (schema, fieldName, value) => {
     }
 };
 
-module.exports = { validateField };
+const validate = async (schema, object) => {
+    try {
+        await schema.validate(object, { abortEarly: false });
+        return { isValid: true, errors: [] };
+    } catch (error) {
+        return { isValid: false, errors: error.errors };
+    }
+};
+
+module.exports = { validateField, validate }; 

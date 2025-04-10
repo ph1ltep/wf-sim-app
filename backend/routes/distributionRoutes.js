@@ -1,4 +1,4 @@
-// backend/routes/distributionRoutesV2.js
+// backend/routes/distributionRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -8,12 +8,14 @@ const {
     validateDistribution,
     fitDistribution
 } = require('../controllers/distributionController');
+const { validateMiddleware } = require('../utils/validate');
+const { SimRequestSchema } = require('../../schemas/yup/distribution');
 
 // POST /api/v2/distributions/simulate - Run simulation for multiple distributions
-router.post('/simulate', simulateDistributions);
+router.post('/simulate', validateMiddleware(SimRequestSchema), simulateDistributions);
 
 // POST /api/v2/distributions/simulate-single - Run simulation for a single distribution
-router.post('/simulate-single', simulateDistribution);
+router.post('/simulate-single', validateMiddleware(SimRequestSchema), simulateDistribution);
 
 // GET /api/v2/distributions/info - Get metadata for all distributions
 router.get('/info', getDistributionsInfo);

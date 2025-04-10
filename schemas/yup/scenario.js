@@ -7,7 +7,7 @@ const {
     DistributionParametersSchema,
     DistributionTypeSchema,
     SimSettingsSchema,
-} = require('./distributionSchemas');
+} = require('./distribution');
 
 // Component Allocation Schema
 const ComponentAllocationSchema = Yup.object().shape({

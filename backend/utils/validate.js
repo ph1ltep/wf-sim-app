@@ -1,3 +1,4 @@
+// backend/utils/validate.js
 const validate = async (schema, object) => {
     try {
         await schema.validate(object, { abortEarly: false });
@@ -7,7 +8,7 @@ const validate = async (schema, object) => {
     }
 };
 
-// Middleware wrapper
+// Middleware for Express routes
 const validateMiddleware = (schema) => {
     return async (req, res, next) => {
         const result = await validate(schema, req.body);

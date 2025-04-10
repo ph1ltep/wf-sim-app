@@ -145,8 +145,6 @@ const getScenarioById = async (req, res, next) => {
 // Update a scenario
 const updateScenario = async (req, res, next) => {
   try {
-    const { name, description, settings } = req.body;
-
     // Find the scenario
     const scenario = await Scenario.findById(req.params.id);
 
@@ -155,14 +153,8 @@ const updateScenario = async (req, res, next) => {
       return res.status(404).json(formatError('Scenario not found'));
     }
 
-    // Update basic fields
-    if (name) scenario.name = name;
-    if (description) scenario.description = description;
-
-    // If settings are provided, update them without running simulation
-    if (settings) {
-      scenario.settings = settings;
-    }
+    // Update the scenario with the validated req.body
+    scenario.set(req.body);
 
     // Save changes
     await scenario.save();

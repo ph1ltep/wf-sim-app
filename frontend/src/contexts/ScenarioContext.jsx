@@ -9,6 +9,9 @@ import { getDefaults } from '../api/defaults';
 
 const ScenarioContext = createContext();
 
+const { validate } = require('../../../schemas/utils/validate'); // Adjust path if needed
+const { ScenarioSchema } = require('../../../schemas/yup/scenario');
+
 export const useScenario = () => useContext(ScenarioContext);
 
 // Action types
@@ -293,11 +296,24 @@ export const ScenarioProvider = ({ children }) => {
       return null;
     }
 
+    // Create payload with full scenario data, applying metadata overrides if provided
     const payload = {
-      name: metadata?.name || scenarioData.name,
-      description: metadata?.description || scenarioData.description,
-      settings: scenarioData.settings
+      ...scenarioData, // Include all fields from scenarioData
+      ...(metadata && { // Override with metadata if provided
+        name: metadata.name,
+        description: metadata.description,
+      }),
     };
+
+    // Validate payload against ScenarioSchema
+    const validationResult = await validate(ScenarioSchema, payload);
+
+    if (!validationResult.isValid) {
+      // Display validation errors to the user
+      const errorMessage = validationResult.errors.join(', ');
+      message.error(`Validation failed: ${errorMessage}`);
+      return null;
+    }
 
     const response = await apiRequest(
       () => api.put(`/scenarios/${scenarioData._id}`, payload),
@@ -307,8 +323,8 @@ export const ScenarioProvider = ({ children }) => {
     if (response.success && response.data) {
       const updatedScenario = {
         ...scenarioData,
-        name: payload.name,
-        description: payload.description,
+        name: response.data.name, // Use server-returned values
+        description: response.data.description,
         updatedAt: response.data.updatedAt
       };
 
@@ -325,8 +341,8 @@ export const ScenarioProvider = ({ children }) => {
           scenario._id === scenarioData._id
             ? {
               ...scenario,
-              name: payload.name,
-              description: payload.description,
+              name: response.data.name,
+              description: response.data.description,
               updatedAt: response.data.updatedAt
             }
             : scenario
