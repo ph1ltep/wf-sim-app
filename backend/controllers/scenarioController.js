@@ -2,6 +2,13 @@
 const { Scenario } = require('../../schemas/mongoose/scenario');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const defaultsController = require('./defaultsController');
+const {
+  SuccessResponseSchema,
+  ErrorResponseSchema,
+  ValidationResponseSchema,
+  CrudResponseSchema,
+  ListResponseSchema
+} = require('../../schemas/yup/response');
 
 // Create a new scenario
 const createScenario = async (req, res, next) => {
@@ -53,15 +60,16 @@ const createScenario = async (req, res, next) => {
 
     console.log(`[ScenarioController] Created new scenario: ${scenario.name} (ID: ${scenario._id})`);
 
+
+    let schema = CrudResponseSchema.cast({
+      success: true,
+      data: { _id, name, description, settings, simulation, createdAt },
+      message: 'Scenario created successfully',
+      timestamp: new Date()
+    });
+
     // Return the saved scenario
-    res.status(201).json(formatSuccess({
-      _id: scenario._id,
-      name: scenario.name,
-      description: scenario.description,
-      settings: scenario.settings,
-      simulation: scenario.simulation,
-      createdAt: scenario.createdAt
-    }, 'Scenario created successfully'));
+    res.status(201).json(formatSuccess(schema, schema.message, "crud"));
 
   } catch (error) {
     console.error('[ScenarioController] Error creating scenario:', error);
@@ -115,15 +123,24 @@ const getAllScenarios = async (req, res, next) => {
       }
     }));
 
-    res.json(formatSuccess({
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit)
+    let schema = ListResponseSchema.cast({
+      success: true,
+      data: {
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit)
+        },
+        items: scenarioListings,
+        count: scenarioListings.length
       },
-      scenarios: scenarioListings
-    }));
+      message: 'Scenarios retrieved successfully',
+      timestamp: new Date()
+    });
+
+    res.json(formatSuccess(schema, schema.message, 'list'));
+
   } catch (error) {
     console.error('[ScenarioController] Error fetching scenarios:', error);
     next(error);
@@ -140,8 +157,15 @@ const getScenarioById = async (req, res, next) => {
       return res.status(404).json(formatError('Scenario not found'));
     }
 
-    console.log(`[ScenarioController] Retrieved scenario: ${scenario.name} (ID: ${scenario._id})`);
-    res.json(formatSuccess(scenario));
+    let schema = SuccessResponseSchema.cast({
+      success: true,
+      data: scenario,
+      message: `Retrieved scenario: ${scenario.name} (ID: ${scenario._id})`,
+      timestamp: new Date()
+    });
+
+    res.json(formatSuccess(scenario, scenario.message, 'default'));
+
   } catch (error) {
     console.error('[ScenarioController] Error fetching scenario:', error);
     next(error);
@@ -165,14 +189,15 @@ const updateScenario = async (req, res, next) => {
     // Save changes
     await scenario.save();
 
-    console.log(`[ScenarioController] Updated scenario: ${scenario.name} (ID: ${scenario._id})`);
+    let schema = CrudResponseSchema.cast({
+      success: true,
+      data: { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt },
+      message: `Scenario updated successfully: ${scenario.name} (ID: ${scenario._id})`,
+      timestamp: new Date()
+    });
 
-    res.json(formatSuccess({
-      _id: scenario._id,
-      name: scenario.name,
-      description: scenario.description,
-      updatedAt: scenario.updatedAt
-    }, 'Scenario updated successfully'));
+    res.json(formatSuccess(schema, schema.message, 'crud'));
+
   } catch (error) {
     console.error('[ScenarioController] Error updating scenario:', error);
     next(error);
@@ -189,52 +214,21 @@ const deleteScenario = async (req, res, next) => {
       return res.status(404).json(formatError('Scenario not found'));
     }
 
-    console.log(`[ScenarioController] Deleted scenario: ${scenario.name} (ID: ${scenario._id})`);
+    let schema = CrudResponseSchema.cast({
+      success: true,
+      data: { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt },
+      message: `Scenario deleted: ${scenario.name} (ID: ${scenario._id})`,
+      timestamp: new Date()
+    });
 
-    res.json(formatSuccess(null, 'Scenario deleted successfully'));
+    res.json(formatSuccess(schema, schema.message, 'crud'));
+
   } catch (error) {
     console.error('[ScenarioController] Error deleting scenario:', error);
     next(error);
   }
 };
 
-// Compare multiple scenarios
-const compareScenarios = async (req, res, next) => {
-  try {
-    const { ids } = req.body;
-
-    if (!ids || !Array.isArray(ids) || ids.length < 2) {
-      console.log('[ScenarioController] Invalid scenarios comparison request');
-      return res.status(400).json(formatError('At least two scenario IDs are required for comparison'));
-    }
-
-    // Get scenarios with selected fields
-    const scenarios = await Scenario.find({ _id: { $in: ids } })
-      .select('name simulation');
-
-    console.log(`[ScenarioController] Comparing ${scenarios.length} scenarios`);
-
-    if (scenarios.length !== ids.length) {
-      console.log(`[ScenarioController] Some scenarios not found. Requested: ${ids.length}, Found: ${scenarios.length}`);
-      return res.status(404).json(formatError('One or more scenarios not found'));
-    }
-
-    // Format for comparison
-    const comparison = scenarios.map(scenario => ({
-      id: scenario._id,
-      name: scenario.name,
-      IRR: scenario.simulation.outputSim.IRR,
-      NPV: scenario.simulation.outputSim.NPV,
-      paybackPeriod: scenario.simulation.outputSim.paybackPeriod,
-      minDSCR: scenario.simulation.outputSim.minDSCR
-    }));
-
-    res.json(formatSuccess(comparison));
-  } catch (error) {
-    console.error('[ScenarioController] Error comparing scenarios:', error);
-    next(error);
-  }
-};
 
 module.exports = {
   createScenario,

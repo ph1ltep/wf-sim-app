@@ -31,10 +31,14 @@ const getDefaults = async (req, res) => {
     defaultScenario.name = 'New Scenario';
     defaultScenario.description = 'Default configuration scenario';
 
-    res.json(formatSuccess({
-      defaults: defaultScenario,
-      count: 1
-    }));
+    let schema = SuccessResponseSchema.cast({
+      success: true,
+      data: defaultScenario,
+      message: 'Default settings retrieved successfully',
+      timestamp: new Date()
+    });
+
+    res.json(formatSuccess(schema, schema.message, 'default'));
   } catch (error) {
     console.error('Error getting default parameters:', error);
     res.status(500).json(formatError(error.message));
