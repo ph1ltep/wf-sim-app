@@ -69,45 +69,51 @@ const createScenario = async (req, res, next) => {
   }
 };
 
-// Get all scenarios
+// Get all scenarios with lightweight schema for listing
 const getAllScenarios = async (req, res, next) => {
   try {
     // Get pagination parameters
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 100;
     const skip = (page - 1) * limit;
 
-    // Get total count
-    const total = await Scenario.countDocuments();
+    // Get search parameter for filtering
+    const search = req.query.search || '';
 
-    // Get scenarios with limited fields
-    const scenarios = await Scenario.find()
-      .select('name description createdAt updatedAt settings.general settings.project')
-      .sort({ createdAt: -1 })
+    // Build filter object
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get total count with filter
+    const total = await Scenario.countDocuments(filter);
+
+    // Get scenarios with essential fields for listing
+    const scenarios = await Scenario.find(filter)
+      .select('_id name description createdAt updatedAt settings.general.projectLife settings.project.windFarm.numWTGs settings.metrics.totalMW')
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    console.log(`[ScenarioController] Fetched ${scenarios.length} scenarios (Total: ${total}, Page: ${page})`);
+    console.log(`[ScenarioController] Fetched ${scenarios.length} scenarios (Total: ${total}, Page: ${page}, Search: ${search || 'None'})`);
 
-    // Transform scenarios to include only the selected fields
-    const simplifiedScenarios = scenarios.map(scenario => {
-      const { _id, name, description, createdAt, updatedAt } = scenario;
-      return {
-        _id,
-        name,
-        description,
-        createdAt,
-        updatedAt,
-        settings: {
-          general: scenario.settings?.general || null,
-          project: scenario.settings?.project || null,
-          modules: null,
-          simulation: null,
-          metrics: null
-        },
-        simulation: null
-      };
-    });
+    // Transform scenarios to match the ScenarioListingSchema
+    const scenarioListings = scenarios.map(scenario => ({
+      _id: scenario._id,
+      name: scenario.name,
+      description: scenario.description,
+      createdAt: scenario.createdAt,
+      updatedAt: scenario.updatedAt,
+      metrics: {
+        totalMW: scenario.settings?.metrics?.totalMW || 0,
+        windFarmSize: scenario.settings?.project?.windFarm?.numWTGs || 0,
+        projectLife: scenario.settings?.general?.projectLife || 0
+      }
+    }));
 
     res.json(formatSuccess({
       pagination: {
@@ -116,7 +122,7 @@ const getAllScenarios = async (req, res, next) => {
         limit,
         pages: Math.ceil(total / limit)
       },
-      scenarios: simplifiedScenarios
+      scenarios: scenarioListings
     }));
   } catch (error) {
     console.error('[ScenarioController] Error fetching scenarios:', error);

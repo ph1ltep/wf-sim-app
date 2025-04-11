@@ -299,6 +299,20 @@ const ScenarioSchema = Yup.object().shape({
     updatedAt: Yup.date().default(() => new Date()),
 });
 
+const ScenarioListingSchema = Yup.object().shape({
+    _id: Yup.string().required('ID is required'),
+    name: Yup.string().required('Name is required'),
+    description: Yup.string(),
+    createdAt: Yup.date(),
+    updatedAt: Yup.date(),
+    // Include a few key metrics for display
+    metrics: Yup.object().shape({
+        totalMW: Yup.number(),
+        windFarmSize: Yup.number(),
+        projectLife: Yup.number()
+    }).default(() => ({})),
+});
+
 module.exports = {
     ScenarioSchema,
     SettingsSchema,
@@ -312,4 +326,5 @@ module.exports = {
     YearlyResponsibilitySchema,
     AdjustmentSchema,
     FailureModelSchema,
+    ScenarioListingSchema
 };

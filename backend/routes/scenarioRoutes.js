@@ -11,8 +11,8 @@ const {
   deleteScenario
 } = require('../controllers/scenarioController');
 
-// GET /api/scenarios - Get all scenarios
-router.get('/', getAllScenarios);
+// GET /api/scenarios/list - Get all scenarios
+router.get('/list', getAllScenarios);
 
 // GET /api/scenarios/:id - Get a specific scenario
 router.get('/:id', getScenarioById);

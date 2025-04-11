@@ -7,7 +7,7 @@ const {
     getDistributionsInfo,
     validateDistribution,
     fitDistribution
-} = require('../controllers/distributionController');
+} = require('../controllers/simulationController');
 const { validateMiddleware } = require('../utils/validate');
 const { SimRequestSchema } = require('../../schemas/yup/distribution');
 

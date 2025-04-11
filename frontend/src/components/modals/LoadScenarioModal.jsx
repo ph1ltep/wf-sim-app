@@ -1,137 +1,107 @@
 // src/components/modals/LoadScenarioModal.jsx
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Spin, Input, Space, Typography, Tag, Tooltip, Table, Popconfirm } from 'antd';
-import { SearchOutlined, UploadOutlined, InfoCircleOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Modal, Table, Input, Button, Space, Typography, Tooltip } from 'antd';
+import { SearchOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { ConfirmationModal } from './';
-import moment from 'moment';
+import ConfirmationModal from './ConfirmationModal';
 
 const { Text } = Typography;
+const { Search } = Input;
 
-const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
-    const { getAllScenarios, getScenario, deleteScenario, loading } = useScenario();
+export const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
     const [scenarios, setScenarios] = useState([]);
     const [filteredScenarios, setFilteredScenarios] = useState([]);
-    const [loadingScenarios, setLoadingScenarios] = useState(false);
-    const [selectedRowKey, setSelectedRowKey] = useState(null);
+    const [selectedScenarioId, setSelectedScenarioId] = useState(null);
+    const [loading, setLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [scenarioToDelete, setScenarioToDelete] = useState(null);
-    const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // Fetch scenarios when modal becomes visible
+    const { getScenario, deleteScenario, getAllScenarios } = useScenario();
+
+    // Load scenarios when modal becomes visible
     useEffect(() => {
         if (visible) {
-            fetchScenarios();
+            loadScenarios();
         }
     }, [visible]);
 
-    const fetchScenarios = async () => {
+    const loadScenarios = async () => {
+        setLoading(true);
         try {
-            setLoadingScenarios(true);
-            // This will directly use the API without needing to update a local state
-            const result = await getAllScenarios(1, 100); // Fetch up to 100 scenarios
-
-            if (result && result.scenarios) {
-                setScenarios(result.scenarios);
-                setFilteredScenarios(result.scenarios);
-            } else {
-                setScenarios([]);
-                setFilteredScenarios([]);
-            }
+            const data = await getAllScenarios();
+            setScenarios(data);
+            setFilteredScenarios(data);
         } catch (error) {
-            console.error('Error fetching scenarios:', error);
+            console.error('Failed to load scenarios:', error);
         } finally {
-            setLoadingScenarios(false);
+            setLoading(false);
         }
     };
 
-    // Handle row selection
-    const onSelectRow = (record) => {
-        setSelectedRowKey(record._id);
-    };
-
-    // Handle loading the selected scenario
-    const handleLoadScenario = async () => {
-        if (!selectedRowKey) return;
-
-        try {
-            await getScenario(selectedRowKey);
-            if (onLoad) onLoad();
-        } catch (error) {
-            console.error('Error loading scenario:', error);
-        }
-    };
-
-    // Handle delete confirmation
-    const showDeleteConfirm = (scenario, e) => {
-        // Stop event propagation to prevent row selection
-        e.stopPropagation();
-        setScenarioToDelete(scenario);
-        setDeleteModalVisible(true);
-    };
-
-    // Handle actual deletion
-    const handleDeleteScenario = async () => {
-        if (!scenarioToDelete) return;
-
-        try {
-            setDeleteLoading(true);
-            await deleteScenario(scenarioToDelete._id);
-            // Refresh the scenario list
-            fetchScenarios();
-            // Reset selection if the deleted scenario was selected
-            if (selectedRowKey === scenarioToDelete._id) {
-                setSelectedRowKey(null);
-            }
-        } catch (error) {
-            console.error('Error deleting scenario:', error);
-        } finally {
-            setDeleteLoading(false);
-            setDeleteModalVisible(false);
-        }
-    };
-
-    // Handle search filtering
-    const handleSearch = (e) => {
-        const value = e.target.value;
+    const handleSearch = (value) => {
         setSearchText(value);
+        const searchTextLower = value.toLowerCase();
 
-        if (!value) {
-            setFilteredScenarios(scenarios);
-            return;
-        }
-
-        // Create a case-insensitive regex pattern from the search text
-        // Handle wildcard * by replacing with .*
-        const pattern = value.replace(/\*/g, '.*').toLowerCase();
-        const regex = new RegExp(pattern, 'i');
-
-        const filtered = scenarios.filter(scenario => {
+        const filtered = scenarios.filter((scenario) => {
             return (
-                regex.test(scenario.name) ||
-                regex.test(scenario.description) ||
-                regex.test(scenario.settings?.general?.projectName)
+                scenario.name.toLowerCase().includes(searchTextLower) ||
+                (scenario.description && scenario.description.toLowerCase().includes(searchTextLower))
             );
         });
 
         setFilteredScenarios(filtered);
     };
 
-    // Table columns
+    const handleLoadScenario = async () => {
+        if (!selectedScenarioId) return;
+
+        setLoading(true);
+        try {
+            const loadedScenario = await getScenario(selectedScenarioId);
+            if (loadedScenario) {
+                onLoad();
+            }
+        } catch (error) {
+            console.error('Failed to load selected scenario:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteScenario = (scenario) => {
+        setScenarioToDelete(scenario);
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDeleteScenario = async () => {
+        if (!scenarioToDelete) return;
+
+        setLoading(true);
+        try {
+            const success = await deleteScenario(scenarioToDelete._id);
+            if (success) {
+                if (selectedScenarioId === scenarioToDelete._id) {
+                    setSelectedScenarioId(null);
+                }
+                await loadScenarios();
+            }
+        } catch (error) {
+            console.error('Failed to delete scenario:', error);
+        } finally {
+            setDeleteModalVisible(false);
+            setScenarioToDelete(null);
+            setLoading(false);
+        }
+    };
+
+    // Define table columns
     const columns = [
         {
             title: 'Name',
             dataIndex: 'name',
             key: 'name',
-            render: (text, record) => (
-                <div>
-                    <div>{text}</div>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {record.settings?.general?.projectName || 'No project name'}
-                    </Text>
-                </div>
-            ),
+            sorter: (a, b) => a.name.localeCompare(b.name),
         },
         {
             title: 'Description',
@@ -140,94 +110,63 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
             ellipsis: true,
         },
         {
-            title: 'Project Size',
-            key: 'projectSize',
-            render: (_, record) => {
-                const totalMW = record.settings?.metrics?.totalMW;
-                return totalMW ? `${totalMW} MW` : 'N/A';
-            },
+            title: 'Wind Farm Size',
+            dataIndex: ['metrics', 'windFarmSize'],
+            key: 'windFarmSize',
+            render: (value) => `${value || 0} WTGs`,
+            sorter: (a, b) => (a.metrics?.windFarmSize || 0) - (b.metrics?.windFarmSize || 0),
         },
         {
-            title: 'Last Modified',
+            title: 'Project Life',
+            dataIndex: ['metrics', 'projectLife'],
+            key: 'projectLife',
+            render: (value) => `${value || 0} years`,
+            sorter: (a, b) => (a.metrics?.projectLife || 0) - (b.metrics?.projectLife || 0),
+        },
+        {
+            title: 'Last Updated',
             dataIndex: 'updatedAt',
             key: 'updatedAt',
-            render: (date) => moment(date).format('YYYY-MM-DD HH:mm'),
-            sorter: (a, b) => moment(a.updatedAt).unix() - moment(b.updatedAt).unix(),
+            render: (date) => new Date(date).toLocaleString(),
+            sorter: (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt),
             defaultSortOrder: 'descend',
         },
         {
-            title: '',
+            title: 'Actions',
             key: 'actions',
-            width: 50,
+            align: 'center',
             render: (_, record) => (
-                <Tooltip title="Delete scenario">
-                    <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => showDeleteConfirm(record, e)}
-                    />
-                </Tooltip>
+                <Space size="small">
+                    <Tooltip title="Delete Scenario">
+                        <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteScenario(record);
+                            }}
+                        />
+                    </Tooltip>
+                    <Tooltip title="View Details">
+                        <Button
+                            type="text"
+                            icon={<InfoCircleOutlined />}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedScenarioId(record._id);
+                            }}
+                        />
+                    </Tooltip>
+                </Space>
             ),
-        }
+        },
     ];
-
-    // Expandable row renderer - More concise with additional info
-    const expandedRowRender = (record) => {
-        const projectLife = record.settings?.general?.projectLife || 0;
-        const numWTGs = record.settings?.project?.windFarm?.numWTGs || 0;
-        const mwPerWTG = record.settings?.project?.windFarm?.mwPerWTG || 0;
-        const capacityFactor = record.settings?.project?.windFarm?.capacityFactor || 0;
-        const currency = record.settings?.project?.currency?.local || 'USD';
-        const startDate = record.settings?.general?.startDate;
-        const netAEP = record.settings?.metrics?.netAEP || 0;
-
-        return (
-            <div style={{ padding: '8px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                        <Space direction="vertical" size="small">
-                            <div>
-                                <Text strong>Configuration:</Text> {numWTGs} WTGs × {mwPerWTG} MW = {(numWTGs * mwPerWTG).toFixed(1)} MW total
-                            </div>
-                            <div>
-                                <Text strong>Capacity Factor:</Text> {capacityFactor}%
-                            </div>
-                            <div>
-                                <Text strong>Net AEP:</Text> {(netAEP / 1000).toFixed(2)} GWh/year
-                            </div>
-                        </Space>
-                    </div>
-                    <div>
-                        <Space direction="vertical" size="small">
-                            <div>
-                                <Text strong>Project Life:</Text> {projectLife} years
-                            </div>
-                            <div>
-                                <Text strong>Start Date:</Text> {startDate ? moment(startDate).format('YYYY-MM-DD') : 'N/A'}
-                            </div>
-                            <div>
-                                <Text strong>Currency:</Text> {currency}
-                            </div>
-                            <div>
-                                <Text strong>Created:</Text> {moment(record.createdAt).format('YYYY-MM-DD')}
-                            </div>
-                        </Space>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <>
             <Modal
-                title={
-                    <Space>
-                        <UploadOutlined />
-                        Load Scenario
-                    </Space>
-                }
+                title="Load Scenario"
                 open={visible}
                 onCancel={onCancel}
                 width={800}
@@ -238,66 +177,56 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
                     <Button
                         key="load"
                         type="primary"
-                        disabled={!selectedRowKey}
+                        disabled={!selectedScenarioId}
                         onClick={handleLoadScenario}
                         loading={loading}
                     >
                         Load Selected
-                    </Button>
+                    </Button>,
                 ]}
             >
-                <div style={{ marginBottom: 16 }}>
-                    <Input
-                        placeholder="Search by name, description or project name (use * for wildcard)"
-                        prefix={<SearchOutlined />}
-                        value={searchText}
-                        onChange={handleSearch}
-                        style={{ width: '100%' }}
+                <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+                    <Search
+                        placeholder="Search scenarios by name or description"
                         allowClear
+                        enterButton={<SearchOutlined />}
+                        size="middle"
+                        onSearch={handleSearch}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        style={{ width: '100%' }}
                     />
-                </div>
-
-                {loadingScenarios ? (
-                    <div style={{ textAlign: 'center', padding: '20px' }}>
-                        <Spin size="large" />
-                        <div style={{ marginTop: '10px' }}>Loading scenarios...</div>
-                    </div>
-                ) : (
                     <Table
-                        columns={columns}
                         dataSource={filteredScenarios}
+                        columns={columns}
                         rowKey="_id"
-                        size="small"
-                        expandable={{ expandedRowRender }}
-                        pagination={{
-                            pageSize: 10,
-                            showTotal: (total) => `Total ${total} scenarios`,
-                        }}
+                        loading={loading}
+                        pagination={{ pageSize: 10 }}
                         rowSelection={{
                             type: 'radio',
-                            selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
-                            onChange: (selectedRowKeys) => setSelectedRowKey(selectedRowKeys[0]),
+                            selectedRowKeys: selectedScenarioId ? [selectedScenarioId] : [],
+                            onChange: (selectedRowKeys) => {
+                                setSelectedScenarioId(selectedRowKeys[0]);
+                            },
                         }}
                         onRow={(record) => ({
-                            onClick: () => onSelectRow(record),
+                            onClick: () => {
+                                setSelectedScenarioId(record._id);
+                            },
                             style: { cursor: 'pointer' }
                         })}
-                        loading={loadingScenarios}
-                        locale={{ emptyText: 'No scenarios found' }}
                     />
-                )}
+                </Space>
             </Modal>
 
-            {/* Delete Confirmation Modal */}
             <ConfirmationModal
                 open={deleteModalVisible}
-                onConfirm={handleDeleteScenario}
+                onConfirm={confirmDeleteScenario}
                 onCancel={() => setDeleteModalVisible(false)}
                 title="Delete Scenario"
                 content={`Are you sure you want to delete the scenario "${scenarioToDelete?.name}"? This action cannot be undone.`}
                 confirmText="Delete"
-                loading={deleteLoading}
-                type="error"
+                loading={loading}
+                type="danger"
             />
         </>
     );

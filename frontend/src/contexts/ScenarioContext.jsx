@@ -99,6 +99,38 @@ export const ScenarioProvider = ({ children }) => {
     return null;
   }, [loading]);
 
+  // Get all scenarios (lightweight listing)
+  const getAllScenarios = useCallback(async (page = 1, limit = 100, search = '') => {
+    if (loading) return [];
+
+    try {
+      setLoading(true);
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        page,
+        limit
+      });
+
+      if (search) {
+        params.append('search', search);
+      }
+
+      const response = await api.get(`/scenarios/list?${params}`);
+
+      if (response.data?.success) {
+        return response.data.data.scenarios || [];
+      }
+
+      return [];
+    } catch (error) {
+      handleApiError(error, 'Failed to fetch scenario list', false);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
   // Prepare scenario payload for API requests
   const prepareScenarioPayload = useCallback((metadata = null) => {
     if (!scenarioData) {
@@ -327,6 +359,7 @@ export const ScenarioProvider = ({ children }) => {
 
     initializeScenario,
     getScenario,
+    getAllScenarios,
     saveScenario,
     updateScenario,
     deleteScenario,
