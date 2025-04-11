@@ -87,7 +87,7 @@ const simulateDistributions = async (req, res) => {
             formattedResults.success = false;
         };
 
-        return res.json(formatSuccess(formattedResults));
+        return res.json(formatSuccess(formattedResults, '', 'simulation'));
     } catch (error) {
         console.error('Error in Monte Carlo V2 simulation:', error);
         return res.status(500).json(formatError(`Simulation failed: ${error.message}`));
@@ -133,7 +133,7 @@ const simulateDistribution = async (req, res) => {
             }]
         };
 
-        return res.json(formatSuccess(formattedResult));
+        return res.json(formatSuccess(formattedResult, '', 'simulation'));
     } catch (error) {
         console.error('Error in distribution simulation:', error);
         return res.status(500).json(formatError(`Distribution simulation failed: ${error.message}`));
@@ -177,7 +177,7 @@ const validateDistribution = (req, res) => {
         return res.json(formatSuccess({
             isValid: validation.isValid,
             errors: validation.errors || []
-        }));
+        }, '', 'simulation'));
     } catch (error) {
         console.error('Error validating distribution:', error);
         return res.status(500).json(formatError(`Validation failed: ${error.message}`));
