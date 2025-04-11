@@ -6,11 +6,12 @@ import { produce } from 'immer';
 import { get, set } from 'lodash';
 import api from '../api/index';
 import { getDefaults } from '../api/defaults';
+import { ScenarioSchema } from 'schemas/yup/scenario';
+import { validatePath } from '../utils/validate';
 
 const ScenarioContext = createContext();
 
 const { validate } = require('../utils/validate'); // Adjust path if needed
-const { ScenarioSchema } = require('schemas/yup/scenario');
 
 export const useScenario = () => useContext(ScenarioContext);
 
@@ -157,22 +158,15 @@ export const ScenarioProvider = ({ children }) => {
     }
   };
 
-  // Initialize a new scenario in memory - this needs to be defined first with useCallback
+  // Initialize a new scenario in memory
   const initializeScenario = useCallback(async () => {
     const response = await apiRequest(
       () => getDefaults()
     );
 
     if (response.success && response.data) {
-      const newScenario = {
-        name: 'New Scenario',
-        description: 'Default configuration scenario',
-        settings: response.data.defaults,
-        simulation: {
-          inputSim: null,
-          outputSim: null
-        }
-      };
+      // Use the complete scenario object directly
+      const newScenario = response.data.defaults;
 
       dispatch({
         type: ACTION_TYPES.SET_SCENARIO_DATA,
@@ -182,6 +176,8 @@ export const ScenarioProvider = ({ children }) => {
 
       message.success('New scenario initialized');
       return newScenario;
+    } else {
+      console.error('Failed to initialize scenario:', response.error);
     }
 
     return null;
@@ -420,40 +416,65 @@ export const ScenarioProvider = ({ children }) => {
     return true;
   }, [scenarioData]);
 
-  const arrayOperations = useCallback((path, operation, item, itemId = null) => {
-    if (!scenarioData) return false;
+  const updateByPathV2 = useCallback(async (path, value) => {
+    if (!scenarioData) return { isValid: false, error: 'No active scenario', path };
 
-    try {
+    // Validate the path and get result
+    const validationResult = await validatePath(ScenarioSchema, path, value, scenarioData);
+
+    // Include path in the result for clarity
+    validationResult.path = path;
+
+    if (validationResult.isValid) {
+      // Update the context only if validation succeeds
       dispatch({
-        type: ACTION_TYPES.UPDATE_ARRAY,
-        payload: { path, operation, item, itemId }
+        type: ACTION_TYPES.UPDATE_PATH,
+        payload: { path, value: validationResult.value }
       });
 
-      return true;
-    } catch (error) {
-      handleApiError(error, 'Array operation failed', false);
-      return false;
+      // Add a success flag to indicate the update was applied
+      validationResult.applied = true;
     }
+
+    return validationResult;
   }, [scenarioData]);
 
+
+  // const arrayOperations = useCallback((path, operation, item, itemId = null) => {
+  //   if (!scenarioData) return false;
+
+  //   try {
+  //     dispatch({
+  //       type: ACTION_TYPES.UPDATE_ARRAY,
+  //       payload: { path, operation, item, itemId }
+  //     });
+
+  //     return true;
+  //   } catch (error) {
+  //     handleApiError(error, 'Array operation failed', false);
+  //     return false;
+  //   }
+  // }, [scenarioData]);
+
   // Helper functions for updating settings
-  const updateSettings = useCallback((section, updates) => {
-    if (!scenarioData) return false;
 
-    return updateByPath(['settings', section], {
-      ...getValueByPath(['settings', section], {}),
-      ...updates
-    });
-  }, [scenarioData, updateByPath, getValueByPath]);
+  // const updateSettings = useCallback((section, updates) => {
+  //   if (!scenarioData) return false;
 
-  const updateModuleSettings = useCallback((moduleName, updates) => {
-    if (!scenarioData) return false;
+  //   return updateByPath(['settings', section], {
+  //     ...getValueByPath(['settings', section], {}),
+  //     ...updates
+  //   });
+  // }, [scenarioData, updateByPath, getValueByPath]);
 
-    return updateByPath(['settings', 'modules', moduleName], {
-      ...getValueByPath(['settings', 'modules', moduleName], {}),
-      ...updates
-    });
-  }, [scenarioData, updateByPath, getValueByPath]);
+  // const updateModuleSettings = useCallback((moduleName, updates) => {
+  //   if (!scenarioData) return false;
+
+  //   return updateByPath(['settings', 'modules', moduleName], {
+  //     ...getValueByPath(['settings', 'modules', moduleName], {}),
+  //     ...updates
+  //   });
+  // }, [scenarioData, updateByPath, getValueByPath]);
 
   // Error component for reuse
   const ScenarioErrorComponent = useMemo(() => {
@@ -492,11 +513,11 @@ export const ScenarioProvider = ({ children }) => {
     isNewScenario,
 
     getValueByPath,
-    updateByPath,
-    arrayOperations,
+    updateByPath//,
+    //arrayOperations,
 
-    updateSettings,
-    updateModuleSettings
+    //updateSettings,
+    //updateModuleSettings
   };
 
   return (

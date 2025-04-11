@@ -20,47 +20,21 @@ export const ContextField = ({
   // Get current value
   const value = getValueByPath(path, null);
 
-  // Validate the value
-  const validate = useCallback((value) => {
-    // Required check
-    if (required && (value === undefined || value === null || value === '')) {
-      return { valid: false, message: `${label} is required` };
-    }
-
-    // Skip other validations if value is empty and not required
-    if (value === undefined || value === null || value === '') {
-      return { valid: true };
-    }
-
-    // Run through all validators
-    for (const validator of validators) {
-      const result = validator(value);
-      if (!result.valid) {
-        return result;
-      }
-    }
-
-    return { valid: true };
-  }, [required, validators, label]);
-
   // Handle change with validation
-  const handleChange = useCallback((newValue) => {
+  const handleChange = useCallback(async (newValue) => {
     const actualValue = newValue && newValue.target ? newValue.target.value : newValue;
 
-    const validationResult = validate(actualValue);
-
-    if (!validationResult.valid) {
-      setError(validationResult.message);
-      return; // Don't update context
-    }
-
-    setError(null); // Clear error on valid input
-
-    // Update context only with valid data
     if (hasValidScenario()) {
-      updateByPath(path, actualValue);
+      // Use the v2 method which handles validation
+      const result = await updateByPathV2(path, actualValue);
+
+      if (!result.isValid) {
+        setError(result.error);
+      } else {
+        setError(null);
+      }
     }
-  }, [validate, path, updateByPath, hasValidScenario]);
+  }, [path, updateByPathV2, hasValidScenario]);
 
   return (
     <Form.Item

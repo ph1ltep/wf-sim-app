@@ -51,11 +51,10 @@
  
  ### Main Endpoints
  
- - `POST /api/v2/distributions/simulate`: Run simulations for multiple distributions
- - `POST /api/v2/distributions/simulate-single`: Run a simulation for a single distribution
- - `GET /api/v2/distributions/info`: Get metadata about available distributions
- - `POST /api/v2/distributions/validate`: Validate distribution parameters
- - `POST /api/v2/distributions/fit`: Fit a distribution to provided data points
+ - `POST /api/simulation/simulate`: Run simulations for a single or multiple distributions
+ - `GET /api/simulation/info`: Get metadata about available distributions
+ - `POST /api/simulation/validate`: Validate distribution parameters
+ - `POST /api/simulation/fit`: Fit a distribution to provided data points
  
  ### Request Format
  

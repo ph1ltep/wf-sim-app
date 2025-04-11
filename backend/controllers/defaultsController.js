@@ -1,171 +1,7 @@
 // backend/controllers/defaultsController.js
 const { getDefaultFailureModels } = require('./failureModelController');
-const { formatSuccess } = require('../utils/responseFormatter');
-
-/**
- * Helper function to get default settings (for internal use)
- * @param {string} platformType - Platform type ('geared' or 'direct-drive')
- * @returns {Promise<Object>} Default settings
- */
-const getDefaultSettings = async (platformType = 'geared') => {
-  try {
-    // Get default failure models
-    const failureModels = await getDefaultFailureModels(platformType);
-
-    // Default settings - structured exactly like the Scenario schema
-    return {
-      general: {
-        projectName: 'Wind Farm Project',
-        startDate: null,
-        projectLife: 20
-      },
-      project: {
-        windFarm: {
-          numWTGs: 20,
-          wtgPlatformType: platformType,
-          mwPerWTG: 3.5,
-          capacityFactor: 35,
-          curtailmentLosses: 0,
-          electricalLosses: 0
-        },
-        currency: {
-          local: 'USD',
-          foreign: 'EUR',
-          exchangeRate: 1.0
-        },
-        location: null
-      },
-      modules: {
-        financing: {
-          capex: 50000000,
-          devex: 10000000,
-          model: 'Balance-Sheet',
-          debtToEquityRatio: 1.5,
-          debtToCapexRatio: 0.7,
-          loanDuration: 15,
-          loanInterestRateBS: 5,
-          loanInterestRatePF: 6,
-          minimumDSCR: 1.3
-        },
-        cost: {
-          annualBaseOM: 5000000,
-          escalationRate: {
-            distribution: {
-              type: 'fixed',
-              timeSeriesMode: false,
-              parameters: {
-                value: 0.025
-              }
-            },
-            data: []
-          },
-          oemTerm: 5,
-          fixedOMFee: 4000000,
-          failureEventProbability: 5,
-          failureEventCost: 200000,
-          adjustments: [],
-          failureModels: failureModels // Add the dynamically generated failure models
-        },
-        revenue: {
-          energyProduction: {
-            distribution: {
-              type: 'fixed',
-              timeSeriesMode: false,
-              parameters: {
-                value: null,
-                stdDev: 10
-              }
-            },
-            data: []
-          },
-          electricityPrice: {
-            distribution: {
-              type: 'fixed',
-              timeSeriesMode: false,
-              parameters: {
-                value: 50,
-                stdDev: 10,
-                timeStep: 1,
-                drift: 10,
-              }
-            },
-            data: []
-          },
-          revenueDegradationRate: 0.5,
-          downtimePerEvent: {
-            distribution: {
-              type: 'lognormal',
-              timeSeriesMode: false,
-              parameters: {
-                value: 90,
-                sigma: 0.3,
-                scale: 24,
-                shape: 1.5,
-                mu: Math.log(90)
-              }
-            },
-            data: []
-          },
-          windVariability: {
-            distribution: {
-              type: 'fixed',
-              timeSeriesMode: false,
-              parameters: {
-                value: 7.5,
-                scale: 6.5,
-                shape: 2,
-                turbulenceIntensity: 10,
-                roughnessLength: 0.03,
-                kaimalScale: 8.1
-              }
-            },
-            data: []
-          },
-          adjustments: []
-        },
-        risk: {
-          insuranceEnabled: false,
-          insurancePremium: 50000,
-          insuranceDeductible: 10000,
-          reserveFunds: 0
-        },
-        contracts: {
-          oemContracts: []
-        }
-      },
-      simulation: {
-        iterations: 10000,
-        seed: 42,
-        // Percentiles as an array matching the schema definition
-        percentiles: [
-          { value: 50, description: 'primary' },
-          { value: 75, description: 'upper_bound' },
-          { value: 25, description: 'lower_bound' },
-          { value: 90, description: 'extreme_upper' },
-          { value: 10, description: 'extreme_lower' }
-        ]
-      },
-      metrics: {
-        totalMW: 70,
-        grossAEP: 214032,
-        netAEP: 214032,
-        componentQuantities: {
-          blades: 60,
-          bladeBearings: 60,
-          transformers: 20,
-          gearboxes: platformType === 'geared' ? 20 : 0,
-          generators: 20,
-          converters: 20,
-          mainBearings: 20,
-          yawSystems: 20
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error getting default settings:', error);
-    throw error;
-  }
-};
+const { formatSuccess, formatError } = require('../utils/responseFormatter');
+const { ScenarioSchema } = require('../../schemas/yup/scenario');
 
 /**
  * Get default parameter values for simulation
@@ -177,26 +13,34 @@ const getDefaults = async (req, res) => {
     // Get platform type from query parameter (default to 'geared')
     const platformType = req.query.platform || 'geared';
 
-    // Get default settings using the helper function
-    const defaults = await getDefaultSettings(platformType);
+    // Get default failure models (these need to come from the DB)
+    const failureModels = await getDefaultFailureModels(platformType);
 
-    res.json({
-      success: true,
-      data: {
-        defaults,
-        count: 1
-      }
-    });
+    // Get complete default scenario from Yup schema
+    let defaultScenario = ScenarioSchema.default();
+
+    // Convert to plain object in case it has getters/setters
+    defaultScenario = JSON.parse(JSON.stringify(defaultScenario));
+
+    // Apply platform-specific overrides
+    defaultScenario.settings.project.windFarm.wtgPlatformType = platformType;
+    defaultScenario.settings.metrics.componentQuantities.gearboxes = platformType === 'geared' ? 20 : 0;
+    defaultScenario.settings.modules.cost.failureModels = failureModels;
+
+    // Customize default name and description
+    defaultScenario.name = 'New Scenario';
+    defaultScenario.description = 'Default configuration scenario';
+
+    res.json(formatSuccess({
+      defaults: defaultScenario,
+      count: 1
+    }));
   } catch (error) {
     console.error('Error getting default parameters:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json(formatError(error.message));
   }
 };
 
 module.exports = {
-  getDefaults,
-  getDefaultSettings
+  getDefaults
 };

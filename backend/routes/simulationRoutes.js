@@ -1,18 +1,26 @@
-// backend/routes/simulationRoutes.js
+// backend/routes/distributionRoutes.js
 const express = require('express');
 const router = express.Router();
-const { validateMiddleware } = require('../utils/validate');
-const { SimRequestSchema } = require('../../schemas/yup/distribution'); // Assuming this schema exists
 const {
-  runSimulation,
-  getSimulationResults
-} = require('../controllers/simulationController');
+    simulateDistributions,
+    simulateDistribution,
+    getDistributionsInfo,
+    validateDistribution,
+    fitDistribution
+} = require('../controllers/distributionController');
+const { validateMiddleware } = require('../utils/validate');
+const { SimRequestSchema } = require('../../schemas/yup/distribution');
 
-// POST /api/simulations - Run a simulation
-// Updated to use validateMiddleware with SimRequestSchema
-router.post('/', validateMiddleware(SimRequestSchema), runSimulation);
+// POST /api/simulation/simulate - Run simulation for multiple distributions
+router.post('/simulate', validateMiddleware(SimRequestSchema), simulateDistributions);
 
-// GET /api/simulations/:id - Get simulation results
-router.get('/:id', getSimulationResults);
+// GET /api/simulation/info - Get metadata for all distributions
+router.get('/info', getDistributionsInfo);
+
+// POST /api/simulation/validate - Validate distribution parameters
+router.post('/validate', validateDistribution);
+
+// POST /api/simulation/fit - Fit a distribution to data points
+router.post('/fit', fitDistribution);
 
 module.exports = router;
