@@ -1,8 +1,7 @@
-// src/contexts/ScenarioContext.jsx - With useReducer implementation
-
-import React, { createContext, useContext, useEffect, useCallback, useMemo, useReducer } from 'react';
+// src/contexts/ScenarioContext.jsx - With Immer optimization
+import React, { createContext, useContext, useEffect, useCallback, useState } from 'react';
 import { message, Alert } from 'antd';
-import { produce } from 'immer';
+import { produce } from 'immer'; // Import Immer's produce function
 import { get, set } from 'lodash';
 import api from '../api/index';
 import { getDefaults } from '../api/defaults';
@@ -11,30 +10,7 @@ import { validatePath } from '../utils/validate';
 
 const ScenarioContext = createContext();
 
-const { validate } = require('../utils/validate'); // Adjust path if needed
-
 export const useScenario = () => useContext(ScenarioContext);
-
-// Action types
-const ACTION_TYPES = {
-  SET_LOADING: 'SET_LOADING',
-  SET_SCENARIO_DATA: 'SET_SCENARIO_DATA',
-  SET_SCENARIO_LIST: 'SET_SCENARIO_LIST',
-  SET_LOCATION: 'SET_LOCATION',
-  SET_MODIFIED: 'SET_MODIFIED',
-  UPDATE_PATH: 'UPDATE_PATH',
-  UPDATE_ARRAY: 'UPDATE_ARRAY',
-  RESET_STATE: 'RESET_STATE'
-};
-
-// Initial state
-const initialState = {
-  scenarioData: null,
-  scenarioList: [],
-  loading: false,
-  selectedLocation: null,
-  isModified: false
-};
 
 // Centralized error handling function
 const handleApiError = (error, fallbackMessage, showMessage = true) => {
@@ -51,98 +27,16 @@ const handleApiError = (error, fallbackMessage, showMessage = true) => {
   return { success: false, error: errorMessage };
 };
 
-// Reducer function
-function scenarioReducer(state, action) {
-  switch (action.type) {
-    case ACTION_TYPES.SET_LOADING:
-      return { ...state, loading: action.payload };
-
-    case ACTION_TYPES.SET_SCENARIO_DATA:
-      return {
-        ...state,
-        scenarioData: action.payload,
-        isModified: action.resetModified ? false : state.isModified
-      };
-
-    case ACTION_TYPES.SET_SCENARIO_LIST:
-      return { ...state, scenarioList: action.payload };
-
-    case ACTION_TYPES.SET_LOCATION:
-      return { ...state, selectedLocation: action.payload };
-
-    case ACTION_TYPES.SET_MODIFIED:
-      return { ...state, isModified: action.payload };
-
-    case ACTION_TYPES.UPDATE_PATH:
-      return {
-        ...state,
-        scenarioData: produce(state.scenarioData, draft => {
-          set(draft, action.payload.path, action.payload.value);
-        }),
-        isModified: true
-      };
-
-    case ACTION_TYPES.UPDATE_ARRAY:
-      return {
-        ...state,
-        scenarioData: produce(state.scenarioData, draft => {
-          const array = get(draft, action.payload.path);
-          if (!Array.isArray(array)) return;
-
-          const { operation, item, itemId } = action.payload;
-
-          switch (operation) {
-            case 'update':
-              if (itemId === null) return;
-              const index = array.findIndex(i =>
-                String(i.value || i.id || i._id) === String(itemId)
-              );
-              if (index >= 0) {
-                array[index] = { ...array[index], ...item };
-              }
-              break;
-
-            case 'add':
-              array.push(item);
-              break;
-
-            case 'remove':
-              if (itemId === null) return;
-              const removeIndex = array.findIndex(i =>
-                String(i.value || i.id || i._id) === String(itemId)
-              );
-              if (removeIndex >= 0) {
-                array.splice(removeIndex, 1);
-              }
-              break;
-
-            case 'replace':
-              set(draft, action.payload.path, item);
-              break;
-
-            default:
-              return state;
-          }
-        }),
-        isModified: true
-      };
-
-    case ACTION_TYPES.RESET_STATE:
-      return initialState;
-
-    default:
-      return state;
-  }
-}
-
 export const ScenarioProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(scenarioReducer, initialState);
-  const { scenarioData, scenarioList, loading, selectedLocation, isModified } = state;
+  const [scenarioData, setScenarioData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [isModified, setIsModified] = useState(false);
 
   // Wrapper for API calls with standard error handling
   const apiRequest = async (apiCall, successMessage = null) => {
     try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: true });
+      setLoading(true);
       const response = await apiCall();
 
       if (response.success) {
@@ -154,12 +48,14 @@ export const ScenarioProvider = ({ children }) => {
     } catch (error) {
       return handleApiError(error, 'API operation failed', true);
     } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+      setLoading(false);
     }
   };
 
   // Initialize a new scenario in memory
   const initializeScenario = useCallback(async () => {
+    if (loading) return null;
+
     const response = await apiRequest(
       () => getDefaults()
     );
@@ -167,13 +63,8 @@ export const ScenarioProvider = ({ children }) => {
     if (response.success && response.data) {
       // Use the complete scenario object directly
       const newScenario = response.data.defaults;
-
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_DATA,
-        payload: newScenario,
-        resetModified: true
-      });
-
+      setScenarioData(newScenario);
+      setIsModified(false);
       message.success('New scenario initialized');
       return newScenario;
     } else {
@@ -181,67 +72,58 @@ export const ScenarioProvider = ({ children }) => {
     }
 
     return null;
-  }, []);
+  }, [loading]);
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {
-    initializeScenario();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Get all scenarios
-  const getAllScenarios = useCallback(async (page = 1, limit = 10) => {
-    const response = await apiRequest(
-      () => api.get(`/scenarios?page=${page}&limit=${limit}`)
-    );
-
-    if (response.success && response.data?.scenarios) {
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_LIST,
-        payload: response.data.scenarios
-      });
-
-      return {
-        scenarios: response.data.scenarios,
-        pagination: response.data.pagination
-      };
+    if (!scenarioData) {
+      initializeScenario();
     }
-
-    return null;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get a single scenario
   const getScenario = useCallback(async (id) => {
+    if (loading) return null;
+
     const response = await apiRequest(
       () => api.get(`/scenarios/${id}`),
       'Scenario loaded successfully'
     );
 
     if (response.success && response.data) {
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_DATA,
-        payload: response.data,
-        resetModified: true
-      });
-
+      setScenarioData(response.data);
+      setIsModified(false);
       return response.data;
     }
 
     return null;
-  }, []);
+  }, [loading]);
 
-  // Save scenario to database
-  const saveScenario = useCallback(async (metadata = null) => {
+  // Prepare scenario payload for API requests
+  const prepareScenarioPayload = useCallback((metadata = null) => {
     if (!scenarioData) {
-      message.error('No scenario to save');
       return null;
     }
 
-    const payload = {
+    // Create a clean scenario object with only what the API needs
+    return {
+      ...(scenarioData._id && { _id: scenarioData._id }), // Include ID if it exists
       name: metadata?.name || scenarioData.name || 'New Scenario',
       description: metadata?.description || scenarioData.description || '',
       settings: scenarioData.settings,
       simulation: scenarioData.simulation || {}
     };
+  }, [scenarioData]);
+
+  // Save scenario to database
+  const saveScenario = useCallback(async (metadata = null) => {
+    if (loading) return null;
+
+    const payload = prepareScenarioPayload(metadata);
+    if (!payload) {
+      message.error('No scenario to save');
+      return null;
+    }
 
     const response = await apiRequest(
       () => api.post('/scenarios', payload),
@@ -249,7 +131,17 @@ export const ScenarioProvider = ({ children }) => {
     );
 
     if (response.success && response.data) {
-      const savedScenario = {
+      // Use Immer to update the scenarioData with the server response
+      setScenarioData(produce(scenarioData, draft => {
+        draft.name = payload.name;
+        draft.description = payload.description;
+        draft._id = response.data._id;
+        draft.createdAt = response.data.createdAt;
+        draft.updatedAt = response.data.updatedAt;
+      }));
+
+      setIsModified(false);
+      return {
         ...scenarioData,
         name: payload.name,
         description: payload.description,
@@ -257,59 +149,22 @@ export const ScenarioProvider = ({ children }) => {
         createdAt: response.data.createdAt,
         updatedAt: response.data.updatedAt
       };
-
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_DATA,
-        payload: savedScenario,
-        resetModified: true
-      });
-
-      // Update scenario list
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_LIST,
-        payload: [
-          {
-            _id: response.data._id,
-            name: savedScenario.name,
-            description: savedScenario.description,
-            createdAt: response.data.createdAt,
-            updatedAt: response.data.updatedAt
-          },
-          ...scenarioList
-        ]
-      });
-
-      return savedScenario;
     }
 
     return null;
-  }, [scenarioData, scenarioList]);
+  }, [loading, prepareScenarioPayload, scenarioData]);
 
   // Update an existing scenario
   const updateScenario = useCallback(async (metadata = null) => {
+    if (loading) return null;
+
     if (!scenarioData?._id) {
       message.error('No saved scenario to update');
       return null;
     }
 
-    // Create payload with full scenario data, applying metadata overrides if provided
-    const payload = {
-      ...scenarioData, // Include all fields from scenarioData
-      ...(metadata && { // Override with metadata if provided
-        name: metadata.name,
-        description: metadata.description,
-      }),
-    };
-
-    // Validate payload against ScenarioSchema
-    const validationResult = await validate(ScenarioSchema, payload);
-
-    if (!validationResult.isValid) {
-      // Display validation errors to the user
-      const errorMessage = validationResult.errors.join(', ');
-      message.error(`Validation failed: ${errorMessage}`);
-      return null;
-    }
+    const payload = prepareScenarioPayload(metadata);
+    if (!payload) return null;
 
     const response = await apiRequest(
       () => api.put(`/scenarios/${scenarioData._id}`, payload),
@@ -317,68 +172,45 @@ export const ScenarioProvider = ({ children }) => {
     );
 
     if (response.success && response.data) {
-      const updatedScenario = {
+      // Use Immer to update only the necessary fields
+      setScenarioData(produce(scenarioData, draft => {
+        draft.name = response.data.name;
+        draft.description = response.data.description;
+        draft.updatedAt = response.data.updatedAt;
+      }));
+
+      setIsModified(false);
+      return {
         ...scenarioData,
-        name: response.data.name, // Use server-returned values
+        name: response.data.name,
         description: response.data.description,
         updatedAt: response.data.updatedAt
       };
-
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_DATA,
-        payload: updatedScenario,
-        resetModified: true
-      });
-
-      // Update scenario in list
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_LIST,
-        payload: scenarioList.map(scenario =>
-          scenario._id === scenarioData._id
-            ? {
-              ...scenario,
-              name: response.data.name,
-              description: response.data.description,
-              updatedAt: response.data.updatedAt
-            }
-            : scenario
-        )
-      });
-
-      return updatedScenario;
     }
 
     return null;
-  }, [scenarioData, scenarioList]);
+  }, [loading, prepareScenarioPayload, scenarioData]);
 
   // Delete a scenario
   const deleteScenario = useCallback(async (id) => {
+    if (loading) return false;
+
     const response = await apiRequest(
       () => api.delete(`/scenarios/${id}`),
       'Scenario deleted successfully'
     );
 
     if (response.success) {
+      // If we deleted the current scenario, create a new one
       if (scenarioData && scenarioData._id === id) {
-        dispatch({ type: ACTION_TYPES.SET_SCENARIO_DATA, payload: null });
+        setScenarioData(null);
         initializeScenario();
       }
-
-      dispatch({
-        type: ACTION_TYPES.SET_SCENARIO_LIST,
-        payload: scenarioList.filter(scenario => scenario._id !== id)
-      });
-
       return true;
     }
 
     return false;
-  }, [scenarioData, scenarioList, initializeScenario]);
-
-  // Set location
-  const setSelectedLocation = useCallback((location) => {
-    dispatch({ type: ACTION_TYPES.SET_LOCATION, payload: location });
-  }, []);
+  }, [loading, scenarioData, initializeScenario]);
 
   // Utility functions
   const hasValidScenario = useCallback((autoInitialize = true) => {
@@ -399,25 +231,52 @@ export const ScenarioProvider = ({ children }) => {
     return scenarioData && !scenarioData._id;
   }, [scenarioData]);
 
-  // Data operations
+  // Data operations - get value from path
   const getValueByPath = useCallback((path, defaultValue = null) => {
     if (!scenarioData) return defaultValue;
     return get(scenarioData, path, defaultValue);
   }, [scenarioData]);
 
+  // Data operations - update by path (legacy method)
+  // Now using Immer for more efficient updates
   const updateByPath = useCallback((path, value) => {
     if (!scenarioData) return false;
 
-    dispatch({
-      type: ACTION_TYPES.UPDATE_PATH,
-      payload: { path, value }
-    });
+    // Use Immer to create an immutable update
+    setScenarioData(produce(scenarioData, draft => {
+      set(draft, path, value);
+    }));
 
+    setIsModified(true);
     return true;
   }, [scenarioData]);
 
+  // Data operations - update by path with validation (v2 method)
+  // Now using Immer for more efficient updates
   const updateByPathV2 = useCallback(async (path, value) => {
-    if (!scenarioData) return { isValid: false, error: 'No active scenario', path };
+    // Handle case when no scenario exists
+    if (!scenarioData) {
+      // Optionally auto-initialize a scenario here if needed
+      try {
+        await initializeScenario();
+        // If still no scenario, return error
+        if (!scenarioData) {
+          return {
+            isValid: false,
+            error: 'No active scenario',
+            path,
+            applied: false
+          };
+        }
+      } catch (error) {
+        return {
+          isValid: false,
+          error: 'Failed to initialize scenario',
+          path,
+          applied: false
+        };
+      }
+    }
 
     // Validate the path and get result
     const validationResult = await validatePath(ScenarioSchema, path, value, scenarioData);
@@ -426,58 +285,24 @@ export const ScenarioProvider = ({ children }) => {
     validationResult.path = path;
 
     if (validationResult.isValid) {
-      // Update the context only if validation succeeds
-      dispatch({
-        type: ACTION_TYPES.UPDATE_PATH,
-        payload: { path, value: validationResult.value }
-      });
+      // Use Immer to efficiently update only the changed path
+      setScenarioData(produce(scenarioData, draft => {
+        set(draft, path, validationResult.value);
+      }));
+
+      setIsModified(true);
 
       // Add a success flag to indicate the update was applied
       validationResult.applied = true;
+    } else {
+      validationResult.applied = false;
     }
 
     return validationResult;
-  }, [scenarioData]);
-
-
-  // const arrayOperations = useCallback((path, operation, item, itemId = null) => {
-  //   if (!scenarioData) return false;
-
-  //   try {
-  //     dispatch({
-  //       type: ACTION_TYPES.UPDATE_ARRAY,
-  //       payload: { path, operation, item, itemId }
-  //     });
-
-  //     return true;
-  //   } catch (error) {
-  //     handleApiError(error, 'Array operation failed', false);
-  //     return false;
-  //   }
-  // }, [scenarioData]);
-
-  // Helper functions for updating settings
-
-  // const updateSettings = useCallback((section, updates) => {
-  //   if (!scenarioData) return false;
-
-  //   return updateByPath(['settings', section], {
-  //     ...getValueByPath(['settings', section], {}),
-  //     ...updates
-  //   });
-  // }, [scenarioData, updateByPath, getValueByPath]);
-
-  // const updateModuleSettings = useCallback((moduleName, updates) => {
-  //   if (!scenarioData) return false;
-
-  //   return updateByPath(['settings', 'modules', moduleName], {
-  //     ...getValueByPath(['settings', 'modules', moduleName], {}),
-  //     ...updates
-  //   });
-  // }, [scenarioData, updateByPath, getValueByPath]);
+  }, [scenarioData, initializeScenario]);
 
   // Error component for reuse
-  const ScenarioErrorComponent = useMemo(() => {
+  const ScenarioErrorComponent = useCallback(() => {
     if (!scenarioData) {
       return (
         <Alert
@@ -490,10 +315,9 @@ export const ScenarioProvider = ({ children }) => {
     return null;
   }, [scenarioData]);
 
-  // Context value - keep the same public API
+  // Context value
   const value = {
     scenarioData,
-    scenarioList,
     loading,
     selectedLocation,
     hasUnsavedChanges: isModified,
@@ -503,7 +327,6 @@ export const ScenarioProvider = ({ children }) => {
 
     initializeScenario,
     getScenario,
-    getAllScenarios,
     saveScenario,
     updateScenario,
     deleteScenario,
@@ -513,11 +336,8 @@ export const ScenarioProvider = ({ children }) => {
     isNewScenario,
 
     getValueByPath,
-    updateByPath//,
-    //arrayOperations,
-
-    //updateSettings,
-    //updateModuleSettings
+    updateByPath,     // Legacy method - now using Immer for efficiency
+    updateByPathV2,   // New method with validation, also using Immer
   };
 
   return (
