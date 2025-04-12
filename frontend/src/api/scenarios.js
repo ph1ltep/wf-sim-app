@@ -9,7 +9,7 @@ import api from './index';
  * @returns {Promise<Object>} Response with ListResponseSchema containing array of ScenarioListingSchema
  */
 export const listScenarios = async (page = 1, limit = 10, search = '') => {
-  let url = `/scenarios?page=${page}&limit=${limit}`;
+  let url = `/scenarios/list?page=${page}&limit=${limit}`;
   if (search) {
     url += `&search=${encodeURIComponent(search)}`;
   }

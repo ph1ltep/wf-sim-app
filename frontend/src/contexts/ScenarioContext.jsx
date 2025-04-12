@@ -1,10 +1,19 @@
-// src/contexts/ScenarioContext.jsx - With Immer optimization
+// src/contexts/ScenarioContext.jsx - With Immer optimization and proper API module usage
 import React, { createContext, useContext, useEffect, useCallback, useState } from 'react';
 import { message, Alert } from 'antd';
 import { produce } from 'immer'; // Import Immer's produce function
 import { get, set } from 'lodash';
-import api from '../api/index';
-import { getDefaults } from '../api/defaults';
+
+// Import API modules with 'api' prefix
+import { getDefaults as apiGetDefaults } from '../api/defaults';
+import {
+  listScenarios as apiListScenarios,
+  getScenarioById as apiGetScenarioById,
+  createScenario as apiCreateScenario,
+  updateScenario as apiUpdateScenario,
+  deleteScenario as apiDeleteScenario
+} from '../api/scenarios';
+
 import { ScenarioSchema } from 'schemas/yup/scenario';
 import { validatePath } from '../utils/validate';
 
@@ -12,24 +21,23 @@ const ScenarioContext = createContext();
 
 export const useScenario = () => useContext(ScenarioContext);
 
-// Centralized error handling function
-const handleApiError = (error, fallbackMessage, showMessage = true) => {
-  const errorMessage = error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    fallbackMessage;
+// Centralized error handling function that works with API response format
+const handleApiError = (response, fallbackMessage, showMessage = true) => {
+  // API modules already return errors in a consistent format
+  const errorMessage = response?.error || fallbackMessage;
 
   if (showMessage) {
     message.error(errorMessage);
   }
 
-  console.error(fallbackMessage, error);
+  console.error(fallbackMessage, response.errors || response.error);
   return { success: false, error: errorMessage };
 };
 
 export const ScenarioProvider = ({ children }) => {
   const [scenarioData, setScenarioData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [isModified, setIsModified] = useState(false);
 
@@ -43,7 +51,7 @@ export const ScenarioProvider = ({ children }) => {
         if (successMessage) message.success(successMessage);
         return response;
       } else {
-        return handleApiError({ message: response.error }, 'API operation failed', true);
+        return handleApiError(response, 'API operation failed', true);
       }
     } catch (error) {
       return handleApiError(error, 'API operation failed', true);
@@ -54,10 +62,12 @@ export const ScenarioProvider = ({ children }) => {
 
   // Initialize a new scenario in memory
   const initializeScenario = useCallback(async () => {
-    if (loading) return null;
+    if (loading || isInitializing) return null;
+
+    setIsInitializing(true);
 
     const response = await apiRequest(
-      () => getDefaults()
+      () => apiGetDefaults()
     );
 
     if (response.success && response.data) {
@@ -66,27 +76,29 @@ export const ScenarioProvider = ({ children }) => {
       setScenarioData(newScenario);
       setIsModified(false);
       message.success('New scenario initialized');
+      setIsInitializing(false);
       return newScenario;
     } else {
       console.error('Failed to initialize scenario:', response.error);
     }
 
+    setIsInitializing(false);
     return null;
-  }, [loading]);
+  }, [loading, isInitializing]);
 
   // Initialize by creating a new scenario on mount
   useEffect(() => {
-    if (!scenarioData) {
+    if (!scenarioData && !isInitializing) {
       initializeScenario();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scenarioData, initializeScenario, isInitializing]); // Include proper dependencies
 
   // Get a single scenario
   const getScenario = useCallback(async (id) => {
     if (loading) return null;
 
     const response = await apiRequest(
-      () => api.get(`/scenarios/${id}`),
+      () => apiGetScenarioById(id),
       'Scenario loaded successfully'
     );
 
@@ -106,20 +118,11 @@ export const ScenarioProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Build query parameters
-      const params = new URLSearchParams({
-        page,
-        limit
-      });
+      const response = await apiListScenarios(page, limit, search);
 
-      if (search) {
-        params.append('search', search);
-      }
-
-      const response = await api.get(`/scenarios/list?${params}`);
-
-      if (response.data?.success) {
-        return response.data.data.scenarios || [];
+      if (response.success) {
+        // Extract the items from the response based on the API structure
+        return response.data.items || [];
       }
 
       return [];
@@ -158,7 +161,7 @@ export const ScenarioProvider = ({ children }) => {
     }
 
     const response = await apiRequest(
-      () => api.post('/scenarios', payload),
+      () => apiCreateScenario(payload),
       'Scenario saved successfully'
     );
 
@@ -199,23 +202,23 @@ export const ScenarioProvider = ({ children }) => {
     if (!payload) return null;
 
     const response = await apiRequest(
-      () => api.put(`/scenarios/${scenarioData._id}`, payload),
+      () => apiUpdateScenario(scenarioData._id, payload),
       'Scenario updated successfully'
     );
 
     if (response.success && response.data) {
       // Use Immer to update only the necessary fields
       setScenarioData(produce(scenarioData, draft => {
-        draft.name = response.data.name;
-        draft.description = response.data.description;
+        draft.name = payload.name;
+        draft.description = payload.description;
         draft.updatedAt = response.data.updatedAt;
       }));
 
       setIsModified(false);
       return {
         ...scenarioData,
-        name: response.data.name,
-        description: response.data.description,
+        name: payload.name,
+        description: payload.description,
         updatedAt: response.data.updatedAt
       };
     }
@@ -228,7 +231,7 @@ export const ScenarioProvider = ({ children }) => {
     if (loading) return false;
 
     const response = await apiRequest(
-      () => api.delete(`/scenarios/${id}`),
+      () => apiDeleteScenario(id),
       'Scenario deleted successfully'
     );
 
@@ -247,7 +250,7 @@ export const ScenarioProvider = ({ children }) => {
   // Utility functions
   const hasValidScenario = useCallback((autoInitialize = true) => {
     if (!scenarioData) {
-      if (autoInitialize) {
+      if (autoInitialize && !isInitializing) {
         // Return promise for async API compatibility
         return Promise.resolve(false).then(() => {
           initializeScenario();
@@ -257,7 +260,7 @@ export const ScenarioProvider = ({ children }) => {
       return false;
     }
     return true;
-  }, [scenarioData, initializeScenario]);
+  }, [scenarioData, initializeScenario, isInitializing]);
 
   const isNewScenario = useCallback(() => {
     return scenarioData && !scenarioData._id;

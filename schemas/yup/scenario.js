@@ -234,8 +234,9 @@ const SettingsSchema = Yup.object().shape({
             { value: 75, description: 'upper_bound' },
             { value: 25, description: 'lower_bound' },
             { value: 10, description: 'extreme_lower' },
-            { value: 90, description: 'extreme_upper' }
-        ]), // Matches getDefaultSettings
+            { value: 90, description: 'extreme_upper' },
+        ]),
+        primaryPercentile: Yup.number().min(1).max(99).default(50) // Matches getDefaultSettings
     }),
     metrics: Yup.object().shape({
         totalMW: Yup.number().default(70), // Matches getDefaultSettings

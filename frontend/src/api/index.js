@@ -3,6 +3,8 @@ import axios from 'axios';
 
 // Get the correct API URL
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/proxy/5000/api';
+const LOG_API_REQ = process.env.REACT_APP_LOG_API_REQ;
+const LOG_API_RES = process.env.REACT_APP_LOG_API_RES;
 
 // Create axios instance
 const api = axios.create({
@@ -38,12 +40,12 @@ const createErrorResponse = (message, statusCode = 500, errors = []) => {
 api.interceptors.request.use(
   (config) => {
     // Log request in development mode if LOG_API_REQ=true
-    if (process.env.NODE_ENV === 'development' && process.env.LOG_API_REQ === 'true') {
-      console.log('API Request:', JSON.stringify({
+    if (process.env.NODE_ENV === 'development' && LOG_API_REQ === 'true') {
+      console.log('API Request:', {
         url: config.url,
         method: config.method,
         data: config.data
-      }, null, 2));
+      });
     }
     return config;
   },
@@ -56,8 +58,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // Log response in development mode if LOG_API_RES=true
-    if (process.env.NODE_ENV === 'development' && process.env.LOG_API_RES === 'true') {
-      console.log('API Success Response:', JSON.stringify(response.data, null, 2));
+    if (process.env.NODE_ENV === 'development' && LOG_API_RES === 'true') {
+      console.log('API Success Response:', response.data);
     }
 
     // Pass through the response data directly
@@ -98,7 +100,7 @@ api.interceptors.response.use(
 
     // Log error response in development mode if LOG_API_RES=true
     if (process.env.NODE_ENV === 'development' && process.env.LOG_API_RES === 'true') {
-      console.error('API Error Response:', JSON.stringify(errorResponse, null, 2));
+      console.error('API Error Response:', errorResponse);
     }
 
     return Promise.resolve(errorResponse);

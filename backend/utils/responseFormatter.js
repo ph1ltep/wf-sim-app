@@ -57,6 +57,16 @@ const formatSuccess = (data, message = 'Operation successful', type = 'default')
  * @returns {Object} Formatted error object
  */
 const formatError = (error, statusCode = 500, errors = []) => {
+  // Development logging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Error Details:', {
+      error,
+      statusCode,
+      errors,
+      stack: error.stack || 'No stack trace available'
+    });
+  }
+
   // Handle different error input types
   const errorMessage = typeof error === 'string'
     ? error
