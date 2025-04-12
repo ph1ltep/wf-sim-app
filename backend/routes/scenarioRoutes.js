@@ -12,7 +12,7 @@ const {
 } = require('../controllers/scenarioController');
 
 // GET /api/scenarios/list - Get all scenarios
-router.get('/list', getAllScenarios);
+router.get('/list', listScenarios);
 
 // GET /api/scenarios/:id - Get a specific scenario
 router.get('/:id', getScenarioById);

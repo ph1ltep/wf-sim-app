@@ -1,5 +1,6 @@
 // schemas/yup/response.js
 const Yup = require('yup');
+const { SimulationInfoSchema, } = require('./distribution');
 
 /**
  * Base API Response Schema
@@ -107,7 +108,7 @@ const SimulationResponseSchema = SuccessResponseSchema.concat(
     Yup.object().shape({
         data: Yup.object().shape({
             success: Yup.boolean().required(),
-            simulationInfo: Yup.array().required(),
+            simulationInfo: SimulationInfoSchema.required(),
             timeElapsed: Yup.number(),
         }),
     })

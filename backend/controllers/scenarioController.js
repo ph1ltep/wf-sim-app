@@ -78,7 +78,7 @@ const createScenario = async (req, res, next) => {
 };
 
 // Get all scenarios with lightweight schema for listing
-const getAllScenarios = async (req, res, next) => {
+const listScenarios = async (req, res, next) => {
   try {
     // Get pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -232,9 +232,8 @@ const deleteScenario = async (req, res, next) => {
 
 module.exports = {
   createScenario,
-  getAllScenarios,
+  listScenarios,
   getScenarioById,
   updateScenario,
-  deleteScenario,
-  compareScenarios
+  deleteScenario
 };

@@ -60,6 +60,14 @@ const DistributionTypeSchema = Yup.object().shape({
     parameters: DistributionParametersSchema.required('Parameters are required'),
 });
 
+const FitDistributionSchema = Yup.object().shape({
+    distribution: DistributionTypeSchema.required('Distribution is required'),
+    dataPoints: Yup.array()
+        .of(DataPointSchema)
+        .min(1, 'At least one data point is required')
+        .required('Data points are required'),
+});
+
 // Schema for simulation settings
 const SimSettingsSchema = Yup.object().shape({
     iterations: Yup.number().min(100).default(10000).required('Iterations are required'),
@@ -112,4 +120,5 @@ module.exports = {
     SimulationInfoSchema,
     SimRequestSchema,
     SimResponseSchema,
+    FitDistributionSchema
 };

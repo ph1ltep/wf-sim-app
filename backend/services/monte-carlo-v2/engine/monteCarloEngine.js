@@ -1,7 +1,6 @@
-// backend/services/monte-carlo-v2/engine/monteCarloEngine.js
 const seedrandom = require('seedrandom');
 const DistributionWorker = require('./worker');
-const validation = require('../utils/validation');
+const { SimRequestSchema, SimResponseSchema } = require('../../../../schemas/yup/distribution');
 
 /**
  * Monte Carlo engine for running multiple distribution simulations
@@ -9,27 +8,27 @@ const validation = require('../utils/validation');
 class MonteCarloEngine {
     /**
      * Create a new Monte Carlo engine
-     * @param {Object} options - Engine configuration options
+     * @param {Object} simRequest - SimRequestSchema-compliant object with distributions and simulationSettings
+     * @param {number} [parallelWorkers=1] - Number of parallel workers for simulation
      */
-    constructor(options = {}) {
-        this.options = {
-            seed: options.seed !== undefined ? options.seed : Math.floor(Math.random() * 1000000),
-            iterations: options.iterations || 10000,
-            years: options.years || 20,
-            percentiles: options.percentiles || [
-                { value: 50, description: 'primary' },
-                { value: 75, description: 'upper_bound' },
-                { value: 25, description: 'lower_bound' },
-                { value: 10, description: 'extreme_lower' },
-                { value: 90, description: 'extreme_upper' }
-            ],
-            parallelWorkers: options.parallelWorkers || 1,
-            ...options
-        };
+    constructor(simRequest, parallelWorkers = 1) {
+        // Validate input against SimRequestSchema
+        const validatedRequest = SimRequestSchema.validateSync(simRequest, { strict: true });
 
+        // Initialize properties
+        this.options = {
+            ...validatedRequest.simulationSettings,
+            parallelWorkers: parallelWorkers // Store parallelWorkers in options
+        };
         this.workers = new Map();
         this.originalRandom = null;
         this.results = null;
+
+        // Add distributions
+        validatedRequest.distributions.forEach((distribution, index) => {
+            const id = distribution.id || `distribution_${index + 1}`;
+            this.addDistribution(id, distribution);
+        });
     }
 
     /**
@@ -40,21 +39,12 @@ class MonteCarloEngine {
      * @returns {this} For method chaining
      */
     addDistribution(id, distribution, settings = {}) {
-        // Verify distribution has proper type and parameters structure
         if (!distribution.type || !distribution.parameters) {
             throw new Error(`Invalid distribution format: must have type and parameters properties`);
         }
-
-        // Create combined settings
-        const combinedSettings = {
-            ...this.options,
-            ...settings
-        };
-
-        // Create worker for this distribution
+        const combinedSettings = { ...this.options, ...settings };
         const worker = new DistributionWorker(distribution, combinedSettings);
         this.workers.set(id, { worker, distribution, settings: combinedSettings });
-
         return this;
     }
 
@@ -82,10 +72,7 @@ class MonteCarloEngine {
      * @private
      */
     _initializeRNG() {
-        // Save original random function
         this.originalRandom = Math.random;
-
-        // Replace with seeded version
         Math.random = seedrandom(this.options.seed);
     }
 
@@ -102,56 +89,44 @@ class MonteCarloEngine {
 
     /**
      * Run the Monte Carlo simulation
-     * @returns {Object} Simulation results following SimResponseSchema
+     * @returns {Object} Simulation results validated against SimResponseSchema
      */
     async run() {
-        // Check if we have any distributions
         if (this.workers.size === 0) {
             throw new Error('No distributions added to the simulation');
         }
 
-        // Initialize RNG
         this._initializeRNG();
-
-        // Create result structure following SimResponseSchema
+        const startTime = Date.now();
         const results = {
             success: true,
             simulationInfo: []
         };
 
-        // Record start time
-        const startTime = Date.now();
-
-        // Initialize and run all workers
-        // For simplicity in initial implementation, we run them sequentially
-        // Future optimization: implement true parallelism or worker pool
+        // Note: Current implementation runs sequentially
+        // Future enhancement: Use this.options.parallelWorkers for true parallelism
         for (const [id, { worker, distribution }] of this.workers.entries()) {
             try {
-                // Initialize worker with a derived seed (unique per distribution)
                 const distributionSeed = `${this.options.seed}-${id}`;
                 worker.initialize(distributionSeed);
-
-                // Run simulation
                 const distributionResults = worker.process();
 
-                // Store results
                 results.simulationInfo.push({
-                    distribution: distribution,
+                    distribution,
                     iterations: this.options.iterations,
                     seed: this.options.seed,
                     years: this.options.years,
-                    timeElapsed: Date.now() - startTime,
+                    timeElapsed: 0, // Updated later
                     results: Array.isArray(distributionResults) ? distributionResults : [distributionResults],
                     errors: []
                 });
             } catch (error) {
-                // Record error
                 results.simulationInfo.push({
-                    distribution: distribution,
+                    distribution,
                     iterations: this.options.iterations,
                     seed: this.options.seed,
                     years: this.options.years,
-                    timeElapsed: Date.now() - startTime,
+                    timeElapsed: 0,
                     results: [],
                     errors: [error.message]
                 });
@@ -159,21 +134,16 @@ class MonteCarloEngine {
             }
         }
 
-        // Record end time and calculate elapsed time
-        const endTime = Date.now();
-        const totalElapsed = endTime - startTime;
-
-        // Update timeElapsed for all simulation info entries
+        const totalElapsed = Date.now() - startTime;
         results.simulationInfo.forEach(info => {
             info.timeElapsed = totalElapsed;
         });
 
-        // Restore RNG
         this._restoreRNG();
 
-        // Store and return results
-        this.results = results;
-        return results;
+        // Validate and cast output
+        this.results = SimResponseSchema.validateSync(results, { stripUnknown: true });
+        return this.results;
     }
 
     /**
