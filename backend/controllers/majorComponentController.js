@@ -1,6 +1,5 @@
 const { MajorComponent } = require('../../schemas/mongoose/majorComponent');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
-const { SuccessResponseSchema, CrudResponseSchema, ErrorResponseSchema } = require('../../schemas/yup/response');
 
 // Get all major components
 const getAllComponents = async (req, res) => {
@@ -17,23 +16,9 @@ const getAllComponents = async (req, res) => {
     }
 
     const components = await MajorComponent.find(query).sort({ name: 1 });
-
-    const response = SuccessResponseSchema.cast({
-      success: true,
-      data: components,
-      message: 'Components retrieved successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'default'));
+    res.json(formatSuccess(components, 'Components retrieved successfully', 'default'));
   } catch (error) {
-    console.error('Error fetching major components:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to fetch components',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to fetch components', 500, [error.message]));
   }
 };
 
@@ -46,10 +31,8 @@ const getComponents = async (platformType) => {
     } else if (platformType === 'direct-drive') {
       query['appliesTo.directDrive'] = true;
     }
-
     return await MajorComponent.find(query).sort({ name: 1 });
   } catch (error) {
-    console.error('Error fetching components internally:', error);
     throw error; // Let caller handle
   }
 };
@@ -59,30 +42,11 @@ const getComponentById = async (req, res) => {
   try {
     const component = await MajorComponent.findById(req.params.id);
     if (!component) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Component not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Component not found', 404, []));
     }
-
-    const response = SuccessResponseSchema.cast({
-      success: true,
-      data: component,
-      message: 'Component retrieved successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'default'));
+    res.json(formatSuccess(component, 'Component retrieved successfully', 'default'));
   } catch (error) {
-    console.error('Error fetching component:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to fetch component',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to fetch component', 500, [error.message]));
   }
 };
 
@@ -95,33 +59,16 @@ const createComponent = async (req, res) => {
     // Check for duplicate name
     const existingComponent = await MajorComponent.findOne({ name: validatedData.name });
     if (existingComponent) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'A component with this name already exists',
-        statusCode: 400,
-        errors: ['Duplicate name'],
-      });
-      return res.status(400).json(formatError(errorResponse.error, errorResponse));
+      return res.status(400).json(formatError('A component with this name already exists', 400, ['Duplicate name']));
     }
 
     const newComponent = new MajorComponent(validatedData);
     await newComponent.save();
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: newComponent._id, createdAt: newComponent.createdAt, updatedAt: newComponent.updatedAt },
-      message: 'Component created successfully',
-      timestamp: new Date(),
-    });
-
-    res.status(201).json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: newComponent._id, createdAt: newComponent.createdAt, updatedAt: newComponent.updatedAt };
+    res.status(201).json(formatSuccess(data, 'Component created successfully', 'crud'));
   } catch (error) {
-    console.error('Error creating component:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to create component',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to create component', 500, [error.message]));
   }
 };
 
@@ -137,12 +84,7 @@ const updateComponent = async (req, res) => {
       _id: { $ne: req.params.id },
     });
     if (existingComponent) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'A component with this name already exists',
-        statusCode: 400,
-        errors: ['Duplicate name'],
-      });
-      return res.status(400).json(formatError(errorResponse.error, errorResponse));
+      return res.status(400).json(formatError('A component with this name already exists', 400, ['Duplicate name']));
     }
 
     const updatedComponent = await MajorComponent.findByIdAndUpdate(
@@ -151,30 +93,13 @@ const updateComponent = async (req, res) => {
       { new: true, runValidators: true }
     );
     if (!updatedComponent) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Component not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Component not found', 404, []));
     }
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: updatedComponent._id, createdAt: updatedComponent.createdAt, updatedAt: updatedComponent.updatedAt },
-      message: 'Component updated successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: updatedComponent._id, createdAt: updatedComponent.createdAt, updatedAt: updatedComponent.updatedAt };
+    res.json(formatSuccess(data, 'Component updated successfully', 'crud'));
   } catch (error) {
-    console.error('Error updating component:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to update component',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to update component', 500, [error.message]));
   }
 };
 
@@ -183,41 +108,19 @@ const deleteComponent = async (req, res) => {
   try {
     const component = await MajorComponent.findById(req.params.id);
     if (!component) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Component not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Component not found', 404, []));
     }
 
     if (component.isDefault) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Cannot delete a default component',
-        statusCode: 400,
-        errors: ['Default component protected'],
-      });
-      return res.status(400).json(formatError(errorResponse.error, errorResponse));
+      return res.status(400).json(formatError('Cannot delete a default component', 400, ['Default component protected']));
     }
 
     const deletedComponent = await MajorComponent.findByIdAndDelete(req.params.id);
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: deletedComponent._id, createdAt: deletedComponent.createdAt, updatedAt: deletedComponent.updatedAt },
-      message: 'Component deleted successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: deletedComponent._id, createdAt: deletedComponent.createdAt, updatedAt: deletedComponent.updatedAt };
+    res.json(formatSuccess(data, 'Component deleted successfully', 'crud'));
   } catch (error) {
-    console.error('Error deleting component:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to delete component',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to delete component', 500, [error.message]));
   }
 };
 

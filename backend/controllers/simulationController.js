@@ -27,8 +27,7 @@ const simulateDistributions = async (req, res) => {
 
         return res.json(formatSuccess(responseData, 'Simulation completed successfully', 'simulation'));
     } catch (error) {
-        console.error('Error in Monte Carlo V2 simulation:', error);
-        return res.status(500).json(formatError(`Simulation failed: ${error.message}`));
+        return res.status(500).json(formatError('Simulation failed', 500, [error.message]));
     }
 };
 
@@ -42,8 +41,7 @@ const getDistributionsInfo = (req, res) => {
         const distributionsInfo = monteCarloV2.getAllDistributionsMetadata();
         return res.json(formatSuccess(distributionsInfo, 'Operation successful', 'default'));
     } catch (error) {
-        console.error('Error getting distributions info:', error);
-        return res.status(500).json(formatError(`Failed to get distributions info: ${error.message}`));
+        return res.status(500).json(formatError('Failed to get distributions info', 500, [error.message]));
     }
 };
 
@@ -69,9 +67,8 @@ const validateDistribution = (req, res) => {
 
         return res.json(formatSuccess(validationResult, 'Validation successful', 'default'));
     } catch (error) {
-        console.error('Error validating distribution:', error);
         const statusCode = error.name === 'ValidationError' ? 400 : 500;
-        return res.status(statusCode).json(formatError(`Validation failed: ${error.message}`));
+        return res.status(statusCode).json(formatError('Validation failed', statusCode, [error.message]));
     }
 };
 
@@ -93,9 +90,8 @@ const fitDistribution = (req, res) => {
 
         return res.json(formatSuccess(validatedParameters, 'Distribution fitted successfully', 'default'));
     } catch (error) {
-        console.error('Error fitting distribution:', error);
         const statusCode = error.name === 'ValidationError' ? 400 : 500;
-        return res.status(statusCode).json(formatError(`Fitting failed: ${error.message}`));
+        return res.status(statusCode).json(formatError('Fitting failed', statusCode, [error.message]));
     }
 };
 

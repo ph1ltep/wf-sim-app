@@ -1,3 +1,5 @@
+I’ll update the `.md` files for each controller (`defaultsController.js`, `oemScopeController.js`, `locationController.js`, `majorComponentController.js`, `scenarioController.js`, and potentially `simulationController.js`) one by one, following the "Future Updates Prompt" rules from `scenarioRoutes.md`. I’ll start with `defaultsRoutes.md`, output only the updated Markdown, and then ask for your confirmation to continue before showing the next one. The updates will reflect the simplified `formatSuccess` and `formatError` calls (no nested responses, no `console.error`), ensure schema-referenced `data` examples, and maintain consistency with `scenarioRoutes.md`’s format.
+
 # Defaults API Routes
 
 This document, `defaultsRoutes.md`, outlines the API route defined in `defaultsRoutes.js`, detailing its usage, input/output schemas, and response formats. It serves as an interface guide for the `defaultsController.js` function, specifying the `formatSuccess` type, data schema, and `formatError` structure. Examples reference Yup schemas for brevity, showing top-level properties with nested schema references.
@@ -6,12 +8,12 @@ This document, `defaultsRoutes.md`, outlines the API route defined in `defaultsR
 
 ### GET /api/defaults
 
-**Description**: Retrieves default parameter values for creating a new scenario, with an optional query parameter to specify the wind turbine platform type.
+**Description**: Retrieves default parameter values for a new scenario, with an optional platform type query parameter to customize the wind turbine platform (geared or direct-drive).
 
 **Controller Function**: `getDefaults`
 
 **Input Schema**: None (uses query parameter `platform`)
-- `platform`: String (optional, defaults to `'geared'`). Must be `'geared'` or `'direct-drive'` per `ScenarioSchema.settings.project.windFarm.wtgPlatformType`.
+- `platform`: String (optional, defaults to `'geared'`, must be `'geared'` or `'direct-drive'` per `ScenarioSchema.settings.project.windFarm.wtgPlatformType`).
 
 **Example Input**:
 ```json
@@ -35,17 +37,7 @@ This document, `defaultsRoutes.md`, outlines the API route defined in `defaultsR
 {
   "success": true,
   "message": "Default settings retrieved successfully",
-  "data": {
-    "name": "New Scenario",
-    "description": "Default configuration scenario",
-    "settings": SettingsSchema,
-    "simulation": {
-      "inputSim": InputSimSchema,
-      "outputSim": OutputSimSchema
-    },
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:00:00.000Z"
-  },
+  "data": ScenarioSchema,
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -53,11 +45,9 @@ This document, `defaultsRoutes.md`, outlines the API route defined in `defaultsR
 **formatError Example**:
 ```json
 {
-  "success": false,
   "error": "Failed to retrieve default settings",
   "statusCode": 500,
-  "errors": [],
-  "timestamp": "2025-04-11T12:00:00.000Z"
+  "errors": []
 }
 ```
 
@@ -76,7 +66,7 @@ I have updated the defaults API route in `backend/routes/defaultsRoutes.js` and/
 - Include example input (query parameters or request body) and output JSON, showing top-level properties and referencing Yup schemas (e.g., `"settings": SettingsSchema`) instead of full data values for brevity.
 - Provide a `formatError` example with structure `{ success: false, error: string, statusCode: number, errors: Array<string>, timestamp: Date }`.
 - Maintain a consistent format with sections for each route and a "Future Updates Prompt" at the end.
-- Ensure only Markdown output lines start with four characters of "%" at the beginning of every new line (other lines, like explanations, are normal).
+- Ensure only Markdown output lines start with # (other lines, like explanations, are normal).
 - Name the file `defaultsRoutes.md`.
 
 Focus on accuracy, conciseness, and clarity, serving as an interface guide for the controller. If schemas or response formats have changed, reflect those updates precisely, ensuring top-level schema properties are listed with nested schema references for all input and output examples, and schema requirements (required vs. optional) are strictly followed.

@@ -29,20 +29,7 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 {
   "success": true,
   "message": "Locations retrieved successfully",
-  "data": [
-    {
-      "country": String,
-      "countryCode": String,
-      "inflationRate": Number,
-      "capacityFactor": Number,
-      "energyPrice": Number,
-      "currency": String,
-      "foreignCurrency": String,
-      "exchangeRate": Number,
-      "createdAt": Date,
-      "updatedAt": Date
-    }
-  ],
+  "data": Array of LocationDefaultsSchema,
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -50,11 +37,9 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 **formatError Example**:
 ```json
 {
-  "success": false,
   "error": "Failed to fetch locations",
   "statusCode": 500,
-  "errors": [],
-  "timestamp": "2025-04-11T12:00:00.000Z"
+  "errors": []
 }
 ```
 
@@ -84,18 +69,7 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 {
   "success": true,
   "message": "Location retrieved successfully",
-  "data": {
-    "country": String,
-    "countryCode": String,
-    "inflationRate": Number,
-    "capacityFactor": Number,
-    "energyPrice": Number,
-    "currency": String,
-    "foreignCurrency": String,
-    "exchangeRate": Number,
-    "createdAt": Date,
-    "updatedAt": Date
-  },
+  "data": LocationDefaultsSchema,
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -156,11 +130,7 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 {
   "success": true,
   "message": "Location created successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:00:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -222,11 +192,7 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 {
   "success": true,
   "message": "Location updated successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:01:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:01:00.000Z"
 }
 ```
@@ -266,11 +232,7 @@ This document, `locationRoutes.md`, outlines the API routes defined in `location
 {
   "success": true,
   "message": "Location deleted successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:00:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -299,7 +261,7 @@ I have updated the location API routes in `backend/routes/locationRoutes.js` and
 - Include example input (query parameters or request body) and output JSON, showing top-level properties and referencing Yup schemas (e.g., `"country": String`) instead of full data values for brevity.
 - Provide a `formatError` example with structure `{ success: false, error: string, statusCode: number, errors: Array<string>, timestamp: Date }`.
 - Maintain a consistent format with sections for each route and a "Future Updates Prompt" at the end.
-Ensure only Markdown output lines start with four characters of "%" at the beginning of every new line (other lines, like explanations, are normal).
+- Ensure only Markdown output lines start with # (other lines, like explanations, are normal).
 - Name the file `locationRoutes.md`.
 
 Focus on accuracy, conciseness, and clarity, serving as an interface guide for the controller. If schemas or response formats have changed, reflect those updates precisely, ensuring top-level schema properties are listed with nested schema references for all input and output examples, and schema requirements (required vs. optional) are strictly followed.

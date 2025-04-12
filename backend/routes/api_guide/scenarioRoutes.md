@@ -4,120 +4,78 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 
 ## Routes
 
-### POST /api/scenarios
+### GET /api/scenarios
 
-**Description**: Creates a new scenario with specified settings and simulation configurations, optionally using default settings.
+**Description**: Retrieves a paginated list of all scenarios with essential fields for listing, optionally filtered by search term, sorted by last updated.
 
-**Controller Function**: `createScenario`
+**Controller Function**: `listScenarios`
 
-**Input Schema**: `ScenarioSchema`
-- `name`: String (required).
-- `description`: String (optional).
-- `settings`: `SettingsSchema` (optional, defaults to `{}`).
-- `simulation`: Object with `inputSim` (`InputSimSchema`) and `outputSim` (`OutputSimSchema`) (optional, defaults to `{}`).
+**Input Schema**: None (uses query parameters for pagination and filtering).
+- `page`: Number (optional, defaults to 1).
+- `limit`: Number (optional, defaults to 100).
+- `search`: String (optional, filters by `name` or `description`).
 
 **Example Input**:
 ```json
 {
-    "name": String,
-    "description": String,
-    "settings": SettingsSchema,
-    "simulation": {
-        "inputSim": InputSimSchema,
-        "outputSim": OutputSimSchema
-    }
+  "page": 1,
+  "limit": 100,
+  "search": "wind"
 }
 ```
-
-**Output Schema**: `CrudResponseSchema`
-- `success`: Boolean.
-- `data`: Object with `_id` (string), `createdAt` (date), `updatedAt` (date).
-- `message`: String.
-- `timestamp`: Date.
-
-**formatSuccess Type**: `'crud'`
-
-**Data Schema**: `{ _id: string, createdAt: date, updatedAt: date }`
-
-**Example Success Response**:
-```json
-{
-    "success": true,
-    "message": "Scenario created successfully",
-    "data": {
-        "_id": "1234567890",
-        "createdAt": "2025-04-11T12:00:00.000Z",
-        "updatedAt": "2025-04-11T12:00:00.000Z"
-    },
-    "timestamp": "2025-04-11T12:00:00.000Z"
-}
-```
-
-**formatError Example**:
-```json
-{
-    "success": false,
-    "error": "Failed to create scenario: Missing name",
-    "statusCode": 400,
-    "errors": [],
-    "timestamp": "2025-04-11T12:00:00.000Z"
-}
-```
-
-### GET /api/scenarios/list
-
-**Description**: Lists all scenarios with pagination and search support.
-
-**Controller Function**: `listScenarios`
-
-**Input Schema**: None (uses query parameters `page`, `limit`, `search`).
 
 **Output Schema**: `ListResponseSchema`
-- `success`: Boolean.
-- `data`: Object with `pagination` (`PaginationSchema`), `items` (array of `ScenarioListingSchema`), `count` (number).
+- `success`: Boolean (required).
+- `data`: Object with `pagination` (total, page, limit, pages), `items` (array of `ScenarioListingSchema`), `count` (number).
 - `message`: String.
 - `timestamp`: Date.
 
 **formatSuccess Type**: `'list'`
 
-**Data Schema**: `{ pagination: PaginationSchema, items: Array<ScenarioListingSchema>, count: number }`
+**Data Schema**: `{ pagination: { total: number, page: number, limit: number, pages: number }, items: Array of ScenarioListingSchema, count: number }`
 
 **Example Success Response**:
 ```json
 {
-    "success": true,
-    "message": "Scenarios retrieved successfully",
-    "data": {
-        "pagination": PaginationSchema,
-        "items": [ScenarioListingSchema],
-        "count": 10
+  "success": true,
+  "message": "Scenarios retrieved successfully",
+  "data": {
+    "pagination": {
+      "total": number,
+      "page": number,
+      "limit": number,
+      "pages": number
     },
-    "timestamp": "2025-04-11T12:00:00.000Z"
+    "items": Array of ScenarioListingSchema,
+    "count": number
+  },
+  "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
 
 **formatError Example**:
 ```json
 {
-    "success": false,
-    "error": "Failed to list scenarios: Invalid query parameters",
-    "statusCode": 400,
-    "errors": [],
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "error": "Failed to fetch scenarios",
+  "statusCode": 500,
+  "errors": []
 }
 ```
 
 ### GET /api/scenarios/:id
 
-**Description**: Retrieves a scenario by its ID.
+**Description**: Retrieves a full scenario configuration by its ID.
 
 **Controller Function**: `getScenarioById`
 
 **Input Schema**: None (uses URL parameter `id`).
+- `id`: String (required, MongoDB ObjectID).
+
+**Example Input**: URL parameter `id="1234567890"`
 
 **Output Schema**: `SuccessResponseSchema`
-- `success`: Boolean.
-- `data`: `ScenarioSchema`.
+- `success`: Boolean (required).
+- `data`: `ScenarioSchema` (required).
 - `message`: String.
 - `timestamp`: Date.
 
@@ -128,51 +86,102 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 **Example Success Response**:
 ```json
 {
-    "success": true,
-    "message": "Retrieved scenario: Example Scenario (ID: 1234567890)",
-    "data": ScenarioSchema,
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "success": true,
+  "message": "Retrieved scenario: ScenarioName (ID: ScenarioID)",
+  "data": ScenarioSchema,
+  "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
 
 **formatError Example**:
 ```json
 {
-    "success": false,
-    "error": "Scenario not found",
-    "statusCode": 404,
-    "errors": [],
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "error": "Scenario not found",
+  "statusCode": 404,
+  "errors": []
+}
+```
+
+### POST /api/scenarios
+
+**Description**: Creates a new scenario, either with complete settings or by extending default settings, validated by middleware.
+
+**Controller Function**: `createScenario`
+
+**Input Schema**: `ScenarioSchema`
+- `name`: String (required, defaults to `'New Scenario'`).
+- `description`: String (optional, defaults to `''`).
+- `settings`: `SettingsSchema` (optional, extends defaults if partial, required if complete scenario).
+- `simulation`: Object (optional, defaults to `{ inputSim: {}, outputSim: {} }`).
+  - `inputSim`: `InputSimSchema` (optional).
+  - `outputSim`: `OutputSimSchema` (optional).
+
+**Example Input**:
+```json
+{
+  "name": String,
+  "description": String,
+  "settings": SettingsSchema,
+  "simulation": { inputSim: InputSimSchema, outputSim: OutputSimSchema }
+}
+```
+
+**Output Schema**: `CrudResponseSchema`
+- `success`: Boolean (required).
+- `data`: Object with `_id` (string), `name` (string), `description` (string), `settings` (SettingsSchema), `simulation` (Object), `createdAt` (date).
+- `message`: String.
+- `timestamp`: Date.
+
+**formatSuccess Type**: `'crud'`
+
+**Data Schema**: `{ _id: string, name: string, description: string, settings: SettingsSchema, simulation: { inputSim: InputSimSchema, outputSim: OutputSimSchema }, createdAt: date }`
+
+**Example Success Response**:
+```json
+{
+  "success": true,
+  "message": "Scenario created successfully",
+  "data": { _id: string, name: string, description: string, settings: SettingsSchema, simulation: { inputSim: InputSimSchema, outputSim: OutputSimSchema }, createdAt: date },
+  "timestamp": "2025-04-11T12:00:00.000Z"
+}
+```
+
+**formatError Example**:
+```json
+{
+  "error": "Failed to create scenario",
+  "statusCode": 500,
+  "errors": []
 }
 ```
 
 ### PUT /api/scenarios/:id
 
-**Description**: Updates an existing scenario by its ID.
+**Description**: Updates an existing scenario by its ID, validated by middleware.
 
 **Controller Function**: `updateScenario`
 
 **Input Schema**: `ScenarioSchema`
 - `name`: String (required).
 - `description`: String (optional).
-- `settings`: `SettingsSchema` (optional, defaults to `{}`).
-- `simulation`: Object with `inputSim` (`InputSimSchema`) and `outputSim` (`OutputSimSchema`) (optional, defaults to `{}`).
+- `settings`: `SettingsSchema` (optional).
+- `simulation`: Object (optional).
+  - `inputSim`: `InputSimSchema` (optional).
+  - `outputSim`: `OutputSimSchema` (optional).
+- `id`: String (required, MongoDB ObjectID, via URL parameter).
 
 **Example Input**:
 ```json
 {
-    "name": String,
-    "description": String,
-    "settings": SettingsSchema,
-    "simulation": {
-        "inputSim": InputSimSchema,
-        "outputSim": OutputSimSchema
-    }
+  "name": String,
+  "description": String,
+  "settings": SettingsSchema,
+  "simulation": { inputSim: InputSimSchema, outputSim: OutputSimSchema }
 }
 ```
 
 **Output Schema**: `CrudResponseSchema`
-- `success`: Boolean.
+- `success`: Boolean (required).
 - `data`: Object with `_id` (string), `createdAt` (date), `updatedAt` (date).
 - `message`: String.
 - `timestamp`: Date.
@@ -184,25 +193,19 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 **Example Success Response**:
 ```json
 {
-    "success": true,
-    "message": "Scenario updated successfully: Example Scenario (ID: 1234567890)",
-    "data": {
-        "_id": "1234567890",
-        "createdAt": "2025-04-11T12:00:00.000Z",
-        "updatedAt": "2025-04-11T12:01:00.000Z"
-    },
-    "timestamp": "2025-04-11T12:01:00.000Z"
+  "success": true,
+  "message": "Scenario updated successfully: ScenarioName (ID: ScenarioID)",
+  "data": { _id: string, createdAt: date, updatedAt: date },
+  "timestamp": "2025-04-11T12:01:00.000Z"
 }
 ```
 
 **formatError Example**:
 ```json
 {
-    "success": false,
-    "error": "Failed to update scenario: Missing name",
-    "statusCode": 400,
-    "errors": [],
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "error": "Scenario not found",
+  "statusCode": 404,
+  "errors": []
 }
 ```
 
@@ -213,9 +216,12 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 **Controller Function**: `deleteScenario`
 
 **Input Schema**: None (uses URL parameter `id`).
+- `id`: String (required, MongoDB ObjectID).
+
+**Example Input**: URL parameter `id="1234567890"`
 
 **Output Schema**: `CrudResponseSchema`
-- `success`: Boolean.
+- `success`: Boolean (required).
 - `data`: Object with `_id` (string), `createdAt` (date), `updatedAt` (date).
 - `message`: String.
 - `timestamp`: Date.
@@ -227,25 +233,19 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 **Example Success Response**:
 ```json
 {
-    "success": true,
-    "message": "Scenario deleted: Example Scenario (ID: 1234567890)",
-    "data": {
-        "_id": "1234567890",
-        "createdAt": "2025-04-11T12:00:00.000Z",
-        "updatedAt": "2025-04-11T12:00:00.000Z"
-    },
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "success": true,
+  "message": "Scenario deleted: ScenarioName (ID: ScenarioID)",
+  "data": { _id: string, createdAt: date, updatedAt: date },
+  "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
 
 **formatError Example**:
 ```json
 {
-    "success": false,
-    "error": "Scenario not found",
-    "statusCode": 404,
-    "errors": [],
-    "timestamp": "2025-04-11T12:00:00.000Z"
+  "error": "Scenario not found",
+  "statusCode": 404,
+  "errors": []
 }
 ```
 
@@ -258,14 +258,15 @@ I have updated the scenario API routes in `backend/routes/scenarioRoutes.js` and
 
 - List all routes with their HTTP method, path, and corresponding controller function.
 - Provide a concise description of each route’s purpose.
-- Specify the input schema (from `schemas/yup/scenario.js` or `distribution.js`) for request bodies, if any, listing top-level properties (e.g., `name`, `settings`) and referencing nested Yup schemas (e.g., `settings: SettingsSchema`) for clarity. Ensure required vs. optional fields are accurately described per the schema.
+- Specify the input schema (from `schemas/yup/scenario.js` or query parameters), listing top-level properties (e.g., `name`, `settings`) and referencing nested Yup schemas (e.g., `settings: SettingsSchema`) for clarity. Ensure required vs. optional fields are accurately described per the schema.
 - Specify the output schema (from `schemas/yup/response.js` or `scenario.js`) for success responses.
 - Indicate the `formatSuccess` type (`'default'`, `'crud'`, `'list'`, etc.) and the schema type of the `data` field.
-- Include example input and output JSON, showing top-level properties and referencing Yup schemas (e.g., `"settings": SettingsSchema`) instead of full data values for brevity.
+- Include example input (query parameters or request body) and output JSON, showing top-level properties and referencing Yup schemas (e.g., `"settings": SettingsSchema`) instead of full data values for brevity.
 - Provide a `formatError` example with structure `{ success: false, error: string, statusCode: number, errors: Array<string>, timestamp: Date }`.
 - Maintain a consistent format with sections for each route and a "Future Updates Prompt" at the end.
-- Ensure only Markdown output lines start with four characters of "%" at the beginning of every new line (other lines, like explanations, are normal).
+- Ensure only Markdown output lines start with # (other lines, like explanations, are normal).
 - Name the file `scenarioRoutes.md`.
 
 Focus on accuracy, conciseness, and clarity, serving as an interface guide for the controller. If schemas or response formats have changed, reflect those updates precisely, ensuring top-level schema properties are listed with nested schema references for all input and output examples, and schema requirements (required vs. optional) are strictly followed.
 ```
+

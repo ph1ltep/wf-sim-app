@@ -62,7 +62,7 @@ export const ScenarioProvider = ({ children }) => {
 
     if (response.success && response.data) {
       // Use the complete scenario object directly
-      const newScenario = response.data.defaults;
+      const newScenario = ScenarioSchema.cast(response.data);
       setScenarioData(newScenario);
       setIsModified(false);
       message.success('New scenario initialized');

@@ -58,7 +58,7 @@ const ScopeAllocationsSchema = Yup.object().shape({
         financialCap: null,
         components: { tooling: { oem: 0.0, owner: 1.0 }, manpower: { oem: 0.0, owner: 1.0 }, parts: { oem: 0.0, owner: 1.0 } },
     })),
-}).default(() => ({}));
+});
 
 // Yearly Responsibility Schema
 const YearlyResponsibilitySchema = Yup.object().shape({
@@ -252,7 +252,7 @@ const SettingsSchema = Yup.object().shape({
             yawSystems: Yup.number().default(20), // Matches getDefaultSettings
         }),
     }),
-}).default(() => ({}));
+});
 
 // InputSim Schema
 const InputSimSchema = Yup.object().shape({
@@ -276,7 +276,7 @@ const InputSimSchema = Yup.object().shape({
     scope: Yup.object().shape({
         responsibilityMatrix: Yup.array().of(YearlyResponsibilitySchema).nullable().default(null),
     }),
-}).default(() => ({}));
+});
 
 // OutputSim Schema
 const OutputSimSchema = Yup.object().shape({
@@ -284,17 +284,17 @@ const OutputSimSchema = Yup.object().shape({
     NPV: Yup.array().of(SimResultsSchema).default([]),
     paybackPeriod: Yup.array().of(SimResultsSchema).default([]),
     minDSCR: Yup.array().of(SimResultsSchema).default([]),
-}).default(() => ({}));
+});
 
 // Main Scenario Schema
 const ScenarioSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
     description: Yup.string(),
-    settings: SettingsSchema.default(() => ({})),
+    settings: SettingsSchema.required(),
     simulation: Yup.object().shape({
         inputSim: InputSimSchema.default(() => ({})),
         outputSim: OutputSimSchema.default(() => ({})),
-    }).default(() => ({})),
+    }).required(),
     createdAt: Yup.date().default(() => new Date()),
     updatedAt: Yup.date().default(() => new Date()),
 });

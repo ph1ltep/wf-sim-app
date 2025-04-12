@@ -1,7 +1,6 @@
 const { getDefaultFailureModels } = require('./failureModelController');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const { ScenarioSchema } = require('../../schemas/yup/scenario');
-const { SuccessResponseSchema, ErrorResponseSchema } = require('../../schemas/yup/response');
 
 /**
  * Get default parameter values for simulation
@@ -31,25 +30,9 @@ const getDefaults = async (req, res) => {
     // Cast to ScenarioSchema for type safety
     const validatedScenario = ScenarioSchema.cast(defaultScenario, { stripUnknown: true });
 
-    // Prepare response
-    const response = SuccessResponseSchema.cast({
-      success: true,
-      data: validatedScenario,
-      message: 'Default settings retrieved successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'default'));
+    res.json(formatSuccess(validatedScenario, 'Default settings retrieved successfully', 'default'));
   } catch (error) {
-    console.error('Error getting default parameters:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      success: false,
-      error: 'Failed to retrieve default settings',
-      statusCode: 500,
-      errors: [error.message],
-      timestamp: new Date(),
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to retrieve default settings', 500, [error.message]));
   }
 };
 

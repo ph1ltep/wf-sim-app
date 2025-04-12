@@ -29,32 +29,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "OEM scopes retrieved successfully",
-  "data": [
-    {
-      "name": String,
-      "isDefault": Boolean,
-      "preventiveMaintenance": Boolean,
-      "bladeInspections": Boolean,
-      "blade": Boolean,
-      "bladeLEP": Boolean,
-      "remoteMonitoring": Boolean,
-      "remoteTechnicalSupport": Boolean,
-      "sitePersonnel": String,
-      "siteManagement": Boolean,
-      "technicianPercent": Number,
-      "correctiveMinor": Boolean,
-      "correctiveMajor": Boolean,
-      "correctiveMajorDetails": CorrectiveMajorSchema,
-      "bladeIntegrityManagement": Boolean,
-      "craneCoverage": Boolean,
-      "craneEventCap": Number,
-      "craneFinancialCap": Number,
-      "majorEventCap": Number,
-      "majorFinancialCap": Number,
-      "createdAt": Date,
-      "updatedAt": Date
-    }
-  ],
+  "data": Array of OEMScopeSchema,
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -94,30 +69,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "OEM scope retrieved successfully",
-  "data": {
-    "name": String,
-    "isDefault": Boolean,
-    "preventiveMaintenance": Boolean,
-    "bladeInspections": Boolean,
-    "blade": Boolean,
-    "bladeLEP": Boolean,
-    "remoteMonitoring": Boolean,
-    "remoteTechnicalSupport": Boolean,
-    "sitePersonnel": String,
-    "siteManagement": Boolean,
-    "technicianPercent": Number,
-    "correctiveMinor": Boolean,
-    "correctiveMajor": Boolean,
-    "correctiveMajorDetails": CorrectiveMajorSchema,
-    "bladeIntegrityManagement": Boolean,
-    "craneCoverage": Boolean,
-    "craneEventCap": Number,
-    "craneFinancialCap": Number,
-    "majorEventCap": Number,
-    "majorFinancialCap": Number,
-    "createdAt": Date,
-    "updatedAt": Date
-  },
+  "data": OEMScopeSchema,
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -202,11 +154,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "OEM scope created successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:00:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -291,9 +239,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "Name generated successfully",
-  "data": {
-    "name": String
-  },
+  "data": { name: string },
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```
@@ -379,11 +325,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "OEM scope updated successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:01:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:01:00.000Z"
 }
 ```
@@ -423,11 +365,7 @@ This document, `oemScopeRoutes.md`, outlines the API routes defined in `oemScope
 {
   "success": true,
   "message": "OEM scope deleted successfully",
-  "data": {
-    "_id": "1234567890",
-    "createdAt": "2025-04-11T12:00:00.000Z",
-    "updatedAt": "2025-04-11T12:00:00.000Z"
-  },
+  "data": { _id: string, createdAt: date, updatedAt: date },
   "timestamp": "2025-04-11T12:00:00.000Z"
 }
 ```

@@ -1,28 +1,13 @@
 const LocationDefaults = require('../../schemas/mongoose/locationDefaults');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
-const { SuccessResponseSchema, CrudResponseSchema, ErrorResponseSchema } = require('../../schemas/yup/response');
 
 // Get all locations
 const getAllLocations = async (req, res) => {
   try {
     const locations = await LocationDefaults.find().sort({ country: 1 });
-
-    const response = SuccessResponseSchema.cast({
-      success: true,
-      data: locations,
-      message: 'Locations retrieved successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'default'));
+    res.json(formatSuccess(locations, 'Locations retrieved successfully', 'default'));
   } catch (error) {
-    console.error('Error fetching locations:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to fetch locations',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to fetch locations', 500, [error.message]));
   }
 };
 
@@ -31,30 +16,11 @@ const getLocationById = async (req, res) => {
   try {
     const location = await LocationDefaults.findById(req.params.id);
     if (!location) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Location not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Location not found', 404, []));
     }
-
-    const response = SuccessResponseSchema.cast({
-      success: true,
-      data: location,
-      message: 'Location retrieved successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'default'));
+    res.json(formatSuccess(location, 'Location retrieved successfully', 'default'));
   } catch (error) {
-    console.error('Error fetching location:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to fetch location',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to fetch location', 500, [error.message]));
   }
 };
 
@@ -69,33 +35,16 @@ const createLocation = async (req, res) => {
       $or: [{ country: validatedData.country }, { countryCode: validatedData.countryCode }],
     });
     if (existingLocation) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'A location with this country or country code already exists',
-        statusCode: 400,
-        errors: ['Duplicate country or country code'],
-      });
-      return res.status(400).json(formatError(errorResponse.error, errorResponse));
+      return res.status(400).json(formatError('A location with this country or country code already exists', 400, ['Duplicate country or country code']));
     }
 
     const newLocation = new LocationDefaults(validatedData);
     await newLocation.save();
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: newLocation._id, createdAt: newLocation.createdAt, updatedAt: newLocation.updatedAt },
-      message: 'Location created successfully',
-      timestamp: new Date(),
-    });
-
-    res.status(201).json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: newLocation._id, createdAt: newLocation.createdAt, updatedAt: newLocation.updatedAt };
+    res.status(201).json(formatSuccess(data, 'Location created successfully', 'crud'));
   } catch (error) {
-    console.error('Error creating location:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to create location',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to create location', 500, [error.message]));
   }
 };
 
@@ -114,12 +63,7 @@ const updateLocation = async (req, res) => {
       _id: { $ne: req.params.id },
     });
     if (existingLocation) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'A location with this country or country code already exists',
-        statusCode: 400,
-        errors: ['Duplicate country or country code'],
-      });
-      return res.status(400).json(formatError(errorResponse.error, errorResponse));
+      return res.status(400).json(formatError('A location with this country or country code already exists', 400, ['Duplicate country or country code']));
     }
 
     const updatedLocation = await LocationDefaults.findByIdAndUpdate(
@@ -128,30 +72,13 @@ const updateLocation = async (req, res) => {
       { new: true, runValidators: true }
     );
     if (!updatedLocation) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Location not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Location not found', 404, []));
     }
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: updatedLocation._id, createdAt: updatedLocation.createdAt, updatedAt: updatedLocation.updatedAt },
-      message: 'Location updated successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: updatedLocation._id, createdAt: updatedLocation.createdAt, updatedAt: updatedLocation.updatedAt };
+    res.json(formatSuccess(data, 'Location updated successfully', 'crud'));
   } catch (error) {
-    console.error('Error updating location:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to update location',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to update location', 500, [error.message]));
   }
 };
 
@@ -160,30 +87,13 @@ const deleteLocation = async (req, res) => {
   try {
     const deletedLocation = await LocationDefaults.findByIdAndDelete(req.params.id);
     if (!deletedLocation) {
-      const errorResponse = ErrorResponseSchema.cast({
-        error: 'Location not found',
-        statusCode: 404,
-        errors: [],
-      });
-      return res.status(404).json(formatError(errorResponse.error, errorResponse));
+      return res.status(404).json(formatError('Location not found', 404, []));
     }
 
-    const response = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: deletedLocation._id, createdAt: deletedLocation.createdAt, updatedAt: deletedLocation.updatedAt },
-      message: 'Location deleted successfully',
-      timestamp: new Date(),
-    });
-
-    res.json(formatSuccess(response, response.message, 'crud'));
+    const data = { _id: deletedLocation._id, createdAt: deletedLocation.createdAt, updatedAt: deletedLocation.updatedAt };
+    res.json(formatSuccess(data, 'Location deleted successfully', 'crud'));
   } catch (error) {
-    console.error('Error deleting location:', error);
-    const errorResponse = ErrorResponseSchema.cast({
-      error: 'Failed to delete location',
-      statusCode: 500,
-      errors: [error.message],
-    });
-    res.status(500).json(formatError(errorResponse.error, errorResponse));
+    res.status(500).json(formatError('Failed to delete location', 500, [error.message]));
   }
 };
 

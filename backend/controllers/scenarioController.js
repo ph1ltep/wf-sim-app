@@ -1,17 +1,9 @@
-// backend/controllers/scenarioController.js
 const { Scenario } = require('../../schemas/mongoose/scenario');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const defaultsController = require('./defaultsController');
-const {
-  SuccessResponseSchema,
-  ErrorResponseSchema,
-  ValidationResponseSchema,
-  CrudResponseSchema,
-  ListResponseSchema
-} = require('../../schemas/yup/response');
 
 // Create a new scenario
-const createScenario = async (req, res, next) => {
+const createScenario = async (req, res) => {
   try {
     // Check if a complete scenario object is provided
     const isCompleteScenario = req.body.settings && req.body.simulation;
@@ -58,27 +50,22 @@ const createScenario = async (req, res, next) => {
     // Save the scenario to the database
     await scenario.save();
 
-    console.log(`[ScenarioController] Created new scenario: ${scenario.name} (ID: ${scenario._id})`);
-
-
-    let schema = CrudResponseSchema.cast({
-      success: true,
-      data: { _id, name, description, settings, simulation, createdAt },
-      message: 'Scenario created successfully',
-      timestamp: new Date()
-    });
-
-    // Return the saved scenario
-    res.status(201).json(formatSuccess(schema, schema.message, "crud"));
-
+    const data = {
+      _id: scenario._id,
+      name: scenario.name,
+      description: scenario.description,
+      settings: scenario.settings,
+      simulation: scenario.simulation,
+      createdAt: scenario.createdAt
+    };
+    res.status(201).json(formatSuccess(data, 'Scenario created successfully', 'crud'));
   } catch (error) {
-    console.error('[ScenarioController] Error creating scenario:', error);
-    next(error);
+    res.status(500).json(formatError('Failed to create scenario', 500, [error.message]));
   }
 };
 
 // Get all scenarios with lightweight schema for listing
-const listScenarios = async (req, res, next) => {
+const listScenarios = async (req, res) => {
   try {
     // Get pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -107,8 +94,6 @@ const listScenarios = async (req, res, next) => {
       .skip(skip)
       .limit(limit);
 
-    console.log(`[ScenarioController] Fetched ${scenarios.length} scenarios (Total: ${total}, Page: ${page}, Search: ${search || 'None'})`);
-
     // Transform scenarios to match the ScenarioListingSchema
     const scenarioListings = scenarios.map(scenario => ({
       _id: scenario._id,
@@ -123,64 +108,42 @@ const listScenarios = async (req, res, next) => {
       }
     }));
 
-    let schema = ListResponseSchema.cast({
-      success: true,
-      data: {
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit)
-        },
-        items: scenarioListings,
-        count: scenarioListings.length
+    const data = {
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
       },
-      message: 'Scenarios retrieved successfully',
-      timestamp: new Date()
-    });
-
-    res.json(formatSuccess(schema, schema.message, 'list'));
-
+      items: scenarioListings,
+      count: scenarioListings.length
+    };
+    res.json(formatSuccess(data, 'Scenarios retrieved successfully', 'list'));
   } catch (error) {
-    console.error('[ScenarioController] Error fetching scenarios:', error);
-    next(error);
+    res.status(500).json(formatError('Failed to fetch scenarios', 500, [error.message]));
   }
 };
 
 // Get a single scenario by ID
-const getScenarioById = async (req, res, next) => {
+const getScenarioById = async (req, res) => {
   try {
     const scenario = await Scenario.findById(req.params.id);
-
     if (!scenario) {
-      console.log(`[ScenarioController] Scenario not found with ID: ${req.params.id}`);
-      return res.status(404).json(formatError('Scenario not found'));
+      return res.status(404).json(formatError('Scenario not found', 404, []));
     }
-
-    let schema = SuccessResponseSchema.cast({
-      success: true,
-      data: scenario,
-      message: `Retrieved scenario: ${scenario.name} (ID: ${scenario._id})`,
-      timestamp: new Date()
-    });
-
-    res.json(formatSuccess(schema, schema.message, 'default'));
-
+    res.json(formatSuccess(scenario, `Retrieved scenario: ${scenario.name} (ID: ${scenario._id})`, 'default'));
   } catch (error) {
-    console.error('[ScenarioController] Error fetching scenario:', error);
-    next(error);
+    res.status(500).json(formatError('Failed to fetch scenario', 500, [error.message]));
   }
 };
 
 // Update a scenario
-const updateScenario = async (req, res, next) => {
+const updateScenario = async (req, res) => {
   try {
     // Find the scenario
     const scenario = await Scenario.findById(req.params.id);
-
     if (!scenario) {
-      console.log(`[ScenarioController] Scenario not found for update: ${req.params.id}`);
-      return res.status(404).json(formatError('Scenario not found'));
+      return res.status(404).json(formatError('Scenario not found', 404, []));
     }
 
     // Update the scenario with the validated req.body
@@ -189,46 +152,26 @@ const updateScenario = async (req, res, next) => {
     // Save changes
     await scenario.save();
 
-    let schema = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt },
-      message: `Scenario updated successfully: ${scenario.name} (ID: ${scenario._id})`,
-      timestamp: new Date()
-    });
-
-    res.json(formatSuccess(schema, schema.message, 'crud'));
-
+    const data = { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt };
+    res.json(formatSuccess(data, `Scenario updated successfully: ${scenario.name} (ID: ${scenario._id})`, 'crud'));
   } catch (error) {
-    console.error('[ScenarioController] Error updating scenario:', error);
-    next(error);
+    res.status(500).json(formatError('Failed to update scenario', 500, [error.message]));
   }
 };
 
 // Delete a scenario
-const deleteScenario = async (req, res, next) => {
+const deleteScenario = async (req, res) => {
   try {
     const scenario = await Scenario.findByIdAndDelete(req.params.id);
-
     if (!scenario) {
-      console.log(`[ScenarioController] Scenario not found for deletion: ${req.params.id}`);
-      return res.status(404).json(formatError('Scenario not found'));
+      return res.status(404).json(formatError('Scenario not found', 404, []));
     }
-
-    let schema = CrudResponseSchema.cast({
-      success: true,
-      data: { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt },
-      message: `Scenario deleted: ${scenario.name} (ID: ${scenario._id})`,
-      timestamp: new Date()
-    });
-
-    res.json(formatSuccess(schema, schema.message, 'crud'));
-
+    const data = { _id: scenario._id, createdAt: scenario.createdAt, updatedAt: scenario.updatedAt };
+    res.json(formatSuccess(data, `Scenario deleted: ${scenario.name} (ID: ${scenario._id})`, 'crud'));
   } catch (error) {
-    console.error('[ScenarioController] Error deleting scenario:', error);
-    next(error);
+    res.status(500).json(formatError('Failed to delete scenario', 500, [error.message]));
   }
 };
-
 
 module.exports = {
   createScenario,
