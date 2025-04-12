@@ -4,7 +4,7 @@ const router = express.Router();
 const { validateMiddleware } = require('../utils/validate');
 const { ScenarioSchema } = require('../../schemas/yup/scenario');
 const {
-  getAllScenarios,
+  listScenarios,
   getScenarioById,
   createScenario,
   updateScenario,

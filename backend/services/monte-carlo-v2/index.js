@@ -65,7 +65,6 @@ function fitDistribution(type, dataPoints) {
 // Export public API
 module.exports = {
     createEngine,
-    simulateDistribution,
     getDistributionsInfo,
     validateParameters,
     fitDistribution,

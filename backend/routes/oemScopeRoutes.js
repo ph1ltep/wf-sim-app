@@ -1,7 +1,9 @@
 // backend/routes/oemScopeRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
+const { OEMScopeSchema } = require('../../schemas/yup/oemScope');
+const { validateMiddleware } = require('../utils/validate');
+const {
   getAllOEMScopes,
   getOEMScopeById,
   createOEMScope,
@@ -17,13 +19,13 @@ router.get('/', getAllOEMScopes);
 router.get('/:id', getOEMScopeById);
 
 // POST /api/oemscopes - Create a new OEM scope
-router.post('/', createOEMScope);
+router.post('/', validateMiddleware(OEMScopeSchema), createOEMScope);
 
 // POST /api/oemscopes/generate-name - Generate a name based on scope selections
 router.post('/generate-name', generateName);
 
 // PUT /api/oemscopes/:id - Update OEM scope
-router.put('/:id', updateOEMScope);
+router.put('/:id', validateMiddleware(OEMScopeSchema), updateOEMScope);
 
 // DELETE /api/oemscopes/:id - Delete OEM scope
 router.delete('/:id', deleteOEMScope);

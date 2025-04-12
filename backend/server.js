@@ -9,18 +9,37 @@ console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running at http://0.0.0.0:${PORT}`);
   console.log('Available routes:');
-  
+
   // Print registered routes
   function print(path, layer) {
     if (layer.route) {
       layer.route.stack.forEach(print.bind(null, path.concat(layer.route.path)));
     } else if (layer.name === 'router' && layer.handle.stack) {
-      layer.handle.stack.forEach(print.bind(null, path.concat(layer.regexp)));
+      layer.handle.stack.forEach(print.bind(null, path.concat(cleanPath(layer.regexp))));
     } else if (layer.method) {
-      console.log('%s /%s', layer.method.toUpperCase(), path.concat(layer.regexp).filter(Boolean).join('/'));
+      const segments = path.concat(cleanPath(layer.regexp)).filter(Boolean);
+      const fullPath = segments.length ? segments.join('/') : '';
+      console.log('%s /%s', layer.method.toUpperCase(), fullPath.replace(/\/+/g, '/'));
     }
   }
-  
+
+  // Helper function to clean regex paths
+  function cleanPath(regex) {
+    if (!regex) return '';
+    // Convert regex to string and remove artifacts
+    let path = regex.toString()
+      .replace(/^\/\^\\\/|\\\//g, '')      // Remove regex start/end
+      .replace(/\?.*$/, '')                // Remove optional markers
+      .replace(/\/\.*$/, '')               // Remove trailing regex
+      .replace(/\\\(.*\\\)/g, ':id');      // Convert params to :id
+    // Remove remaining regex characters and normalize slashes
+    path = path.replace(/[\\^$*+?.()|[\]{}]/g, '');
+    // Trim leading/trailing slashes and prevent empty segments
+    path = path.replace(/^\/+|\/+$/g, '');
+    // Replace internal multiple slashes
+    return path.replace(/\/+/g, '/');
+  }
+
   app._router.stack.forEach(print.bind(null, []));
 });
 
@@ -32,3 +51,4 @@ server.on('error', (error) => {
     console.error('Server error:', error);
   }
 });
+

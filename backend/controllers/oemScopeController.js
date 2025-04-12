@@ -1,15 +1,29 @@
-// backend/controllers/oemScopeController.js
 const OEMScope = require('../../schemas/mongoose/oemScope');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
+const { OEMScopeSchema } = require('../../schemas/yup/oemScope');
+const { SuccessResponseSchema, CrudResponseSchema, ErrorResponseSchema } = require('../../schemas/yup/response');
 
 // Get all OEM scopes
 const getAllOEMScopes = async (req, res) => {
   try {
     const oemScopes = await OEMScope.find().sort({ name: 1 });
-    res.json(formatSuccess(oemScopes));
+
+    const response = SuccessResponseSchema.cast({
+      success: true,
+      data: oemScopes,
+      message: 'OEM scopes retrieved successfully',
+      timestamp: new Date(),
+    });
+
+    res.json(formatSuccess(response, response.message, 'default'));
   } catch (error) {
     console.error('Error fetching OEM scopes:', error);
-    res.status(500).json(formatError('Failed to fetch OEM scopes'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to fetch OEM scopes',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
@@ -17,116 +31,195 @@ const getAllOEMScopes = async (req, res) => {
 const getOEMScopeById = async (req, res) => {
   try {
     const oemScope = await OEMScope.findById(req.params.id);
-
     if (!oemScope) {
-      return res.status(404).json(formatError('OEM scope not found'));
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'OEM scope not found',
+        statusCode: 404,
+        errors: [],
+      });
+      return res.status(404).json(formatError(errorResponse.error, errorResponse));
     }
 
-    res.json(formatSuccess(oemScope));
+    const response = SuccessResponseSchema.cast({
+      success: true,
+      data: oemScope,
+      message: 'OEM scope retrieved successfully',
+      timestamp: new Date(),
+    });
+
+    res.json(formatSuccess(response, response.message, 'default'));
   } catch (error) {
     console.error('Error fetching OEM scope:', error);
-    res.status(500).json(formatError('Failed to fetch OEM scope'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to fetch OEM scope',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
 // Create a new OEM scope
 const createOEMScope = async (req, res) => {
   try {
-    // Check if scope with same name already exists
-    if (req.body.name) {
-      const existingScope = await OEMScope.findOne({ name: req.body.name });
+    // Validation handled by middleware
+    const validatedData = req.body;
 
-      if (existingScope) {
-        return res.status(400).json(formatError('An OEM scope with this name already exists'));
-      }
+    // Check for duplicate name
+    const existingScope = await OEMScope.findOne({ name: validatedData.name });
+    if (existingScope) {
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'An OEM scope with this name already exists',
+        statusCode: 400,
+        errors: ['Duplicate name'],
+      });
+      return res.status(400).json(formatError(errorResponse.error, errorResponse));
     }
 
-    const newOEMScope = new OEMScope(req.body);
+    const newOEMScope = new OEMScope(validatedData);
     await newOEMScope.save();
 
-    res.status(201).json(formatSuccess(newOEMScope, 'OEM scope created successfully'));
+    const response = CrudResponseSchema.cast({
+      success: true,
+      data: { _id: newOEMScope._id, createdAt: newOEMScope.createdAt, updatedAt: newOEMScope.updatedAt },
+      message: 'OEM scope created successfully',
+      timestamp: new Date(),
+    });
+
+    res.status(201).json(formatSuccess(response, response.message, 'crud'));
   } catch (error) {
     console.error('Error creating OEM scope:', error);
-
-    if (error.name === 'ValidationError') {
-      return res.status(400).json(formatError('Validation error: ' + error.message));
-    }
-
-    res.status(500).json(formatError('Failed to create OEM scope'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to create OEM scope',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
 // Generate name for an OEM scope based on selections
 const generateName = async (req, res) => {
   try {
+    // Validate request body
+    const validatedData = await OEMScopeSchema.validate(req.body, { stripUnknown: true });
+
     // Create a temporary document to use the generateName method
-    const tempScope = new OEMScope(req.body);
+    const tempScope = new OEMScope(validatedData);
     const generatedName = tempScope.generateName();
 
-    res.json(formatSuccess({ name: generatedName }, 'Name generated successfully'));
+    const response = SuccessResponseSchema.cast({
+      success: true,
+      data: { name: generatedName },
+      message: 'Name generated successfully',
+      timestamp: new Date(),
+    });
+
+    res.json(formatSuccess(response, response.message, 'default'));
   } catch (error) {
     console.error('Error generating name:', error);
-    res.status(500).json(formatError('Failed to generate name'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to generate name',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
 // Update OEM scope
 const updateOEMScope = async (req, res) => {
   try {
-    // Check if update would create a duplicate name
-    if (req.body.name) {
-      const existingScope = await OEMScope.findOne({
-        name: req.body.name,
-        _id: { $ne: req.params.id }
-      });
+    // Validation handled by middleware
+    const validatedData = req.body;
 
-      if (existingScope) {
-        return res.status(400).json(formatError('An OEM scope with this name already exists'));
-      }
+    // Check for duplicate name, excluding current scope
+    const existingScope = await OEMScope.findOne({
+      name: validatedData.name,
+      _id: { $ne: req.params.id },
+    });
+    if (existingScope) {
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'An OEM scope with this name already exists',
+        statusCode: 400,
+        errors: ['Duplicate name'],
+      });
+      return res.status(400).json(formatError(errorResponse.error, errorResponse));
     }
 
     const updatedOEMScope = await OEMScope.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      validatedData,
       { new: true, runValidators: true }
     );
-
     if (!updatedOEMScope) {
-      return res.status(404).json(formatError('OEM scope not found'));
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'OEM scope not found',
+        statusCode: 404,
+        errors: [],
+      });
+      return res.status(404).json(formatError(errorResponse.error, errorResponse));
     }
 
-    res.json(formatSuccess(updatedOEMScope, 'OEM scope updated successfully'));
+    const response = CrudResponseSchema.cast({
+      success: true,
+      data: { _id: updatedOEMScope._id, createdAt: updatedOEMScope.createdAt, updatedAt: updatedOEMScope.updatedAt },
+      message: 'OEM scope updated successfully',
+      timestamp: new Date(),
+    });
+
+    res.json(formatSuccess(response, response.message, 'crud'));
   } catch (error) {
     console.error('Error updating OEM scope:', error);
-
-    if (error.name === 'ValidationError') {
-      return res.status(400).json(formatError('Validation error: ' + error.message));
-    }
-
-    res.status(500).json(formatError('Failed to update OEM scope'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to update OEM scope',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
 // Delete OEM scope
 const deleteOEMScope = async (req, res) => {
   try {
-    // Check if it's a default scope (should not delete default scopes)
     const scope = await OEMScope.findById(req.params.id);
-
     if (!scope) {
-      return res.status(404).json(formatError('OEM scope not found'));
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'OEM scope not found',
+        statusCode: 404,
+        errors: [],
+      });
+      return res.status(404).json(formatError(errorResponse.error, errorResponse));
     }
 
     if (scope.isDefault) {
-      return res.status(400).json(formatError('Cannot delete a default OEM scope'));
+      const errorResponse = ErrorResponseSchema.cast({
+        error: 'Cannot delete a default OEM scope',
+        statusCode: 400,
+        errors: ['Default scope protected'],
+      });
+      return res.status(400).json(formatError(errorResponse.error, errorResponse));
     }
 
     const deletedOEMScope = await OEMScope.findByIdAndDelete(req.params.id);
 
-    res.json(formatSuccess(null, 'OEM scope deleted successfully'));
+    const response = CrudResponseSchema.cast({
+      success: true,
+      data: { _id: deletedOEMScope._id, createdAt: deletedOEMScope.createdAt, updatedAt: deletedOEMScope.updatedAt },
+      message: 'OEM scope deleted successfully',
+      timestamp: new Date(),
+    });
+
+    res.json(formatSuccess(response, response.message, 'crud'));
   } catch (error) {
     console.error('Error deleting OEM scope:', error);
-    res.status(500).json(formatError('Failed to delete OEM scope'));
+    const errorResponse = ErrorResponseSchema.cast({
+      error: 'Failed to delete OEM scope',
+      statusCode: 500,
+      errors: [error.message],
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
@@ -136,5 +229,5 @@ module.exports = {
   createOEMScope,
   generateName,
   updateOEMScope,
-  deleteOEMScope
+  deleteOEMScope,
 };

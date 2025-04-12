@@ -164,7 +164,7 @@ const getScenarioById = async (req, res, next) => {
       timestamp: new Date()
     });
 
-    res.json(formatSuccess(scenario, scenario.message, 'default'));
+    res.json(formatSuccess(schema, schema.message, 'default'));
 
   } catch (error) {
     console.error('[ScenarioController] Error fetching scenario:', error);

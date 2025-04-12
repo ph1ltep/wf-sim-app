@@ -1,7 +1,10 @@
 // backend/routes/locationRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
+const { validateMiddleware } = require('../utils/validate');
+const { LocationDefaultsSchema } = require('../../schemas/yup/locationDefaults');
+
+const {
   getAllLocations,
   getLocationById,
   createLocation,
@@ -16,10 +19,10 @@ router.get('/', getAllLocations);
 router.get('/:id', getLocationById);
 
 // POST /api/locations - Create a new location
-router.post('/', createLocation);
+router.post('/', validateMiddleware(LocationDefaultsSchema), createLocation);
 
 // PUT /api/locations/:id - Update location
-router.put('/:id', updateLocation);
+router.put('/:id', validateMiddleware(LocationDefaultsSchema), updateLocation);
 
 // DELETE /api/locations/:id - Delete location
 router.delete('/:id', deleteLocation);

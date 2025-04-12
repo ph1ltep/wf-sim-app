@@ -1,7 +1,7 @@
-// backend/controllers/defaultsController.js
 const { getDefaultFailureModels } = require('./failureModelController');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const { ScenarioSchema } = require('../../schemas/yup/scenario');
+const { SuccessResponseSchema, ErrorResponseSchema } = require('../../schemas/yup/response');
 
 /**
  * Get default parameter values for simulation
@@ -10,17 +10,14 @@ const { ScenarioSchema } = require('../../schemas/yup/scenario');
  */
 const getDefaults = async (req, res) => {
   try {
-    // Get platform type from query parameter (default to 'geared')
+    // Extract platform from query, default to 'geared'
     const platformType = req.query.platform || 'geared';
 
-    // Get default failure models (these need to come from the DB)
+    // Get default failure models
     const failureModels = await getDefaultFailureModels(platformType);
 
-    // Get complete default scenario from Yup schema
+    // Get default scenario from Yup schema
     let defaultScenario = ScenarioSchema.default();
-
-    // Convert to plain object in case it has getters/setters
-    defaultScenario = JSON.parse(JSON.stringify(defaultScenario));
 
     // Apply platform-specific overrides
     defaultScenario.settings.project.windFarm.wtgPlatformType = platformType;
@@ -31,20 +28,31 @@ const getDefaults = async (req, res) => {
     defaultScenario.name = 'New Scenario';
     defaultScenario.description = 'Default configuration scenario';
 
-    let schema = SuccessResponseSchema.cast({
+    // Cast to ScenarioSchema for type safety
+    const validatedScenario = ScenarioSchema.cast(defaultScenario, { stripUnknown: true });
+
+    // Prepare response
+    const response = SuccessResponseSchema.cast({
       success: true,
-      data: defaultScenario,
+      data: validatedScenario,
       message: 'Default settings retrieved successfully',
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
-    res.json(formatSuccess(schema, schema.message, 'default'));
+    res.json(formatSuccess(response, response.message, 'default'));
   } catch (error) {
     console.error('Error getting default parameters:', error);
-    res.status(500).json(formatError(error.message));
+    const errorResponse = ErrorResponseSchema.cast({
+      success: false,
+      error: 'Failed to retrieve default settings',
+      statusCode: 500,
+      errors: [error.message],
+      timestamp: new Date(),
+    });
+    res.status(500).json(formatError(errorResponse.error, errorResponse));
   }
 };
 
 module.exports = {
-  getDefaults
+  getDefaults,
 };

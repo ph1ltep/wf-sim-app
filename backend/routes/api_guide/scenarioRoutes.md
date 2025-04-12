@@ -264,7 +264,7 @@ I have updated the scenario API routes in `backend/routes/scenarioRoutes.js` and
 - Include example input and output JSON, showing top-level properties and referencing Yup schemas (e.g., `"settings": SettingsSchema`) instead of full data values for brevity.
 - Provide a `formatError` example with structure `{ success: false, error: string, statusCode: number, errors: Array<string>, timestamp: Date }`.
 - Maintain a consistent format with sections for each route and a "Future Updates Prompt" at the end.
-- Ensure only Markdown output lines start with  (other lines, like explanations, are normal).
+- Ensure only Markdown output lines start with four characters of "%" at the beginning of every new line (other lines, like explanations, are normal).
 - Name the file `scenarioRoutes.md`.
 
 Focus on accuracy, conciseness, and clarity, serving as an interface guide for the controller. If schemas or response formats have changed, reflect those updates precisely, ensuring top-level schema properties are listed with nested schema references for all input and output examples, and schema requirements (required vs. optional) are strictly followed.
