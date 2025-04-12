@@ -32,7 +32,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
             // This will directly use the API without needing to update a local state
             const result = await getAllScenarios(1, 100); // Fetch up to 100 scenarios
 
-            if (result && result {
+            if (result && result) {
                 setScenarios(result);
                 setFilteredScenarios(result);
             } else {
