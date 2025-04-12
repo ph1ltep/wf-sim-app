@@ -1,109 +1,56 @@
-// src/api/oemScopes.js - Improved error handling
+// src/api/oemScopes.js - With schema information
 import api from './index';
 
 /**
  * Fetch all OEM scopes
- * @returns {Promise<Object>} Response with data or error
+ * @returns {Promise<Object>} Response with SuccessResponseSchema containing array of OEMScopeSchema
  */
 export const getAllOEMScopes = async () => {
-  try {
-    return await api.get('/oemscopes');
-  } catch (error) {
-    console.error('getAllOEMScopes error:', error);
-    return {
-      success: false,
-      error: error.error || 'Failed to fetch OEM scopes',
-      data: null
-    };
-  }
+  return await api.get('/oemscopes');
 };
 
 /**
  * Fetch a single OEM scope by ID
  * @param {string} id - OEM scope ID
- * @returns {Promise<Object>} Response with data or error
+ * @returns {Promise<Object>} Response with SuccessResponseSchema containing OEMScopeSchema
  */
 export const getOEMScopeById = async (id) => {
-  try {
-    return await api.get(`/oemscopes/${id}`);
-  } catch (error) {
-    console.error(`getOEMScopeById(${id}) error:`, error);
-    return {
-      success: false,
-      error: error.error || 'Failed to fetch OEM scope',
-      data: null
-    };
-  }
+  return await api.get(`/oemscopes/${id}`);
 };
 
 /**
  * Create a new OEM scope
- * @param {Object} data - OEM scope data
- * @returns {Promise<Object>} Response with data or error
+ * @param {Object} data - OEM scope data matching OEMScopeSchema
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing created OEM scope metadata
  */
 export const createOEMScope = async (data) => {
-  try {
-    return await api.post('/oemscopes', data);
-  } catch (error) {
-    console.error('createOEMScope error:', error);
-    return {
-      success: false,
-      error: error.error || 'Failed to create OEM scope',
-      data: null
-    };
-  }
+  return await api.post('/oemscopes', data);
 };
 
 /**
- * Generate name for OEM scope
- * @param {Object} data - OEM scope data
- * @returns {Promise<Object>} Response with generated name or error
+ * Generate name for OEM scope based on selected options
+ * @param {Object} data - OEM scope data matching OEMScopeSchema
+ * @returns {Promise<Object>} Response with SuccessResponseSchema containing generated name
  */
 export const generateOEMScopeName = async (data) => {
-  try {
-    return await api.post('/oemscopes/generate-name', data);
-  } catch (error) {
-    console.error('generateOEMScopeName error:', error);
-    return {
-      success: false,
-      error: error.error || 'Failed to generate OEM scope name',
-      name: null
-    };
-  }
+  return await api.post('/oemscopes/generate-name', data);
 };
 
 /**
  * Update an existing OEM scope
  * @param {string} id - OEM scope ID
- * @param {Object} data - Updated OEM scope data
- * @returns {Promise<Object>} Response with data or error
+ * @param {Object} data - Updated OEM scope data matching OEMScopeSchema
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing updated OEM scope metadata
  */
 export const updateOEMScope = async (id, data) => {
-  try {
-    return await api.put(`/oemscopes/${id}`, data);
-  } catch (error) {
-    console.error(`updateOEMScope(${id}) error:`, error);
-    return {
-      success: false,
-      error: error.error || 'Failed to update OEM scope',
-      data: null
-    };
-  }
+  return await api.put(`/oemscopes/${id}`, data);
 };
 
 /**
  * Delete an OEM scope
  * @param {string} id - OEM scope ID
- * @returns {Promise<Object>} Response with success or error
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing deleted OEM scope metadata
  */
 export const deleteOEMScope = async (id) => {
-  try {
-    return await api.delete(`/oemscopes/${id}`);
-  } catch (error) {
-    console.error(`deleteOEMScope(${id}) error:`, error);
-    return {
-      success: false,
-      error: error.error || 'Failed to delete OEM scope'
-    };
-  }
+  return await api.delete(`/oemscopes/${id}`);
 };

@@ -1,12 +1,11 @@
-// src/api/defaults.js
+// src/api/defaults.js - With schema information
 import api from './index';
 
+/**
+ * Get default parameter values for a new scenario
+ * @param {string} platformType - Wind turbine platform type ('geared' or 'direct-drive')
+ * @returns {Promise<Object>} Response with SuccessResponseSchema containing ScenarioSchema defaults
+ */
 export const getDefaults = async (platformType = 'geared') => {
-  try {
-    const response = await api.get(`/defaults?platform=${platformType}`);
-    return response;
-  } catch (error) {
-    console.error('Error fetching default settings:', error);
-    throw error;
-  }
+  return await api.get(`/defaults?platform=${platformType}`);
 };

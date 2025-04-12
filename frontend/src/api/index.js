@@ -1,9 +1,8 @@
-// src/api/index.js - Improved error handling and debug logging
+// src/api/index.js - With simple debug logging
 import axios from 'axios';
 
 // Get the correct API URL
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/proxy/5000/api';
-console.log('API Base URL:', API_BASE_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -11,112 +10,98 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  // Add this to ensure cookies are sent with the request
   withCredentials: true,
-  // Add timeout to prevent infinite waiting
   timeout: 30000
 });
 
-// Debugging: Log configuration
-console.log('API Configuration:', {
-  baseURL: api.defaults.baseURL,
-  timeout: api.defaults.timeout,
-  withCredentials: api.defaults.withCredentials
-});
+/**
+ * Creates an error object matching ErrorResponseSchema
+ */
+const createErrorResponse = (message, statusCode = 500, errors = []) => {
+  const errorResponse = {
+    success: false,
+    error: message,
+    statusCode,
+    errors: Array.isArray(errors) ? errors : [],
+    timestamp: new Date()
+  };
 
-// Add a request interceptor for logging
+  // Log in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.error('API Error Response:', errorResponse);
+  }
+
+  return errorResponse;
+};
+
+// Add a request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Log the request for debugging
-    console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`);
+    // Log request in development mode if LOG_API_REQ=true
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_API_REQ === 'true') {
+      console.log('API Request:', JSON.stringify({
+        url: config.url,
+        method: config.method,
+        data: config.data
+      }, null, 2));
+    }
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
-    return Promise.reject(error);
+    return Promise.resolve(createErrorResponse('Request configuration error', 0));
   }
 );
 
-// Add a response interceptor for error handling
+// Add a response interceptor
 api.interceptors.response.use(
   (response) => {
-    console.log(`API Response (${response.config.url}):`, response.status, response.data);
-
-    // Check if the response data is already in our expected format
-    if (response.data &&
-      (response.data.success !== undefined ||
-        response.data.data !== undefined ||
-        response.data.error !== undefined)) {
-      // Response is already in our expected format
-      return {
-        ...response.data,
-        status: response.status,
-        statusText: response.statusText
-      };
+    // Log response in development mode if LOG_API_RES=true
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_API_RES === 'true') {
+      console.log('API Success Response:', JSON.stringify(response.data, null, 2));
     }
 
-    // Otherwise transform response data to our standard format
-    return {
-      success: true,
-      data: response.data,
-      status: response.status,
-      statusText: response.statusText
-    };
+    // Pass through the response data directly
+    return response.data;
   },
   (error) => {
-    // Extract the error details and create a standardized error response
-    let errorMessage = 'An unexpected error occurred';
-    let errorDetails = null;
+    let errorResponse;
 
     if (error.response) {
-      // The request was made and the server responded with an error status
-      errorMessage = error.response.data?.error ||
-        error.response.data?.message ||
-        `Server error: ${error.response.status} ${error.response.statusText}`;
-      errorDetails = error.response.data;
+      // Server responded with an error status
+      const data = error.response.data;
 
-      console.error('API Response Error:', {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data,
-        url: error.config.url
-      });
-    } else if (error.request) {
-      // The request was made but no response was received
-      errorMessage = 'No response received from server. Please check your connection.';
-      console.error('API No Response Error:', {
-        request: error.request,
-        url: error.config?.url
-      });
-    } else {
-      // Something happened in setting up the request
-      errorMessage = error.message || 'Error setting up the request';
-      console.error('API Setup Error:', error.message);
+      // If the response is already in ErrorResponseSchema format, use it
+      if (data && data.success === false && data.error !== undefined) {
+        errorResponse = data;
+      } else {
+        // Create a standardized error response
+        let errorMessage = 'Server error';
+        if (data && data.message) {
+          errorMessage = data.message;
+        } else if (typeof data === 'string') {
+          errorMessage = data;
+        } else {
+          errorMessage = `Server error: ${error.response.status} ${error.response.statusText}`;
+        }
+
+        errorResponse = createErrorResponse(errorMessage, error.response.status);
+      }
+    }
+    else if (error.request) {
+      // No response received
+      errorResponse = createErrorResponse('No response received from server', 0);
+    }
+    else {
+      // Request setup error
+      errorResponse = createErrorResponse(error.message || 'Error setting up the request', 500);
     }
 
-
-    // Add network details for debugging
-    if (error.config) {
-      console.error('Failed request details:', {
-        url: error.config.url,
-        method: error.config.method,
-        baseURL: error.config.baseURL
-      });
+    // Log error response in development mode if LOG_API_RES=true
+    if (process.env.NODE_ENV === 'development' && process.env.LOG_API_RES === 'true') {
+      console.error('API Error Response:', JSON.stringify(errorResponse, null, 2));
     }
 
-    // Create a standardized error response
-    const standardError = {
-      success: false,
-      error: errorMessage,
-      details: errorDetails,
-      status: error.response?.status || 0,
-      statusText: error.response?.statusText || 'Unknown Error'
-    };
-
-    console.error('Standardized error:', standardError);
-
-    // Return the error in our standard format
-    return Promise.resolve(standardError);
+    return Promise.resolve(errorResponse);
   }
 );
 

@@ -1,26 +1,54 @@
-// src/api/scenarios.js
+// src/api/scenarios.js - Updated with current API routes
 import api from './index';
 
-export const getAllScenarios = (page = 1, limit = 10) => {
-  return api.get(`/scenarios?page=${page}&limit=${limit}`);
+/**
+ * Fetch a paginated list of all scenarios with optional filtering
+ * @param {number} page - Page number (default: 1)
+ * @param {number} limit - Number of items per page (default: 10)
+ * @param {string} search - Optional search term for filtering by name/description
+ * @returns {Promise<Object>} Response with ListResponseSchema containing array of ScenarioListingSchema
+ */
+export const listScenarios = async (page = 1, limit = 10, search = '') => {
+  let url = `/scenarios?page=${page}&limit=${limit}`;
+  if (search) {
+    url += `&search=${encodeURIComponent(search)}`;
+  }
+  return await api.get(url);
 };
 
-export const getScenarioById = (id) => {
-  return api.get(`/scenarios/${id}`);
+/**
+ * Fetch a scenario by its ID
+ * @param {string} id - Scenario ID
+ * @returns {Promise<Object>} Response with SuccessResponseSchema containing ScenarioSchema
+ */
+export const getScenarioById = async (id) => {
+  return await api.get(`/scenarios/${id}`);
 };
 
-export const createScenario = (data) => {
-  return api.post('/scenarios', data);
+/**
+ * Create a new scenario
+ * @param {Object} data - Scenario data (partial or complete ScenarioSchema)
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing created scenario metadata
+ */
+export const createScenario = async (data) => {
+  return await api.post('/scenarios', data);
 };
 
-export const updateScenario = (id, data) => {
-  return api.put(`/scenarios/${id}`, data);
+/**
+ * Update an existing scenario
+ * @param {string} id - Scenario ID
+ * @param {Object} data - Updated scenario data (partial or complete ScenarioSchema)
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing updated scenario metadata
+ */
+export const updateScenario = async (id, data) => {
+  return await api.put(`/scenarios/${id}`, data);
 };
 
-export const deleteScenario = (id) => {
-  return api.delete(`/scenarios/${id}`);
-};
-
-export const compareScenarios = (ids) => {
-  return api.post('/scenarios/compare', { ids });
+/**
+ * Delete a scenario
+ * @param {string} id - Scenario ID
+ * @returns {Promise<Object>} Response with CrudResponseSchema containing deleted scenario metadata
+ */
+export const deleteScenario = async (id) => {
+  return await api.delete(`/scenarios/${id}`);
 };
