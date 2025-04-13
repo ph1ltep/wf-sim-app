@@ -22,11 +22,11 @@ export const ContextField = ({
   ...rest
 }) => {
   const [error, setError] = useState(null);
-  const { getValueByPath, updateByPathV2 } = useScenario();
+  const { getValueByPath, updateByPath } = useScenario();
 
   // Use provided overrides when in form mode, or context functions otherwise
   const getValue = formMode && getValueOverride ? getValueOverride : getValueByPath;
-  const updateValue = formMode && updateValueOverride ? updateValueOverride : updateByPathV2;
+  const updateValue = formMode && updateValueOverride ? updateValueOverride : updateByPath;
 
   // Get current value
   const value = getValue(path, null);

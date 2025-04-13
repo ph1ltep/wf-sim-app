@@ -140,7 +140,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
                 <div>
                     <div>{text}</div>
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {record.settings?.general?.projectName || 'No project name'}
+                        {record.details?.projectName || 'No project name'}
                     </Text>
                 </div>
             ),
@@ -155,7 +155,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
             title: 'Project Size',
             key: 'projectSize',
             render: (_, record) => {
-                const totalMW = record.metrics?.totalMW;
+                const totalMW = record.details?.totalMW;
                 return totalMW ? `${totalMW} MW` : 'N/A';
             },
         },
@@ -186,19 +186,25 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
 
     // Expandable row renderer - More concise with additional info
     const expandedRowRender = (record) => {
-        const projectLife = record.settings?.general?.projectLife || 0;
-        const numWTGs = record.settings?.project?.windFarm?.numWTGs || 0;
-        const mwPerWTG = record.settings?.project?.windFarm?.mwPerWTG || 0;
-        const capacityFactor = record.settings?.project?.windFarm?.capacityFactor || 0;
-        const currency = record.settings?.project?.currency?.local || 'USD';
-        const startDate = record.settings?.general?.startDate;
-        const netAEP = record.metrics?.netAEP || 0;
+        const projectName = record.details?.projectName || 'N/A';
+        const totalMW = record.details?.totalMW || 0;
+        const windFarmSize = record.details?.numWTGs || 0;
+        const projectLife = record.details?.projectLife || 0;
+        const numWTGs = record.details?.numWTGs || 0;
+        const mwPerWTG = record.details?.mwPerWTG || 0;
+        const capacityFactor = record.details?.capacityFactor || 0;
+        const currency = record.details?.local || 'USD';
+        const startDate = record.details?.startDate;
+        const netAEP = record.details?.netAEP || 0;
 
         return (
             <div style={{ padding: '8px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
                         <Space direction="vertical" size="small">
+                            <div>
+                                <Text strong>Project Name:</Text> {projectName}
+                            </div>
                             <div>
                                 <Text strong>Configuration:</Text> {numWTGs} WTGs × {mwPerWTG} MW = {(numWTGs * mwPerWTG).toFixed(1)} MW total
                             </div>

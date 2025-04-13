@@ -87,9 +87,9 @@ const listScenarios = async (req, res) => {
     // Get total count with filter
     const total = await Scenario.countDocuments(filter);
 
-    // Get scenarios with essential fields for listing
+    //Get scenarios with essential fields for listing
     const scenarios = await Scenario.find(filter)
-      .select('_id name description createdAt updatedAt settings.general.projectLife settings.project.windFarm.numWTGs settings.metrics.totalMW')
+      .select('_id name description createdAt updatedAt settings.general settings.project.windFarm settings.metrics')
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -101,10 +101,17 @@ const listScenarios = async (req, res) => {
       description: scenario.description,
       createdAt: scenario.createdAt,
       updatedAt: scenario.updatedAt,
-      metrics: {
+      details: {
+        projectName: scenario.settings?.general?.projectName || '',
         totalMW: scenario.settings?.metrics?.totalMW || 0,
         windFarmSize: scenario.settings?.project?.windFarm?.numWTGs || 0,
-        projectLife: scenario.settings?.general?.projectLife || 0
+        projectLife: scenario.settings?.general?.projectLife || 0,
+        numWTGs: scenario.settings?.project?.windFarm?.numWTGs || 0,
+        mwPerWTG: scenario.settings?.project?.windFarm?.mwPerWTG || 0,
+        capacityFactor: scenario.settings?.project?.windFarm?.capacityFactor || 0,
+        currency: scenario.settings?.general?.currency || 'USD',
+        startDate: scenario.settings?.general?.startDate || null,
+        netAEP: scenario.settings?.metrics?.netAEP || 0
       }
     }));
 

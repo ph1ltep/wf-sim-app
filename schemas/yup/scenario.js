@@ -307,10 +307,17 @@ const ScenarioListingSchema = Yup.object().shape({
     createdAt: Yup.date(),
     updatedAt: Yup.date(),
     // Include a few key metrics for display
-    metrics: Yup.object().shape({
+    details: Yup.object().shape({
+        projectName: Yup.string(),
         totalMW: Yup.number(),
         windFarmSize: Yup.number(),
-        projectLife: Yup.number()
+        projectLife: Yup.number(),
+        numWTGs: Yup.number(),
+        mwPerWTG: Yup.number(),
+        capacityFactor: Yup.number(),
+        currency: Yup.string(),
+        startDate: Yup.date(),
+        netAEP: Yup.number()
     }).default(() => ({})),
 });
 

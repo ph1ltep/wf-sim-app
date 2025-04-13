@@ -36,8 +36,20 @@ const ContextForm = ({
 
     // Load initial values from context
     useEffect(() => {
-        const initialValue = getValueByPath(basePath) || {};
-        setFormState(initialValue);
+        let initialValue = getValueByPath(basePath);
+        // Handle both direct object references and array indices
+        if (initialValue === undefined || initialValue === null) {
+            // If we're editing a temp item (new item), initialize with empty object
+            if (basePath[basePath.length - 1] === 'temp_new_item') {
+                initialValue = {};
+            } else {
+                console.warn(`No value found at path: ${basePath.join('.')}`);
+                initialValue = {};
+            }
+        }
+
+        // Make a deep copy to avoid reference issues
+        setFormState(JSON.parse(JSON.stringify(initialValue)));
         setIsInitialized(true);
     }, [basePath, getValueByPath]);
 
@@ -61,30 +73,67 @@ const ContextForm = ({
 
     // Field value getter (for form state)
     const getFormValue = (fieldPath) => {
-        // Convert to array if string
+        // Handle simple property name (without full path)
+        if (typeof fieldPath === 'string' && !fieldPath.includes('.')) {
+            return formState[fieldPath];
+        }
+
+        // Convert to array if string with dots
         const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
 
-        // Calculate relative path from the base
-        const relativePath = fieldPathArray.slice(basePath.length);
+        // Check if fieldPath already contains basePath elements
+        let relativePath;
+        if (fieldPathArray.length < basePath.length ||
+            !basePath.every((segment, index) => segment === fieldPathArray[index])) {
+            // fieldPath doesn't contain basePath, use it directly
+            relativePath = fieldPathArray;
+        } else {
+            // fieldPath contains basePath, extract relativePath
+            relativePath = fieldPathArray.slice(basePath.length);
+        }
 
-        // Return value from form state
+        // Handle numeric indices in string form
+        if (relativePath.length === 1 && !isNaN(Number(relativePath[0]))) {
+            // It's a numeric index as string, convert to number for array access
+            return formState;
+        }
+
         return get(formState, relativePath);
     };
 
     // Field update handler
     const updateFormValue = (fieldPath, value) => {
-        // Convert to array if string
+        // Handle simple property name (without full path)
+        if (typeof fieldPath === 'string' && !fieldPath.includes('.')) {
+            setFormState(produce(formState, draft => {
+                draft[fieldPath] = value;
+            }));
+            return { isValid: true, applied: true, value };
+        }
+
+        // Convert to array if string with dots
         const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
 
-        // Calculate relative path from the base
-        const relativePath = fieldPathArray.slice(basePath.length);
+        // Check if fieldPath already contains basePath elements
+        let relativePath;
+        if (fieldPathArray.length < basePath.length ||
+            !basePath.every((segment, index) => segment === fieldPathArray[index])) {
+            // fieldPath doesn't contain basePath, use it directly
+            relativePath = fieldPathArray;
+        } else {
+            // fieldPath contains basePath, extract relativePath
+            relativePath = fieldPathArray.slice(basePath.length);
+        }
 
         // Update form state immutably using Immer
-        setFormState(
-            produce(formState, draft => {
+        setFormState(produce(formState, draft => {
+            if (relativePath.length === 0) {
+                // If no relative path, replace the entire state
+                return value;
+            } else {
                 set(draft, relativePath, value);
-            })
-        );
+            }
+        }));
 
         // Return success object to match updateByPathV2 format
         return { isValid: true, applied: true, value };
