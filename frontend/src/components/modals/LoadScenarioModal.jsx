@@ -18,6 +18,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [scenarioToDelete, setScenarioToDelete] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0 });
 
     // Fetch scenarios when modal becomes visible
     useEffect(() => {
@@ -29,12 +30,22 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
     const fetchScenarios = async () => {
         try {
             setLoadingScenarios(true);
-            // This will directly use the API without needing to update a local state
-            const result = await getAllScenarios(1, 100); // Fetch up to 100 scenarios
+            // Get scenarios using the pagination parameters
+            const result = await getAllScenarios(pagination.page, pagination.limit, searchText);
 
-            if (result && result) {
-                setScenarios(result);
-                setFilteredScenarios(result);
+            if (result && result.success) {
+                // The API now returns a ListResponseSchema with items in data.items
+                setScenarios(result.data.items || []);
+                setFilteredScenarios(result.data.items || []);
+
+                // Update pagination from the response
+                if (result.data.pagination) {
+                    setPagination({
+                        page: result.data.pagination.page || 1,
+                        limit: result.data.pagination.limit || 100,
+                        total: result.data.pagination.total || 0
+                    });
+                }
             } else {
                 setScenarios([]);
                 setFilteredScenarios([]);
@@ -92,7 +103,8 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
         }
     };
 
-    // Handle search filtering
+    // Handle search filtering - locally filter pre-fetched scenarios
+    // Note: For larger datasets, we might want to use the server's search instead
     const handleSearch = (e) => {
         const value = e.target.value;
         setSearchText(value);
@@ -143,7 +155,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
             title: 'Project Size',
             key: 'projectSize',
             render: (_, record) => {
-                const totalMW = record.settings?.metrics?.totalMW;
+                const totalMW = record.metrics?.totalMW;
                 return totalMW ? `${totalMW} MW` : 'N/A';
             },
         },
@@ -180,7 +192,7 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
         const capacityFactor = record.settings?.project?.windFarm?.capacityFactor || 0;
         const currency = record.settings?.project?.currency?.local || 'USD';
         const startDate = record.settings?.general?.startDate;
-        const netAEP = record.settings?.metrics?.netAEP || 0;
+        const netAEP = record.metrics?.netAEP || 0;
 
         return (
             <div style={{ padding: '8px' }}>
@@ -270,7 +282,8 @@ const LoadScenarioModal = ({ visible, onCancel, onLoad }) => {
                         size="small"
                         expandable={{ expandedRowRender }}
                         pagination={{
-                            pageSize: 10,
+                            pageSize: pagination.limit,
+                            total: pagination.total,
                             showTotal: (total) => `Total ${total} scenarios`,
                         }}
                         rowSelection={{

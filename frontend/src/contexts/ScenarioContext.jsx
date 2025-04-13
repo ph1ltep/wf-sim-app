@@ -122,7 +122,7 @@ export const ScenarioProvider = ({ children }) => {
 
       if (response.success) {
         // Extract the items from the response based on the API structure
-        return response.data.items || [];
+        return response || [];
       }
 
       return [];
@@ -274,7 +274,7 @@ export const ScenarioProvider = ({ children }) => {
 
   // Data operations - update by path (legacy method)
   // Now using Immer for more efficient updates
-  const updateByPath = useCallback((path, value) => {
+  const updateByPathV1 = useCallback((path, value) => {
     if (!scenarioData) return false;
 
     // Use Immer to create an immutable update
@@ -288,7 +288,7 @@ export const ScenarioProvider = ({ children }) => {
 
   // Data operations - update by path with validation (v2 method)
   // Now using Immer for more efficient updates
-  const updateByPathV2 = useCallback(async (path, value) => {
+  const updateByPath = useCallback(async (path, value) => {
     // Handle case when no scenario exists
     if (!scenarioData) {
       // Optionally auto-initialize a scenario here if needed
@@ -333,6 +333,9 @@ export const ScenarioProvider = ({ children }) => {
       validationResult.applied = false;
     }
 
+    if (process.env.REACT_APP_LOG_SCENARIO_UDPATES === 'true') {
+      console.log('updateByPath: ', validationResult);
+    }
     return validationResult;
   }, [scenarioData, initializeScenario]);
 
@@ -372,8 +375,8 @@ export const ScenarioProvider = ({ children }) => {
     isNewScenario,
 
     getValueByPath,
-    updateByPath,     // Legacy method - now using Immer for efficiency
-    updateByPathV2,   // New method with validation, also using Immer
+    updateByPath     // Legacy method - now using Immer for efficiency
+    //1updateByPathV2,   // New method with validation, also using Immer
   };
 
   return (

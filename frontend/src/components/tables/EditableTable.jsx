@@ -1,17 +1,12 @@
-// src/components/contextFields/EditableTable.jsx
-import React, { useState, useCallback, useEffect } from 'react';
-import { Table, Button, Modal, Alert, Form } from 'antd';
+// src/components/tables/EditableTable.jsx
+import React, { useState, useCallback } from 'react';
+import { Table, Button, Modal, Alert } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import ContextForm from '../contextFields/ContextForm';
 
 /**
  * EditableTable - Table with in-line editing capabilities connected to context arrays
- * 
- * @param {Object[]} columns - Table column definitions
- * @param {string[]} path - Path to the array in scenario context
- * @param {React.ReactNode[]} formFields - Array of field components to use in the edit form
- * @param {string} keyField - Name of the field to use as the unique key
- * @param {string} itemName - Display name for the items being edited
  */
 const EditableTable = ({
   // Required props
@@ -39,40 +34,23 @@ const EditableTable = ({
 }) => {
   // State for the edit modal
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
   const [editingItemIndex, setEditingItemIndex] = useState(null);
   const [error, setError] = useState(null);
-  
+
   // Get data and operations from context
   const { getValueByPath, updateByPath } = useScenario();
   const dataSource = getValueByPath(path, []);
-  
-  // Form state to manage the edited values
-  const [editValues, setEditValues] = useState({});
-  
-  // Reset form values when editing item changes
-  useEffect(() => {
-    if (editingItem) {
-      setEditValues({...editingItem});
-    } else {
-      setEditValues({});
-    }
-  }, [editingItem]);
 
   // Handle adding new item
   const handleAdd = useCallback(() => {
-    setEditingItem(null);
     setEditingItemIndex(null);
-    setEditValues({});
     setError(null);
     setModalVisible(true);
   }, []);
 
   // Handle editing existing item
   const handleEdit = useCallback((record, index) => {
-    setEditingItem(record);
     setEditingItemIndex(index);
-    setEditValues({...record});
     setError(null);
     setModalVisible(true);
   }, []);
@@ -89,67 +67,41 @@ const EditableTable = ({
     }
   }, [dataSource, path, updateByPath]);
 
-  // Handle form field changes
-  const handleFieldChange = useCallback((fieldPath, value) => {
-    setEditValues(prev => {
-      const result = {...prev};
-      // Handle nested paths
-      if (Array.isArray(fieldPath) && fieldPath.length > 1) {
-        let current = result;
-        for (let i = 0; i < fieldPath.length - 1; i++) {
-          if (!current[fieldPath[i]]) {
-            current[fieldPath[i]] = {};
-          }
-          current = current[fieldPath[i]];
-        }
-        current[fieldPath[fieldPath.length - 1]] = value;
-      } else {
-        const field = Array.isArray(fieldPath) ? fieldPath[0] : fieldPath;
-        result[field] = value;
-      }
-      return result;
-    });
-  }, []);
-
-  // Handle saving the changes
-  const handleSave = useCallback(() => {
+  // Handle saving changes
+  const handleSave = useCallback((formValues) => {
     try {
       const newArray = [...dataSource];
-      
+
       if (editingItemIndex !== null) {
-        // Update existing item
-        newArray[editingItemIndex] = {...editValues};
+        // If editing an existing item, the context is already updated
+        // We just need to close the modal
       } else {
-        // Add new item
-        const newItem = {...editValues};
+        // For new items, we need to add to the array
+        const newItem = formValues;
+
+        // Generate a unique ID if needed
         if (keyField && !newItem[keyField]) {
-          // Generate a unique ID if needed
           newItem[keyField] = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         }
+
         newArray.push(newItem);
+        updateByPath(path, newArray);
       }
-      
-      updateByPath(path, newArray);
+
       setModalVisible(false);
-      setEditingItem(null);
       setEditingItemIndex(null);
     } catch (error) {
       console.error("Save error:", error);
       setError(`Error: ${error.message || "Failed to save"}`);
     }
-  }, [dataSource, editValues, editingItemIndex, keyField, path, updateByPath]);
+  }, [dataSource, editingItemIndex, keyField, path, updateByPath]);
 
-  // Render field components with values connected to the edit form
-  const renderFormFields = () => {
-    return formFields.map((field, index) => {
-      // Clone the field and inject necessary props
-      return React.cloneElement(field, {
-        key: index,
-        value: editValues[field.props.name] || field.props.defaultValue || null,
-        onChange: (value) => handleFieldChange(field.props.name, value)
-      });
-    });
-  };
+  // Handle modal cancel
+  const handleCancel = useCallback(() => {
+    setModalVisible(false);
+    setEditingItemIndex(null);
+    setError(null);
+  }, []);
 
   // Use exactly the columns provided - don't filter anything
   const finalColumns = [...columns];
@@ -224,15 +176,23 @@ const EditableTable = ({
 
       {/* Add/Edit Modal */}
       <Modal
-        title={editingItem ? `Edit ${itemName}` : `Add ${itemName}`}
+        title={editingItemIndex !== null ? `Edit ${itemName}` : `Add ${itemName}`}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        onOk={handleSave}
+        onCancel={handleCancel}
+        footer={null}
         {...modalProps}
       >
-        <Form layout="vertical">
-          {renderFormFields()}
-          
+        <ContextForm
+          path={editingItemIndex !== null
+            ? [...path, editingItemIndex]
+            : [...path, 'temp_new_item']
+          }
+          onSubmit={handleSave}
+          onCancel={handleCancel}
+          layout="vertical"
+        >
+          {formFields}
+
           {error && (
             <Alert
               message="Error"
@@ -242,7 +202,7 @@ const EditableTable = ({
               style={{ marginBottom: 16 }}
             />
           )}
-        </Form>
+        </ContextForm>
       </Modal>
     </div>
   );

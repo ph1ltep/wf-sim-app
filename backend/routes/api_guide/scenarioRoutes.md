@@ -4,7 +4,7 @@ This document, `scenarioRoutes.md`, outlines the API routes defined in `scenario
 
 ## Routes
 
-### GET /api/scenarios
+### GET /api/scenarios/list
 
 **Description**: Retrieves a paginated list of all scenarios with essential fields for listing, optionally filtered by search term, sorted by last updated.
 

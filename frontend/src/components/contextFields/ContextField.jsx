@@ -1,9 +1,9 @@
-// src/components/contextFields/ContextField.jsx
+// src/components/contextFields/ContextField.jsx - Modified version
 import React, { useState, useCallback } from 'react';
 import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
-// Enhanced ContextField with validation
+// Enhanced ContextField with formMode support
 export const ContextField = ({
   path,
   label,
@@ -11,30 +11,40 @@ export const ContextField = ({
   tooltip,
   required,
   disabled,
-  validators = [], // Custom validators (will override built-ins if needed)
+  validators = [], // Custom validators
   transform, // Optional transform function for the input value
+
+  // New props for form mode
+  formMode = false,
+  getValueOverride = null,
+  updateValueOverride = null,
+
   ...rest
 }) => {
   const [error, setError] = useState(null);
   const { getValueByPath, updateByPathV2 } = useScenario();
 
+  // Use provided overrides when in form mode, or context functions otherwise
+  const getValue = formMode && getValueOverride ? getValueOverride : getValueByPath;
+  const updateValue = formMode && updateValueOverride ? updateValueOverride : updateByPathV2;
+
   // Get current value
-  const value = getValueByPath(path, null);
+  const value = getValue(path, null);
 
   // Handle change with validation
   const handleChange = useCallback(async (newValue) => {
     // Apply transform function if provided (e.g., for checkbox which returns event)
     const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
 
-    // Use the v2 method which handles validation
-    const result = await updateByPathV2(path, actualValue);
+    // Use the appropriate update method
+    const result = await updateValue(path, actualValue);
 
     if (!result.isValid) {
       setError(result.error);
     } else {
       setError(null);
     }
-  }, [path, updateByPathV2, transform]);
+  }, [path, updateValue, transform]);
 
   return (
     <Form.Item
