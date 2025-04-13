@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { Table, Button, Modal, Alert } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
-import ContextForm from '../contextFields/ContextForm';
+import ContextForm from '../forms/ContextForm';
 
 /**
  * EditableTable - Table with in-line editing capabilities connected to context arrays
