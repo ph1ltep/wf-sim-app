@@ -52,10 +52,9 @@ const DistributionParametersSchema = Yup.object().shape({
 const DistributionTypeSchema = Yup.object().shape({
     type: Yup.string()
         .oneOf([
-            'Normal', 'Lognormal', 'Triangular', 'Uniform', 'Weibull',
-            'Exponential', 'Poisson', 'Fixed', 'Kaimal', 'GBM',
-        ])
-        .required('Type is required'),
+            'normal', 'lognormal', 'triangular', 'uniform', 'weibull',
+            'exponential', 'poisson', 'fixed', 'kaimal', 'gbm', 'gamma'
+        ]),
     timeSeriesMode: Yup.boolean().default(false),
     parameters: DistributionParametersSchema.required('Parameters are required'),
 });

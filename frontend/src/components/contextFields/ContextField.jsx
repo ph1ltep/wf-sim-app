@@ -44,6 +44,8 @@ export const ContextField = ({
     } else {
       setError(null);
     }
+
+    return result;
   }, [path, updateValue, transform]);
 
   return (

@@ -55,6 +55,7 @@ const PaginationSchema = Yup.object().shape({
 const ValidationResponseSchema = Yup.object().shape({
     isValid: Yup.boolean().required(),
     errors: Yup.array().of(Yup.string()).default([]),
+    error: Yup.string(),
     details: Yup.mixed(), // For detailed field-specific errors
 });
 
@@ -62,15 +63,13 @@ const ValidationResponseSchema = Yup.object().shape({
  * Field Validation Response Schema
  * For validating individual fields
  */
-const FieldValidationResponseSchema = Yup.object().shape({
-    isValid: Yup.boolean().required(),
-    applied: Yup.boolean().default(false),
-    value: Yup.mixed().required(),
-    defaultValue: Yup.mixed(),
-    errors: Yup.array().of(Yup.string()).default([]),
-    error: Yup.string(),
-    path: Yup.array().of(Yup.string()),
-});
+const FieldValidationResponseSchema = ValidationResponseSchema.concat(
+    Yup.object().shape({
+        applied: Yup.boolean().required().default(false), // Indicates if the value was applied to the field
+        error: Yup.string().when('isValid', { is: false, then: Yup.string().required(), otherwise: Yup.string() }), // Primary error message if validation failed (optional)
+        path: Yup.array().of(Yup.string()),
+    })
+);
 
 /**
  * CRUD Response Schema

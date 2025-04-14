@@ -286,58 +286,57 @@ export const ScenarioProvider = ({ children }) => {
     return true;
   }, [scenarioData]);
 
-  // Data operations - update by path with validation (v2 method)
-  // Now using Immer for more efficient updates
+  /**
+   * Updates a value at a specific path in the scenario data with validation
+   * 
+   * @param {string[]|string} path - Path to the value to update (array or dot-notation string)
+   * @param {any} value - New value to set
+   * @returns {Object} Response object of type FieldValidationResponseSchema
+   */
   const updateByPath = useCallback(async (path, value) => {
     // Handle case when no scenario exists
-    if (!scenarioData) {
-      // Optionally auto-initialize a scenario here if needed
-      try {
-        await initializeScenario();
-        // If still no scenario, return error
-        if (!scenarioData) {
-          return {
-            isValid: false,
-            error: 'No active scenario',
-            path,
-            applied: false
-          };
-        }
-      } catch (error) {
-        return {
-          isValid: false,
-          error: 'Failed to initialize scenario',
-          path,
-          applied: false
-        };
-      }
+    if (!hasValidScenario(false)) {
+      return {
+        isValid: false,
+        applied: false,
+        errors: ['No active scenario'],
+        error: 'No active scenario',
+        path: Array.isArray(path) ? path : path.split('.')
+      };
     }
 
     // Validate the path and get result
     const validationResult = await validatePath(ScenarioSchema, path, value, scenarioData);
-
-    // Include path in the result for clarity
-    validationResult.path = path;
+    const pathArray = Array.isArray(path) ? path : path.split('.');
 
     if (validationResult.isValid) {
       // Use Immer to efficiently update only the changed path
       setScenarioData(produce(scenarioData, draft => {
-        set(draft, path, validationResult.value);
+        set(draft, pathArray, validationResult.details?.value || value);
       }));
 
       setIsModified(true);
 
-      // Add a success flag to indicate the update was applied
-      validationResult.applied = true;
+      // Return a properly formatted response
+      return {
+        isValid: true,
+        applied: true,
+        errors: [],
+        path: pathArray
+      };
     } else {
-      validationResult.applied = false;
+      // Return validation error
+      return {
+        isValid: false,
+        applied: false,
+        errors: validationResult.errors || [],
+        error: validationResult.error || validationResult.errors?.[0] || 'Validation failed',
+        path: pathArray
+      };
     }
+  }, [scenarioData, hasValidScenario]);
 
-    if (process.env.REACT_APP_LOG_SCENARIO_UDPATES === 'true') {
-      console.log('updateByPath: ', validationResult);
-    }
-    return validationResult;
-  }, [scenarioData, initializeScenario]);
+
 
   // Error component for reuse
   const ScenarioErrorComponent = useCallback(() => {
