@@ -21,6 +21,7 @@ import RiskModule from './components/modules/RiskModule';
 // Input analysis components
 import CashflowAnalysis from './components/analysis/CashflowAnalysis';
 import RiskAnalysis from './components/analysis/RiskAnalysis';
+import DistributionAnalysis from 'components/analysis/DistributionAnalysis';
 
 // Results components
 import Overview from './components/results/Overview';
@@ -29,6 +30,7 @@ import RevenueAnalysis from './components/results/RevenueAnalysis';
 import CashFlowChart from './components/results/CashFlowChart';
 import IRRDistribution from './components/results/IRRDistribution';
 import ScenarioComparison from './components/results/ScenarioComparison';
+
 
 // Scenario management component
 import ScenarioList from './components/scenarios/ScenarioList';
@@ -75,6 +77,7 @@ function App() {
             <Route path="input">
               <Route path="cashflow" element={<CashflowAnalysis />} />
               <Route path="risk" element={<RiskAnalysis />} />
+              <Route path="distribution" element={<DistributionAnalysis />} />
             </Route>
             
             {/* Results routes */}

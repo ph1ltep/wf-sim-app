@@ -7,7 +7,7 @@ import api from './index';
  * @returns {Promise<Object>} Response with SimulationResponseSchema containing simulation results
  */
 export const simulateDistributions = (parameters) => {
-  return api.post('/simulations/run', parameters);
+  return api.post('/simulation/simulate', parameters);
 };
 
 /**
@@ -15,7 +15,7 @@ export const simulateDistributions = (parameters) => {
  * @returns {Promise<Object>} Response with SuccessResponseSchema containing array of distribution metadata
  */
 export const getDistributionsInfo = () => {
-  return api.get('/simulations/distributions');
+  return api.get('/simulation/distributions');
 };
 
 /**
@@ -24,7 +24,7 @@ export const getDistributionsInfo = () => {
  * @returns {Promise<Object>} Response with SuccessResponseSchema containing ValidationResponseSchema
  */
 export const validateDistribution = (distribution) => {
-  return api.post('/simulations/validate', distribution);
+  return api.post('/simulation/validate', distribution);
 };
 
 /**

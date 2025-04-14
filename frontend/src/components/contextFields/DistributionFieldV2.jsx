@@ -141,8 +141,7 @@ const DistributionFieldV2 = ({
                                 {
                                     required: true,
                                     value: Math.round(Math.log(value) * 100) / 100,
-                                    step: 0.01,
-                                    disabled: true
+                                    step: 0.01
                                 }
                             )}
                         </FormCol>

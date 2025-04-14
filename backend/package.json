@@ -29,7 +29,8 @@
     "nanoid": "^5.1.4",
     "random": "^5.3.0",
     "random-normal": "^1.0.0",
-    "seedrandom": "^3.0.5"
+    "seedrandom": "^3.0.5",
+    "yup": "^1.6.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

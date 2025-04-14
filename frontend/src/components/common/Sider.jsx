@@ -15,7 +15,8 @@ import {
   WarningOutlined,
   GlobalOutlined,
   ToolOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  DotChartOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -93,24 +94,7 @@ const Sider = ({ collapsed }) => {
   // Handle menu item click
   const handleMenuClick = (e) => {
     const targetPath = e.key;
-
-    //console.log("=== MENU CLICK DEBUG ===");
-    //console.log("Target path:", targetPath);
-    //console.log("Current path:", location.pathname);
-    //console.log("hasUnsavedChanges:", hasUnsavedChanges);
     navigate(targetPath);
-    // Only do something if we're navigating to a different path
-    //if (targetPath !== location.pathname) {
-    // Check if we have unsaved changes
-    //  if (hasUnsavedChanges) {
-    //console.log("Showing custom confirmation modal");
-    //    setPendingNavigation(targetPath);
-    //setModalVisible(true);
-    //  } else {
-    // No unsaved changes, navigate directly
-    //console.log("No unsaved changes, navigating directly to:", targetPath);
-    //    navigate(targetPath);
-    //  }
   };
 
 
@@ -198,6 +182,11 @@ const Sider = ({ collapsed }) => {
           key: '/input/risk',
           icon: <WarningOutlined />,
           label: 'Risk Analysis'
+        },
+        {
+          key: '/input/distribution',
+          icon: <DotChartOutlined />,
+          label: 'Distribution Analysis'
         }
       ]
     },
