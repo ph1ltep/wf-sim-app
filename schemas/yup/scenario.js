@@ -140,7 +140,7 @@ const SettingsSchema = Yup.object().shape({
             // Updated to be a DistributionTypeSchema of Fixed type (to match getDefaultSettings)
             escalationRate: Yup.object().shape({
                 distribution: DistributionTypeSchema.default(() => ({
-                    type: 'Fixed',
+                    type: 'fixed',
                     timeSeriesMode: false,
                     parameters: { value: 0.025 } // Matches getDefaultSettings value
                 })),
@@ -163,28 +163,37 @@ const SettingsSchema = Yup.object().shape({
         revenue: Yup.object().shape({
             energyProduction: Yup.object().shape({
                 distribution: DistributionTypeSchema.default(() => ({
-                    type: 'Normal',
+                    type: 'normal',
                     timeSeriesMode: false,
-                    parameters: { mean: 1000, stdDev: 10 } // Matches getDefaultSettings
+                    parameters: {
+                        value: 100000,
+                        stdDev: 10
+                    }
                 })),
                 data: Yup.array().default([])
             }),
             electricityPrice: Yup.object().shape({
                 distribution: DistributionTypeSchema.default(() => ({
-                    type: 'Fixed',
+                    type: 'gbm', // Changed to GBM type
                     timeSeriesMode: false,
-                    parameters: { value: 50 } // Matches getDefaultSettings
+                    parameters: {
+                        value: 50,
+                        drift: 0.02,
+                        volatility: 0.1,
+                        timeStep: 1
+                    }
                 })),
                 data: Yup.array().default([])
             }),
             revenueDegradationRate: Yup.number().default(0.5),
             downtimePerEvent: Yup.object().shape({
                 distribution: DistributionTypeSchema.default(() => ({
-                    type: 'Lognormal', // Matches getDefaultSettings
+                    type: 'lognormal', // Matches getDefaultSettings
                     timeSeriesMode: false,
                     parameters: {
+                        value: 90,
                         sigma: 0.3,
-                        mu: Math.log(90) // Matches getDefaultSettings
+                        mu: Math.log(90),
                     }
                 })),
                 data: Yup.array().default([])
@@ -192,13 +201,12 @@ const SettingsSchema = Yup.object().shape({
             // Updated to use GBM type
             windVariability: Yup.object().shape({
                 distribution: DistributionTypeSchema.default(() => ({
-                    type: 'GBM', // Changed to GBM type
+                    type: 'weibull', // Changed to weibull type
                     timeSeriesMode: false,
                     parameters: {
-                        value: 7.5, // From getDefaultSettings
-                        drift: 0.02,
-                        volatility: 0.1,
-                        timeStep: 1
+                        value: 7.5,
+                        scale: 7.9,
+                        shape: 1.8
                     }
                 })),
                 data: Yup.array().default([])

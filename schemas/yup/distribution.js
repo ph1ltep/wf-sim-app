@@ -37,6 +37,7 @@ const DistributionParametersSchema = Yup.object().shape({
     meanWindSpeed: Yup.mixed(),
     stdDev: Yup.mixed(),
     mode: Yup.number(),
+    mu: Yup.number(),
     sigma: Yup.number(),
     shape: Yup.number(),
     lambda: Yup.number(),

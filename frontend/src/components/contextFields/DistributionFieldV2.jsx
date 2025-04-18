@@ -51,7 +51,7 @@ const DistributionFieldV2 = ({
     // Get current distribution type
     const typePath = [...path, 'type'];
     const parametersPath = [...path, 'parameters'];
-    const currentType = getValueByPath(typePath, 'fixed');
+    const currentType = (getValueByPath(typePath, 'fixed')).toLowerCase();;
 
     // Get parameters for visualization
     const parameters = getValueByPath(parametersPath, {});
@@ -455,6 +455,7 @@ const DistributionFieldV2 = ({
                     label={`Distribution Type`}
                     tooltip={tooltip}
                     options={options}
+                    defaultValue={currentType}
                     {...rest}
                 />
 

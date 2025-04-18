@@ -27,6 +27,13 @@ const getDefaults = async (req, res) => {
     defaultScenario.name = 'New Scenario';
     defaultScenario.description = 'Default configuration scenario';
 
+    // Custom overrides
+    defaultScenario.settings.modules.revenue.energyProduction.distribution.parameters.value = defaultScenario.settings.metrics.netAEP
+
+
+
+
+
     // Cast to ScenarioSchema for type safety
     const validatedScenario = ScenarioSchema.cast(defaultScenario, { stripUnknown: true });
 
