@@ -25,7 +25,7 @@ class NormalDistribution extends DistributionGenerator {
      */
     generate(year, random) {
         // Use parameters exactly as defined in DistributionParametersSchema
-        const mean = this.getParameterValue('mean', year, 0);
+        const mean = this.getParameterValue('value', year, 0);
         const stdDev = this.getParameterValue('stdDev', year, 1);
 
         // Box-Muller transform for normal distribution

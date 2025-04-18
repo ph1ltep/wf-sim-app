@@ -178,8 +178,8 @@ const SettingsSchema = Yup.object().shape({
                     timeSeriesMode: false,
                     parameters: {
                         value: 50,
-                        drift: 0.02,
-                        volatility: 0.1,
+                        drift: 4,
+                        volatility: 2,
                         timeStep: 1
                     }
                 })),

@@ -112,7 +112,23 @@ const DistributionFieldV2 = ({
     const renderParameterFields = () => {
         switch (currentType) {
             case 'fixed':
-                return null; // Value field is already rendered separately
+                return (
+                    <FormRow>
+                        <FormCol span={colSpan}>
+                            <PercentageField
+                                path={[...parametersPath, 'drift']}
+                                label="Growth Rate (Annual)"
+                                tooltip="Annual growth rate"
+                                min={-20}
+                                max={100}
+                                step={0.1}
+                                precision={1}
+                                defaultValue={5}
+                                required
+                            />
+                        </FormCol>
+                    </FormRow>
+                ); // Value field is already rendered separately
 
             case 'normal':
                 return (

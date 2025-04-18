@@ -1,8 +1,8 @@
 // src/components/input/DistributionAnalysis.jsx
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Space, Typography, Divider, Statistic, Empty, Spin, Button, message } from 'antd';
-import { 
-  LineChartOutlined, 
+import {
+  LineChartOutlined,
   ReloadOutlined,
   AreaChartOutlined,
   DollarOutlined,
@@ -25,14 +25,14 @@ const generateSampleData = (years = 20, percentiles) => {
   return percentiles.map(percentile => {
     // Generate data points with some randomness based on percentile
     const factor = percentile.value / 50; // Scale factor based on percentile
-    
+
     const data = Array.from({ length: years }, (_, i) => {
       // Base value increases over time
       const baseValue = 100 + (i * 5);
-      
+
       // Apply percentile factor and some randomness
       const value = baseValue * factor * (0.9 + Math.random() * 0.2);
-      
+
       return {
         year: i + 1,
         value: value
@@ -50,20 +50,20 @@ const generateSampleData = (years = 20, percentiles) => {
 // Helper function to prepare Plotly data from simulation results
 const prepareChartData = (results, primaryPercentile, baseColor) => {
   if (!results || results.length === 0) return { data: [], layout: {} };
-  
+
   // Sort percentiles in ascending order
   const sortedResults = [...results].sort((a, b) => a.percentile.value - b.percentile.value);
-  
+
   // Plotly traces for each percentile
   const traces = [];
-  
+
   // Find specific percentiles for area fills
   const extremeLower = sortedResults.find(r => r.percentile.description === 'extreme_lower');
   const extremeUpper = sortedResults.find(r => r.percentile.description === 'extreme_upper');
   const lowerBound = sortedResults.find(r => r.percentile.description === 'lower_bound');
   const upperBound = sortedResults.find(r => r.percentile.description === 'upper_bound');
   const primary = sortedResults.find(r => r.percentile.value === primaryPercentile);
-  
+
   // Add extreme area (if available)
   if (extremeLower && extremeUpper) {
     // Lower extreme area
@@ -75,7 +75,7 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
       showlegend: false,
       hoverinfo: 'skip'
     });
-    
+
     // Upper extreme area
     traces.push({
       x: extremeUpper.data.map(d => d.year),
@@ -89,7 +89,7 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
       hoverlabel: { namelength: -1 }
     });
   }
-  
+
   // Add standard bounds area (if available)
   if (lowerBound && upperBound) {
     // Lower bound
@@ -101,7 +101,7 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
       showlegend: false,
       hoverinfo: 'skip'
     });
-    
+
     // Upper bound
     traces.push({
       x: upperBound.data.map(d => d.year),
@@ -115,7 +115,7 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
       hoverlabel: { namelength: -1 }
     });
   }
-  
+
   // Add primary percentile line
   if (primary) {
     traces.push({
@@ -130,7 +130,7 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
       hoverlabel: { namelength: -1 }
     });
   }
-  
+
   // Base layout for the plot
   const layout = {
     autosize: true,
@@ -155,13 +155,13 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
     },
     hovermode: 'closest'
   };
-  
+
   // Configuration options
   const config = {
     responsive: true,
     displayModeBar: false
   };
-  
+
   return { data: traces, layout, config };
 };
 
@@ -169,28 +169,28 @@ const prepareChartData = (results, primaryPercentile, baseColor) => {
 function hexToRgb(hex) {
   // Remove # if present
   hex = hex.replace('#', '');
-  
+
   // Parse hex
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  
+
   return `${r}, ${g}, ${b}`;
 }
 
 const DistributionAnalysis = () => {
   const { getValueByPath, scenarioData, updateByPath } = useScenario();
   const [loading, setLoading] = useState(false);
-  
+
   // State to track simulation results for each distribution
   const [simulationResults, setSimulationResults] = useState({});
-  
+
   // Check if we have simulation settings
   const simulationSettings = getValueByPath(['settings', 'simulation'], null);
   const percentiles = simulationSettings?.percentiles || [];
   const primaryPercentile = simulationSettings?.primaryPercentile || 50;
   const projectYears = getValueByPath(['settings', 'general', 'projectLife'], 20);
-  
+
   // Define the distribution fields to display
   const distributionFields = [
     {
@@ -230,15 +230,15 @@ const DistributionAnalysis = () => {
     if (simulationResults[pathKey] && simulationResults[pathKey].length > 0) {
       return simulationResults[pathKey];
     }
-    
+
     // Try to get actual results from the scenario
     const actualResults = getValueByPath([...path, 'data'], []);
-    
+
     // If we have actual results, use them
     if (actualResults && actualResults.length > 0) {
       return actualResults;
     }
-    
+
     // Otherwise, generate sample data
     return generateSampleData(projectYears, percentiles);
   };
@@ -246,11 +246,11 @@ const DistributionAnalysis = () => {
   // Function to run the simulation for all distributions
   const runSimulation = async () => {
     setLoading(true);
-    
+
     try {
       // Prepare distributions array for the API call
       const distributions = [];
-      
+
       // Add each distribution from the revenue module
       for (const field of distributionFields) {
         const distribution = getValueByPath([...field.path, 'distribution'], null);
@@ -258,7 +258,7 @@ const DistributionAnalysis = () => {
           distributions.push(distribution);
         }
       }
-      
+
       // Prepare simulation settings
       const simSettings = {
         iterations: simulationSettings?.iterations || 10000,
@@ -266,38 +266,38 @@ const DistributionAnalysis = () => {
         years: projectYears,
         percentiles: percentiles
       };
-      
+
       // Create the SimRequestSchema object
       const simulationRequest = {
         distributions: distributions,
         simulationSettings: simSettings
       };
-      
+
       // Make the API call
       const response = await simulateDistributions(simulationRequest);
-      
+
       if (response.success) {
         // API call was successful
         const simulationInfo = response.data?.simulationInfo || [];
-        
+
         // Process the results
         const newResults = {};
-        
+
         // Map simulation results back to their respective distributions
         simulationInfo.forEach((info, index) => {
           if (index < distributionFields.length) {
             const field = distributionFields[index];
             const pathKey = field.path.join('.');
             newResults[pathKey] = info.results;
-            
+
             // Update the scenario context with the results
             updateByPath([...field.path, 'data'], info.results);
           }
         });
-        
+
         // Update our state with the new results
         setSimulationResults(newResults);
-        
+
         message.success('Simulation completed successfully');
       } else {
         // API call failed
@@ -330,7 +330,7 @@ const DistributionAnalysis = () => {
           <Title level={2}>Distribution Analysis Dashboard</Title>
         </Col>
         <Col>
-          <Button 
+          <Button
             type="primary"
             icon={<ReloadOutlined />}
             onClick={runSimulation}
@@ -340,44 +340,44 @@ const DistributionAnalysis = () => {
           </Button>
         </Col>
       </Row>
-      
+
       <Paragraph>
         This dashboard shows the key probability distributions used in the Monte Carlo simulation.
         The charts display percentile bands with the primary percentile (P{primaryPercentile}) highlighted.
         Click "Run Simulation" to generate results based on the current distributions.
       </Paragraph>
-      
+
       <Divider />
-      
+
       {/* Simulation Parameters Card */}
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Card title="Simulation Parameters" bordered={true}>
             <Row gutter={16}>
               <Col span={6}>
-                <Statistic 
-                  title="Monte Carlo Iterations" 
+                <Statistic
+                  title="Monte Carlo Iterations"
                   value={simulationSettings?.iterations || 10000}
                   suffix="runs"
                 />
               </Col>
               <Col span={6}>
-                <Statistic 
-                  title="Primary Percentile" 
+                <Statistic
+                  title="Primary Percentile"
                   value={`P${primaryPercentile}`}
                   prefix={<LineChartOutlined />}
                 />
               </Col>
               <Col span={6}>
-                <Statistic 
-                  title="Percentiles Tracked" 
+                <Statistic
+                  title="Percentiles Tracked"
                   value={percentiles.length}
                   suffix="values"
                 />
               </Col>
               <Col span={6}>
-                <Statistic 
-                  title="Project Timeline" 
+                <Statistic
+                  title="Project Timeline"
                   value={projectYears}
                   suffix="years"
                 />
@@ -386,7 +386,7 @@ const DistributionAnalysis = () => {
           </Card>
         </Col>
       </Row>
-      
+
       {/* Distribution Charts */}
       <Spin spinning={loading} tip="Running simulation...">
         <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
@@ -394,19 +394,20 @@ const DistributionAnalysis = () => {
             const results = getDistributionResults(field.path);
             const distribution = getValueByPath([...field.path, 'distribution'], {});
             const { data, layout, config } = prepareChartData(results, primaryPercentile, field.color);
-            
+
             // Customize layout for each field
             const customizedLayout = {
               ...layout,
               yaxis: {
                 ...layout.yaxis,
-                title: field.addonAfter
+                title: field.addonAfter,
+                hoverformat: '.2f',
               }
             };
-            
+
             return (
               <Col span={12} key={index}>
-                <Card 
+                <Card
                   title={
                     <Space>
                       {field.icon}
@@ -415,7 +416,7 @@ const DistributionAnalysis = () => {
                         ({distribution.type?.charAt(0).toUpperCase() + distribution.type?.slice(1) || 'Unknown'})
                       </Text>
                     </Space>
-                  } 
+                  }
                   bordered={true}
                   style={{ marginBottom: '16px' }}
                 >
@@ -427,22 +428,22 @@ const DistributionAnalysis = () => {
                         config={config}
                         style={{ width: '100%' }}
                       />
-                      
+
                       <Divider style={{ margin: '12px 0' }} />
-                      
+
                       {/* Display first year values for quick reference */}
                       <Row gutter={16}>
                         {percentiles.map((p, i) => {
                           const result = results.find(r => r.percentile.value === p.value);
                           const firstYearValue = result?.data[0]?.value;
-                          
+
                           return (
                             <Col span={8} key={i}>
-                              <Statistic 
+                              <Statistic
                                 title={`P${p.value}`}
                                 value={firstYearValue !== undefined ? firstYearValue.toFixed(2) : 'N/A'}
                                 suffix={field.addonAfter}
-                                valueStyle={{ 
+                                valueStyle={{
                                   color: p.value === primaryPercentile ? field.color : 'inherit',
                                   fontWeight: p.value === primaryPercentile ? 'bold' : 'normal',
                                   fontSize: '16px'
@@ -454,8 +455,8 @@ const DistributionAnalysis = () => {
                       </Row>
                     </>
                   ) : (
-                    <Empty 
-                      description="No simulation results available" 
+                    <Empty
+                      description="No simulation results available"
                       style={{ padding: '40px 0' }}
                     />
                   )}
