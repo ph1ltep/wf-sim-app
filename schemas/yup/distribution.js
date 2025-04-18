@@ -1,19 +1,6 @@
 // schemas/yup/distribution.js
 const Yup = require('yup');
 
-// Mock SimResultsSchema (from Scenario.js)
-const SimResultsSchema = Yup.object().shape({
-    name: Yup.string().required('Name is required'),
-    percentile: Yup.object().shape({
-        value: Yup.number().min(1).max(99).default(50),
-        description: Yup.string().default('primary'),
-    }).required(),
-    data: Yup.array().of(Yup.object().shape({
-        year: Yup.number().required(),
-        value: Yup.number().required(),
-    })).default([]),
-});
-
 // Schema for a data point with year and value
 const DataPointSchema = Yup.object().shape({
     year: Yup.number().min(0).required('Year is required'),
@@ -25,6 +12,13 @@ const PercentileSchema = Yup.object().shape({
     value: Yup.number().min(1).max(99).default(50).required('Value is required'),
     description: Yup.string().default('primary'),
     // Note: 'label' getter isn’t replicated in Yup; it’s a Mongoose-specific feature
+});
+
+// SimResultsSchema (from Scenario.js)
+const SimResultsSchema = Yup.object().shape({
+    name: Yup.string().required('Name is required'),
+    percentile: PercentileSchema.required(),
+    data: DataPointSchema.required(),
 });
 
 // Schema for distribution parameters with mixed types

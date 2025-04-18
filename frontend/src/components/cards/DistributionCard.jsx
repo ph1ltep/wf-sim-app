@@ -1,4 +1,4 @@
-// src/components/cards/DistributionCard.jsx
+// src/components/cards/DistributionCard.jsx - Modified version
 import React, { useState, useMemo } from 'react';
 import { Card, Space, Typography, Divider, Empty, Row, Col, Tooltip, Badge, Alert, Table, Button } from 'antd';
 import { InfoCircleOutlined, ClockCircleOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
@@ -86,6 +86,11 @@ const DistributionCard = ({
                 title: units,
                 hoverformat: `.${actualPrecision}f`,
             },
+            // Adjust margins to make room for summary column
+            margin: {
+                ...(layout.margin || {}),
+                r: 80, // Add right margin for summary column
+            },
             ...extraLayoutOptions
         };
     }, [layout, height, units, actualPrecision, extraLayoutOptions]);
@@ -167,12 +172,66 @@ const DistributionCard = ({
                 />
             ) : hasResults ? (
                 <>
-                    <Plot
-                        data={data}
-                        layout={customizedLayout}
-                        config={config}
-                        style={{ width: '100%' }}
-                    />
+                    <div style={{ display: 'flex', position: 'relative' }}>
+                        {/* Main chart */}
+                        <div style={{ flex: 1 }}>
+                            <Plot
+                                data={data}
+                                layout={customizedLayout}
+                                config={config}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+
+                        {/* Summary column - positioned absolute to overlay on the right */}
+                        <div style={{
+                            position: 'absolute',
+                            right: 10,
+                            top: 40,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            background: 'rgba(255,255,255,0.85)',
+                            padding: '8px 6px',
+                            borderRadius: '4px',
+                            boxShadow: '0 0 4px rgba(0,0,0,0.1)'
+                        }}>
+                            {summaryData.map(summary => (
+                                <div key={summary.percentile} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '2px 4px',
+                                    backgroundColor: summary.isPrimary ? `rgba(${hexToRgb(color)}, 0.2)` : 'transparent',
+                                    borderRadius: '3px'
+                                }}>
+                                    <div style={{
+                                        fontSize: '11px',
+                                        fontWeight: 'bold',
+                                        width: '26px',
+                                        color: summary.isPrimary ? color : '#666'
+                                    }}>
+                                        P{summary.percentile}
+                                    </div>
+                                    <div style={{
+                                        fontSize: '12px',
+                                        fontWeight: summary.isPrimary ? 'bold' : 'normal',
+                                        color: summary.isPrimary ? color : '#333'
+                                    }}>
+                                        {summary.mean}
+                                        {units && <span style={{ marginLeft: '2px', fontSize: '10px' }}>{units}</span>}
+                                    </div>
+                                </div>
+                            ))}
+                            <div style={{
+                                fontSize: '9px',
+                                color: '#999',
+                                textAlign: 'center',
+                                marginTop: '2px'
+                            }}>
+                                mean
+                            </div>
+                        </div>
+                    </div>
 
                     <Divider style={{ margin: '12px 0' }} />
 
@@ -197,33 +256,6 @@ const DistributionCard = ({
                             />
                         </div>
                     )}
-
-                    {/* Summary row with means at the bottom */}
-                    <Row gutter={16}>
-                        {summaryData.map(summary => {
-                            return (
-                                <Col span={4} key={summary.percentile}>
-                                    <div style={{
-                                        textAlign: 'center',
-                                        padding: '8px',
-                                        backgroundColor: summary.isPrimary ? `rgba(${hexToRgb(color)}, 0.1)` : 'transparent',
-                                        borderRadius: '4px'
-                                    }}>
-                                        <div style={{ fontWeight: 'bold' }}>P{summary.percentile}</div>
-                                        <div style={{
-                                            fontSize: '16px',
-                                            fontWeight: summary.isPrimary ? 'bold' : 'normal',
-                                            color: summary.isPrimary ? color : 'inherit'
-                                        }}>
-                                            {summary.mean}
-                                            {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
-                                        </div>
-                                        <div style={{ fontSize: '12px', color: '#999' }}>mean</div>
-                                    </div>
-                                </Col>
-                            );
-                        })}
-                    </Row>
                 </>
             ) : (
                 <Empty
