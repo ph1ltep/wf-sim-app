@@ -88,6 +88,116 @@ class DistributionGenerator {
     static fitCurve(dataPoints) {
         throw new Error('Method fitCurve() must be implemented');
     }
+
+    /**
+         * Get analytical formula for mean
+         * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+         */
+    getMeanFormula() {
+        return null;
+    }
+
+    /**
+     * Get analytical formula for standard deviation
+     * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+     */
+    getStdDevFormula() {
+        return null;
+    }
+
+    /**
+     * Get analytical formula for minimum
+     * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+     */
+    getMinFormula() {
+        return null;
+    }
+
+    /**
+     * Get analytical formula for maximum
+     * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+     */
+    getMaxFormula() {
+        return null;
+    }
+
+    /**
+     * Get analytical formula for skewness
+     * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+     */
+    getSkewnessFormula() {
+        return null;
+    }
+
+    /**
+     * Get analytical formula for kurtosis
+     * @returns {Function|null} Function (parameters, year) => number|null, or null for numerical fallback
+     */
+    getKurtosisFormula() {
+        return null;
+    }
+
+    /**
+     * Calculate per-year statistics from running statistics and analytical formulas
+     * @param {Array<Object>} runningStatsByYear - Array of running statistics for each year
+     * @param {number} years - Number of years
+     * @returns {Object} Statistics object with arrays of DataPointSchema objects
+     */
+    calculateStatistics(runningStatsByYear, years) {
+        const statistics = {
+            mean: [],
+            stdDev: [],
+            min: [],
+            max: [],
+            skewness: [],
+            kurtosis: []
+        };
+
+        // Get formula providers
+        const formulas = {
+            mean: this.getMeanFormula(),
+            stdDev: this.getStdDevFormula(),
+            min: this.getMinFormula(),
+            max: this.getMaxFormula(),
+            skewness: this.getSkewnessFormula(),
+            kurtosis: this.getKurtosisFormula()
+        };
+
+        for (let year = 1; year <= years; year++) {
+            const stats = runningStatsByYear[year - 1] || {};
+            const n = stats.count || 0;
+
+            if (n === 0) {
+                // Push empty DataPointSchema for missing years
+                const emptyPoint = { year: Number(year), value: null };
+                Object.keys(statistics).forEach(stat => statistics[stat].push(emptyPoint));
+                continue;
+            }
+
+            // Compute statistics, preferring analytical formulas
+            const mean = formulas.mean ? formulas.mean(this.parameters, year) : stats.sum / n;
+            const variance = stats.m2 / n;
+            const stdDev = formulas.stdDev ? formulas.stdDev(this.parameters, year) : Math.sqrt(variance);
+            const min = formulas.min ? formulas.min(this.parameters, year) : stats.min;
+            const max = formulas.max ? formulas.max(this.parameters, year) : stats.max;
+            const skewness = formulas.skewness
+                ? formulas.skewness(this.parameters, year)
+                : stdDev > 0 ? (stats.m3 / n) / (stdDev ** 3) : 0;
+            const kurtosis = formulas.kurtosis
+                ? formulas.kurtosis(this.parameters, year)
+                : stdDev > 0 ? ((stats.m4 / n) / (stdDev ** 4) - 3) : 0;
+
+            // Store as DataPointSchema with numeric types
+            statistics.mean.push({ year: Number(year), value: mean !== null ? Number(mean) : null });
+            statistics.stdDev.push({ year: Number(year), value: stdDev !== null ? Number(stdDev) : null });
+            statistics.min.push({ year: Number(year), value: min !== null ? Number(min) : null });
+            statistics.max.push({ year: Number(year), value: max !== null ? Number(max) : null });
+            statistics.skewness.push({ year: Number(year), value: skewness !== null ? Number(skewness) : null });
+            statistics.kurtosis.push({ year: Number(year), value: kurtosis !== null ? Number(kurtosis) : null });
+        }
+
+        return statistics;
+    }
 }
 
 module.exports = DistributionGenerator;

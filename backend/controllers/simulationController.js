@@ -21,7 +21,10 @@ const simulateDistributions = async (req, res) => {
         // Format response for API
         const responseData = {
             success: simulationResults.success,
-            simulationInfo: simulationResults.simulationInfo,
+            simulationInfo: simulationResults.simulationInfo.map(info => ({
+                ...info,
+                statistics: info.statistics // Ensure statistics are included
+            })),
             timeElapsed: simulationResults.simulationInfo[0]?.timeElapsed || 0
         };
 

@@ -143,6 +143,42 @@ class NormalDistribution extends DistributionGenerator {
             stdDev: stdDevPercent > 0 ? stdDevPercent : 10 // Ensure positive standard deviation percentage, default to 10%
         };
     }
+
+    /**
+     * Get analytical formula for mean
+     * @returns {Function} Formula function
+     */
+    getMeanFormula() {
+        return (params, year) => this.getParameterValue('value', year, 0);
+    }
+
+    /**
+     * Get analytical formula for standard deviation
+     * @returns {Function} Formula function
+     */
+    getStdDevFormula() {
+        return (params, year) => {
+            const mean = this.getParameterValue('value', year, 0);
+            const stdDevPercent = this.getParameterValue('stdDev', year, 10);
+            return mean * (stdDevPercent / 100);
+        };
+    }
+
+    /**
+     * Get analytical formula for skewness
+     * @returns {Function} Formula function
+     */
+    getSkewnessFormula() {
+        return () => 0; // Normal distribution is symmetric
+    }
+
+    /**
+     * Get analytical formula for kurtosis
+     * @returns {Function} Formula function
+     */
+    getKurtosisFormula() {
+        return () => 0; // Normal distribution has zero excess kurtosis
+    }
 }
 
 module.exports = NormalDistribution;

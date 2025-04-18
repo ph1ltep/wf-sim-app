@@ -245,6 +245,34 @@ class KaimalDistribution extends DistributionGenerator {
             scale
         };
     }
+
+    /**
+     * Get analytical formula for mean
+     * @returns {Function} Formula function
+     */
+    getMeanFormula() {
+        return (params, year) => this.getParameterValue('value', year, 10);
+    }
+
+    /**
+     * Get analytical formula for standard deviation
+     * @returns {Function} Formula function
+     */
+    getStdDevFormula() {
+        return (params, year) => {
+            const meanWindSpeed = this.getParameterValue('value', year, 10);
+            const turbulenceIntensity = this.getParameterValue('turbulenceIntensity', year, 15) / 100;
+            return meanWindSpeed * turbulenceIntensity;
+        };
+    }
+
+    /**
+     * Get analytical formula for minimum
+     * @returns {Function} Formula function
+     */
+    getMinFormula() {
+        return () => 0; // Kaimal ensures non-negative values
+    }
 }
 
 module.exports = KaimalDistribution;

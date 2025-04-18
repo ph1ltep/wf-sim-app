@@ -88,21 +88,24 @@ const DistributionAnalysis = () => {
       path: ['settings', 'modules', 'revenue', 'electricityPrice'],
       icon: <DollarOutlined style={{ color: '#52c41a' }} />,
       units: '$/MWh',
-      color: '#52c41a'
+      color: '#52c41a',
+      precision: 2
     },
     {
       name: 'Downtime Per Event',
       path: ['settings', 'modules', 'revenue', 'downtimePerEvent'],
       icon: <FieldTimeOutlined style={{ color: '#faad14' }} />,
       units: 'hours',
-      color: '#faad14'
+      color: '#faad14',
+      precision: 0
     },
     {
       name: 'Wind Variability',
       path: ['settings', 'modules', 'revenue', 'windVariability'],
       icon: <AreaChartOutlined style={{ color: '#eb2f96' }} />,
       units: 'm/s',
-      color: '#eb2f96'
+      color: '#eb2f96',
+      precision: 1
     }
   ];
 
@@ -302,6 +305,7 @@ const DistributionAnalysis = () => {
                   icon={field.icon}
                   units={field.units}
                   color={field.color}
+                  precision={field.precision}
                   cardProps={{ style: { marginBottom: '16px' } }}
                 />
               </Col>

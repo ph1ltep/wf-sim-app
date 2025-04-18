@@ -145,6 +145,25 @@ class FixedDistribution extends DistributionGenerator {
             drift: Math.round(drift * 100) / 100 // Round to 2 decimal places
         };
     }
+
+    getMeanFormula() {
+        return (params, year) => this.getParameterValue('value', year, 0);
+    }
+    getStdDevFormula() {
+        return () => 0;
+    }
+    getMinFormula() {
+        return (params, year) => this.getParameterValue('value', year, 0);
+    }
+    getMaxFormula() {
+        return (params, year) => this.getParameterValue('value', year, 0);
+    }
+    getSkewnessFormula() {
+        return () => 0;
+    }
+    getKurtosisFormula() {
+        return () => 0; // Or null if undefined
+    }
 }
 
 module.exports = FixedDistribution;

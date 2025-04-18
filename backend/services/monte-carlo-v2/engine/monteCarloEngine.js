@@ -109,7 +109,7 @@ class MonteCarloEngine {
             try {
                 const distributionSeed = `${this.options.seed}-${id}`;
                 worker.initialize(distributionSeed);
-                const distributionResults = worker.process();
+                const { results: distributionResults, statistics } = worker.process();
 
                 results.simulationInfo.push({
                     distribution,
@@ -118,7 +118,8 @@ class MonteCarloEngine {
                     years: this.options.years,
                     timeElapsed: 0, // Updated later
                     results: Array.isArray(distributionResults) ? distributionResults : [distributionResults],
-                    errors: []
+                    errors: [],
+                    statistics
                 });
             } catch (error) {
                 results.simulationInfo.push({
@@ -128,7 +129,8 @@ class MonteCarloEngine {
                     years: this.options.years,
                     timeElapsed: 0,
                     results: [],
-                    errors: [error.message]
+                    errors: [error.message],
+                    statistics: {}
                 });
                 results.success = false;
             }

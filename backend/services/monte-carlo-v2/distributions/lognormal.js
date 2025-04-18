@@ -148,6 +148,36 @@ class LognormalDistribution extends DistributionGenerator {
             sigma: sigma > 0 ? sigma : 0.1 // Ensure positive sigma
         };
     }
+
+    getMeanFormula() {
+        return (params, year) => {
+            const mu = this.getParameterValue('mu', year, 0);
+            const sigma = this.getParameterValue('sigma', year, 1);
+            return Math.exp(mu + sigma * sigma / 2);
+        };
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const mu = this.getParameterValue('mu', year, 0);
+            const sigma = this.getParameterValue('sigma', year, 1);
+            return Math.sqrt((Math.exp(sigma * sigma) - 1) * Math.exp(2 * mu + sigma * sigma));
+        };
+    }
+    getMinFormula() {
+        return () => 0; // Lognormal is positive
+    }
+    getSkewnessFormula() {
+        return (params, year) => {
+            const sigma = this.getParameterValue('sigma', year, 1);
+            return (Math.exp(sigma * sigma) + 2) * Math.sqrt(Math.exp(sigma * sigma) - 1);
+        };
+    }
+    getKurtosisFormula() {
+        return (params, year) => {
+            const sigma = this.getParameterValue('sigma', year, 1);
+            return Math.exp(4 * sigma * sigma) + 2 * Math.exp(3 * sigma * sigma) + 3 * Math.exp(2 * sigma * sigma) - 3;
+        };
+    }
 }
 
 module.exports = LognormalDistribution;

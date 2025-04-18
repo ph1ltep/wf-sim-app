@@ -1,10 +1,10 @@
-// src/components/cards/DistributionCard.jsx - Modified version
 import React, { useState, useMemo } from 'react';
-import { Card, Space, Typography, Divider, Empty, Row, Col, Tooltip, Badge, Alert, Table, Button } from 'antd';
-import { InfoCircleOutlined, ClockCircleOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { Card, Space, Typography, Divider, Empty, Tooltip, Badge, Alert, Table, Button } from 'antd';
+import { InfoCircleOutlined, ClockCircleOutlined, TableOutlined, SwapOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { hexToRgb, determineDecimalPrecision } from '../../utils/plotUtils';
 import { generateTableData, prepareSummaryData, preparePercentileChartData } from '../../utils/plotDataUtils';
+import { generateStatisticsTableData, prepareStatisticsBoxPlotData } from '../../utils/plotStatisticsUtils';
 
 const { Text } = Typography;
 
@@ -39,61 +39,118 @@ const DistributionCard = ({
 }) => {
     // UI state
     const [dataTableVisible, setDataTableVisible] = useState(false);
+    const [chartMode, setChartMode] = useState('percentiles'); // 'percentiles' or 'statistics'
 
-    // Safely extract data from simulationInfo (handle null/undefined)
-    const distribution = simulationInfo?.distribution || {};
-    const iterations = simulationInfo?.iterations || 0;
-    const seed = simulationInfo?.seed || 0;
-    const years = simulationInfo?.years || 0;
-    const timeElapsed = simulationInfo?.timeElapsed || 0;
-    const results = simulationInfo?.results || [];
-    const errors = simulationInfo?.errors || [];
+    // Memoized extracted data from simulationInfo
+    const distribution = useMemo(() => simulationInfo?.distribution || {}, [simulationInfo]);
+    const iterations = useMemo(() => simulationInfo?.iterations || 0, [simulationInfo]);
+    const timeElapsed = useMemo(() => simulationInfo?.timeElapsed || 0, [simulationInfo]);
+    const results = useMemo(() => simulationInfo?.results || [], [simulationInfo]);
+    const statistics = useMemo(() => simulationInfo?.statistics || {}, [simulationInfo]);
+    const errors = useMemo(() => simulationInfo?.errors || [], [simulationInfo]);
 
     // Check for simulation errors
-    const hasErrors = errors && errors.length > 0;
-    const hasResults = results && results.length > 0;
+    const hasErrors = useMemo(() => errors.length > 0, [errors]);
+    const hasResults = useMemo(() => results.length > 0, [results]);
 
     // Determine precision for numerical display (memoized)
     const actualPrecision = useMemo(() => {
         return precision !== null ? precision : determineDecimalPrecision(results);
     }, [results, precision]);
 
-    // Prepare table data (memoized)
-    const { columns, data: tableData } = useMemo(() => {
-        if (!hasResults) return { columns: [], data: [] };
-        return generateTableData(results, primaryPercentile, color, actualPrecision);
-    }, [results, primaryPercentile, color, actualPrecision, hasResults]);
-
-    // Prepare chart data (memoized)
-    const { data, layout, config } = useMemo(() => {
-        if (hasErrors || !hasResults) return { data: [], layout: {}, config: {} };
-        return preparePercentileChartData(results, primaryPercentile, color, actualPrecision);
-    }, [hasErrors, results, primaryPercentile, color, actualPrecision, hasResults]);
-
     // Prepare summary data (memoized)
     const summaryData = useMemo(() => {
         if (!hasResults) return [];
         return prepareSummaryData(results, primaryPercentile, actualPrecision);
-    }, [results, primaryPercentile, actualPrecision, hasResults]);
+    }, [hasResults, results, primaryPercentile, actualPrecision]);
 
-    // Customize layout with provided options
-    const customizedLayout = useMemo(() => {
+    // Prepare percentile table data (memoized)
+    const { columns: percentileColumns, data: percentileTableData } = useMemo(() => {
+        if (!hasResults) return { columns: [], data: [] };
+
+        // Get initial table data
+        const tableInfo = generateTableData(results, primaryPercentile, color, actualPrecision);
+
+        // Add comma formatting to the numeric columns without compact notation
+        const formattedColumns = tableInfo.columns.map(column => {
+            if (column.dataIndex !== 'year' && column.dataIndex !== 'percentile') {
+                return {
+                    ...column,
+                    render: (text) => {
+                        if (typeof text === 'number') {
+                            return Number(text).toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: actualPrecision
+                            });
+                        }
+                        return text;
+                    }
+                };
+            }
+            return column;
+        });
+
+        return { columns: formattedColumns, data: tableInfo.data };
+    }, [results, primaryPercentile, color, actualPrecision, hasResults]);
+
+    // Prepare statistics table data (memoized)
+    const { columns: statsColumns, data: statsTableData } = useMemo(() => {
+        if (!hasResults || !statistics) return { columns: [], data: [] };
+        return generateStatisticsTableData(statistics, color, actualPrecision);
+    }, [hasResults, statistics, color, actualPrecision]);
+
+    // Prepare percentile chart data (memoized)
+    const percentileChartData = useMemo(() => {
+        if (hasErrors || !hasResults) return { data: [], layout: {}, config: {} };
+
+        const chartData = preparePercentileChartData(results, primaryPercentile, color, actualPrecision);
+        const enhancedData = chartData.data.map(trace => ({
+            ...trace,
+            hovertemplate: trace.hovertemplate?.replace(
+                '%{y}',
+                '%{y:,.' + actualPrecision + 'f}'
+            ) || `Year: %{x}<br>Value: %{y:,.${actualPrecision}f}${units ? ' ' + units : ''}<extra>%{fullData.name}</extra>`
+        }));
+
         return {
-            ...layout,
+            data: enhancedData,
+            layout: chartData.layout,
+            config: chartData.config
+        };
+    }, [hasErrors, results, primaryPercentile, color, actualPrecision, hasResults, units]);
+
+    // Prepare statistics box plot data (memoized)
+    const statsChartData = useMemo(() => {
+        //console.log('hasResults:', hasResults);
+        //console.log('statistics:', statistics);
+        if (hasErrors || !hasResults || !statistics) return { data: [], layout: {}, config: {} };
+        return prepareStatisticsBoxPlotData(statistics, color, actualPrecision, units);
+    }, [hasErrors, hasResults, statistics, color, actualPrecision, units]);
+
+    // Customize layout for the selected chart mode
+    const customizedLayout = useMemo(() => {
+        const baseLayout = chartMode === 'percentiles' ? percentileChartData.layout : statsChartData.layout;
+        return {
+            ...baseLayout,
             height: height,
             yaxis: {
-                ...(layout.yaxis || {}),
+                ...(baseLayout.yaxis || {}),
                 title: units,
-                hoverformat: `.${actualPrecision}f`,
+                hoverformat: `,.${actualPrecision}f`,
+                tickformat: ",~s" // SI prefix for large numbers
             },
-            // Adjust margins to make room for summary column
+            xaxis: {
+                ...(baseLayout.xaxis || {}),
+                tickformat: ",d",
+                hoverformat: ",d"
+            },
             margin: {
-                ...(layout.margin || {}),
-                r: 80, // Add right margin for summary column
+                ...(baseLayout.margin || {}),
+                r: 80 // Space for summary column
             },
             ...extraLayoutOptions
         };
-    }, [layout, height, units, actualPrecision, extraLayoutOptions]);
+    }, [chartMode, percentileChartData.layout, statsChartData.layout, height, units, actualPrecision, extraLayoutOptions]);
 
     // Use the provided title or get it from the distribution
     const cardTitle = useMemo(() => {
@@ -102,7 +159,7 @@ const DistributionCard = ({
             : "Distribution Analysis");
     }, [title, distribution]);
 
-    // Create extra content for card title to show distribution type
+    // Create title content
     const titleContent = useMemo(() => {
         return (
             <Space>
@@ -120,22 +177,58 @@ const DistributionCard = ({
         );
     }, [cardTitle, icon, distribution, title, actualPrecision]);
 
-    // Card extra content with metadata
+    // Card extra content with metadata, table toggle, and mode toggle
     const cardExtra = useMemo(() => {
-        if (!showMetadata || !simulationInfo) return null;
+        if (!simulationInfo) return null;
 
         return (
-            <Tooltip title={`${iterations.toLocaleString()} iterations, ${timeElapsed.toFixed(2)}ms execution time`}>
-                <Space>
-                    <Badge count={hasErrors ? errors.length : 0} color="red" size="small">
-                        <InfoCircleOutlined style={{ fontSize: '16px', cursor: 'pointer' }} />
-                    </Badge>
-                    <ClockCircleOutlined style={{ fontSize: '16px' }} />
-                    {timeElapsed.toFixed(0)}ms
-                </Space>
-            </Tooltip>
+            <Space>
+                {showMetadata && (
+                    <Tooltip title={`${iterations.toLocaleString()} iterations, ${timeElapsed.toFixed(2)}ms execution time`}>
+                        <Space>
+                            <Badge count={hasErrors ? errors.length : 0} color="red" size="small">
+                                <InfoCircleOutlined style={{ fontSize: '16px', cursor: 'pointer' }} />
+                            </Badge>
+                            <ClockCircleOutlined style={{ fontSize: '16px' }} />
+                            {timeElapsed.toFixed(0)}ms
+                        </Space>
+                    </Tooltip>
+                )}
+
+                {hasResults && (
+                    <Tooltip title={dataTableVisible ? "Hide data table" : "Show data table"}>
+                        <Button
+                            type="text"
+                            icon={<TableOutlined
+                                style={{
+                                    color: dataTableVisible ? color : 'inherit',
+                                    fontSize: '16px'
+                                }}
+                            />}
+                            onClick={() => setDataTableVisible(!dataTableVisible)}
+                            size="small"
+                        />
+                    </Tooltip>
+                )}
+
+                {hasResults && (
+                    <Tooltip title={`Switch to ${chartMode === 'percentiles' ? 'Statistics' : 'Percentiles'} mode`}>
+                        <Button
+                            type="text"
+                            icon={<SwapOutlined
+                                style={{
+                                    color: chartMode === 'percentiles' ? 'inherit' : color,
+                                    fontSize: '16px'
+                                }}
+                            />}
+                            onClick={() => setChartMode(chartMode === 'percentiles' ? 'statistics' : 'percentiles')}
+                            size="small"
+                        />
+                    </Tooltip>
+                )}
+            </Space>
         );
-    }, [showMetadata, iterations, timeElapsed, hasErrors, errors, simulationInfo]);
+    }, [showMetadata, iterations, timeElapsed, hasErrors, errors, hasResults, dataTableVisible, chartMode, color, simulationInfo]);
 
     // Early return if no simulation info
     if (!simulationInfo) {
@@ -173,88 +266,87 @@ const DistributionCard = ({
             ) : hasResults ? (
                 <>
                     <div style={{ display: 'flex', position: 'relative' }}>
-                        {/* Main chart */}
                         <div style={{ flex: 1 }}>
                             <Plot
-                                data={data}
+                                data={chartMode === 'percentiles' ? percentileChartData.data : statsChartData.data}
                                 layout={customizedLayout}
-                                config={config}
+                                config={chartMode === 'percentiles' ? percentileChartData.config : statsChartData.config}
                                 style={{ width: '100%' }}
                             />
                         </div>
 
-                        {/* Summary column - positioned absolute to overlay on the right */}
-                        <div style={{
-                            position: 'absolute',
-                            right: 10,
-                            top: 40,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            background: 'rgba(255,255,255,0.85)',
-                            padding: '8px 6px',
-                            borderRadius: '4px',
-                            boxShadow: '0 0 4px rgba(0,0,0,0.1)'
-                        }}>
-                            {summaryData.map(summary => (
-                                <div key={summary.percentile} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '2px 4px',
-                                    backgroundColor: summary.isPrimary ? `rgba(${hexToRgb(color)}, 0.2)` : 'transparent',
-                                    borderRadius: '3px'
-                                }}>
-                                    <div style={{
-                                        fontSize: '11px',
-                                        fontWeight: 'bold',
-                                        width: '26px',
-                                        color: summary.isPrimary ? color : '#666'
-                                    }}>
-                                        P{summary.percentile}
-                                    </div>
-                                    <div style={{
-                                        fontSize: '12px',
-                                        fontWeight: summary.isPrimary ? 'bold' : 'normal',
-                                        color: summary.isPrimary ? color : '#333'
-                                    }}>
-                                        {summary.mean}
-                                        {units && <span style={{ marginLeft: '2px', fontSize: '10px' }}>{units}</span>}
-                                    </div>
-                                </div>
-                            ))}
+                        {/* Summary column */}
+                        {chartMode === 'percentiles' && (
                             <div style={{
-                                fontSize: '9px',
-                                color: '#999',
-                                textAlign: 'center',
-                                marginTop: '2px'
+                                position: 'absolute',
+                                right: 10,
+                                top: 40,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                background: 'rgba(255,255,255,0.85)',
+                                padding: '8px 6px',
+                                borderRadius: '4px',
+                                boxShadow: '0 0 4px rgba(0,0,0,0.1)'
                             }}>
-                                mean
+                                {summaryData.map(summary => (
+                                    <div key={summary.percentile} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '2px 4px',
+                                        backgroundColor: summary.isPrimary ? `rgba(${hexToRgb(color)}, 0.2)` : 'transparent',
+                                        borderRadius: '3px'
+                                    }}>
+                                        <div style={{
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            width: '26px',
+                                            color: summary.isPrimary ? color : '#666'
+                                        }}>
+                                            P{summary.percentile}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '12px',
+                                            fontWeight: summary.isPrimary ? 'bold' : 'normal',
+                                            color: summary.isPrimary ? color : '#333'
+                                        }}>
+                                            {Number(summary.mean).toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: actualPrecision,
+                                                notation: summary.mean > 9999 ? 'compact' : 'standard',
+                                                compactDisplay: 'short'
+                                            })}
+                                            {units && <span style={{ marginLeft: '2px', fontSize: '10px' }}>{units}</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                                <div style={{
+                                    fontSize: '9px',
+                                    color: '#999',
+                                    textAlign: 'center',
+                                    marginTop: '2px'
+                                }}>
+                                    mean
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
-                    <Divider style={{ margin: '12px 0' }} />
-
-                    <Button
-                        type="link"
-                        icon={dataTableVisible ? <UpOutlined /> : <DownOutlined />}
-                        onClick={() => setDataTableVisible(!dataTableVisible)}
-                        style={{ paddingLeft: 0, marginBottom: 8 }}
-                    >
-                        {dataTableVisible ? 'Hide data table' : 'Show data table'}
-                    </Button>
-
+                    {/* Table section */}
                     {dataTableVisible && (
-                        <div style={{ marginBottom: 16 }}>
-                            <Table
-                                columns={columns}
-                                dataSource={tableData}
-                                size="small"
-                                pagination={false}
-                                scroll={{ x: 'max-content', y: 300 }}
-                                bordered
-                            />
-                        </div>
+                        <>
+                            <Divider style={{ margin: '12px 0 8px 0' }} />
+                            <div style={{ marginBottom: 16 }}>
+                                <Table
+                                    columns={chartMode === 'percentiles' ? percentileColumns : statsColumns}
+                                    dataSource={chartMode === 'percentiles' ? percentileTableData : statsTableData}
+                                    size="small"
+                                    pagination={false}
+                                    scroll={{ x: 'max-content', y: 300 }}
+                                    bordered
+                                />
+                            </div>
+                        </>
                     )}
                 </>
             ) : (

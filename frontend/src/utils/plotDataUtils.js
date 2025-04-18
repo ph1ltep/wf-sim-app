@@ -1,4 +1,3 @@
-// src/utils/plotTableUtils.js
 import { hexToRgb } from './plotUtils';
 
 /**
@@ -17,6 +16,9 @@ export const generateTableData = (results, primaryPercentile, color, precision) 
     // Get array of all years from first result's data
     const allYears = results[0].data.map(d => d.year);
 
+    // Sort results by percentile value (ascending)
+    const sortedResults = [...results].sort((a, b) => a.percentile.value - b.percentile.value);
+
     // Create columns for the table
     const columns = [
         {
@@ -26,7 +28,7 @@ export const generateTableData = (results, primaryPercentile, color, precision) 
             fixed: 'left',
             width: 70,
         },
-        ...results.map(result => ({
+        ...sortedResults.map(result => ({
             title: `P${result.percentile.value}`,
             dataIndex: `p${result.percentile.value}`,
             key: `p${result.percentile.value}`,
@@ -62,7 +64,7 @@ export const generateTableData = (results, primaryPercentile, color, precision) 
         const rowData = { key: year, year };
 
         // Add value for each percentile
-        results.forEach(result => {
+        sortedResults.forEach(result => {
             const dataPoint = result.data.find(d => d.year === year);
             rowData[`p${result.percentile.value}`] = dataPoint ? dataPoint.value : undefined;
         });
@@ -107,9 +109,7 @@ export const prepareSummaryData = (results, primaryPercentile, precision) => {
             isPrimary: result.percentile.value === primaryPercentile,
             mean: mean !== null ? Number(mean).toFixed(precision) : 'N/A',
             description: result.percentile.description || '',
-            // First data point value (usually Year 1)
             firstValue: data[0] ? Number(data[0].value).toFixed(precision) : 'N/A',
-            // Last data point value (usually final year)
             lastValue: data.length ? Number(data[data.length - 1].value).toFixed(precision) : 'N/A'
         };
     });
@@ -234,8 +234,7 @@ export const preparePercentileChartData = (results, primaryPercentile, baseColor
 };
 
 /**
- * Helper function for organizing percentiles - imported here to avoid
- * circular dependencies since this is also used in preparePercentileChartData
+ * Helper function for organizing percentiles
  */
 function organizePercentiles(percentileResults, primaryPercentileValue) {
     if (!percentileResults || percentileResults.length === 0) {
@@ -258,12 +257,10 @@ function organizePercentiles(percentileResults, primaryPercentileValue) {
     let singles = [];
 
     if (sorted.length <= 1) {
-        // Just the primary percentile
         if (sorted.length === 1) {
             singles = [sorted[0]];
         }
     } else if (sorted.length === 2) {
-        // Two percentiles - use as a pair if one is the primary
         if (sorted[0].percentile.value === primaryPercentileValue ||
             sorted[1].percentile.value === primaryPercentileValue) {
             percentilePairs = [{
@@ -273,41 +270,28 @@ function organizePercentiles(percentileResults, primaryPercentileValue) {
                 name: `P${sorted[0].percentile.value}-P${sorted[1].percentile.value}`
             }];
         } else {
-            // Neither is primary, use them as individual lines
             singles = sorted;
         }
     } else {
-        // More than two percentiles - create symmetric pairs around the primary
-        // If a matching symmetric pair can't be found, it's added as a single line
-
-        // Remove primary from the array for pairing
         const withoutPrimary = sorted.filter(p => p.percentile.value !== primary.percentile.value);
-
-        // Split into percentiles below and above the primary
         const below = withoutPrimary.filter(p => p.percentile.value < primary.percentile.value);
         const above = withoutPrimary.filter(p => p.percentile.value > primary.percentile.value);
-
-        // Create percentile pairs, starting from those closest to the primary
         const maxPairs = Math.min(below.length, above.length);
 
-        // Create pairs starting from percentiles closest to the primary
         for (let i = 0; i < maxPairs; i++) {
             const lowerIndex = below.length - 1 - i;
             const upperIndex = i;
-
             percentilePairs.push({
                 lower: below[lowerIndex],
                 upper: above[upperIndex],
-                opacity: 0.3 - (i * 0.1), // Decrease opacity for pairs further from the primary
+                opacity: 0.3 - (i * 0.1),
                 name: `P${below[lowerIndex].percentile.value}-P${above[upperIndex].percentile.value}`
             });
         }
 
-        // Add any remaining percentiles as single lines
         if (below.length > maxPairs) {
             singles = singles.concat(below.slice(0, below.length - maxPairs));
         }
-
         if (above.length > maxPairs) {
             singles = singles.concat(above.slice(maxPairs));
         }

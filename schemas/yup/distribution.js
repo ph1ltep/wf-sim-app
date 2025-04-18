@@ -18,7 +18,7 @@ const PercentileSchema = Yup.object().shape({
 const SimResultsSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
     percentile: PercentileSchema.required(),
-    data: DataPointSchema.required(),
+    data: Yup.array().of(DataPointSchema).required(),
 });
 
 // Schema for distribution parameters with mixed types
@@ -97,6 +97,14 @@ const SimulationInfoSchema = Yup.object().shape({
     timeElapsed: Yup.number().required('Time elapsed is required'),
     results: Yup.array().of(SimResultsSchema).required('Results are required').default([]),
     errors: Yup.array().of(Yup.string()).required('Errors are required').default([]),
+    statistics: Yup.object().shape({
+        mean: Yup.array().of(DataPointSchema),
+        stdDev: Yup.array().of(DataPointSchema),
+        min: Yup.array().of(DataPointSchema),
+        max: Yup.array().of(DataPointSchema),
+        skewness: Yup.array().of(DataPointSchema),
+        kurtosis: Yup.array().of(DataPointSchema),
+    }).required('Statistics are required').default({}),
 });
 
 // Schema for SimResponse

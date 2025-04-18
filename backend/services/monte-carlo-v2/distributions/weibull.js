@@ -193,6 +193,40 @@ class WeibullDistribution extends DistributionGenerator {
         const t = x + g + 0.5;
         return Math.sqrt(2 * Math.PI) * Math.pow(t, (x + 0.5)) * Math.exp(-t) * a;
     }
+
+    /**
+     * Get analytical formula for mean
+     * @returns {Function} Formula function
+     */
+    getMeanFormula() {
+        return (params, year) => {
+            const scale = this.getParameterValue('scale', year, 1);
+            const shape = this.getParameterValue('shape', year, 1);
+            return scale * this.constructor._gammaFunction(1 + 1 / shape);
+        };
+    }
+
+    /**
+     * Get analytical formula for standard deviation
+     * @returns {Function} Formula function
+     */
+    getStdDevFormula() {
+        return (params, year) => {
+            const scale = this.getParameterValue('scale', year, 1);
+            const shape = this.getParameterValue('shape', year, 1);
+            const meanGamma = this.constructor._gammaFunction(1 + 1 / shape);
+            const variance = scale * scale * (this.constructor._gammaFunction(1 + 2 / shape) - meanGamma * meanGamma);
+            return Math.sqrt(variance);
+        };
+    }
+
+    /**
+     * Get analytical formula for minimum
+     * @returns {Function} Formula function
+     */
+    getMinFormula() {
+        return () => 0; // Weibull is non-negative
+    }
 }
 
 module.exports = WeibullDistribution;

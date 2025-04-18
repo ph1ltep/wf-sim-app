@@ -132,6 +132,28 @@ class ExponentialDistribution extends DistributionGenerator {
 
         return { lambda: Math.min(1000, Math.max(0.00001, lambda)) };
     }
+
+    getMeanFormula() {
+        return (params, year) => {
+            const lambda = this.getParameterValue('lambda', year, 1);
+            return lambda > 0 ? 1 / lambda : null;
+        };
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const lambda = this.getParameterValue('lambda', year, 1);
+            return lambda > 0 ? 1 / lambda : null;
+        };
+    }
+    getMinFormula() {
+        return () => 0;
+    }
+    getSkewnessFormula() {
+        return () => 2;
+    }
+    getKurtosisFormula() {
+        return () => 6;
+    }
 }
 
 module.exports = ExponentialDistribution;

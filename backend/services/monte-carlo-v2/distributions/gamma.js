@@ -211,6 +211,36 @@ class GammaDistribution extends DistributionGenerator {
             scale: Math.max(0.1, Math.min(1000, scale))
         };
     }
+
+    getMeanFormula() {
+        return (params, year) => {
+            const shape = this.getParameterValue('shape', year, 1);
+            const scale = this.getParameterValue('scale', year, 1);
+            return shape * scale;
+        };
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const shape = this.getParameterValue('shape', year, 1);
+            const scale = this.getParameterValue('scale', year, 1);
+            return Math.sqrt(shape) * scale;
+        };
+    }
+    getMinFormula() {
+        return () => 0;
+    }
+    getSkewnessFormula() {
+        return (params, year) => {
+            const shape = this.getParameterValue('shape', year, 1);
+            return shape > 0 ? 2 / Math.sqrt(shape) : null;
+        };
+    }
+    getKurtosisFormula() {
+        return (params, year) => {
+            const shape = this.getParameterValue('shape', year, 1);
+            return shape > 0 ? 6 / shape : null;
+        };
+    }
 }
 
 module.exports = GammaDistribution;

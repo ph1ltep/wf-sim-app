@@ -246,6 +246,28 @@ class GBMDistribution extends DistributionGenerator {
             timeStep: timeStep
         };
     }
+
+    // getMeanFormula() {
+    //     return (params, year) => {
+    //         const value = this.getParameterValue('value', year, 1);
+    //         const drift = this.getParameterValue('drift', year, 0);
+    //         const timeStep = this.getParameterValue('timeStep', year, 1);
+    //         return value * Math.exp(drift * timeStep * year);
+    //     };
+    // }
+    // getStdDevFormula() {
+    //     return (params, year) => {
+    //         const value = this.getParameterValue('value', year, 1);
+    //         const drift = this.getParameterValue('drift', year, 0);
+    //         const volatility = this.getParameterValue('volatility', year, 0);
+    //         const timeStep = this.getParameterValue('timeStep', year, 1);
+    //         const t = timeStep * year;
+    //         return value * Math.exp(drift * t) * Math.sqrt(Math.exp(volatility * volatility * t) - 1);
+    //     };
+    // }
+    getMinFormula() {
+        return () => 0; // GBM is positive
+    }
 }
 
 module.exports = GBMDistribution;

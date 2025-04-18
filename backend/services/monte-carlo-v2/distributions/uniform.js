@@ -142,6 +142,33 @@ class UniformDistribution extends DistributionGenerator {
 
         return { min, max };
     }
+
+    getMeanFormula() {
+        return (params, year) => {
+            const min = this.getParameterValue('min', year, 0);
+            const max = this.getParameterValue('max', year, 1);
+            return (min + max) / 2;
+        };
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const min = this.getParameterValue('min', year, 0);
+            const max = this.getParameterValue('max', year, 1);
+            return (max - min) / Math.sqrt(12);
+        };
+    }
+    getMinFormula() {
+        return (params, year) => this.getParameterValue('min', year, 0);
+    }
+    getMaxFormula() {
+        return (params, year) => this.getParameterValue('max', year, 1);
+    }
+    getSkewnessFormula() {
+        return () => 0;
+    }
+    getKurtosisFormula() {
+        return () => -6 / 5;
+    }
 }
 
 module.exports = UniformDistribution;

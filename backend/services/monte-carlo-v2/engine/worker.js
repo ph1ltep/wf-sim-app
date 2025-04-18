@@ -76,8 +76,8 @@ class DistributionWorker {
     }
 
     /**
-     * Process the distribution simulation
-     * @returns {Array} Array of SimResultsSchema objects
+     * Process the distribution simulation and compute statistics
+     * @returns {Object} Object containing results (SimResultsSchema) and statistics
      */
     process() {
         if (!this.generator || !this.random) {
@@ -86,21 +86,50 @@ class DistributionWorker {
 
         const { iterations, years, percentiles: percentileValues } = this.settings;
 
-        // Create result structure for storing values
+        // Initialize structures for percentiles and running statistics
         const yearlyData = Array(years).fill().map(() => []);
+        const runningStats = Array(years).fill().map(() => ({
+            count: 0,
+            sum: 0,
+            m2: 0,
+            m3: 0,
+            m4: 0,
+            min: Infinity,
+            max: -Infinity
+        }));
 
         // Run iterations
         try {
             for (let i = 0; i < iterations; i++) {
                 for (let year = 0; year < years; year++) {
-                    // Update generator year if needed
+                    // Update generator year
                     this.generator.updateYear(year + 1);
 
                     // Generate value
                     const value = this.generator.generate(year + 1, this.random);
 
-                    // Store value
+                    // Store value for percentile calculation
                     yearlyData[year].push(value);
+
+                    // Update running statistics
+                    const stats = runningStats[year];
+                    stats.count += 1;
+                    const n = stats.count;
+
+                    // Welford's algorithm for mean and variance
+                    const delta = value - (stats.sum / n);
+                    stats.sum += value;
+                    const mean = stats.sum / n;
+                    const delta2 = value - mean;
+                    stats.m2 += delta * delta2;
+
+                    // Higher moments for skewness and kurtosis
+                    stats.m3 += delta * delta2 * delta2;
+                    stats.m4 += delta * delta2 * delta2 * delta2;
+
+                    // Update min and max
+                    stats.min = Math.min(stats.min, value);
+                    stats.max = Math.max(stats.max, value);
                 }
             }
         } catch (error) {
@@ -108,10 +137,7 @@ class DistributionWorker {
         }
 
         // Calculate percentiles for each year
-        const results = [];
-
-        // Generate results for each requested percentile
-        percentileValues.forEach(percentileConfig => {
+        const results = percentileValues.map(percentileConfig => {
             const result = {
                 name: `${this.distribution.type}_P${percentileConfig.value}`,
                 percentile: percentileConfig,
@@ -128,43 +154,13 @@ class DistributionWorker {
                 });
             }
 
-            results.push(result);
+            return result;
         });
 
-        return results;
-    }
+        // Calculate statistics from running stats
+        const statistics = this.generator.calculateStatistics(runningStats, years);
 
-    /**
-     * Calculate summary statistics for the distribution
-     * @returns {Object} Summary statistics
-     */
-    calculateStatistics() {
-        if (!this.generator || !this.random) {
-            throw new Error('Worker must be initialized before calculating statistics');
-        }
-
-        const { iterations, years } = this.settings;
-        const stats = {
-            years: Array(years).fill().map(() => ({}))
-        };
-
-        // Generate sample data
-        const samples = Array(iterations).fill().map(() => {
-            const sample = [];
-            for (let year = 0; year < years; year++) {
-                this.generator.updateYear(year + 1);
-                sample.push(this.generator.generate(year + 1, this.random));
-            }
-            return sample;
-        });
-
-        // Calculate statistics for each year
-        for (let year = 0; year < years; year++) {
-            const yearValues = samples.map(sample => sample[year]);
-            stats.years[year] = percentiles.calculateStatistics(yearValues);
-        }
-
-        return stats;
+        return { results, statistics };
     }
 }
 

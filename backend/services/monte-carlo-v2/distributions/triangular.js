@@ -211,6 +211,38 @@ class TriangularDistribution extends DistributionGenerator {
             return { min, mode, max };
         }
     }
+
+    getMeanFormula() {
+        return (params, year) => {
+            const min = this.getParameterValue('min', year, 0);
+            const mode = this.getParameterValue('mode', year, 0.5);
+            const max = this.getParameterValue('max', year, 1);
+            return (min + mode + max) / 3;
+        };
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const min = this.getParameterValue('min', year, 0);
+            const mode = this.getParameterValue('mode', year, 0.5);
+            const max = this.getParameterValue('max', year, 1);
+            return Math.sqrt((min * min + mode * mode + max * max - min * mode - min * max - mode * max) / 18);
+        };
+    }
+    getMinFormula() {
+        return (params, year) => this.getParameterValue('min', year, 0);
+    }
+    getMaxFormula() {
+        return (params, year) => this.getParameterValue('max', year, 1);
+    }
+    getSkewnessFormula() {
+        return (params, year) => {
+            const min = this.getParameterValue('min', year, 0);
+            const mode = this.getParameterValue('mode', year, 0.5);
+            const max = this.getParameterValue('max', year, 1);
+            const denom = 5 * Math.pow(min * min + mode * mode + max * max - min * mode - min * max - mode * max, 1.5);
+            return denom !== 0 ? (Math.sqrt(2) * (min + max - 2 * mode) * (max - min)) / denom : 0;
+        };
+    }
 }
 
 module.exports = TriangularDistribution;

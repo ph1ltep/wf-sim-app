@@ -177,7 +177,7 @@ export const determineDecimalPrecision = (results) => {
     // If it's a small decimal, determine appropriate precision
     if (Math.abs(firstValue) < 0.01) return 4;
     if (Math.abs(firstValue) < 0.1) return 3;
-    if (Math.abs(firstValue) < 10) return 2;
+    if (Math.abs(firstValue) < 100) return 2;
 
     return 1; // Default for medium-sized numbers
 };

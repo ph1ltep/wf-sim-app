@@ -134,6 +134,31 @@ class PoissonDistribution extends DistributionGenerator {
         // Ensure lambda is positive
         return { lambda: Math.max(lambda, 0.001) };
     }
+
+    getMeanFormula() {
+        return (params, year) => this.getParameterValue('lambda', year, 1);
+    }
+    getStdDevFormula() {
+        return (params, year) => {
+            const lambda = this.getParameterValue('lambda', year, 1);
+            return lambda > 0 ? Math.sqrt(lambda) : null;
+        };
+    }
+    getMinFormula() {
+        return () => 0;
+    }
+    getSkewnessFormula() {
+        return (params, year) => {
+            const lambda = this.getParameterValue('lambda', year, 1);
+            return lambda > 0 ? 1 / Math.sqrt(lambda) : null;
+        };
+    }
+    getKurtosisFormula() {
+        return (params, year) => {
+            const lambda = this.getParameterValue('lambda', year, 1);
+            return lambda > 0 ? 1 / lambda : null;
+        };
+    }
 }
 
 module.exports = PoissonDistribution;
