@@ -45,7 +45,7 @@ class NormalDistribution extends DistributionGenerator {
         const errors = [];
 
         // Check mean parameter
-        if (!validation.isValidParameter(parameters.mean)) {
+        if (!validation.isValidParameter(parameters.value)) {
             errors.push("Mean value must be a number or a valid time series");
         }
 

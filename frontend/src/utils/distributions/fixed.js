@@ -78,6 +78,11 @@ export const Fixed = {
                     name: "value",
                     description: "Set to the most likely or contractually agreed value",
                     required: true
+                },
+                {
+                    name: "drift",
+                    description: "Annual rate of change, in percentage. This is a fixed value that will be applied to the value each year.",
+                    required: true
                 }
             ]
         };

@@ -1,28 +1,28 @@
-// src/components/input/DistributionAnalysis.jsx
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Space, Typography, Divider, Statistic, Empty, Spin, Button, message } from 'antd';
+// src/components/analysis/DistributionAnalysis.jsx
+import React, { useState } from 'react';
+import { Row, Col, Card, Space, Typography, Divider, Statistic, Button, message, Spin } from 'antd';
 import {
-  LineChartOutlined,
   ReloadOutlined,
   AreaChartOutlined,
   DollarOutlined,
   FieldTimeOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  LineChartOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { simulateDistributions } from '../../api/simulation';
-import Plot from 'react-plotly.js';
+import { DistributionCard } from '../cards';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 
-// Helper function to generate sample data for a distribution simulation
-const generateSampleData = (years = 20, percentiles) => {
+// Helper function to generate sample SimulationInfoSchema data
+const generateSampleSimulationInfo = (type, years = 20, percentiles, color) => {
   if (!percentiles || percentiles.length === 0) {
-    return [];
+    return null;
   }
 
-  // Create simulation results for each percentile
-  return percentiles.map(percentile => {
+  // Generate results for each percentile
+  const results = percentiles.map(percentile => {
     // Generate data points with some randomness based on percentile
     const factor = percentile.value / 50; // Scale factor based on percentile
 
@@ -45,138 +45,21 @@ const generateSampleData = (years = 20, percentiles) => {
       data: data
     };
   });
-};
 
-// Helper function to prepare Plotly data from simulation results
-const prepareChartData = (results, primaryPercentile, baseColor) => {
-  if (!results || results.length === 0) return { data: [], layout: {} };
-
-  // Sort percentiles in ascending order
-  const sortedResults = [...results].sort((a, b) => a.percentile.value - b.percentile.value);
-
-  // Plotly traces for each percentile
-  const traces = [];
-
-  // Find specific percentiles for area fills
-  const extremeLower = sortedResults.find(r => r.percentile.description === 'extreme_lower');
-  const extremeUpper = sortedResults.find(r => r.percentile.description === 'extreme_upper');
-  const lowerBound = sortedResults.find(r => r.percentile.description === 'lower_bound');
-  const upperBound = sortedResults.find(r => r.percentile.description === 'upper_bound');
-  const primary = sortedResults.find(r => r.percentile.value === primaryPercentile);
-
-  // Add extreme area (if available)
-  if (extremeLower && extremeUpper) {
-    // Lower extreme area
-    traces.push({
-      x: extremeLower.data.map(d => d.year),
-      y: extremeLower.data.map(d => d.value),
-      name: `P${extremeLower.percentile.value} (Extreme Lower)`,
-      line: { color: baseColor, width: 0 },
-      showlegend: false,
-      hoverinfo: 'skip'
-    });
-
-    // Upper extreme area
-    traces.push({
-      x: extremeUpper.data.map(d => d.year),
-      y: extremeUpper.data.map(d => d.value),
-      name: `P${extremeUpper.percentile.value} (Extreme Upper)`,
-      fill: 'tonexty',
-      fillcolor: `rgba(${hexToRgb(baseColor)}, 0.1)`,
-      line: { color: baseColor, width: 0 },
-      showlegend: true,
-      hoverinfo: 'x+y',
-      hoverlabel: { namelength: -1 }
-    });
-  }
-
-  // Add standard bounds area (if available)
-  if (lowerBound && upperBound) {
-    // Lower bound
-    traces.push({
-      x: lowerBound.data.map(d => d.year),
-      y: lowerBound.data.map(d => d.value),
-      name: `P${lowerBound.percentile.value} (Lower Bound)`,
-      line: { color: baseColor, width: 0 },
-      showlegend: false,
-      hoverinfo: 'skip'
-    });
-
-    // Upper bound
-    traces.push({
-      x: upperBound.data.map(d => d.year),
-      y: upperBound.data.map(d => d.value),
-      name: `P${upperBound.percentile.value}-P${lowerBound.percentile.value} Band`,
-      fill: 'tonexty',
-      fillcolor: `rgba(${hexToRgb(baseColor)}, 0.3)`,
-      line: { color: baseColor, width: 0 },
-      showlegend: true,
-      hoverinfo: 'x+y',
-      hoverlabel: { namelength: -1 }
-    });
-  }
-
-  // Add primary percentile line
-  if (primary) {
-    traces.push({
-      x: primary.data.map(d => d.year),
-      y: primary.data.map(d => d.value),
-      name: `P${primary.percentile.value} (Primary)`,
-      type: 'scatter',
-      mode: 'lines+markers',
-      line: { color: baseColor, width: 3 },
-      marker: { size: 6, color: baseColor },
-      hoverinfo: 'x+y',
-      hoverlabel: { namelength: -1 }
-    });
-  }
-
-  // Base layout for the plot
-  const layout = {
-    autosize: true,
-    height: 300,
-    margin: { l: 50, r: 30, t: 10, b: 40 },
-    xaxis: {
-      title: 'Year',
-      showgrid: true,
-      zeroline: false
+  // Create a sample SimulationInfoSchema object
+  return {
+    distribution: {
+      type: type || 'normal',
+      parameters: { value: 100, stdDev: 10 }
     },
-    yaxis: {
-      zeroline: false,
-      showgrid: true
-    },
-    showlegend: true,
-    legend: {
-      orientation: 'h',
-      yanchor: 'bottom',
-      y: -0.2,
-      xanchor: 'center',
-      x: 0.5
-    },
-    hovermode: 'closest'
+    iterations: 10000,
+    seed: 42,
+    years: years,
+    timeElapsed: Math.random() * 1000 + 500, // Random execution time between 500-1500ms
+    results: results,
+    errors: []
   };
-
-  // Configuration options
-  const config = {
-    responsive: true,
-    displayModeBar: false
-  };
-
-  return { data: traces, layout, config };
 };
-
-// Helper function to convert hex color to rgb format for rgba
-function hexToRgb(hex) {
-  // Remove # if present
-  hex = hex.replace('#', '');
-
-  // Parse hex
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-
-  return `${r}, ${g}, ${b}`;
-}
 
 const DistributionAnalysis = () => {
   const { getValueByPath, scenarioData, updateByPath } = useScenario();
@@ -197,50 +80,64 @@ const DistributionAnalysis = () => {
       name: 'Energy Production',
       path: ['settings', 'modules', 'revenue', 'energyProduction'],
       icon: <ThunderboltOutlined style={{ color: '#1890ff' }} />,
-      addonAfter: 'MWh',
+      units: 'MWh',
       color: '#1890ff'
     },
     {
       name: 'Electricity Price',
       path: ['settings', 'modules', 'revenue', 'electricityPrice'],
       icon: <DollarOutlined style={{ color: '#52c41a' }} />,
-      addonAfter: '$/MWh',
+      units: '$/MWh',
       color: '#52c41a'
     },
     {
       name: 'Downtime Per Event',
       path: ['settings', 'modules', 'revenue', 'downtimePerEvent'],
       icon: <FieldTimeOutlined style={{ color: '#faad14' }} />,
-      addonAfter: 'hours',
+      units: 'hours',
       color: '#faad14'
     },
     {
       name: 'Wind Variability',
       path: ['settings', 'modules', 'revenue', 'windVariability'],
       icon: <AreaChartOutlined style={{ color: '#eb2f96' }} />,
-      addonAfter: 'm/s',
+      units: 'm/s',
       color: '#eb2f96'
     }
   ];
 
-  // Function to get simulation results for a distribution
-  const getDistributionResults = (path) => {
+  // Get simulation info for a distribution
+  const getSimulationInfo = (path) => {
     // Check if we have results in our state first
     const pathKey = path.join('.');
-    if (simulationResults[pathKey] && simulationResults[pathKey].length > 0) {
+    if (simulationResults[pathKey]) {
       return simulationResults[pathKey];
     }
 
     // Try to get actual results from the scenario
-    const actualResults = getValueByPath([...path, 'data'], []);
+    const actualData = getValueByPath([...path, 'data'], []);
+    const distribution = getValueByPath([...path, 'distribution'], null);
 
-    // If we have actual results, use them
-    if (actualResults && actualResults.length > 0) {
-      return actualResults;
+    // If we have actual results, create a SimulationInfoSchema
+    if (actualData && actualData.length > 0 && distribution) {
+      return {
+        distribution: distribution,
+        iterations: simulationSettings?.iterations || 10000,
+        seed: simulationSettings?.seed || 42,
+        years: projectYears,
+        timeElapsed: 0, // We don't know the actual time for stored results
+        results: actualData,
+        errors: []
+      };
     }
 
     // Otherwise, generate sample data
-    return generateSampleData(projectYears, percentiles);
+    return generateSampleSimulationInfo(
+      distribution?.type,
+      projectYears,
+      percentiles,
+      distributionFields.find(f => f.path.join('.') === pathKey)?.color
+    );
   };
 
   // Function to run the simulation for all distributions
@@ -288,9 +185,11 @@ const DistributionAnalysis = () => {
           if (index < distributionFields.length) {
             const field = distributionFields[index];
             const pathKey = field.path.join('.');
-            newResults[pathKey] = info.results;
 
-            // Update the scenario context with the results
+            // Store the complete SimulationInfoSchema object
+            newResults[pathKey] = info;
+
+            // Update the scenario context with just the results
             updateByPath([...field.path, 'data'], info.results);
           }
         });
@@ -317,7 +216,7 @@ const DistributionAnalysis = () => {
       <div>
         <Title level={2}>Distribution Analysis Dashboard</Title>
         <Card>
-          <Text>No active scenario. Please create or load a scenario first.</Text>
+          <Paragraph>No active scenario. Please create or load a scenario first.</Paragraph>
         </Card>
       </div>
     );
@@ -391,76 +290,20 @@ const DistributionAnalysis = () => {
       <Spin spinning={loading} tip="Running simulation...">
         <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
           {distributionFields.map((field, index) => {
-            const results = getDistributionResults(field.path);
-            const distribution = getValueByPath([...field.path, 'distribution'], {});
-            const { data, layout, config } = prepareChartData(results, primaryPercentile, field.color);
-
-            // Customize layout for each field
-            const customizedLayout = {
-              ...layout,
-              yaxis: {
-                ...layout.yaxis,
-                title: field.addonAfter,
-                hoverformat: '.2f',
-              }
-            };
+            // Get the full SimulationInfoSchema for this distribution
+            const simulationInfo = getSimulationInfo(field.path);
 
             return (
               <Col span={12} key={index}>
-                <Card
-                  title={
-                    <Space>
-                      {field.icon}
-                      {field.name}
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
-                        ({distribution.type?.charAt(0).toUpperCase() + distribution.type?.slice(1) || 'Unknown'})
-                      </Text>
-                    </Space>
-                  }
-                  bordered={true}
-                  style={{ marginBottom: '16px' }}
-                >
-                  {results && results.length > 0 ? (
-                    <>
-                      <Plot
-                        data={data}
-                        layout={customizedLayout}
-                        config={config}
-                        style={{ width: '100%' }}
-                      />
-
-                      <Divider style={{ margin: '12px 0' }} />
-
-                      {/* Display first year values for quick reference */}
-                      <Row gutter={16}>
-                        {percentiles.map((p, i) => {
-                          const result = results.find(r => r.percentile.value === p.value);
-                          const firstYearValue = result?.data[0]?.value;
-
-                          return (
-                            <Col span={8} key={i}>
-                              <Statistic
-                                title={`P${p.value}`}
-                                value={firstYearValue !== undefined ? firstYearValue.toFixed(2) : 'N/A'}
-                                suffix={field.addonAfter}
-                                valueStyle={{
-                                  color: p.value === primaryPercentile ? field.color : 'inherit',
-                                  fontWeight: p.value === primaryPercentile ? 'bold' : 'normal',
-                                  fontSize: '16px'
-                                }}
-                              />
-                            </Col>
-                          );
-                        })}
-                      </Row>
-                    </>
-                  ) : (
-                    <Empty
-                      description="No simulation results available"
-                      style={{ padding: '40px 0' }}
-                    />
-                  )}
-                </Card>
+                <DistributionCard
+                  simulationInfo={simulationInfo}
+                  primaryPercentile={primaryPercentile}
+                  title={field.name}
+                  icon={field.icon}
+                  units={field.units}
+                  color={field.color}
+                  cardProps={{ style: { marginBottom: '16px' } }}
+                />
               </Col>
             );
           })}

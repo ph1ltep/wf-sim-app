@@ -117,7 +117,7 @@ const DistributionFieldV2 = ({
                         <FormCol span={colSpan}>
                             <PercentageField
                                 path={[...parametersPath, 'drift']}
-                                label="Growth Rate (Annual)"
+                                label="Change rate (Annual)"
                                 tooltip="Annual growth rate"
                                 min={-20}
                                 max={100}
@@ -497,7 +497,7 @@ const DistributionFieldV2 = ({
                         </FormRow>
 
                         {/* Render other parameter fields based on selected distribution */}
-                        {currentType !== 'fixed' && renderParameterFields()}
+                        {renderParameterFields()}
                     </Col>
 
                     {showVisualization && (
