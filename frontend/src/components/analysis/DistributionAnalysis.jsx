@@ -294,7 +294,7 @@ const DistributionAnalysis = () => {
             const simulationInfo = getSimulationInfo(field.path);
 
             return (
-              <Col span={12} key={index}>
+              <Col span={24} key={index}>
                 <DistributionCard
                   simulationInfo={simulationInfo}
                   primaryPercentile={primaryPercentile}

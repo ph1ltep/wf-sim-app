@@ -202,7 +202,7 @@ const DistributionCard = ({
                     <Row gutter={16}>
                         {summaryData.map(summary => {
                             return (
-                                <Col span={8} key={summary.percentile}>
+                                <Col span={4} key={summary.percentile}>
                                     <div style={{
                                         textAlign: 'center',
                                         padding: '8px',

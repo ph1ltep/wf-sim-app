@@ -24,9 +24,14 @@ class NormalDistribution extends DistributionGenerator {
      * @returns {number} Random value from normal distribution
      */
     generate(year, random) {
-        // Use parameters exactly as defined in DistributionParametersSchema
+        // Get the mean value
         const mean = this.getParameterValue('value', year, 0);
-        const stdDev = this.getParameterValue('stdDev', year, 1);
+
+        // Get the stdDev as a percentage of the mean
+        const stdDevPercent = this.getParameterValue('stdDev', year, 10);
+
+        // Convert stdDev from percentage to absolute value
+        const stdDev = mean * (stdDevPercent / 100);
 
         // Box-Muller transform for normal distribution
         const u1 = random();
@@ -55,12 +60,12 @@ class NormalDistribution extends DistributionGenerator {
         } else {
             // If stdDev is provided, check if it's positive
             if (typeof parameters.stdDev === 'number' && parameters.stdDev <= 0) {
-                errors.push("Standard deviation must be positive");
+                errors.push("Standard deviation percentage must be positive");
             } else if (Array.isArray(parameters.stdDev)) {
                 // Check each time series point
                 parameters.stdDev.forEach((point, index) => {
                     if (point.value <= 0) {
-                        errors.push(`Standard deviation at index ${index} (year ${point.year}) must be positive`);
+                        errors.push(`Standard deviation percentage at index ${index} (year ${point.year}) must be positive`);
                     }
                 });
             }
@@ -89,7 +94,7 @@ class NormalDistribution extends DistributionGenerator {
                 },
                 {
                     name: "stdDev",
-                    description: "Standard deviation (spread)",
+                    description: "Standard deviation as percentage of mean (e.g., 10 for 10%)",
                     required: true,
                     type: "number or time series",
                     constraints: "must be positive"
@@ -98,11 +103,11 @@ class NormalDistribution extends DistributionGenerator {
             examples: [
                 {
                     description: "Standard normal distribution",
-                    parameters: { mean: 0, stdDev: 1 }
+                    parameters: { value: 0, stdDev: 10 }
                 },
                 {
-                    description: "Distribution centered at 100 with moderate spread",
-                    parameters: { mean: 100, stdDev: 15 }
+                    description: "Distribution centered at 100 with moderate spread (15%)",
+                    parameters: { value: 100, stdDev: 15 }
                 }
             ]
         };
@@ -130,13 +135,14 @@ class NormalDistribution extends DistributionGenerator {
         const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / values.length;
         const stdDev = Math.sqrt(variance);
 
+        // Convert stdDev to percentage of mean
+        const stdDevPercent = (stdDev / mean) * 100;
+
         return {
-            mean,
-            stdDev: stdDev > 0 ? stdDev : 1 // Ensure positive standard deviation
+            value: mean,
+            stdDev: stdDevPercent > 0 ? stdDevPercent : 10 // Ensure positive standard deviation percentage, default to 10%
         };
     }
 }
-
-module.exports = NormalDistribution;
 
 module.exports = NormalDistribution;
