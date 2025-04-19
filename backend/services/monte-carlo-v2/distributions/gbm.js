@@ -265,9 +265,9 @@ class GBMDistribution extends DistributionGenerator {
     //         return value * Math.exp(drift * t) * Math.sqrt(Math.exp(volatility * volatility * t) - 1);
     //     };
     // }
-    getMinFormula() {
-        return () => 0; // GBM is positive
-    }
+    // getMinFormula() {
+    //     return () => 0; // GBM is positive
+    // }
 }
 
 module.exports = GBMDistribution;

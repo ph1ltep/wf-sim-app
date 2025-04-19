@@ -270,9 +270,9 @@ class KaimalDistribution extends DistributionGenerator {
      * Get analytical formula for minimum
      * @returns {Function} Formula function
      */
-    getMinFormula() {
-        return () => 0; // Kaimal ensures non-negative values
-    }
+    // getMinFormula() {
+    //     return () => 0; // Kaimal ensures non-negative values
+    // }
 }
 
 module.exports = KaimalDistribution;

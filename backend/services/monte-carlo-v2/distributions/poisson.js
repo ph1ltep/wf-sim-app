@@ -144,9 +144,9 @@ class PoissonDistribution extends DistributionGenerator {
             return lambda > 0 ? Math.sqrt(lambda) : null;
         };
     }
-    getMinFormula() {
-        return () => 0;
-    }
+    // getMinFormula() {
+    //     return () => 0;
+    // }
     getSkewnessFormula() {
         return (params, year) => {
             const lambda = this.getParameterValue('lambda', year, 1);

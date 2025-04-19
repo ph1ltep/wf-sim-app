@@ -226,9 +226,9 @@ class GammaDistribution extends DistributionGenerator {
             return Math.sqrt(shape) * scale;
         };
     }
-    getMinFormula() {
-        return () => 0;
-    }
+    // getMinFormula() {
+    //     return () => 0;
+    // }
     getSkewnessFormula() {
         return (params, year) => {
             const shape = this.getParameterValue('shape', year, 1);

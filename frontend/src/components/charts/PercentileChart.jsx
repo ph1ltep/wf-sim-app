@@ -56,7 +56,7 @@ const PercentileChart = React.memo(({
         const enhancedData = chartData.data.map(trace => ({
             ...trace,
             hovertemplate: trace.name.includes('-')
-                ? `Year: % { x } < br > Range: ${trace.name} <br>Value: %{y}${units ? ' ' + units : ''}<extra></extra>`
+                ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y}${units ? ' ' + units : ''}<extra></extra>`
                 : `Year: %{x}<br>${trace.name}: %{y}${units ? ' ' + units : ''}<extra></extra>`
         }));
         return {

@@ -163,9 +163,9 @@ class LognormalDistribution extends DistributionGenerator {
             return Math.sqrt((Math.exp(sigma * sigma) - 1) * Math.exp(2 * mu + sigma * sigma));
         };
     }
-    getMinFormula() {
-        return () => 0; // Lognormal is positive
-    }
+    // getMinFormula() {
+    //     return () => 0; // Lognormal is positive
+    // }
     getSkewnessFormula() {
         return (params, year) => {
             const sigma = this.getParameterValue('sigma', year, 1);

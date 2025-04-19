@@ -195,7 +195,8 @@ export function preparePercentileChartData(results, primaryPercentile, color, pr
             mode: 'lines+markers',
             name: `P${primary.percentile.value} `,
             line: { color, width: 2 },
-            marker: { size: 6, color }
+            marker: { size: 6, color },
+            showlegend: false
         });
     }
 
@@ -208,7 +209,8 @@ export function preparePercentileChartData(results, primaryPercentile, color, pr
             type: 'scatter',
             mode: 'lines',
             name: `P${single.percentile.value} `,
-            line: { color: `${color} 80`, width: 1 }
+            line: { color: `${color} 80`, width: 1 },
+            showlegend: false
         });
     });
 
@@ -223,7 +225,7 @@ export function preparePercentileChartData(results, primaryPercentile, color, pr
             mode: 'lines',
             name: 'T=0',
             line: { color: `${color} 40`, width: 1, dash: 'dash' },
-            showlegend: true
+            showlegend: false
         });
     }
 

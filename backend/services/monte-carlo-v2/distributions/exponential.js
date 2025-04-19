@@ -145,9 +145,9 @@ class ExponentialDistribution extends DistributionGenerator {
             return lambda > 0 ? 1 / lambda : null;
         };
     }
-    getMinFormula() {
-        return () => 0;
-    }
+    // getMinFormula() {
+    //     return () => 0;
+    // }
     getSkewnessFormula() {
         return () => 2;
     }
