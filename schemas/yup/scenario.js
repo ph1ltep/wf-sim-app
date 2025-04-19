@@ -7,6 +7,7 @@ const {
     DistributionParametersSchema,
     DistributionTypeSchema,
     SimSettingsSchema,
+    SimulationInfoSchema,
 } = require('./distribution');
 
 // Component Allocation Schema
@@ -265,6 +266,12 @@ const SettingsSchema = Yup.object().shape({
 
 // InputSim Schema
 const InputSimSchema = Yup.object().shape({
+    distributionAnalysis: Yup.object().shape({
+        energyProduction: SimulationInfoSchema,
+        electricityPrice: SimulationInfoSchema,
+        windVariability: SimulationInfoSchema,
+        downtimePerEvent: SimulationInfoSchema
+    }),
     cashflow: Yup.object().shape({
         annualCosts: Yup.object().shape({
             components: Yup.object().shape({
