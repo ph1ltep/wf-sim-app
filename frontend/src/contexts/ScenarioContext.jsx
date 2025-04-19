@@ -287,14 +287,13 @@ export const ScenarioProvider = ({ children }) => {
   }, [scenarioData]);
 
   /**
-   * Updates a value at a specific path in the scenario data with validation
-   * 
-   * @param {string[]|string} path - Path to the value to update (array or dot-notation string)
-   * @param {any} value - New value to set
-   * @returns {Object} Response object of type FieldValidationResponseSchema
-   */
+    * Updates a value at a specific path in the scenario data with validation
+    * 
+    * @param {string[]|string} path - Path to the value to update (array or dot-notation string)
+    * @param {any} value - New value to set
+    * @returns {Object} Response object of type FieldValidationResponseSchema
+    */
   const updateByPath = useCallback(async (path, value) => {
-    // Handle case when no scenario exists
     if (!hasValidScenario(false)) {
       return {
         isValid: false,
@@ -305,27 +304,48 @@ export const ScenarioProvider = ({ children }) => {
       };
     }
 
-    // Validate the path and get result
     const validationResult = await validatePath(ScenarioSchema, path, value, scenarioData);
     const pathArray = Array.isArray(path) ? path : path.split('.');
 
+    console.log('updateByPath validation:', {
+      path: pathArray,
+      isValid: validationResult.isValid,
+      value: value,
+      detailsValue: validationResult.details?.value,
+      errors: validationResult.errors
+    });
+
     if (validationResult.isValid) {
-      // Use Immer to efficiently update only the changed path
+      const finalValue = validationResult.details?.value !== undefined ? validationResult.details.value : value;
+      if (finalValue === null && value !== null) {
+        console.warn(`Validation cast value to null for path ${pathArray.join('.')}, original value:`, value);
+        return {
+          isValid: false,
+          applied: false,
+          errors: [`Validation cast value to null for path ${pathArray.join('.')}`],
+          error: 'Validation cast value to null',
+          path: pathArray
+        };
+      }
+
       setScenarioData(produce(scenarioData, draft => {
-        set(draft, pathArray, validationResult.details?.value || value);
+        set(draft, pathArray, finalValue);
       }));
 
       setIsModified(true);
 
-      // Return a properly formatted response
       return {
         isValid: true,
         applied: true,
         errors: [],
-        path: pathArray
+        path: pathArray,
+        appliedValue: finalValue
       };
     } else {
-      // Return validation error
+      const dev_mode = process.env.NODE_ENV === 'development';
+      if (dev_mode) {
+        console.error('UpdateByPath Validation failed:', validationResult.errors);
+      }
       return {
         isValid: false,
         applied: false,
@@ -335,8 +355,6 @@ export const ScenarioProvider = ({ children }) => {
       };
     }
   }, [scenarioData, hasValidScenario]);
-
-
 
   // Error component for reuse
   const ScenarioErrorComponent = useCallback(() => {

@@ -56,7 +56,7 @@ const RevenueModule = () => {
               <p>Configure the annual energy production and its variability.</p>
 
               <DistributionFieldV2
-                path={[...basePath, 'energyProduction', 'distribution']}
+                path={[...basePath, 'energyProduction']}
                 defaultValuePath={['settings', 'metrics', 'netAEP']}
                 tooltip="Statistical distribution of the annual energy production"
                 showVisualization={true}
@@ -89,7 +89,7 @@ const RevenueModule = () => {
           <FormRow>
             <FormCol >
               <DistributionFieldV2
-                path={[...basePath, 'electricityPrice', 'distribution']}
+                path={[...basePath, 'electricityPrice']}
                 label="Fixed Price per MWh"
                 tooltip="Fixed electricity price under PPA or other agreement"
                 addonAfter="/MWh"
@@ -125,7 +125,7 @@ const RevenueModule = () => {
             <FormCol >
               <p>Configure the statistical distribution for downtime duration per failure event.</p>
               <DistributionFieldV2
-                path={[...basePath, 'downtimePerEvent', 'distribution']}
+                path={[...basePath, 'downtimePerEvent']}
                 tooltip="Statistical distribution for downtime duration"
                 addonAfter="days/event"
                 valueType="number"
@@ -159,7 +159,7 @@ const RevenueModule = () => {
             <FormCol >
               <p>Configure the statistical distribution for wind variability.</p>
               <DistributionFieldV2
-                path={[...basePath, 'windVariability', 'distribution']}
+                path={[...basePath, 'windVariability']}
                 tooltip="Method for simulating wind resource variability"
                 showVisualization={true}
                 addonAfter="m/s"

@@ -59,7 +59,7 @@ const formatSuccess = (data, message = 'Operation successful', type = 'default')
 const formatError = (error, statusCode = 500, errors = []) => {
   // Development logging
   if (process.env.NODE_ENV === 'development') {
-    console.log('Error Details:', {
+    console.error('Error Details:', {
       error,
       statusCode,
       errors,

@@ -45,6 +45,7 @@ const DistributionParametersSchema = Yup.object().shape({
 
 // Main DistributionTypeSchema
 const DistributionTypeSchema = Yup.object().shape({
+    key: Yup.string().default(''),
     type: Yup.string()
         .oneOf([
             'normal', 'lognormal', 'triangular', 'uniform', 'weibull',

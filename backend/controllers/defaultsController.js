@@ -28,7 +28,7 @@ const getDefaults = async (req, res) => {
     defaultScenario.description = 'Default configuration scenario';
 
     // Custom overrides
-    defaultScenario.settings.modules.revenue.energyProduction.distribution.parameters.value = defaultScenario.settings.metrics.netAEP
+    defaultScenario.settings.modules.revenue.energyProduction.parameters.value = defaultScenario.settings.metrics.netAEP
 
 
 

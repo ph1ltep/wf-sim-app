@@ -162,56 +162,48 @@ const SettingsSchema = Yup.object().shape({
             failureModels: Yup.array().of(FailureModelSchema).default([]),
         }),
         revenue: Yup.object().shape({
-            energyProduction: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({
-                    type: 'normal',
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 100000,
-                        stdDev: 10
-                    }
-                })),
-                data: Yup.array().default([])
-            }),
-            electricityPrice: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({
-                    type: 'gbm', // Changed to GBM type
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 50,
-                        drift: 4,
-                        volatility: 2,
-                        timeStep: 1
-                    }
-                })),
-                data: Yup.array().default([])
-            }),
+            energyProduction: DistributionTypeSchema.default(() => ({
+                key: 'energyProduction',
+                type: 'normal',
+                timeSeriesMode: false,
+                parameters: {
+                    value: 100000,
+                    stdDev: 10
+                }
+            })),
+            electricityPrice: DistributionTypeSchema.default(() => ({
+                key: 'electricityPrice',
+                type: 'gbm', // Changed to GBM type
+                timeSeriesMode: false,
+                parameters: {
+                    value: 50,
+                    drift: 4,
+                    volatility: 2,
+                    timeStep: 1
+                }
+            })),
             revenueDegradationRate: Yup.number().default(0.5),
-            downtimePerEvent: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({
-                    type: 'lognormal', // Matches getDefaultSettings
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 90,
-                        sigma: 0.3,
-                        mu: Math.log(90),
-                    }
-                })),
-                data: Yup.array().default([])
-            }),
+            downtimePerEvent: DistributionTypeSchema.default(() => ({
+                key: 'downtimePerEvent',
+                type: 'lognormal', // Matches getDefaultSettings
+                timeSeriesMode: false,
+                parameters: {
+                    value: 90,
+                    sigma: 0.3,
+                    mu: Math.log(90),
+                }
+            })),
             // Updated to use GBM type
-            windVariability: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({
-                    type: 'weibull', // Changed to weibull type
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 7.5,
-                        scale: 7.9,
-                        shape: 1.8
-                    }
-                })),
-                data: Yup.array().default([])
-            }),
+            windVariability: DistributionTypeSchema.default(() => ({
+                key: 'windVariability',
+                type: 'weibull', // Changed to weibull type
+                timeSeriesMode: false,
+                parameters: {
+                    value: 7.5,
+                    scale: 7.9,
+                    shape: 1.8
+                }
+            })),
             turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
             surfaceRoughness: Yup.number().default(0.03), // Matches getDefaultSettings
             kaimalScale: Yup.number().default(8.1), // Matches getDefaultSettings
@@ -267,10 +259,10 @@ const SettingsSchema = Yup.object().shape({
 // InputSim Schema
 const InputSimSchema = Yup.object().shape({
     distributionAnalysis: Yup.object().shape({
-        energyProduction: SimulationInfoSchema,
-        electricityPrice: SimulationInfoSchema,
-        windVariability: SimulationInfoSchema,
-        downtimePerEvent: SimulationInfoSchema
+        energyProduction: SimulationInfoSchema.nullable().default(null),
+        electricityPrice: SimulationInfoSchema.nullable().default(null),
+        windVariability: SimulationInfoSchema.nullable().default(null),
+        downtimePerEvent: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
         annualCosts: Yup.object().shape({
@@ -308,7 +300,7 @@ const ScenarioSchema = Yup.object().shape({
     description: Yup.string(),
     settings: SettingsSchema.required(),
     simulation: Yup.object().shape({
-        inputSim: InputSimSchema.default(() => ({})),
+        inputSim: InputSimSchema.required(),
         outputSim: OutputSimSchema.default(() => ({})),
     }).required(),
     createdAt: Yup.date().default(() => new Date()),
