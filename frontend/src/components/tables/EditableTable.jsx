@@ -1,6 +1,6 @@
-// src/components/tables/EditableTable.jsx
+// src/components/tables/EditableTable.jsx - Modified version
 import React, { useState, useCallback } from 'react';
-import { Table, Button, Modal, Alert } from 'antd';
+import { Table, Button, Modal, Alert, Space } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import ContextForm from '../forms/ContextForm';
@@ -28,6 +28,10 @@ const EditableTable = ({
   // Error handling
   errorText = null,
 
+  // Summary row support
+  showSummary = false,
+  renderSummary = null,
+
   // Additional props
   modalProps = {},
   tableProps = {}
@@ -39,7 +43,10 @@ const EditableTable = ({
 
   // Get data and operations from context
   const { getValueByPath, updateByPath } = useScenario();
-  const dataSource = getValueByPath(path, []);
+
+  // Get data safely - ensure it's always an array
+  const dataFromContext = getValueByPath(path, null);
+  const dataSource = Array.isArray(dataFromContext) ? dataFromContext : [];
 
   // Handle adding new item
   const handleAdd = useCallback(() => {
@@ -136,6 +143,25 @@ const EditableTable = ({
     }
   }
 
+  // Generate summary row
+  const summary = showSummary && renderSummary ? (data) => {
+    const summaryData = renderSummary(data);
+    if (!summaryData) return null;
+
+    return (
+      <Table.Summary.Row>
+        {finalColumns.map((column, index) => {
+          const dataIndex = column.dataIndex;
+          return (
+            <Table.Summary.Cell key={index} index={index}>
+              {summaryData[dataIndex] || null}
+            </Table.Summary.Cell>
+          );
+        })}
+      </Table.Summary.Row>
+    );
+  } : undefined;
+
   return (
     <div className="editable-table">
       {/* Error messages */}
@@ -166,11 +192,12 @@ const EditableTable = ({
 
       {/* Main table */}
       <Table
-        dataSource={dataSource}
+        dataSource={Array.isArray(dataSource) ? dataSource : []}
         columns={finalColumns}
         rowKey={keyField}
         pagination={pagination}
         size={tableSize}
+        summary={summary}
         {...tableProps}
       />
 
