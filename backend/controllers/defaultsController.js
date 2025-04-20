@@ -33,7 +33,6 @@ const getDefaults = async (req, res) => {
 
 
 
-
     // Cast to ScenarioSchema for type safety
     const validatedScenario = ScenarioSchema.cast(defaultScenario, { stripUnknown: true });
 

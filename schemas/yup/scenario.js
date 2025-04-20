@@ -190,7 +190,7 @@ const SettingsSchema = Yup.object().shape({
                 parameters: {
                     value: 90,
                     sigma: 0.3,
-                    mu: Math.log(90),
+                    mu: Math.round(Math.log(90) * 100) / 100,
                 }
             })),
             // Updated to use GBM type

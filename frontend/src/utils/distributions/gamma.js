@@ -176,24 +176,47 @@ export const Gamma = {
     getMetadata() {
         return {
             name: "Gamma Distribution",
-            description: "Versatile right-skewed distribution ideal for modeling maintenance durations and repair times.",
-            applications: "Excellent for modeling repair times, maintenance durations, and downtime events in wind farms.",
-            examples: "Turbine maintenance durations, component repair times, downtime periods for major repairs.",
+            description: "Flexible two-parameter distribution for positive-valued random variables.",
+            applications: "Used for modeling waiting times, rainfall amounts, and other quantities that are always positive and may be skewed.",
+            examples: "Repair times, component lifetime, precipitation levels.",
             parameters: [
                 {
-                    name: "shape",
-                    description: "Controls distribution shape (k): 1-3 for maintenance tasks, 2-5 for complex repairs",
-                    required: true,
-                    min: 0
+                    name: "value",
+                    description: "Default value",
+                    required: false,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Default value"
+                    }
                 },
                 {
                     name: "scale",
-                    description: "Controls distribution spread (θ): typically 4-24 for maintenance tasks in hours",
+                    description: "Scale Parameter (β)",
                     required: true,
-                    min: 0
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Scale (β)",
+                        tooltip: "Scale parameter of the Gamma distribution",
+                        min: 0,
+                        step: 0.1,
+                        defaultValue: 1
+                    }
+                },
+                {
+                    name: "shape",
+                    description: "Shape Parameter (α)",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Shape (α)",
+                        tooltip: "Shape parameter of the Gamma distribution",
+                        min: 0,
+                        step: 0.1,
+                        defaultValue: 2
+                    }
                 }
-            ],
-            axis: "The x-axis represents time (typically hours or days) and y-axis shows probability density."
+            ]
         };
     }
 };

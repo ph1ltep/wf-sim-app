@@ -70,19 +70,36 @@ export const Fixed = {
     getMetadata() {
         return {
             name: "Fixed Value",
-            description: "Uses a single deterministic value with no variability.",
-            applications: "Used for deterministic analysis, base case scenarios, or when uncertainty is accounted for separately.",
-            examples: "Fixed power purchase agreement (PPA) prices, guaranteed availability levels, or contractual performance metrics.",
+            description: "A constant value with optional annual growth/decline rate.",
+            applications: "Used for well-known constant values or when a single best estimate is preferred over a range of values.",
+            examples: "Fixed operations and maintenance costs, known quantities, or deterministic projections.",
             parameters: [
                 {
                     name: "value",
-                    description: "Set to the most likely or contractually agreed value",
-                    required: true
+                    description: "The exact value to use",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Exact value to use (no randomness)",
+                        min: undefined,
+                        step: 1
+                    }
                 },
                 {
                     name: "drift",
-                    description: "Annual rate of change, in percentage. This is a fixed value that will be applied to the value each year.",
-                    required: true
+                    description: "Annual percentage change",
+                    required: false,
+                    fieldType: "percentage",
+                    fieldProps: {
+                        label: "Change rate",
+                        tooltip: "Annual growth rate",
+                        min: -20,
+                        max: 100,
+                        step: 0.1,
+                        precision: 1,
+                        defaultValue: 5
+                    }
                 }
             ]
         };

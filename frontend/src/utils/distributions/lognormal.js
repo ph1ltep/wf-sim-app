@@ -159,25 +159,42 @@ export const LogNormal = {
     getMetadata() {
         return {
             name: "Lognormal Distribution",
-            description: "Skewed distribution where logarithm of the variable follows normal distribution.",
-            applications: "Good for modeling values that cannot be negative and have occasional large positive values.",
-            examples: "Repair costs, downtime duration, time between failures, component repair times.",
+            description: "Right-skewed distribution for positive values, useful for modeling multiplicative processes.",
+            applications: "Ideal for modeling prices, costs, or physical quantities that can't be negative.",
+            examples: "Repair costs, component lifetimes, project delays, market prices.",
             parameters: [
                 {
-                    name: "mean",
-                    description: "The avarge expected value",
-                    required: true
+                    name: "value",
+                    description: "Median value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Median",
+                        tooltip: "Median value of the distribution"
+                    }
                 },
                 {
                     name: "mu",
-                    description: "Natural log of the expected value",
-                    required: true
+                    description: "Log-mean (mu)",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mu (Log-mean)",
+                        tooltip: "Mean of the logarithm of the variable",
+                        step: 0.01
+                    }
                 },
                 {
                     name: "sigma",
-                    description: "0.4-0.8 for repair costs, 0.3-0.6 for failure intervals",
+                    description: "Log-std (sigma)",
                     required: true,
-                    min: 0
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Sigma (Log-std)",
+                        tooltip: "Standard deviation of the logarithm of the variable",
+                        min: 0,
+                        step: 0.01
+                    }
                 }
             ]
         };

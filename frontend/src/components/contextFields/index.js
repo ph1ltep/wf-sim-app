@@ -10,32 +10,72 @@ import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
 
 // Import special components
 import EditableTable from '../tables/EditableTable';
-import DistributionFieldV2 from './DistributionFieldV2';
-import DistributionPlot from './DistributionPlot';
+// import DistributionFieldV2 from './DistributionFieldV2';
+// import DistributionPlot from './DistributionPlot';
 import PrimaryPercentileSelectField from './PrimaryPercentileSelectField';
 
 /**
- * Get appropriate width for number field based on its parameters
+ * Get appropriate width for an Ant Design number field based on its parameters.
+ * Estimates width by converting parameters to strings and calculating character lengths.
+ *
+ * @param {number} [min] - Minimum value
+ * @param {number} [max] - Maximum value
+ * @param {number} [step] - Step value
+ * @param {number} [precision] - Decimal precision
+ * @param {string|ReactNode} [addonBefore] - Content before the input
+ * @param {string|ReactNode} [addonAfter] - Content after the input
+ * @param {Object} [options] - Optional configuration
+ * @param {number} [options.baseWidth=100] - Base width for the input (px)
+ * @param {number} [options.pixelsPerChar=9] - Pixels per character
+ * @param {number} [options.addonPadding=20] - Padding for addons (px)
+ * @returns {number} Estimated width in pixels
  */
-const getNumberFieldWidth = (min, max, step, precision, addonBefore, addonAfter) => {
-  // Base width for basic numeric input
-  let width = 120;
+const getNumberFieldWidth = (min, max, step, precision, addonBefore, addonAfter,
+  {
+    baseWidth = 100,
+    pixelsPerChar = 9, // Approx 9px per char for 14px font
+    addonPadding = 20, // Padding for addon elements
+  } = {}) => {
+  // Initialize width with base value
+  let width = baseWidth;
 
-  // Add width for larger numbers
-  if (max !== undefined && max > 9999) {
-    width += 40; // Add more space for larger numbers
+  // Determine the longest number string (min or max)
+  let maxLength = 0;
+  if (max !== undefined || min !== undefined) {
+    const maxStr = max !== undefined ? Math.abs(max).toString() : '';
+    const minStr = min !== undefined ? Math.abs(min).toString() : '';
+    maxLength = Math.max(maxStr.length, minStr.length);
   }
 
-  // Add width for decimal precision
+  // Add space for negative sign if min is negative
+  if (min !== undefined && min < 0) {
+    maxLength += 1; // For the minus sign
+  }
+
+  // Add space for decimal point and precision
   if (precision !== undefined && precision > 0) {
-    width += precision * 8; // Roughly 8px per decimal place
+    maxLength += 1 + precision; // Decimal point + precision digits
   }
 
-  // Add width for addons
-  if (addonBefore) width += 30;
-  if (addonAfter) width += 50;
+  // Calculate width for the number content
+  width += maxLength * pixelsPerChar;
 
-  return width;
+  // Handle addonBefore
+  if (addonBefore) {
+    const addonBeforeLength =
+      typeof addonBefore === 'string' ? addonBefore.length : 1; // Fallback for ReactNode
+    width += addonBeforeLength * pixelsPerChar + addonPadding;
+  }
+
+  // Handle addonAfter
+  if (addonAfter) {
+    const addonAfterLength =
+      typeof addonAfter === 'string' ? addonAfter.length : 1; // Fallback for ReactNode
+    width += addonAfterLength * pixelsPerChar + addonPadding;
+  }
+
+  // Ensure a minimum width
+  return Math.max(width, 80); // Prevent overly narrow fields
 };
 
 /**
@@ -427,8 +467,6 @@ export {
   FormCol,
   FormDivider,
   EditableTable,
-  DistributionFieldV2,
-  DistributionPlot,
   PrimaryPercentileSelectField,
   getTextFieldWidth
 };

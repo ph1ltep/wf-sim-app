@@ -139,21 +139,32 @@ export const Normal = {
     getMetadata() {
         return {
             name: "Normal Distribution",
-            description: "Symmetric bell-shaped distribution defined by mean and standard deviation.",
-            applications: "Ideal for modeling natural variations with equal probabilities of being above or below the mean.",
-            examples: "Annual energy production, wind speed at hub height, component lifetimes, or operations costs.",
-            axis: "The probability density shows how concentrated the distribution is at each point, with higher values indicating greater likelihood relative to other points (e.g., a density of 0.4 is twice as likely as 0.2).",
+            description: "Symmetric bell-shaped distribution, defined by a mean and standard deviation.",
+            applications: "Ideal for modeling random variables where values cluster around a mean, with no skew.",
+            examples: "Energy production fluctuations, equipment performance variations, measurement errors.",
             parameters: [
                 {
-                    name: "mean",
-                    description: "Central expected value",
-                    required: true
+                    name: "value",
+                    description: "Mean (average) value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Mean value (center of distribution)"
+                    }
                 },
                 {
                     name: "stdDev",
-                    description: "~10-15% of mean for energy production, ~5-10% for component lifetimes",
+                    description: "Standard deviation",
                     required: true,
-                    min: 0
+                    fieldType: "percentage",
+                    fieldProps: {
+                        label: "Standard Deviation",
+                        tooltip: "Measure of dispersion",
+                        min: 0.1,
+                        step: 0.1,
+                        defaultValue: 10.0
+                    }
                 }
             ]
         };

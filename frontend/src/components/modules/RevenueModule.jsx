@@ -12,11 +12,11 @@ import { useScenario } from '../../contexts/ScenarioContext';
 // Import context field components
 import {
   PercentageField,
-  DistributionFieldV2,
   FormSection,
   FormRow,
   FormCol
 } from '../contextFields';
+import { DistributionFieldV3 } from 'components/distributionFields';
 
 const { Title } = Typography;
 
@@ -55,7 +55,7 @@ const RevenueModule = () => {
             <FormCol >
               <p>Configure the annual energy production and its variability.</p>
 
-              <DistributionFieldV2
+              <DistributionFieldV3
                 path={[...basePath, 'energyProduction']}
                 defaultValuePath={['settings', 'metrics', 'netAEP']}
                 tooltip="Statistical distribution of the annual energy production"
@@ -88,7 +88,7 @@ const RevenueModule = () => {
 
           <FormRow>
             <FormCol >
-              <DistributionFieldV2
+              <DistributionFieldV3
                 path={[...basePath, 'electricityPrice']}
                 label="Fixed Price per MWh"
                 tooltip="Fixed electricity price under PPA or other agreement"
@@ -124,12 +124,12 @@ const RevenueModule = () => {
           <FormRow>
             <FormCol >
               <p>Configure the statistical distribution for downtime duration per failure event.</p>
-              <DistributionFieldV2
+              <DistributionFieldV3
                 path={[...basePath, 'downtimePerEvent']}
                 tooltip="Statistical distribution for downtime duration"
                 addonAfter="days/event"
                 valueType="number"
-                valueName="Downtime Duration (mean)"
+                valueName="Downtime Duration (median)"
                 showVisualization={true}
                 showInfoBox={true}
                 options={[
@@ -158,7 +158,7 @@ const RevenueModule = () => {
           <FormRow>
             <FormCol >
               <p>Configure the statistical distribution for wind variability.</p>
-              <DistributionFieldV2
+              <DistributionFieldV3
                 path={[...basePath, 'windVariability']}
                 tooltip="Method for simulating wind resource variability"
                 showVisualization={true}

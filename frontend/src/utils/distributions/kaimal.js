@@ -179,50 +179,72 @@ export const Kaimal = {
      */
     getMetadata() {
         return {
-            name: "Kaimal Spectrum",
-            description: "Specialized model for wind turbulence following IEC 61400 standards.",
-            applications: "Industry standard for modeling wind turbulence and its effect on turbine loads.",
-            examples: "Wind turbulence modeling, load calculations, site-specific design adaptations.",
+            name: "Kaimal Distribution",
+            description: "Models wind turbulence using the Kaimal spectrum (IEC 61400-1 standard).",
+            applications: "Used in wind engineering for modeling turbulence intensity and load calculations.",
+            examples: "Wind turbulence modeling, load calculations for turbine components.",
             parameters: [
                 {
-                    name: "meanWindSpeed",
-                    description: "Site average (5-10 m/s)",
-                    required: true
+                    name: "value",
+                    description: "Mean wind speed",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Mean wind speed at hub height"
+                    }
                 },
                 {
                     name: "turbulenceIntensity",
-                    description: "10-20% (Class A: 16%, Class B: 14%, Class C: 12%)",
+                    description: "Turbulence Intensity",
                     required: true,
-                    min: 0,
-                    max: 1
+                    fieldType: "percentage",
+                    fieldProps: {
+                        label: "Turbulence Intensity",
+                        tooltip: "Turbulence intensity as percentage of mean wind speed",
+                        min: 0,
+                        max: 30,
+                        step: 0.1
+                    }
                 },
                 {
-                    name: 'roughnessLength',
-                    description: 'Surface roughness length',
-                    required: false,
-                    min: 0,
-                    default: 0.03,
-                    units: 'm'
+                    name: "roughnessLength",
+                    description: "Roughness Length",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Roughness Length",
+                        tooltip: "Surface roughness length in meters",
+                        min: 0,
+                        step: 0.01,
+                        addonAfter: "m"
+                    }
                 },
                 {
-                    name: 'scale',
-                    description: 'Kaimal scale parameter',
-                    required: false,
-                    min: 0,
-                    default: 8.1
+                    name: "scale",
+                    description: "Kaimal Scale",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Kaimal Scale",
+                        tooltip: "Scale parameter for the Kaimal spectrum",
+                        step: 0.01,
+                        min: 0
+                    }
                 },
                 {
-                    name: 'hubHeight',
-                    description: 'Hub height above ground',
-                    required: false,
-                    min: 0,
-                    default: 100,
-                    units: 'm'
-                },
-                {
-                    name: 'value',
-                    description: 'Custom value to highlight (defaults to mean wind speed)',
-                    required: false
+                    name: "hubHeight",
+                    description: "Hub Height",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Hub Height",
+                        tooltip: "Hub height in meters",
+                        min: 70,
+                        defaultValue: 105,
+                        step: 0.5,
+                        addonAfter: "m"
+                    }
                 }
             ]
         };

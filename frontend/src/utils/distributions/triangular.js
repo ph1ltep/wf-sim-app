@@ -210,24 +210,49 @@ export const Triangular = {
     getMetadata() {
         return {
             name: "Triangular Distribution",
-            description: "Simple distribution defined by minimum, maximum, and most likely values.",
-            applications: "Useful when data is limited but min, max, and most likely values are known from expert judgment.",
-            examples: "Construction costs, project timelines, capacity factors, seasonal energy output variations.",
+            description: "Simple distribution defined by minimum, maximum, and most likely value.",
+            applications: "Useful when exact distribution is unknown but minimum, maximum, and most likely values can be estimated.",
+            examples: "Project durations, cost estimates with best/worst case scenarios, and expert opinions.",
             parameters: [
                 {
+                    name: "value",
+                    description: "Mode (most likely value)",
+                    required: false,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Value",
+                        tooltip: "Default value"
+                    }
+                },
+                {
                     name: "min",
-                    description: "Absolute minimum (e.g., 30% for capacity factor)",
-                    required: true
+                    description: "Minimum value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Minimum",
+                        tooltip: "Smallest possible value"
+                    }
                 },
                 {
                     name: "mode",
-                    description: "Most likely value (e.g., 40% for capacity factor)",
-                    required: true
+                    description: "Mode (most likely value)",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mode",
+                        tooltip: "Most likely value"
+                    }
                 },
                 {
                     name: "max",
-                    description: "Maximum reasonable value (e.g., 50% for capacity factor)",
-                    required: true
+                    description: "Maximum value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Maximum",
+                        tooltip: "Largest possible value"
+                    }
                 }
             ]
         };

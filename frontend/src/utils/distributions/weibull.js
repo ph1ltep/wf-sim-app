@@ -203,19 +203,40 @@ export const Weibull = {
             examples: "Wind speed distributions, component failure rates, turbine lifetime modeling, repair times for major components as turbines age.",
             parameters: [
                 {
-                    name: "mean",
-                    description: "Central expected value",
-                    required: true
+                    name: "value",
+                    description: "Default value",
+                    required: false,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Default value"
+                    }
                 },
                 {
                     name: "scale",
-                    description: "Time by which 63.2% of components fail (years), wind speed at which 63.2% of measurements fall below (m/s), or time (days) by which 63.2% of repairs are completed.",
-                    required: true
+                    description: "Scale parameter",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Scale",
+                        tooltip: "Scale parameter of the Weibull distribution",
+                        min: 0,
+                        step: 0.01,
+                        defaultValue: 1
+                    }
                 },
                 {
                     name: "shape",
-                    description: "Controls skewness and peakedness of wind speeds (higher for less variability), or failure/repair evolution (<1 early delays, 1 random, >1 wear-out or scarcity-driven).",
-                    required: true
+                    description: "Shape parameter",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Shape",
+                        tooltip: "Shape parameter of the Weibull distribution",
+                        min: 0,
+                        step: 0.01,
+                        defaultValue: 2
+                    }
                 }
             ]
         };

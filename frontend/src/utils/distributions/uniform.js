@@ -156,19 +156,39 @@ export const Uniform = {
     getMetadata() {
         return {
             name: "Uniform Distribution",
-            description: "Equal probability across all values in a defined range.",
-            applications: "Used when all values in a range are equally likely or when uncertainty is high.",
-            examples: "Energy price forecasts under high uncertainty, random component failures, initial bidding ranges.",
+            description: "Equal probability across a range of values, defined by minimum and maximum.",
+            applications: "Used when any value in a range is equally likely, often for modeling complete uncertainty.",
+            examples: "Random equipment selection, uncertainty in expert opinions, or arrival times with high uncertainty.",
             parameters: [
                 {
+                    name: "value",
+                    description: "Default value",
+                    required: false,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Default value"
+                    }
+                },
+                {
                     name: "min",
-                    description: "Lower bound (typically -20% of expected value for pricing)",
-                    required: true
+                    description: "Minimum value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Minimum",
+                        tooltip: "Smallest possible value"
+                    }
                 },
                 {
                     name: "max",
-                    description: "Upper bound (typically +20% of expected value for pricing)",
-                    required: true
+                    description: "Maximum value",
+                    required: true,
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Maximum",
+                        tooltip: "Largest possible value"
+                    }
                 }
             ]
         };

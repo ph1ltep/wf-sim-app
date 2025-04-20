@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { Alert, Typography, Space, Divider, Row, Col } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { SelectField, NumberField, CurrencyField, PercentageField, FormRow, FormCol } from './index';
-import DistributionPlot from './DistributionPlot';
+import DistributionPlot from '../distributionFields/DistributionPlot';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
 
 

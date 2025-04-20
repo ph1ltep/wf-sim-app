@@ -249,33 +249,64 @@ export const GBM = {
     getMetadata() {
         return {
             name: "Geometric Brownian Motion",
-            description: "A continuous-time stochastic process where logarithmic returns follow Brownian motion with drift.",
-            applications: "Excellent for modeling price series and financial parameters that evolve over time.",
-            examples: "Electricity market prices, carbon credit values, variable tariffs, investment returns over time.",
+            description: "Models values that evolve with drift and volatility, common in financial models.",
+            applications: "Used for modeling prices, assets, or quantities that change over time with both trend and random volatility.",
+            examples: "Electricity prices over time, asset valuations, market prices with growth and volatility.",
             parameters: [
                 {
-                    name: 'mean',
-                    description: 'Initial value at t=0',
+                    name: "value",
+                    description: "Initial value",
                     required: true,
-                    min: 0
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Mean",
+                        tooltip: "Starting value at time zero"
+                    }
                 },
                 {
                     name: "drift",
-                    description: "Annual growth rate (2-5%)",
-                    required: true
+                    description: "Drift (Annual)",
+                    required: true,
+                    fieldType: "percentage",
+                    fieldProps: {
+                        label: "Drift (Annual)",
+                        tooltip: "Annual growth rate",
+                        min: -20,
+                        max: 20,
+                        step: 0.1,
+                        precision: 1,
+                        defaultValue: 5
+                    }
                 },
                 {
                     name: "volatility",
-                    description: "Annual standard deviation (15-30% for electricity prices)",
+                    description: "Volatility (Annual)",
                     required: true,
-                    min: 0
+                    fieldType: "percentage",
+                    fieldProps: {
+                        label: "Volatility (Annual)",
+                        tooltip: "Annual standard deviation as percentage",
+                        min: 0,
+                        max: 100,
+                        step: 0.1,
+                        precision: 1,
+                        defaultValue: 20
+                    }
                 },
                 {
-                    name: 'timeStep',
-                    description: 'Time step for simulation (years)',
+                    name: "timeStep",
+                    description: "Time Step",
                     required: true,
-                    min: 0,
-                    default: 1
+                    fieldType: "number",
+                    fieldProps: {
+                        label: "Time Step",
+                        tooltip: "Time increment in years (typically 1 for annual)",
+                        min: 0.1,
+                        step: 1,
+                        defaultValue: 1,
+                        precision: 1,
+                        addonAfter: "years"
+                    }
                 }
             ]
         };
