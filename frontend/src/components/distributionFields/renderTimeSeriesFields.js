@@ -33,6 +33,7 @@ const { Text } = Typography;
  * @param {boolean} options.hasFittedParams - Whether fitted parameters exist
  * @param {Object} options.metadata - Distribution metadata from getMetadata()
  * @param {Object} options.parameters - Current distribution parameters
+ * @param {number} options.minRequiredPoints - Minimum points required for fitting
  * @returns {React.ReactNode} Time series UI components
  */
 const renderTimeSeriesFields = (
@@ -52,86 +53,11 @@ const renderTimeSeriesFields = (
         onClearFit,
         hasFittedParams = false,
         metadata = {},
-        parameters = {}
+        parameters = {},
+        minRequiredPoints = 3
     } = options;
 
-    // Get the minimum required data points based on distribution type
-    const getMinRequiredPoints = () => {
-        switch (distributionType) {
-            case 'normal':
-            case 'lognormal':
-                return 5;
-            case 'weibull':
-            case 'gamma':
-                return 6;
-            case 'triangular':
-                return 3;
-            case 'uniform':
-                return 2;
-            case 'exponential':
-                return 4;
-            case 'gbm':
-                return 8; // Time series data needs more points for GBM
-            default:
-                return 3;
-        }
-    };
-
-    const minRequiredPoints = getMinRequiredPoints();
     const hasEnoughData = timeSeriesData && Array.isArray(timeSeriesData) && timeSeriesData.length >= minRequiredPoints;
-
-    // Calculate a compatibility score for data with selected distribution
-    const getCompatibilityMessage = () => {
-        if (!timeSeriesData || !Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
-            return null;
-        }
-
-        // Simple compatibility checks based on distribution type and data patterns
-        if (distributionType === 'lognormal' || distributionType === 'exponential' || distributionType === 'weibull') {
-            // Check if any values are <= 0, which is incompatible with these distributions
-            const hasNegativeOrZero = timeSeriesData.some(point => {
-                return point && typeof point === 'object' && point.value !== undefined && point.value <= 0;
-            });
-            if (hasNegativeOrZero) {
-                return {
-                    type: 'warning',
-                    message: `${distributionType} distribution requires all values to be positive`
-                };
-            }
-        }
-
-        if (distributionType === 'normal') {
-            // For normal distribution, check if data is relatively symmetric
-            // This is a simplified check - real implementation would use skewness calculation
-            if (Array.isArray(timeSeriesData) && timeSeriesData.length > 0) {
-                const values = timeSeriesData
-                    .filter(point => point && typeof point === 'object' && point.value !== undefined)
-                    .map(point => point.value);
-
-                if (values.length > 2) { // Need at least 3 values for meaningful symmetry check
-                    const sum = values.reduce((acc, val) => acc + val, 0);
-                    const mean = sum / values.length;
-                    const sortedValues = [...values].sort((a, b) => a - b);
-                    const median = sortedValues[Math.floor(values.length / 2)];
-
-                    const meanMedianDiff = Math.abs(mean - median) / mean;
-                    if (meanMedianDiff > 0.3) {
-                        return {
-                            type: 'info',
-                            message: 'Data appears skewed. Consider using lognormal or weibull distribution instead.'
-                        };
-                    }
-                }
-            }
-        }
-
-        return {
-            type: 'success',
-            message: `Data compatible with ${distributionType} distribution`
-        };
-    };
-
-    const compatibility = getCompatibilityMessage();
 
     return (
         <div className="time-series-fields">
@@ -192,14 +118,32 @@ const renderTimeSeriesFields = (
                             <div>
                                 <Text strong>Fitted Parameters:</Text>
                                 <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
-                                    {Object.entries(parameters).map(([key, value]) => (
-                                        key !== 'value' && (
+                                    {/* Display all parameters from the parameters object */}
+                                    {Object.entries(parameters).map(([key, value]) => {
+                                        // Get parameter display name from metadata if available
+                                        const paramMeta = metadata.parameters?.find(p => p.name === key);
+                                        const displayName = paramMeta ?
+                                            (paramMeta.fieldProps.label || paramMeta.name) : key;
+
+                                        // Format the value appropriately
+                                        const formattedValue = typeof value === 'number' ?
+                                            value.toFixed(4) : (value === null ? 'null' : String(value));
+
+                                        // Display description if available
+                                        const description = paramMeta?.description ?
+                                            ` - ${paramMeta.description}` : '';
+
+                                        return (
                                             <li key={key}>
-                                                <Text code>{key}</Text>: {typeof value === 'number' ? value.toFixed(4) : value}
+                                                <Text code>{displayName}</Text>: {formattedValue}{description}
                                             </li>
-                                        )
-                                    ))}
+                                        );
+                                    })}
                                 </ul>
+                            </div>
+
+                            <div>
+                                <Text strong>Time Series Data:</Text> {timeSeriesData.length} points used for fitting
                             </div>
                         </Space>
                     }

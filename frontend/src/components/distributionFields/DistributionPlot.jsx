@@ -11,8 +11,6 @@ const { Title, Text, Paragraph } = Typography;
  * 
  * @param {string} distributionType - Type of distribution to visualize
  * @param {Object} parameters - Parameters for the distribution
- * @param {Object} timeSeriesParameters - Time series parameters if in time series mode 
- * @param {boolean} timeSeriesMode - Whether the distribution is in time series mode
  * @param {string} addonAfter - Unit to display on x-axis label
  * @param {boolean} showMean - Whether to show mean marker
  * @param {boolean} showStdDev - Whether to show standard deviation markers
@@ -23,8 +21,6 @@ const { Title, Text, Paragraph } = Typography;
 const DistributionPlot = ({
     distributionType,
     parameters,
-    timeSeriesParameters,
-    timeSeriesMode = false,
     addonAfter,
     showMean = true,
     showStdDev = true,
@@ -34,15 +30,6 @@ const DistributionPlot = ({
 }) => {
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
-
-    // For time series mode with fitted parameters, we use the parameters object
-    // but still want to show the time series data in some capacity
-    const timeSeriesData = useMemo(() => {
-        if (timeSeriesMode && timeSeriesParameters && Array.isArray(timeSeriesParameters.value)) {
-            return timeSeriesParameters.value;
-        }
-        return [];
-    }, [timeSeriesMode, timeSeriesParameters]);
 
     // Normalize parameters to ensure we have valid objects
     const normalizedParameters = useMemo(() => {
@@ -72,7 +59,6 @@ const DistributionPlot = ({
                 options
             );
 
-            // We're not adding the time series data scatter plot anymore
             setPlotData(plotInfo.data);
 
             // Set plot layout

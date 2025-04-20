@@ -1,4 +1,4 @@
-// src/components/tables/TimeSeriesTable.jsx - Updated with inline editing
+// src/components/tables/TimeSeriesTable.jsx - Updated with minimum points display
 import React, { useMemo, useState } from 'react';
 import { Typography, Space, Tooltip, Table, Input, InputNumber, Form, Button, Popconfirm } from 'antd';
 import { LineChartOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
@@ -126,6 +126,7 @@ const EditableCell = ({
  * @param {number} maxYear Maximum allowed year
  * @param {boolean} disableEditing Whether to disable editing functionality
  * @param {number} minRequiredPoints Minimum points required for distribution fitting
+ * @param {boolean} showDataCount Whether to show the data point count
  */
 const TimeSeriesTable = ({
     path,
@@ -137,7 +138,7 @@ const TimeSeriesTable = ({
     maxYear = 100,
     disableEditing = false,
     showDataCount = true,
-    minRequiredPoints,
+    minRequiredPoints = 3,
 }) => {
     // Get scenario context
     const { getValueByPath, updateByPath } = useScenario();
@@ -366,6 +367,9 @@ const TimeSeriesTable = ({
         );
     };
 
+    // Determine if we have enough data points for fitting
+    const hasEnoughData = dataCount >= minRequiredPoints;
+
     return (
         <div className="time-series-table">
             <Space direction="vertical" style={{ width: '100%' }}>
@@ -375,7 +379,9 @@ const TimeSeriesTable = ({
                         <Text strong>Time Series Data</Text>
                         {showDataCount && (
                             <Tooltip title={`Need at least ${minRequiredPoints} data points for this distribution type`}>
-                                <Text type="secondary">({dataCount} points)</Text>
+                                <Text type={hasEnoughData ? "success" : "warning"}>
+                                    ({dataCount}/{minRequiredPoints} points {hasEnoughData ? "✓" : "needed"})
+                                </Text>
                             </Tooltip>
                         )}
                     </Space>

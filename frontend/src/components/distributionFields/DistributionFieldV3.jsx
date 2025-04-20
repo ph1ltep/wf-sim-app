@@ -1,4 +1,4 @@
-// src/components/distributionFields/DistributionFieldV3.jsx - Updated for new schema structure
+// src/components/distributionFields/DistributionFieldV3.jsx
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin, message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
@@ -85,6 +85,12 @@ const DistributionFieldV3 = ({
         }
         return [];
     }, [timeSeriesMode, timeSeriesParametersPath, getValueByPath]);
+
+    // Determine if we can display the plot 
+    // We always use the regular parameters object, but in time series mode we need fitted parameters
+    const canShowPlot = useMemo(() => {
+        return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
+    }, [timeSeriesMode, hasFittedParams]);
 
     // Set column widths based on compact mode
     const colSpan = compact ? 200 : 150;
@@ -188,12 +194,13 @@ const DistributionFieldV3 = ({
         };
 
         // Call API to fit distribution
-        const success = await fitDistributionToData(distribution, validData, async (fittedParams) => {
-            // If fitting succeeded, update parameters in context
-            if (fittedParams && fittedParams.parameters) {
-                for (const [key, value] of Object.entries(fittedParams.parameters)) {
-                    await updateByPath([...parametersPath, key], value);
-                }
+        const success = await fitDistributionToData(distribution, validData, async (response) => {
+            // API returns fitted parameters directly in the response.data object
+            if (response && response.success && response.data) {
+                const fittedParams = response.data;
+
+                // Update all parameters in the context
+                await updateByPath(parametersPath, fittedParams);
 
                 // Mark as having fitted parameters
                 setHasFittedParams(true);
@@ -224,6 +231,11 @@ const DistributionFieldV3 = ({
     // Get distribution metadata for info box
     const metadata = useMemo(() => {
         return DistributionUtils.getMetadata(currentType) || {};
+    }, [currentType]);
+
+    // Get minimum required points for this distribution type
+    const minRequiredPoints = useMemo(() => {
+        return DistributionUtils.getMinRequiredPoints(currentType) || 3;
     }, [currentType]);
 
     // If no valid display name, use parameter name or field type
@@ -282,7 +294,8 @@ const DistributionFieldV3 = ({
                                     onClearFit: handleClearFit,
                                     hasFittedParams,
                                     metadata,
-                                    parameters
+                                    parameters,
+                                    minRequiredPoints
                                 })
                             ) : (
                                 <>
@@ -346,7 +359,7 @@ const DistributionFieldV3 = ({
                                     description={
                                         <div style={{ fontSize: '0.9em' }}>
                                             <p>Please fit a distribution to your time series data to see the visualization.</p>
-                                            <p>You need at least {DistributionUtils.getMinRequiredPoints(currentType)} data points for the {currentType} distribution.</p>
+                                            <p>You need at least {minRequiredPoints} data points for the {currentType} distribution.</p>
                                         </div>
                                     }
                                     type="info"
@@ -357,8 +370,6 @@ const DistributionFieldV3 = ({
                                 <DistributionPlot
                                     distributionType={currentType}
                                     parameters={parameters}
-                                    timeSeriesParameters={timeSeriesParameters}
-                                    timeSeriesMode={timeSeriesMode}
                                     addonAfter={addonAfter}
                                     showMean={true}
                                     showStdDev={true}
