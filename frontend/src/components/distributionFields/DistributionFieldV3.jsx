@@ -1,12 +1,13 @@
-// src/components/distributionFields/DistributionFieldV3.jsx - Updated for time series mode
+// src/components/distributionFields/DistributionFieldV3.jsx - Updated for new schema structure
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin } from 'antd';
+import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin, message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField } from '../contextFields';
 import DistributionPlot from './DistributionPlot';
 import renderParameterFields from './renderParameterFields';
 import renderTimeSeriesFields from './renderTimeSeriesFields';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
+import { validateTimeSeriesModeTransition, getAppropriateValue } from '../../utils/distributions/stateTransition';
 import useInputSim from '../../hooks/useInputSim';
 
 const { Title, Text, Paragraph } = Typography;
@@ -58,11 +59,13 @@ const DistributionFieldV3 = ({
     // Define parameter paths
     const typePath = [...path, 'type'];
     const parametersPath = [...path, 'parameters'];
+    const timeSeriesParametersPath = [...path, 'timeSeriesParameters'];
     const timeSeriesModePath = [...path, 'timeSeriesMode'];
 
     // Get current distribution settings
     const currentType = (getValueByPath(typePath, 'fixed')).toLowerCase();
     const parameters = getValueByPath(parametersPath, {});
+    const timeSeriesParameters = getValueByPath(timeSeriesParametersPath, { value: [] });
     const timeSeriesMode = getValueByPath(timeSeriesModePath, false);
 
     // Track fitted state
@@ -70,15 +73,18 @@ const DistributionFieldV3 = ({
 
     // Get default value from defaultValuePath if provided
     const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
+
+    // Get current value based on mode
     const value = getValueByPath([...parametersPath, 'value'], defaultValue);
 
     // Track time series data
     const timeSeriesData = useMemo(() => {
-        if (timeSeriesMode && Array.isArray(value)) {
-            return value;
+        if (timeSeriesMode) {
+            const tsData = getValueByPath([...timeSeriesParametersPath, 'value'], []);
+            return Array.isArray(tsData) ? tsData : [];
         }
         return [];
-    }, [timeSeriesMode, value]);
+    }, [timeSeriesMode, timeSeriesParametersPath, getValueByPath]);
 
     // Set column widths based on compact mode
     const colSpan = compact ? 200 : 150;
@@ -89,58 +95,73 @@ const DistributionFieldV3 = ({
         if (defaultValue !== undefined && defaultValue !== null) {
             if (timeSeriesMode) {
                 // If time series mode and no data, initialize with empty array
-                if (!Array.isArray(value)) {
-                    updateByPath([...parametersPath, 'value'], []);
+                const currentTSData = getValueByPath([...timeSeriesParametersPath, 'value'], null);
+                if (!currentTSData || !Array.isArray(currentTSData) || currentTSData.length === 0) {
+                    // Initialize with current parameter value if available
+                    const initialData = [];
+                    if (typeof value === 'number') {
+                        initialData.push({ year: 0, value: value });
+                    }
+                    updateByPath([...timeSeriesParametersPath, 'value'], initialData);
                 }
             } else if (value === undefined || value === null) {
                 // In regular mode, initialize with default value
                 updateByPath([...parametersPath, 'value'], defaultValue);
             }
         }
-    }, [defaultValue, parameters, parametersPath, updateByPath, value, timeSeriesMode]);
+    }, [defaultValue, parametersPath, timeSeriesParametersPath, updateByPath, value, timeSeriesMode, getValueByPath]);
 
-    // Handle time series mode toggle
+    // Handle time series mode toggle with validation
     const handleTimeSeriesModeChange = useCallback(async (checked) => {
-        // If turning off time series mode and we have fitted parameters,
-        // keep those parameters but switch to scalar value
-        if (!checked && timeSeriesMode && hasFittedParams && Array.isArray(value)) {
-            // Get current parameters but convert to scalar value
-            // This preserves fitted parameters when switching modes
-            const currentValue = parameters.value;
+        try {
+            // Get the current distribution state
+            const currentType = getValueByPath(typePath, 'fixed');
+            const currentParameters = getValueByPath(parametersPath, {});
+            const currentTimeSeriesParameters = getValueByPath(timeSeriesParametersPath, { value: [] });
+            const currentIsTimeSeriesMode = getValueByPath(timeSeriesModePath, false);
 
-            // Get average value from time series data as a fallback
-            let scalarValue = defaultValue;
-            if (Array.isArray(currentValue) && currentValue.length > 0) {
-                const validPoints = currentValue.filter(
-                    point => point && typeof point === 'object' && point.value !== undefined
-                );
-                if (validPoints.length > 0) {
-                    const values = validPoints.map(point => parseFloat(point.value) || 0);
-                    scalarValue = values.reduce((sum, v) => sum + v, 0) / values.length;
+            // Create current distribution object
+            const currentDistribution = {
+                type: currentType,
+                timeSeriesMode: currentIsTimeSeriesMode,
+                parameters: currentParameters,
+                timeSeriesParameters: currentTimeSeriesParameters
+            };
+
+            // Validate and prepare the transition
+            const { isValid, message: validationMessage, distribution: updatedDistribution } =
+                validateTimeSeriesModeTransition(currentDistribution, checked, defaultValue);
+
+            if (validationMessage) {
+                console.log(`Time series mode transition: ${validationMessage}`);
+            }
+
+            // Apply updates
+            if (checked !== currentIsTimeSeriesMode) {
+                // Update time series mode flag
+                await updateByPath(timeSeriesModePath, checked);
+
+                // Update parameters if they've changed
+                if (updatedDistribution.parameters.value !== currentParameters.value) {
+                    await updateByPath([...parametersPath, 'value'], updatedDistribution.parameters.value);
+                }
+
+                // Update time series parameters if they've changed
+                if (JSON.stringify(updatedDistribution.timeSeriesParameters.value) !==
+                    JSON.stringify(currentTimeSeriesParameters.value)) {
+                    await updateByPath([...timeSeriesParametersPath, 'value'], updatedDistribution.timeSeriesParameters.value);
+                }
+
+                // Reset fitted parameters when switching to regular mode
+                if (!checked && hasFittedParams) {
+                    setHasFittedParams(false);
                 }
             }
-
-            // Update time series mode first
-            await updateByPath(timeSeriesModePath, checked);
-
-            // Then update value to be scalar instead of array
-            await updateByPath([...parametersPath, 'value'], scalarValue);
-        } else {
-            // Simple mode toggle
-            await updateByPath(timeSeriesModePath, checked);
-
-            // Initialize appropriate value structure
-            if (checked && !Array.isArray(value)) {
-                // If turning on time series mode, convert scalar to empty array
-                await updateByPath([...parametersPath, 'value'], []);
-                setHasFittedParams(false);
-            } else if (!checked && Array.isArray(value)) {
-                // If turning off time series mode, use default value
-                await updateByPath([...parametersPath, 'value'], defaultValue);
-                setHasFittedParams(false);
-            }
+        } catch (error) {
+            console.error('Error toggling time series mode:', error);
+            message.error('Failed to toggle time series mode');
         }
-    }, [defaultValue, hasFittedParams, parameters, parametersPath, timeSeriesMode, updateByPath, value]);
+    }, [defaultValue, timeSeriesParametersPath, parametersPath, timeSeriesModePath, typePath, updateByPath, getValueByPath, hasFittedParams]);
 
     // Handle fitting distribution to time series data
     const handleFitDistribution = useCallback(async () => {
@@ -162,6 +183,7 @@ const DistributionFieldV3 = ({
         const distribution = {
             type: currentType,
             parameters: { ...parameters },
+            timeSeriesParameters: { value: validData },
             timeSeriesMode: true
         };
 
@@ -170,10 +192,7 @@ const DistributionFieldV3 = ({
             // If fitting succeeded, update parameters in context
             if (fittedParams && fittedParams.parameters) {
                 for (const [key, value] of Object.entries(fittedParams.parameters)) {
-                    // Skip updating the value parameter because that contains the time series data
-                    if (key !== 'value') {
-                        await updateByPath([...parametersPath, key], value);
-                    }
+                    await updateByPath([...parametersPath, key], value);
                 }
 
                 // Mark as having fitted parameters
@@ -234,7 +253,10 @@ const DistributionFieldV3 = ({
                                 <Text>Time Series Mode:</Text>
                                 <Switch
                                     checked={timeSeriesMode}
-                                    onChange={handleTimeSeriesModeChange}
+                                    onChange={(checked) => {
+                                        // Use setTimeout with 0ms delay instead of setImmediate
+                                        setTimeout(() => handleTimeSeriesModeChange(checked), 0);
+                                    }}
                                     disabled={fittingDistribution}
                                 />
                             </Space>
@@ -245,11 +267,11 @@ const DistributionFieldV3 = ({
                 <Divider style={{ margin: '8px 0' }} />
 
                 <Row gutter={16} align="top">
-                    <Col span={showVisualization && (!timeSeriesMode || hasFittedParams) ? 12 : 24}>
+                    <Col span={showVisualization ? 12 : 24}>
                         <Spin spinning={fittingDistribution} tip="Fitting distribution to data...">
                             {/* Parameter Fields or Time Series Fields based on mode */}
                             {timeSeriesMode ? (
-                                renderTimeSeriesFields(currentType, parametersPath, {
+                                renderTimeSeriesFields(currentType, parametersPath, timeSeriesParametersPath, {
                                     addonAfter,
                                     valueType,
                                     valueName: displayName,
@@ -259,7 +281,8 @@ const DistributionFieldV3 = ({
                                     onFitDistribution: handleFitDistribution,
                                     onClearFit: handleClearFit,
                                     hasFittedParams,
-                                    metadata
+                                    metadata,
+                                    parameters
                                 })
                             ) : (
                                 <>
@@ -314,24 +337,41 @@ const DistributionFieldV3 = ({
                         </Spin>
                     </Col>
 
-                    {/* Only show visualization when not in time series mode, or when in time series mode with fitted parameters */}
-                    {showVisualization && (!timeSeriesMode || hasFittedParams) && (
+                    {/* Visualization column */}
+                    {showVisualization && (
                         <Col span={12}>
-                            <DistributionPlot
-                                distributionType={currentType}
-                                parameters={parameters}
-                                addonAfter={addonAfter}
-                                showMean={true}
-                                showStdDev={true}
-                                showMarkers={true}
-                                showSummary={false}
-                            />
+                            {timeSeriesMode && !hasFittedParams ? (
+                                <Alert
+                                    message="Visualization not available"
+                                    description={
+                                        <div style={{ fontSize: '0.9em' }}>
+                                            <p>Please fit a distribution to your time series data to see the visualization.</p>
+                                            <p>You need at least {DistributionUtils.getMinRequiredPoints(currentType)} data points for the {currentType} distribution.</p>
+                                        </div>
+                                    }
+                                    type="info"
+                                    showIcon
+                                    style={{ width: '100%' }}
+                                />
+                            ) : (
+                                <DistributionPlot
+                                    distributionType={currentType}
+                                    parameters={parameters}
+                                    timeSeriesParameters={timeSeriesParameters}
+                                    timeSeriesMode={timeSeriesMode}
+                                    addonAfter={addonAfter}
+                                    showMean={true}
+                                    showStdDev={true}
+                                    showMarkers={true}
+                                    showSummary={false}
+                                />
+                            )}
                         </Col>
                     )}
                 </Row>
 
-                {/* Show info box if enabled */}
-                {showInfoBox && metadata && (
+                {/* Show info box if enabled and not in time series mode */}
+                {showInfoBox && metadata && !timeSeriesMode && (
                     <Alert
                         type="info"
                         message={metadata.name || currentType}

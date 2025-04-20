@@ -1,4 +1,4 @@
-// src/components/contextFields/DistributionPlot.jsx
+// src/components/distributionFields/DistributionPlot.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { Typography, Alert } from 'antd';
@@ -11,6 +11,8 @@ const { Title, Text, Paragraph } = Typography;
  * 
  * @param {string} distributionType - Type of distribution to visualize
  * @param {Object} parameters - Parameters for the distribution
+ * @param {Object} timeSeriesParameters - Time series parameters if in time series mode 
+ * @param {boolean} timeSeriesMode - Whether the distribution is in time series mode
  * @param {string} addonAfter - Unit to display on x-axis label
  * @param {boolean} showMean - Whether to show mean marker
  * @param {boolean} showStdDev - Whether to show standard deviation markers
@@ -21,6 +23,8 @@ const { Title, Text, Paragraph } = Typography;
 const DistributionPlot = ({
     distributionType,
     parameters,
+    timeSeriesParameters,
+    timeSeriesMode = false,
     addonAfter,
     showMean = true,
     showStdDev = true,
@@ -31,10 +35,24 @@ const DistributionPlot = ({
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
 
+    // For time series mode with fitted parameters, we use the parameters object
+    // but still want to show the time series data in some capacity
+    const timeSeriesData = useMemo(() => {
+        if (timeSeriesMode && timeSeriesParameters && Array.isArray(timeSeriesParameters.value)) {
+            return timeSeriesParameters.value;
+        }
+        return [];
+    }, [timeSeriesMode, timeSeriesParameters]);
+
+    // Normalize parameters to ensure we have valid objects
+    const normalizedParameters = useMemo(() => {
+        return parameters || {};
+    }, [parameters]);
+
     // Validate parameters using the distribution utilities
     const validationResult = useMemo(() => {
-        return DistributionUtils.validateDistribution(distributionType, parameters);
-    }, [distributionType, parameters]);
+        return DistributionUtils.validateDistributionParameters(distributionType, normalizedParameters);
+    }, [distributionType, normalizedParameters]);
 
     // Update visualization when parameters change
     useEffect(() => {
@@ -50,10 +68,11 @@ const DistributionPlot = ({
             // Use the distribution utilities to generate plot data
             const plotInfo = DistributionUtils.generateDistributionData(
                 distributionType,
-                parameters,
+                normalizedParameters,
                 options
             );
 
+            // We're not adding the time series data scatter plot anymore
             setPlotData(plotInfo.data);
 
             // Set plot layout
@@ -77,7 +96,7 @@ const DistributionPlot = ({
                 },
                 annotations: plotInfo.annotations,
                 shapes: plotInfo.shapes,
-                showlegend: plotInfo.showLegend
+                showlegend: false  // Always hide legend
             };
 
             if (plotInfo.legend) {
@@ -88,7 +107,7 @@ const DistributionPlot = ({
         }
     }, [
         distributionType,
-        parameters,
+        normalizedParameters,
         validationResult.isValid,
         addonAfter,
         showMean,
@@ -104,7 +123,7 @@ const DistributionPlot = ({
                 message="Visualization not available"
                 description={
                     <div style={{ fontSize: '0.9em' }}>
-                        {validationResult.message.length > 0 ? (
+                        {validationResult.message && validationResult.message.length > 0 ? (
                             <>
                                 <ul style={{ margin: 0, paddingLeft: '30px' }}>
                                     {validationResult.message.map((error, index) => (

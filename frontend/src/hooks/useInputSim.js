@@ -1,141 +1,154 @@
-// src/hooks/useInputSim.js - Adding fitDistribution functionality
-import { useState, useCallback } from 'react';
-import { message } from 'antd';
+// src/hooks/useInputSim.js - Updated for new schema structure
+import { useCallback, useState } from 'react';
 import { useScenario } from '../contexts/ScenarioContext';
-import {
-    simulateDistributions,
-    fitDistribution
-} from '../api/simulation';
+import { message } from 'antd';
+import { simulateDistributions, fitDistribution } from '../api/simulation';
+import { DistributionUtils } from '../utils/distributions';
 
 /**
- * Hook for managing input simulation operations
+ * Hook for managing input simulation data
+ * @returns {Object} Input simulation functions and state
  */
 const useInputSim = () => {
+    const { updateByPath, scenarioData } = useScenario();
     const [loading, setLoading] = useState(false);
     const [fittingDistribution, setFittingDistribution] = useState(false);
-    const { getValueByPath, updateByPath } = useScenario();
 
-    // Function to update distribution analysis results
+    /**
+     * Update distributions in the input simulation
+     * @returns {Promise<boolean>} Success status
+     */
     const updateDistributions = useCallback(async () => {
+        if (!scenarioData) return false;
+
         try {
             setLoading(true);
-            message.loading('Running distribution analysis...', 0);
 
-            // Gather the distribution settings from scenario
-            const settings = getValueByPath(['settings'], {});
-            const simulationSettings = getValueByPath(['settings', 'simulation'], {});
-            const distributionAnalysisPath = ['simulation', 'inputSim', 'distributionAnalysis'];
+            // Extract required distribution objects from scenario data
+            const energyProduction = scenarioData.settings.modules.revenue.energyProduction;
+            const electricityPrice = scenarioData.settings.modules.revenue.electricityPrice;
+            const downtimePerEvent = scenarioData.settings.modules.revenue.downtimePerEvent;
+            const windVariability = scenarioData.settings.modules.revenue.windVariability;
 
-            // Collect all distributions to simulate
-            const distributions = [
-                settings?.modules?.revenue?.energyProduction,
-                settings?.modules?.revenue?.electricityPrice,
-                settings?.modules?.revenue?.downtimePerEvent,
-                settings?.modules?.revenue?.windVariability,
-            ].filter(Boolean);
-
-            // Prepare payload for the API
-            const payload = {
-                distributions,
-                simulationSettings: {
-                    iterations: simulationSettings.iterations || 10000,
-                    seed: simulationSettings.seed || 42,
-                    percentiles: simulationSettings.percentiles || [],
-                },
+            // Ensure proper structure for each distribution
+            const normalizeDistribution = (dist) => {
+                return DistributionUtils.normalizeDistribution(dist);
             };
 
-            // Call the API
-            const response = await simulateDistributions(payload);
+            // Create parameters for API request
+            const params = {
+                distributions: [
+                    normalizeDistribution(energyProduction),
+                    normalizeDistribution(electricityPrice),
+                    normalizeDistribution(downtimePerEvent),
+                    normalizeDistribution(windVariability)
+                ],
+                simulationSettings: {
+                    iterations: scenarioData.settings.simulation.iterations || 10000,
+                    seed: scenarioData.settings.simulation.seed || 42,
+                    years: scenarioData.settings.general.projectLife || 20,
+                    percentiles: scenarioData.settings.simulation.percentiles || []
+                }
+            };
 
-            if (response.success) {
-                // Map simulation results to the right place in the context
+            // Call simulation API
+            const response = await simulateDistributions(params);
+
+            if (response && response.success) {
+                // Update each simulation result in context
                 const results = response.data.simulationInfo;
-                const mapping = {
-                    energyProduction: [...distributionAnalysisPath, 'energyProduction'],
-                    electricityPrice: [...distributionAnalysisPath, 'electricityPrice'],
-                    downtimePerEvent: [...distributionAnalysisPath, 'downtimePerEvent'],
-                    windVariability: [...distributionAnalysisPath, 'windVariability'],
-                };
 
-                // Update each distribution's results
-                for (const result of results) {
-                    const distributionKey = result.distribution.key;
-                    if (mapping[distributionKey]) {
-                        await updateByPath(mapping[distributionKey], result);
+                // Map results to their respective paths in the context
+                const resultMap = [
+                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'], index: 0 },
+                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice'], index: 1 },
+                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'downtimePerEvent'], index: 2 },
+                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability'], index: 3 }
+                ];
+
+                // Update each result in the scenario context
+                for (const { path, index } of resultMap) {
+                    if (results[index]) {
+                        await updateByPath(path, results[index]);
                     }
                 }
 
-                message.success('Distribution analysis completed');
+                message.success('Distributions updated successfully');
                 return true;
             } else {
-                message.error('Distribution analysis failed: ' + (response.error || 'Unknown error'));
+                message.error('Failed to update distributions: ' + (response?.error || 'Unknown error'));
                 return false;
             }
         } catch (error) {
-            console.error('Error in distribution analysis:', error);
-            message.error('Distribution analysis failed: ' + (error.message || 'Unknown error'));
+            console.error('Error updating distributions:', error);
+            message.error('An error occurred while updating distributions');
             return false;
         } finally {
             setLoading(false);
-            message.destroy();
         }
-    }, [getValueByPath, updateByPath]);
+    }, [scenarioData, updateByPath]);
 
     /**
-     * Fit a distribution to time series data
-     * @param {Object} distribution - Distribution configuration object
-     * @param {Array} dataPoints - Array of time series data points
-     * @param {Function} onSuccess - Optional callback on successful fit
+     * Fit distribution to time series data
+     * @param {Object} distribution Distribution object
+     * @param {Array} dataPoints Time series data points
+     * @param {Function} onSuccess Callback on successful fitting
      * @returns {Promise<boolean>} Success status
      */
     const fitDistributionToData = useCallback(async (distribution, dataPoints, onSuccess) => {
-        if (!distribution || !dataPoints || dataPoints.length === 0) {
-            message.error('Invalid data for distribution fitting');
+        if (!distribution || !dataPoints || !Array.isArray(dataPoints) || dataPoints.length === 0) {
+            message.error('Invalid data for fitting distribution');
             return false;
         }
 
         try {
             setFittingDistribution(true);
-            message.loading('Fitting distribution to data...', 0);
 
-            // Prepare payload for API
-            const payload = {
-                distribution: { ...distribution },
+            // Validate distribution and data points
+            const normalizedDist = DistributionUtils.normalizeDistribution(distribution);
+
+            // Create parameters for API request
+            const params = {
+                distribution: {
+                    type: normalizedDist.type,
+                    parameters: normalizedDist.parameters,
+                    timeSeriesMode: true
+                },
                 dataPoints: dataPoints
             };
 
-            // Call the API
-            const response = await fitDistribution(payload);
+            // Call fitting API
+            const response = await fitDistribution(params);
 
-            if (response.success) {
-                // Successfully fitted distribution
-                message.success('Distribution fitted to data');
-
-                // If onSuccess callback provided, call it with the fitted parameters
+            if (response && response.success && response.data) {
+                // Call onSuccess callback with fitted parameters
                 if (onSuccess && typeof onSuccess === 'function') {
-                    onSuccess(response.data);
+                    await onSuccess({
+                        type: response.data.type || normalizedDist.type,
+                        parameters: response.data.parameters || {}
+                    });
                 }
 
+                message.success('Distribution fitted successfully');
                 return true;
             } else {
-                message.error('Failed to fit distribution: ' + (response.error || 'Unknown error'));
+                message.error('Failed to fit distribution: ' + (response?.error || 'Unknown error'));
                 return false;
             }
         } catch (error) {
             console.error('Error fitting distribution:', error);
-            message.error('Failed to fit distribution: ' + (error.message || 'Unknown error'));
+            message.error('An error occurred while fitting distribution');
             return false;
         } finally {
             setFittingDistribution(false);
-            message.destroy();
         }
     }, []);
 
     return {
-        loading,
-        fittingDistribution,
         updateDistributions,
-        fitDistributionToData
+        fitDistributionToData,
+        loading,
+        fittingDistribution
     };
 };
 

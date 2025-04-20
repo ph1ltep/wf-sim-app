@@ -112,7 +112,7 @@ const formatValidation = (isValid, errors = [], details = null) => {
     return ValidationResponseSchema.validateSync(baseResponse);
   } catch (error) {
     // If schema validation fails, return the base validation response
-    console.warn('Validation response schema validation failed:', error.message);
+    console.warn('Validation response schema validation failed:', errors, error.stack);
     return baseResponse;
   }
 };

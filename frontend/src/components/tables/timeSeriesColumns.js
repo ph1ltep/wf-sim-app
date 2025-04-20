@@ -1,16 +1,14 @@
-// src/components/tables/timeSeriesColumns.js
+// src/components/tables/timeSeriesColumns.js - Updated formatting
 import React from 'react';
-import { InputNumber, Form, Tooltip } from 'antd';
-import {
-    createTextColumn,
-    createNumberColumn
-} from './columns';
+import { Tooltip } from 'antd';
+import { createNumberColumn } from './columns';
+import { formatNumber } from '../../utils/formatUtils';
 
 /**
  * Creates column definitions for time series data table
  * @param {string} valueType Type of value (number, percentage, currency)
  * @param {string} valueLabel Label for the value column
- * @param {string} addonAfter Unit text to display after value
+ * @param {string} addonAfter Unit to display after value
  * @param {number} precision Decimal precision for values
  * @param {number} minYear Minimum allowed year
  * @param {number} maxYear Maximum allowed year
@@ -21,33 +19,32 @@ export const createTimeSeriesColumns = (
     valueLabel = 'Value',
     addonAfter = '',
     precision = 2,
-    minYear = 1900,
-    maxYear = 2100
+    minYear = 0,
+    maxYear = 100
 ) => {
     return [
         createNumberColumn('year', 'Year', {
-            width: 90,
+            width: 100,
+            fixed: 'left',
             sorter: true,
             defaultSortOrder: 'ascend',
-            align: 'center'
+            align: 'center',
+            precision: 0
         }),
 
-        createNumberColumn('value', `${valueLabel}${addonAfter ? ` (${addonAfter})` : ''}`, {
-            width: 150,
+        createNumberColumn('value', addonAfter ? `${valueLabel} (${addonAfter})` : valueLabel, {
+            width: 'auto',
             precision: precision,
             render: (value) => {
                 if (value === undefined || value === null) return '-';
 
                 let formattedValue;
                 if (valueType === 'percentage') {
-                    formattedValue = `${parseFloat(value).toFixed(precision)}%`;
+                    formattedValue = `${formatNumber(value, precision)}%`;
                 } else if (valueType === 'currency') {
-                    formattedValue = `${parseFloat(value).toFixed(precision)}`;
+                    formattedValue = `${formatNumber(value, precision)}`;
                 } else {
-                    formattedValue = parseFloat(value).toFixed(precision);
-                    if (addonAfter) {
-                        formattedValue += ` ${addonAfter}`;
-                    }
+                    formattedValue = formatNumber(value, precision);
                 }
 
                 return <Tooltip title={`${valueLabel}: ${formattedValue}`}>{formattedValue}</Tooltip>;
@@ -62,9 +59,10 @@ export const createTimeSeriesColumns = (
  * @param {Array} data Time series data points
  * @param {string} valueType Type of value
  * @param {number} precision Decimal precision
+ * @param {string} addonAfter Unit to display after values
  * @returns {Object} Summary row configuration
  */
-export const createTimeSeriesSummary = (data, valueType = 'number', precision = 2) => {
+export const createTimeSeriesSummary = (data, valueType = 'number', precision = 2, addonAfter = '') => {
     if (!data || data.length === 0) {
         return null;
     }
@@ -79,11 +77,13 @@ export const createTimeSeriesSummary = (data, valueType = 'number', precision = 
         if (val === undefined || val === null) return '-';
 
         if (valueType === 'percentage') {
-            return `${parseFloat(val).toFixed(precision)}%`;
+            return `${formatNumber(val, precision)}%`;
         } else if (valueType === 'currency') {
-            return `$${parseFloat(val).toFixed(precision)}`;
+            return `$${formatNumber(val, precision)}`;
+        } else if (addonAfter) {
+            return `${formatNumber(val, precision)} ${addonAfter}`;
         }
-        return parseFloat(val).toFixed(precision);
+        return formatNumber(val, precision);
     };
 
     return {

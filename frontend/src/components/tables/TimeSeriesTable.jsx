@@ -1,16 +1,121 @@
-// src/components/tables/TimeSeriesTable.jsx
-import React, { useMemo } from 'react';
-import { Typography, Space, Tooltip } from 'antd';
-import { LineChartOutlined } from '@ant-design/icons';
-import EditableTable from './EditableTable';
-import { createTimeSeriesColumns, createTimeSeriesSummary } from './timeSeriesColumns';
+// src/components/tables/TimeSeriesTable.jsx - Updated with inline editing
+import React, { useMemo, useState } from 'react';
+import { Typography, Space, Tooltip, Table, Input, InputNumber, Form, Button, Popconfirm } from 'antd';
+import { LineChartOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { formatNumber } from '../../utils/formatUtils';
 
 const { Text } = Typography;
+const EditableContext = React.createContext(null);
+
+// EditableRow component with Form context
+const EditableRow = ({ index, ...props }) => {
+    const [form] = Form.useForm();
+    return (
+        <Form form={form} component={false}>
+            <EditableContext.Provider value={form}>
+                <tr {...props} />
+            </EditableContext.Provider>
+        </Form>
+    );
+};
+
+// EditableCell component
+const EditableCell = ({
+    title,
+    editable,
+    children,
+    dataIndex,
+    record,
+    handleSave,
+    inputType,
+    inputProps,
+    ...restProps
+}) => {
+    const [editing, setEditing] = useState(false);
+    const form = React.useContext(EditableContext);
+
+    // Toggle edit state
+    const toggleEdit = () => {
+        setEditing(!editing);
+        // Set the raw value without formatting
+        form.setFieldsValue({ [dataIndex]: record[dataIndex] });
+    };
+
+    // Save cell value
+    const save = async () => {
+        try {
+            const values = await form.validateFields();
+            toggleEdit();
+            // Make sure we convert to number for the value field
+            if (dataIndex === 'value' && values.value !== undefined) {
+                values.value = parseFloat(values.value);
+            } else if (dataIndex === 'year' && values.year !== undefined) {
+                values.year = parseInt(values.year, 10);
+            }
+            handleSave({ ...record, ...values });
+        } catch (errInfo) {
+            console.error('Save failed:', errInfo);
+        }
+    };
+
+    // Handle key press for keyboard navigation
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            save();
+        } else if (e.key === 'Escape') {
+            toggleEdit();
+        }
+    };
+
+    // Render cell content
+    let childNode = children;
+
+    if (editable) {
+        childNode = editing ? (
+            <Form.Item
+                style={{ margin: 0 }}
+                name={dataIndex}
+                rules={[
+                    {
+                        required: true,
+                        message: `${title} is required.`,
+                    },
+                ]}
+            >
+                {inputType === 'number' ? (
+                    <InputNumber
+                        {...inputProps}
+                        onPressEnter={save}
+                        onBlur={save}
+                        onKeyDown={handleKeyPress}
+                        autoFocus
+                    />
+                ) : (
+                    <Input
+                        onPressEnter={save}
+                        onBlur={save}
+                        onKeyDown={handleKeyPress}
+                        autoFocus
+                    />
+                )}
+            </Form.Item>
+        ) : (
+            <div
+                className="editable-cell-value-wrap"
+                style={{ paddingRight: 24, cursor: 'pointer' }}
+                onClick={toggleEdit}
+            >
+                {children}
+            </div>
+        );
+    }
+
+    return <td {...restProps}>{childNode}</td>;
+};
 
 /**
- * Time Series Table component for editing year/value data points
- * Built on top of EditableTable to leverage context integration
+ * Enhanced Time Series Table component with inline editing
  * 
  * @param {string[]} path Path to the data array in context
  * @param {string} valueLabel Label for the value column
@@ -19,9 +124,8 @@ const { Text } = Typography;
  * @param {string} addonAfter Unit to display after values
  * @param {number} minYear Minimum allowed year
  * @param {number} maxYear Maximum allowed year
- * @param {React.ReactNode} additionalFormFields Additional form fields to render in add/edit modal
  * @param {boolean} disableEditing Whether to disable editing functionality
- * @param {Object} tableProps Additional props to pass to EditableTable
+ * @param {number} minRequiredPoints Minimum points required for distribution fitting
  */
 const TimeSeriesTable = ({
     path,
@@ -29,137 +133,275 @@ const TimeSeriesTable = ({
     valueType = 'number',
     precision = 2,
     addonAfter = '',
-    minYear = 1900,
-    maxYear = 2100,
-    additionalFormFields = null,
+    minYear = 0,
+    maxYear = 100,
     disableEditing = false,
-    dataCount,
     showDataCount = true,
-    ...tableProps
+    minRequiredPoints,
 }) => {
-    // Create time series columns
-    const columns = useMemo(() => {
-        return createTimeSeriesColumns(
-            valueType,
-            valueLabel,
-            addonAfter,
-            precision,
-            minYear,
-            maxYear
-        );
-    }, [valueType, valueLabel, addonAfter, precision, minYear, maxYear]);
+    // Get scenario context
+    const { getValueByPath, updateByPath } = useScenario();
+    const [editingKey, setEditingKey] = useState('');
 
-    // Custom render for summary
-    const renderSummary = (dataSource) => {
-        // Ensure dataSource is an array
-        if (!dataSource || !Array.isArray(dataSource) || dataSource.length === 0) {
+    // Get data from context with proper fallback
+    const timeSeriesData = useMemo(() => {
+        const data = getValueByPath(path, []);
+        return Array.isArray(data) ? data : [];
+    }, [getValueByPath, path]);
+
+    // Calculate data count
+    const dataCount = timeSeriesData.length;
+
+    // Format value based on type without adding unit in the value
+    const formatValue = (value) => {
+        if (value === undefined || value === null) return '-';
+
+        let formattedValue;
+        if (valueType === 'percentage') {
+            formattedValue = `${formatNumber(value, precision)}%`;
+        } else if (valueType === 'currency') {
+            formattedValue = `${formatNumber(value, precision)}`;
+        } else {
+            formattedValue = formatNumber(value, precision);
+        }
+        return formattedValue;
+    };
+
+    // Handle row save
+    const handleSave = (row) => {
+        const newData = [...timeSeriesData];
+        const index = newData.findIndex(item => item.year === row.year);
+
+        if (index > -1) {
+            const item = newData[index];
+            newData.splice(index, 1, { ...item, ...row });
+        } else {
+            newData.push(row);
+        }
+
+        updateByPath(path, newData);
+    };
+
+    // Handle delete row
+    const handleDelete = (year) => {
+        const newData = timeSeriesData.filter(item => item.year !== year);
+        updateByPath(path, newData);
+    };
+
+    // Handle add row
+    const handleAdd = () => {
+        // Find available year (starting from 0)
+        const usedYears = new Set(timeSeriesData.map(item => item.year));
+        let newYear = 0;
+        while (usedYears.has(newYear)) {
+            newYear++;
+        }
+
+        // Get default value (average of existing values or 0)
+        let defaultValue = 0;
+        if (timeSeriesData.length > 0) {
+            const sum = timeSeriesData.reduce((acc, item) => acc + (item.value || 0), 0);
+            defaultValue = sum / timeSeriesData.length;
+        }
+
+        // Add new row
+        const newData = [...timeSeriesData, { year: newYear, value: defaultValue }];
+        updateByPath(path, newData);
+    };
+
+    // Define columns
+    const columns = [
+        {
+            title: 'Year',
+            dataIndex: 'year',
+            key: 'year',
+            width: 100,
+            fixed: 'left',
+            sorter: (a, b) => a.year - b.year,
+            editable: !disableEditing,
+            inputType: 'number',
+            inputProps: {
+                min: minYear,
+                max: maxYear,
+                precision: 0,
+                style: { width: 80 }
+            }
+        },
+        {
+            title: addonAfter ? `${valueLabel} (${addonAfter})` : valueLabel,
+            dataIndex: 'value',
+            key: 'value',
+            editable: !disableEditing,
+            inputType: 'number',
+            inputProps: {
+                step: valueType === 'percentage' ? 0.1 : 1,
+                precision: precision,
+                style: { width: 120 }
+            },
+            render: value => {
+                if (value === undefined || value === null) return '-';
+
+                // For display only, not for edit mode
+                let formattedValue;
+                if (valueType === 'percentage') {
+                    formattedValue = `${formatNumber(value, precision)}%`;
+                } else if (valueType === 'currency') {
+                    formattedValue = `${formatNumber(value, precision)}`;
+                } else {
+                    formattedValue = formatNumber(value, precision);
+                }
+
+                return formattedValue;
+            }
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            width: 100,
+            fixed: 'right',
+            render: (_, record) =>
+                !disableEditing && (
+                    <Space size="small">
+                        <Popconfirm
+                            title="Delete this data point?"
+                            onConfirm={() => handleDelete(record.year)}
+                            okText="Yes"
+                            cancelText="No"
+                        >
+                            <Button type="text" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                    </Space>
+                )
+        }
+    ];
+
+    // Map columns to include editable property
+    const mergedColumns = columns.map(col => {
+        if (!col.editable) {
+            return col;
+        }
+        return {
+            ...col,
+            onCell: record => ({
+                record,
+                dataIndex: col.dataIndex,
+                title: col.title,
+                editable: col.editable,
+                handleSave,
+                inputType: col.inputType,
+                inputProps: col.inputProps
+            }),
+        };
+    });
+
+    // Create components for editable table
+    const components = {
+        body: {
+            row: EditableRow,
+            cell: EditableCell,
+        },
+    };
+
+    // Calculate summary data
+    const calculateSummary = () => {
+        if (!timeSeriesData || timeSeriesData.length === 0) {
             return null;
         }
 
-        const summary = createTimeSeriesSummary(dataSource, valueType, precision);
-        if (!summary) return null;
+        const values = timeSeriesData.map(item => item.value);
+        const years = timeSeriesData.map(item => item.year);
+
+        const sum = values.reduce((acc, val) => acc + parseFloat(val || 0), 0);
+        const avg = sum / values.length;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const minYear = Math.min(...years);
+        const maxYear = Math.max(...years);
 
         return {
-            year: summary.yearContent,
-            value: summary.valueContent
+            count: values.length,
+            avg,
+            min,
+            max,
+            minYear,
+            maxYear
         };
     };
 
-    // Create form fields for year and value inputs
-    const formFields = useMemo(() => {
-        // Import the field components only if we need them
-        const { NumberField } = require('../contextFields');
+    // Summary function
+    const summary = (pageData) => {
+        const summaryData = calculateSummary();
+        if (!summaryData) return null;
 
-        const baseFields = (
-            <>
-                <NumberField
-                    path="year"
-                    label="Year"
-                    min={minYear}
-                    max={maxYear}
-                    step={1}
-                    precision={0}
-                    required
-                />
+        // Calculate timespan information
+        let timeSpanText = `${summaryData.count} Years`;
+        if (summaryData.count > 1) {
+            const span = summaryData.maxYear - summaryData.minYear;
+            timeSpanText = `${summaryData.count} of ${span + 1}`;
+        }
 
-                {valueType === 'percentage' ? (
-                    <NumberField
-                        path="value"
-                        label={valueLabel}
-                        addonAfter="%"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        precision={precision}
-                        required
-                    />
-                ) : valueType === 'currency' ? (
-                    <NumberField
-                        path="value"
-                        label={valueLabel}
-                        prefix="$"
-                        step={1}
-                        precision={precision}
-                        required
-                    />
-                ) : (
-                    <NumberField
-                        path="value"
-                        label={valueLabel}
-                        addonAfter={addonAfter}
-                        step={1}
-                        precision={precision}
-                        required
-                    />
-                )}
+        // Style for all summary cells
+        const summaryStyle = {
+            backgroundColor: '#f5f5f5',
+            fontWeight: 'bold',
+            borderTop: '1px solid #d9d9d9'
+        };
 
-                {additionalFormFields}
-            </>
+        return (
+            <Table.Summary.Row>
+                <Table.Summary.Cell index={0} style={summaryStyle}>
+                    <Tooltip title={`${summaryData.count} data points spanning years ${summaryData.minYear}-${summaryData.maxYear}`}>
+                        <Text strong>{timeSpanText}</Text>
+                    </Tooltip>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={1} style={summaryStyle}>
+                    <Tooltip title="Min / Avg / Max">
+                        <Text strong>
+                            {`${formatValue(summaryData.min)} / ${formatValue(summaryData.avg)} / ${formatValue(summaryData.max)}`}
+                        </Text>
+                    </Tooltip>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={2} style={summaryStyle} />
+            </Table.Summary.Row>
         );
-
-        return baseFields;
-    }, [valueType, valueLabel, addonAfter, precision, minYear, maxYear, additionalFormFields]);
-
-    // Calculate data count
-    const actualDataCount = typeof dataCount === 'number' ? dataCount : null;
-
-    // Get data from context with proper fallback
-    const { getValueByPath } = useScenario();
-    const timeSeriesData = useMemo(() => {
-        const data = getValueByPath(path, []);
-        // Ensure we always have a valid array for the Table component
-        return Array.isArray(data) ? data : [];
-    }, [getValueByPath, path]);
+    };
 
     return (
         <div className="time-series-table">
             <Space direction="vertical" style={{ width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <Space>
                         <LineChartOutlined />
                         <Text strong>Time Series Data</Text>
-                        {showDataCount && actualDataCount !== null && (
-                            <Text type="secondary">({actualDataCount} points)</Text>
+                        {showDataCount && (
+                            <Tooltip title={`Need at least ${minRequiredPoints} data points for this distribution type`}>
+                                <Text type="secondary">({dataCount} points)</Text>
+                            </Tooltip>
                         )}
                     </Space>
+
+                    {!disableEditing && (
+                        <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={handleAdd}
+                            size="small"
+                        >
+                            Add Year
+                        </Button>
+                    )}
                 </div>
 
-                <EditableTable
-                    path={path}
-                    columns={columns}
-                    formFields={formFields}
-                    itemName="Data Point"
-                    addButtonText="Add Year"
-                    keyField="year" // Use year as the key field
-                    tableSize="small"
-                    showSummary={true}
-                    renderSummary={renderSummary}
+                <Table
+                    components={components}
+                    rowClassName={() => 'editable-row'}
+                    dataSource={timeSeriesData}
+                    columns={mergedColumns}
+                    rowKey="year"
                     pagination={false}
-                    showAddButton={!disableEditing}
-                    autoActions={!disableEditing}
-                    // Ensure dataSource is valid (added for debugging)
-                    initialData={[]} // Provide a default empty array to EditableTable
-                    {...tableProps}
+                    size="small"
+                    summary={summary}
+                    scroll={{ x: 'max-content' }}
                 />
             </Space>
         </div>

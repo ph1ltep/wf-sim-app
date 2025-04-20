@@ -1,6 +1,6 @@
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 const monteCarloV2 = require('../services/monte-carlo-v2');
-const { DistributionTypeSchema, ValidationResponseSchema, DataPointSchema } = require('../../schemas/yup/distribution');
+const { DistributionTypeSchema, ValidationResponseSchema, DataPointSchema, DistributionParametersSchema } = require('../../schemas/yup/distribution');
 
 /**
  * Run a simulation of one or more distributions with the new Monte Carlo engine

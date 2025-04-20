@@ -10,6 +10,13 @@ import { Poisson } from './poisson';
 import { Kaimal } from './kaimal';
 import { GBM } from './gbm';
 import { Gamma } from './gamma';
+import {
+    validateDistribution,
+    normalizeDistribution,
+    initializeTimeSeriesIfEmpty,
+    getMinRequiredPoints,
+    checkDataCompatibility
+} from './validationHelper';
 
 // Map of distribution types to their implementations
 const DISTRIBUTIONS = {
@@ -55,12 +62,20 @@ export const DistributionUtils = {
     },
 
     /**
-     * Validate distribution parameters
+     * Validate distribution parameters using the new schema structure
+     * @param {Object} distribution - Distribution object with type, parameters, and timeSeriesParameters
+     * @param {boolean} validateTimeSeries - Whether to validate time series data
+     * @returns {Object} Validation result with isValid flag and messages
+     */
+    validateDistribution,
+
+    /**
+     * Validate distribution parameters (legacy method)
      * @param {string} type - Distribution type
      * @param {Object} parameters - Distribution parameters
      * @returns {Object} Validation result with isValid flag and messages
      */
-    validateDistribution(type, parameters) {
+    validateDistributionParameters(type, parameters) {
         const distribution = this.getDistribution(type);
 
         if (!distribution) {
@@ -130,18 +145,46 @@ export const DistributionUtils = {
     },
 
     /**
-    * Get Metadata by type
+     * Get Metadata by type
      * @param {string} type - Distribution type
-    * @returns {Object} Metadata implementation or null if not found
-    */
+     * @returns {Object} Metadata implementation or null if not found
+     */
     getMetadata(type) {
         if (!type) return null;
         const distribution = this.getDistribution(type);
 
-        return distribution.getMetadata();
-    }
-};
+        return distribution ? distribution.getMetadata() : null;
+    },
 
+    /**
+     * Normalize a distribution object to ensure it conforms to the expected schema
+     * @param {Object} distribution - Distribution object to normalize
+     * @returns {Object} Normalized distribution object
+     */
+    normalizeDistribution,
+
+    /**
+     * Initialize time series data if empty
+     * @param {Object} distribution - Distribution object
+     * @returns {Object} Distribution with initialized time series data
+     */
+    initializeTimeSeriesIfEmpty,
+
+    /**
+     * Get minimum required points for a distribution type
+     * @param {string} type - Distribution type
+     * @returns {number} Minimum recommended number of data points
+     */
+    getMinRequiredPoints,
+
+    /**
+     * Check compatibility of time series data with a distribution type
+     * @param {string} type - Distribution type
+     * @param {Array} data - Time series data points
+     * @returns {Object|null} Compatibility check result or null if compatible
+     */
+    checkDataCompatibility
+};
 
 // Export individual distributions
 export {

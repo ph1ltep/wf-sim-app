@@ -33,5 +33,5 @@ export const validateDistribution = (distribution) => {
  * @returns {Promise<Object>} Response with SuccessResponseSchema containing DistributionParametersSchema
  */
 export const fitDistribution = (data) => {
-  return api.post('/simulations/fit', data);
+  return api.post('/simulation/fit', data);
 };

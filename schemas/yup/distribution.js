@@ -21,15 +21,15 @@ const SimResultsSchema = Yup.object().shape({
     data: Yup.array().of(DataPointSchema).required(),
 });
 
-// Schema for distribution parameters with mixed types
+// Schema for distribution parameters with number types
 const DistributionParametersSchema = Yup.object().shape({
-    value: Yup.mixed(), // Mixed type
-    scale: Yup.mixed(),
-    mean: Yup.mixed(),
-    min: Yup.mixed(),
-    max: Yup.mixed(),
-    meanWindSpeed: Yup.mixed(),
-    stdDev: Yup.mixed(),
+    value: Yup.number(),
+    scale: Yup.number(),
+    mean: Yup.number(),
+    min: Yup.number(),
+    max: Yup.number(),
+    meanWindSpeed: Yup.number(),
+    stdDev: Yup.number().nullable(),
     mode: Yup.number(),
     mu: Yup.number(),
     sigma: Yup.number(),
@@ -40,7 +40,12 @@ const DistributionParametersSchema = Yup.object().shape({
     hubHeight: Yup.number(),
     drift: Yup.number(),
     volatility: Yup.number(),
-    timeStep: Yup.number(),
+    timeStep: Yup.number()
+});
+
+// Schema for distribution parameters with DataPointSchema types
+const DistributionTimeSeriesParametersSchema = Yup.object().shape({
+    value: Yup.array().of(DataPointSchema).default([]),
 });
 
 // Main DistributionTypeSchema
@@ -52,7 +57,8 @@ const DistributionTypeSchema = Yup.object().shape({
             'exponential', 'poisson', 'fixed', 'kaimal', 'gbm', 'gamma'
         ]),
     timeSeriesMode: Yup.boolean().default(false),
-    parameters: DistributionParametersSchema.required('Parameters are required'),
+    parameters: DistributionParametersSchema.required('Parameters are required').default({}),
+    timeSeriesParameters: DistributionTimeSeriesParametersSchema.required('Parameters are required').default({}),
 });
 
 const FitDistributionSchema = Yup.object().shape({

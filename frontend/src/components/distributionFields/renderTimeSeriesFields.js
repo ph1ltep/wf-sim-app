@@ -1,5 +1,5 @@
 // src/components/distributionFields/renderTimeSeriesFields.js
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Button,
     Alert,
@@ -20,22 +20,25 @@ const { Text } = Typography;
  *
  * @param {string} distributionType - Type of distribution
  * @param {Array} parametersPath - Path to the parameters object in context
+ * @param {Array} timeSeriesParametersPath - Path to the timeSeriesParameters object in context
  * @param {Object} options - Additional options
  * @param {string} options.addonAfter - Text to display after value inputs
  * @param {string} options.valueType - Type of value (number, percentage, currency)
  * @param {number} options.precision - Decimal precision for value display
  * @param {string} options.valueName - Display name for the value field
- * @param {Object} options.timeSeriesData - Current time series data points
+ * @param {Array} options.timeSeriesData - Current time series data points
  * @param {boolean} options.isFitting - Whether fitting operation is in progress
  * @param {Function} options.onFitDistribution - Callback when fit button is clicked
  * @param {Function} options.onClearFit - Callback when clear fit button is clicked
  * @param {boolean} options.hasFittedParams - Whether fitted parameters exist
  * @param {Object} options.metadata - Distribution metadata from getMetadata()
+ * @param {Object} options.parameters - Current distribution parameters
  * @returns {React.ReactNode} Time series UI components
  */
 const renderTimeSeriesFields = (
     distributionType,
     parametersPath,
+    timeSeriesParametersPath,
     options = {}
 ) => {
     const {
@@ -48,7 +51,8 @@ const renderTimeSeriesFields = (
         onFitDistribution,
         onClearFit,
         hasFittedParams = false,
-        metadata = {}
+        metadata = {},
+        parameters = {}
     } = options;
 
     // Get the minimum required data points based on distribution type
@@ -133,40 +137,22 @@ const renderTimeSeriesFields = (
         <div className="time-series-fields">
             {/* Data Table */}
             <TimeSeriesTable
-                path={[...parametersPath, 'value']}
+                path={[...timeSeriesParametersPath, 'value']}
                 valueLabel={valueName}
                 valueType={valueType}
                 precision={precision}
                 addonAfter={addonAfter}
                 disableEditing={isFitting}
+                minRequiredPoints={minRequiredPoints}
             />
 
             <Divider style={{ margin: '12px 0' }} />
 
             {/* Compatibility and Fit Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Space direction="vertical" style={{ flex: 1 }}>
-                    {!hasEnoughData ? (
-                        <Alert
-                            message={`Need at least ${minRequiredPoints} data points`}
-                            type="info"
-                            showIcon
-                            icon={<FileTextOutlined />}
-                        />
-                    ) : compatibility ? (
-                        <Alert
-                            message={compatibility.message}
-                            type={compatibility.type}
-                            showIcon
-                        />
-                    ) : null}
-
-                    {metadata && metadata.applications && (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                            <FundOutlined /> Best for: {metadata.applications}
-                        </Text>
-                    )}
-                </Space>
+                <div style={{ flex: 1 }}>
+                    {/* Left column empty - removed compatibility alerts and application notes */}
+                </div>
 
                 <Space>
                     {hasFittedParams && (
@@ -203,8 +189,18 @@ const renderTimeSeriesFields = (
                     message="Distribution parameters have been fitted to your data"
                     description={
                         <Space direction="vertical" style={{ width: '100%' }}>
-                            <Text>Parameters were automatically calculated based on your time series data.</Text>
-                            <Text type="secondary">You can still view and modify the distribution plot using the fitted parameters.</Text>
+                            <div>
+                                <Text strong>Fitted Parameters:</Text>
+                                <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                                    {Object.entries(parameters).map(([key, value]) => (
+                                        key !== 'value' && (
+                                            <li key={key}>
+                                                <Text code>{key}</Text>: {typeof value === 'number' ? value.toFixed(4) : value}
+                                            </li>
+                                        )
+                                    ))}
+                                </ul>
+                            </div>
                         </Space>
                     }
                     type="success"
