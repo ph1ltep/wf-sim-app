@@ -2,9 +2,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { Typography, Alert } from 'antd';
+import { useScenario } from '../../contexts/ScenarioContext';
 import { DistributionUtils } from '../../utils/distributions';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 /**
  * Component to visualize different statistical distributions
@@ -16,6 +17,8 @@ const { Title, Text, Paragraph } = Typography;
  * @param {boolean} showStdDev - Whether to show standard deviation markers
  * @param {boolean} showMarkers - Whether to show key point markers
  * @param {boolean} showSummary - Whether to show parameter summary
+ * @param {boolean} showPercentiles - Whether to show percentile bands from scenario settings
+ * @param {string} baseColor - Base color for the distribution curve and percentiles
  * @param {Object} style - Additional styling
  */
 const DistributionPlot = ({
@@ -26,10 +29,21 @@ const DistributionPlot = ({
     showStdDev = true,
     showMarkers = true,
     showSummary = false,
+    showPercentiles = true, // Default to true
+    baseColor = 'rgb(31, 119, 180)',
     style = {}
 }) => {
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
+    const { getValueByPath } = useScenario();
+
+    // Get percentiles from scenario settings
+    const percentiles = useMemo(() => {
+        if (showPercentiles) {
+            return getValueByPath(['settings', 'simulation', 'percentiles'], []);
+        }
+        return [];
+    }, [showPercentiles, getValueByPath]);
 
     // Normalize parameters to ensure we have valid objects
     const normalizedParameters = useMemo(() => {
@@ -49,7 +63,10 @@ const DistributionPlot = ({
                 showMean,
                 showStdDev,
                 showMarkers,
-                showSummary
+                showSummary,
+                showPercentiles,
+                percentiles,
+                baseColor
             };
 
             // Use the distribution utilities to generate plot data
@@ -63,7 +80,6 @@ const DistributionPlot = ({
 
             // Set plot layout
             const layout = {
-                title: plotInfo.title,
                 autosize: true,
                 width: 400,
                 height: 300,
@@ -82,12 +98,9 @@ const DistributionPlot = ({
                 },
                 annotations: plotInfo.annotations,
                 shapes: plotInfo.shapes,
-                showlegend: false  // Always hide legend
+                showlegend: false, // Always hide legend
+                hovermode: 'closest'
             };
-
-            if (plotInfo.legend) {
-                layout.legend = plotInfo.legend;
-            }
 
             setPlotLayout(layout);
         }
@@ -99,7 +112,10 @@ const DistributionPlot = ({
         showMean,
         showStdDev,
         showMarkers,
-        showSummary
+        showSummary,
+        showPercentiles,
+        percentiles,
+        baseColor
     ]);
 
     // If parameters are not valid, show an enhanced warning with detailed message

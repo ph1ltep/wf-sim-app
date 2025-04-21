@@ -1,4 +1,4 @@
-// src/utils/distributions/index.js
+// src/utils/distributions/index.js - Enhanced with percentile support
 import { Fixed } from './fixed';
 import { Normal } from './normal';
 import { LogNormal } from './lognormal';
@@ -17,6 +17,7 @@ import {
     getMinRequiredPoints,
     checkDataCompatibility
 } from './validationHelper';
+import { generatePdfPlot, hexToRgb, organizePercentiles } from '../plotUtils';
 
 // Map of distribution types to their implementations
 const DISTRIBUTIONS = {
@@ -101,7 +102,7 @@ export const DistributionUtils = {
      * Generate plot data for a distribution
      * @param {string} type - Distribution type
      * @param {Object} parameters - Distribution parameters
-     * @param {Object} options - Plot options
+     * @param {Object} options - Plot options including percentile support
      * @returns {Object} Plot data
      */
     generateDistributionData(type, parameters, options = {}) {
@@ -119,7 +120,8 @@ export const DistributionUtils = {
             };
         }
 
-        return distribution.generatePlot(parameters, options);
+        // Use plotUtils.generatePdfPlot instead of distribution.generatePlot
+        return generatePdfPlot(distribution, parameters, options);
     },
 
     /**
@@ -183,7 +185,8 @@ export const DistributionUtils = {
      * @param {Array} data - Time series data points
      * @returns {Object|null} Compatibility check result or null if compatible
      */
-    checkDataCompatibility
+    checkDataCompatibility,
+
 };
 
 // Export individual distributions

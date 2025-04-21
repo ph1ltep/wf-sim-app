@@ -1,6 +1,6 @@
 // src/utils/distributions/distributionBase.js
 import * as jStat from 'jstat';
-import { PlotUtils } from '../plotUtils';
+import { getParam } from '../plotUtils';
 
 /**
  * Base distribution functions and structure
@@ -21,13 +21,33 @@ export const DistributionBase = {
         },
 
         /**
-         * Generate plot data for this distribution
+         * Calculate probability density function (PDF) at point x
+         * @param {number} x - Point to evaluate PDF at
          * @param {Object} parameters - Distribution parameters
-         * @param {Object} options - Plotting options
-         * @returns {Object} Plot data object with data, shapes, annotations, etc.
+         * @returns {number} PDF value at x
          */
-        generatePlot(parameters, options) {
-            throw new Error('generatePlot() method must be implemented by each distribution');
+        calculatePDF(x, parameters) {
+            throw new Error('calculatePDF() method must be implemented by each distribution');
+        },
+
+        /**
+         * Calculate cumulative distribution function (CDF) at point x
+         * @param {number} x - Point to evaluate CDF at
+         * @param {Object} parameters - Distribution parameters
+         * @returns {number} CDF value at x (0-1)
+         */
+        calculateCDF(x, parameters) {
+            throw new Error('calculateCDF() method must be implemented by each distribution');
+        },
+
+        /**
+         * Calculate the inverse cumulative distribution function (quantile) for probability p
+         * @param {number} p - Probability (0-1)
+         * @param {Object} parameters - Distribution parameters
+         * @returns {number} Value x where CDF(x) = p
+         */
+        calculateQuantile(p, parameters) {
+            throw new Error('calculateQuantile() method must be implemented by each distribution');
         },
 
         /**
@@ -52,6 +72,6 @@ export const DistributionBase = {
      * Common helper functions that distributions may use
      */
     helpers: {
-        getParam: PlotUtils.getParam
+        getParam
     }
 };

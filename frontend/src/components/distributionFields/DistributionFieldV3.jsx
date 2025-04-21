@@ -318,6 +318,7 @@ const DistributionFieldV3 = ({
                   showStdDev={true}
                   showMarkers={true}
                   showSummary={false}
+                  showPercentiles={true}
                 />
               )}
             </Col>

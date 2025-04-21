@@ -1,23 +1,18 @@
 // src/utils/distributions/normal.js
 import * as jStat from 'jstat';
-import { PlotUtils } from '../plotUtils';
-import { DistributionBase } from './distributionBase';
+import { getParam } from '../plotUtils';
 
 /**
  * Normal Distribution
  */
 export const Normal = {
     /**
-     * Validate parameters for normal distribution
+     * Validate parameters for Normal distribution
      * @param {Object} parameters - Distribution parameters
      * @returns {Object} Validation result
      */
     validate(parameters) {
         const issues = [];
-
-        if (parameters.value === undefined || parameters.value === null) {
-            issues.push("Mean value is required");
-        }
 
         if (parameters.stdDev === undefined || parameters.stdDev === null) {
             issues.push("Standard deviation is required");
@@ -29,7 +24,7 @@ export const Normal = {
             return {
                 isValid: false,
                 message: issues,
-                details: "The normal distribution requires a mean and a positive standard deviation."
+                details: "The normal distribution requires a positive standard deviation."
             };
         }
 
@@ -37,89 +32,137 @@ export const Normal = {
     },
 
     /**
-     * Generate plot data for normal distribution
+     * Generate PDF curve and key statistics for plotting
      * @param {Object} parameters - Distribution parameters
-     * @param {Object} options - Plot options
-     * @returns {Object} Plot data
+     * @param {Array} xValues - X values to calculate for
+     * @param {Array} percentiles - Array of percentile objects (optional)
+     * @returns {Object} PDF curve data and statistics
      */
-    generatePlot(parameters, options) {
-        const mean = DistributionBase.helpers.getParam(parameters, 'value', 0);
-        const stdDev = mean * (DistributionBase.helpers.getParam(parameters, 'stdDev', 10.0) / 100);
-        const value = mean //DistributionBase.helpers.getParam(parameters, 'value', mean);
-
-        // Generate x values
-        const min = mean - 4 * stdDev;
-        const max = mean + 4 * stdDev;
-        const xValues = PlotUtils.generateXValues(min, max);
-
-        // Calculate PDF values
-        const yValues = xValues.map(x => jStat.normal.pdf(x, mean, stdDev));
-        const peakY = jStat.normal.pdf(mean, mean, stdDev);
-        const valueY = jStat.normal.pdf(value, mean, stdDev);
-
-        const data = [PlotUtils.createMainCurve(xValues, yValues)];
-        const shapes = [];
-        const annotations = [];
-
-        // Add markers for mean and standard deviation
-        if (options.showMarkers) {
-            const markers = [];
-
-            // Add value marker
-            markers.push({ x: value, y: valueY, label: 'Value' });
-
-            if (options.showMean && value !== mean) {
-                markers.push({ x: mean, y: peakY, label: 'μ' });
-            }
-
-            if (options.showStdDev) {
-                markers.push(
-                    { x: mean + stdDev, y: jStat.normal.pdf(mean + stdDev, mean, stdDev), label: '+1σ' },
-                    { x: mean - stdDev, y: jStat.normal.pdf(mean - stdDev, mean, stdDev), label: '-1σ' },
-                    { x: mean + 2 * stdDev, y: jStat.normal.pdf(mean + 2 * stdDev, mean, stdDev), label: '+2σ' },
-                    { x: mean - 2 * stdDev, y: jStat.normal.pdf(mean - 2 * stdDev, mean, stdDev), label: '-2σ' }
-                );
-            }
-
-            data.push(PlotUtils.createMarkers(markers));
-            annotations.push(...PlotUtils.createMarkerAnnotations(markers));
+    generatePDF(parameters, xValues, percentiles = []) {
+        const mean = getParam(parameters, 'value', 0);
+        const stdDev = getParam(parameters, 'stdDev', 1);
+        
+        // Calculate PDF values for all x values at once
+        const pdfValues = xValues.map(x => jStat.normal.pdf(x, mean, stdDev));
+        
+        // Calculate percentile x-values
+        const percentilePoints = [];
+        if (percentiles && percentiles.length > 0) {
+            percentiles.forEach(percentile => {
+                const p = percentile.value / 100;
+                const x = jStat.normal.inv(p, mean, stdDev);
+                const y = jStat.normal.pdf(x, mean, stdDev);
+                percentilePoints.push({
+                    percentile: percentile,
+                    x: x,
+                    y: y
+                });
+            });
         }
-
-        // Add vertical lines
-        if (options.showMean) {
-            shapes.push(PlotUtils.createVerticalLine(mean, peakY, { color: 'rgba(0, 0, 0, 0.5)', width: 2, dash: 'dot' }));
-        }
-
-        if (options.showStdDev) {
-            shapes.push(
-                PlotUtils.createVerticalLine(mean + stdDev, jStat.normal.pdf(mean + stdDev, mean, stdDev)),
-                PlotUtils.createVerticalLine(mean - stdDev, jStat.normal.pdf(mean - stdDev, mean, stdDev)),
-                PlotUtils.createVerticalLine(mean + 2 * stdDev, jStat.normal.pdf(mean + 2 * stdDev, mean, stdDev)),
-                PlotUtils.createVerticalLine(mean - 2 * stdDev, jStat.normal.pdf(mean - 2 * stdDev, mean, stdDev))
-            );
-        }
-
-        // Add parameter summary
-        if (options.showSummary) {
-            annotations.push(
-                PlotUtils.createParameterLabel(
-                    mean + 2 * stdDev,
-                    peakY / 2,
-                    `μ: ${mean.toFixed(2)}, σ: ${stdDev.toFixed(2)}`,
-                    'right'
-                )
-            );
-        }
-
-        return {
-            data,
-            shapes,
-            annotations,
-            title: 'Normal Distribution',
-            xaxisTitle: options.addonAfter ? `Value (${options.addonAfter})` : 'Value',
-            yaxisTitle: 'Probability Density',
-            showLegend: false
+        
+        // Calculate key statistics
+        const stats = {
+            mean: mean,
+            median: mean, // For normal distribution, mean = median
+            mode: mean,   // For normal distribution, mean = mode = median
+            stdDev: stdDev,
+            variance: stdDev * stdDev
         };
+        
+        // Create key point data
+        const keyPoints = [
+            { x: mean, y: jStat.normal.pdf(mean, mean, stdDev), label: 'Mean' }
+        ];
+        
+        // Add std dev points
+        const stdDevPlus = mean + stdDev;
+        const stdDevMinus = mean - stdDev;
+        
+        keyPoints.push(
+            { x: stdDevPlus, y: jStat.normal.pdf(stdDevPlus, mean, stdDev), label: '+1σ' },
+            { x: stdDevMinus, y: jStat.normal.pdf(stdDevMinus, mean, stdDev), label: '-1σ' }
+        );
+        
+        return {
+            xValues,
+            pdfValues,
+            percentilePoints,
+            keyPoints,
+            stats
+        };
+    },
+
+    /**
+     * Generate CDF curve and key statistics for plotting
+     * @param {Object} parameters - Distribution parameters
+     * @param {Array} xValues - X values to calculate for
+     * @param {Array} percentiles - Array of percentile objects (optional)
+     * @returns {Object} CDF curve data and statistics
+     */
+    generateCDF(parameters, xValues, percentiles = []) {
+        const mean = getParam(parameters, 'value', 0);
+        const stdDev = getParam(parameters, 'stdDev', 1);
+        
+        // Calculate CDF values for all x values at once
+        const cdfValues = xValues.map(x => jStat.normal.cdf(x, mean, stdDev));
+        
+        // Calculate percentile x-values
+        const percentilePoints = [];
+        if (percentiles && percentiles.length > 0) {
+            percentiles.forEach(percentile => {
+                const p = percentile.value / 100;
+                const x = jStat.normal.inv(p, mean, stdDev);
+                const y = p; // CDF value is exactly p at the percentile point
+                percentilePoints.push({
+                    percentile: percentile,
+                    x: x,
+                    y: y
+                });
+            });
+        }
+        
+        // Calculate key statistics
+        const stats = {
+            mean: mean,
+            median: mean, // For normal distribution, mean = median
+            mode: mean,   // For normal distribution, mean = mode = median
+            stdDev: stdDev,
+            variance: stdDev * stdDev
+        };
+        
+        // Create key point data for CDF
+        const keyPoints = [
+            { x: mean, y: 0.5, label: 'Mean' } // CDF = 0.5 at mean for normal distribution
+        ];
+        
+        // Add std dev points
+        const stdDevPlus = mean + stdDev;
+        const stdDevMinus = mean - stdDev;
+        
+        keyPoints.push(
+            { x: stdDevPlus, y: jStat.normal.cdf(stdDevPlus, mean, stdDev), label: '+1σ' }, // ~0.84
+            { x: stdDevMinus, y: jStat.normal.cdf(stdDevMinus, mean, stdDev), label: '-1σ' } // ~0.16
+        );
+        
+        return {
+            xValues,
+            cdfValues, // CDF values instead of PDF values
+            percentilePoints,
+            keyPoints,
+            stats
+        };
+    },
+
+    /**
+     * Calculate quantile (inverse CDF) for probability p
+     * @param {number} p - Probability (0-1)
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Quantile value
+     */
+    calculateQuantile(p, parameters) {
+        const mean = getParam(parameters, 'value', 0);
+        const stdDev = getParam(parameters, 'stdDev', 1);
+        return jStat.normal.inv(p, mean, stdDev);
     },
 
     /**
@@ -128,42 +171,44 @@ export const Normal = {
      * @returns {number} Standard deviation
      */
     calculateStdDev(parameters) {
-        const mean = DistributionBase.helpers.getParam(parameters, 'value', 0);
-        return mean * (DistributionBase.helpers.getParam(parameters, 'stdDev', 10.0) / 100);
+        return getParam(parameters, 'stdDev', 1);
     },
 
     /**
-     * Get metadata for normal distribution
+     * Get metadata for Normal distribution
      * @returns {Object} Metadata
      */
     getMetadata() {
         return {
             name: "Normal Distribution",
-            description: "Symmetric bell-shaped distribution, defined by a mean and standard deviation.",
-            applications: "Ideal for modeling random variables where values cluster around a mean, with no skew.",
-            examples: "Energy production fluctuations, equipment performance variations, measurement errors.",
+            description: "Symmetrical bell curve representing values clustered around a mean.",
+            applications: "Modeling natural phenomena, measurement errors, and averages of large samples regardless of the underlying distribution.",
+            examples: "Average wind speeds, measurement errors, aggregated financial metrics.",
+            nonNegativeSupport: false, // Normal distribution supports negative values
+            getMean: (parameters) => parameters.value || 0,
             parameters: [
                 {
                     name: "value",
-                    description: "Mean (average) value",
+                    description: "Mean value of the distribution",
                     required: true,
                     fieldType: "number",
                     fieldProps: {
                         label: "Mean",
-                        tooltip: "Mean value (center of distribution)"
+                        tooltip: "Center point of the normal distribution",
+                        defaultValue: 0
                     }
                 },
                 {
                     name: "stdDev",
-                    description: "Standard deviation",
+                    description: "Standard deviation (σ) controlling curve width",
                     required: true,
-                    fieldType: "percentage",
+                    fieldType: "number",
                     fieldProps: {
-                        label: "Standard Deviation",
-                        tooltip: "Measure of dispersion",
-                        min: 0.1,
+                        label: "Std Dev",
+                        tooltip: "Standard deviation controls the spread of the distribution",
+                        min: 0.001,
                         step: 0.1,
-                        defaultValue: 10.0
+                        defaultValue: 1
                     }
                 }
             ]
