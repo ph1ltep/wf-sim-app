@@ -127,7 +127,7 @@ const renderTimeSeriesFields = (
 
                                         // Format the value appropriately
                                         const formattedValue = typeof value === 'number' ?
-                                            value.toFixed(4) : (value === null ? 'null' : String(value));
+                                            value.toFixed(String(paramMeta.fieldProps.step).length - 1) : (value === null ? 'null' : String(value));
 
                                         // Display description if available
                                         const description = paramMeta?.description ?

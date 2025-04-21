@@ -194,20 +194,19 @@ const DistributionFieldV3 = ({
         };
 
         // Call API to fit distribution
-        const success = await fitDistributionToData(distribution, validData, async (response) => {
-            // API returns fitted parameters directly in the response.data object
-            if (response && response.success && response.data) {
-                const fittedParams = response.data;
-
-                // Update all parameters in the context
-                await updateByPath(parametersPath, fittedParams);
+        const fittedParams = await fitDistributionToData(distribution, validData, async (fittedParams) => {
+            // If fitting succeeded, update parameters in context
+            if (fittedParams) {
+                for (const [key, value] of Object.entries(fittedParams)) {
+                    updateByPath([...parametersPath, key], value);
+                }
 
                 // Mark as having fitted parameters
                 setHasFittedParams(true);
             }
         });
 
-        return success;
+        return fittedParams;
     }, [currentType, fitDistributionToData, parameters, parametersPath, timeSeriesData, updateByPath]);
 
     // Handle clearing fitted parameters

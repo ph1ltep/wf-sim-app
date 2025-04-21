@@ -121,12 +121,8 @@ const useInputSim = () => {
             const response = await fitDistribution(params);
 
             if (response && response.success && response.data) {
-                // Call onSuccess callback with fitted parameters
                 if (onSuccess && typeof onSuccess === 'function') {
-                    await onSuccess({
-                        type: response.data.type || normalizedDist.type,
-                        parameters: response.data.parameters || {}
-                    });
+                    await onSuccess(response.data);
                 }
 
                 message.success('Distribution fitted successfully');
