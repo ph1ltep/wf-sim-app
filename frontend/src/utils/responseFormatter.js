@@ -25,6 +25,7 @@ const formatValidation = (isValid, errors = [], details = null) => {
     }
 
     // Log debugging info in development mode
+    const NODE_ENV = process.env.NODE_ENV || 'development';
     if (process.env.NODE_ENV === 'development' && !response.isValid) {
         console.warn(`Validation failed${details?.path ? ` for path: ${details.path}` : ''}`, {
             ...details,

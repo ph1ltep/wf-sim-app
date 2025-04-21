@@ -65,7 +65,7 @@ const ValidationResponseSchema = Yup.object().shape({
  */
 const FieldValidationResponseSchema = ValidationResponseSchema.concat(
     Yup.object().shape({
-        applied: Yup.boolean().required().default(false), // Indicates if the value was applied to the field
+        applied: Yup.number().required().default(0), // Indicates if the value was applied to the field
         error: Yup.string().when('isValid', { is: false, then: Yup.string().required(), otherwise: Yup.string() }), // Primary error message if validation failed (optional)
         path: Yup.array().of(Yup.string()),
     })

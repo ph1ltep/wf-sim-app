@@ -287,41 +287,86 @@ export const ScenarioProvider = ({ children }) => {
   }, [scenarioData]);
 
   /**
-    * Updates a value at a specific path in the scenario data with validation
-    * 
-    * @param {string[]|string} path - Path to the value to update (array or dot-notation string)
-    * @param {any} value - New value to set
-    * @returns {Object} Response object of type FieldValidationResponseSchema
-    */
-  const updateByPath = useCallback(async (path, value) => {
+     * Updates values at specific paths in the scenario data with validation
+     * @param {string[]|string|Object} pathOrUpdates - Path to update or object of path-value pairs
+     * @param {any} value - New value (ignored if pathOrUpdates is an object)
+     * @returns {Object} FieldValidationResponseSchema
+     */
+  const updateByPath = useCallback(async (pathOrUpdates, value) => {
     if (!hasValidScenario(false)) {
       return {
         isValid: false,
-        applied: false,
+        applied: 0,
         errors: ['No active scenario'],
         error: 'No active scenario',
-        path: Array.isArray(path) ? path : path.split('.')
+        path: []
       };
     }
 
-    const validationResult = await validatePath(ScenarioSchema, path, value, scenarioData);
-    const pathArray = Array.isArray(path) ? path : path.split('.');
+    console.log(pathOrUpdates);
+    console.log(!Array.isArray(pathOrUpdates));
+    if (typeof pathOrUpdates === 'object' && !Array.isArray(pathOrUpdates)) {
+      // Batch updates
+      const updates = Object.entries(pathOrUpdates);
+      if (updates.length === 0) {
+        return {
+          isValid: true,
+          applied: 0,
+          errors: []
+        };
+      }
 
-    console.log('updateByPath validation:', {
-      path: pathArray,
-      isValid: validationResult.isValid,
-      value: value,
-      detailsValue: validationResult.details?.value,
-      errors: validationResult.errors
-    });
+      // Validate all updates
+      const validatedUpdates = await Promise.all(
+        updates.map(async ([path, val]) => {
+          const pathArray = path.split('.');
+          const validationResult = await validatePath(ScenarioSchema, pathArray, val, scenarioData);
+          return { pathArray, value: val, validationResult };
+        })
+      );
+
+      // Apply valid updates
+      const errors = [];
+      let appliedCount = 0;
+
+      setScenarioData(produce(scenarioData, draft => {
+        for (const { pathArray, value, validationResult } of validatedUpdates) {
+          if (validationResult.isValid) {
+            const finalValue = validationResult.details?.value ?? value;
+            if (finalValue === null && value !== null) {
+              errors.push(`Validation cast value to null for path ${pathArray.join('.')}`);
+              continue;
+            }
+            set(draft, pathArray, finalValue);
+            appliedCount++;
+          } else {
+            errors.push(validationResult.error || 'Validation failed');
+          }
+        }
+      }));
+
+      if (appliedCount > 0) {
+        setIsModified(true);
+      }
+
+      return {
+        isValid: errors.length === 0,
+        applied: appliedCount,
+        errors,
+        error: errors[0]
+      };
+    }
+
+    // Single update
+    const pathArray = Array.isArray(pathOrUpdates) ? pathOrUpdates : pathOrUpdates.split('.');
+    const validationResult = await validatePath(ScenarioSchema, pathArray, value, scenarioData);
 
     if (validationResult.isValid) {
-      const finalValue = validationResult.details?.value !== undefined ? validationResult.details.value : value;
+      const finalValue = validationResult.details?.value ?? value;
       if (finalValue === null && value !== null) {
-        console.warn(`Validation cast value to null for path ${pathArray.join('.')}, original value:`, value);
         return {
           isValid: false,
-          applied: false,
+          applied: 0,
           errors: [`Validation cast value to null for path ${pathArray.join('.')}`],
           error: 'Validation cast value to null',
           path: pathArray
@@ -336,25 +381,26 @@ export const ScenarioProvider = ({ children }) => {
 
       return {
         isValid: true,
-        applied: true,
+        applied: 1,
         errors: [],
         path: pathArray,
         appliedValue: finalValue
       };
-    } else {
-      const dev_mode = process.env.NODE_ENV === 'development';
-      if (dev_mode) {
-        console.error('UpdateByPath Validation failed:', validationResult.errors);
-      }
-      return {
-        isValid: false,
-        applied: false,
-        errors: validationResult.errors || [],
-        error: validationResult.error || validationResult.errors?.[0] || 'Validation failed',
-        path: pathArray
-      };
     }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.error('UpdateByPath Validation failed:', validationResult.errors);
+    }
+
+    return {
+      isValid: false,
+      applied: 0,
+      errors: validationResult.errors || [],
+      error: validationResult.error || validationResult.errors?.[0] || 'Validation failed',
+      path: pathArray
+    };
   }, [scenarioData, hasValidScenario]);
+
 
   // Error component for reuse
   const ScenarioErrorComponent = useCallback(() => {

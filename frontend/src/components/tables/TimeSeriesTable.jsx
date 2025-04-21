@@ -55,7 +55,7 @@ const EditableCell = ({
             }
             handleSave({ ...record, ...values });
         } catch (errInfo) {
-            console.error('Save failed:', errInfo);
+            console.error('Save failed:', errInfo); 
         }
     };
 
