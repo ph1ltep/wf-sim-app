@@ -37,13 +37,17 @@ const DistributionPlot = ({
     const [plotLayout, setPlotLayout] = useState({});
     const { getValueByPath } = useScenario();
 
-    // Get percentiles from scenario settings
+    // Get percentiles and primary percentile from scenario settings
     const percentiles = useMemo(() => {
         if (showPercentiles) {
             return getValueByPath(['settings', 'simulation', 'percentiles'], []);
         }
         return [];
     }, [showPercentiles, getValueByPath]);
+
+    const primaryPercentile = useMemo(() => {
+        return getValueByPath(['settings', 'simulation', 'primaryPercentile'], 50);
+    }, [getValueByPath]);
 
     // Normalize parameters to ensure we have valid objects
     const normalizedParameters = useMemo(() => {
@@ -66,6 +70,7 @@ const DistributionPlot = ({
                 showSummary,
                 showPercentiles,
                 percentiles,
+                primaryPercentile, // Pass primary percentile to plotting utilities
                 baseColor
             };
 
@@ -115,6 +120,7 @@ const DistributionPlot = ({
         showSummary,
         showPercentiles,
         percentiles,
+        primaryPercentile, // Include primary percentile in dependencies
         baseColor
     ]);
 

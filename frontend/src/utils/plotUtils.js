@@ -75,7 +75,11 @@ export function createMarkers(points, options = {}) {
             color
         },
         name,
-        text: points.map(p => p.label),
+        text: points.map(p => {
+            // Format x value with appropriate precision
+            const xFormatted = typeof p.x === 'number' ? p.x.toFixed(2) : p.x;
+            return `${p.label}: ${xFormatted}`;
+        }),
         hoverinfo,
         showlegend: showLegend
     };
@@ -396,94 +400,114 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
     
     // Add percentile bands if requested
     if (showPercentiles && percentiles && percentiles.length > 0) {
-        // Use organizePercentiles to get band structure
-        const { primary, bands } = organizePercentiles(percentiles);
-        
-        // Calculate base transparency for bands
-        const baseTransparency = 0.33;
+        // Use updated organizePercentiles to get band structure
+        const { primary, percentilePairs, singles } = organizePercentiles(pdfData.percentilePoints, options.primaryPercentile || 50);
         
         // Add band for each percentile pair
-        bands.forEach(band => {
-            // Find percentile points in the PDF data
-            const lowerPoint = pdfData.percentilePoints.find(p => p.percentile.value === band.lower.value);
-            const upperPoint = pdfData.percentilePoints.find(p => p.percentile.value === band.upper.value);
-            
-            if (!lowerPoint || !upperPoint) return;
-            
-            // Create band
-            const bandPlot = createPercentileBand(
-                pdfData.xValues,
-                pdfData.pdfValues,
-                lowerPoint.x,
-                upperPoint.x,
-                {
-                    opacity: baseTransparency,
-                    name: `P${band.lower.value}-P${band.upper.value}`
+        if (percentilePairs && percentilePairs.length > 0) {
+            percentilePairs.forEach(band => {
+                // Only create band if we have both lower and upper points
+                if (!band.lower || !band.upper) return;
+                
+                // Create band with proper opacity from the band object
+                const bandOpacity = band.opacity || 0.33;
+                
+                const bandPlot = createPercentileBand(
+                    pdfData.xValues,
+                    pdfData.pdfValues,
+                    band.lower.x,
+                    band.upper.x,
+                    {
+                        opacity: bandOpacity,
+                        name: band.name || `P${band.lower.percentile.value}-P${band.upper.percentile.value}`
+                    }
+                );
+                
+                if (bandPlot) {
+                    data.push(bandPlot);
                 }
-            );
-            
-            if (bandPlot) {
-                data.push(bandPlot);
-            }
-            
-            // Add percentile markers
-            const percentileMarkers = [
-                { x: lowerPoint.x, y: lowerPoint.y, label: `P${band.lower.value}` },
-                { x: upperPoint.x, y: upperPoint.y, label: `P${band.upper.value}` }
-            ];
-            
-            // Add markers
-            data.push(createMarkers(percentileMarkers, {
-                size: 5,
-                color: 'rgba(100, 100, 100, 0.7)',
-                name: 'Percentiles'
-            }));
-            
-            // Add annotations
-            annotations.push(...createMarkerAnnotations(percentileMarkers, {
-                fontSize: 9,
-                fontColor: 'rgba(100, 100, 100, 0.9)'
-            }));
-        });
+                
+                // Add percentile markers
+                const percentileMarkers = [
+                    { x: band.lower.x, y: band.lower.y, label: `P${band.lower.percentile.value}` },
+                    { x: band.upper.x, y: band.upper.y, label: `P${band.upper.percentile.value}` }
+                ];
+                
+                // Add markers
+                data.push(createMarkers(percentileMarkers, {
+                    size: 5,
+                    color: 'rgba(100, 100, 100, 0.7)',
+                    name: 'Percentiles'
+                }));
+                
+                // Add annotations
+                annotations.push(...createMarkerAnnotations(percentileMarkers, {
+                    fontSize: 9,
+                    fontColor: 'rgba(100, 100, 100, 0.9)'
+                }));
+            });
+        }
         
-        // Add primary percentile
-        if (primary) {
-            const primaryPoint = pdfData.percentilePoints.find(p => p.percentile.value === primary.value);
-            
-            if (primaryPoint) {
+        // Add single percentile lines
+        if (singles && singles.length > 0) {
+            singles.forEach(point => {
                 // Add vertical line
                 shapes.push(createVerticalLine(
-                    primaryPoint.x,
-                    primaryPoint.y,
+                    point.x,
+                    point.y,
                     { 
-                        color: 'rgba(0, 0, 0, 0.7)', 
-                        width: 2,
-                        dash: 'dash'
+                        color: 'rgba(100, 100, 100, 0.5)', 
+                        width: 1,
+                        dash: 'dot'
                     }
                 ));
                 
                 // Add marker
                 data.push(createMarkers(
-                    [{ x: primaryPoint.x, y: primaryPoint.y, label: `P${primary.value} (Primary)` }],
+                    [{ x: point.x, y: point.y, label: `P${point.percentile.value}` }],
                     {
-                        size: 7,
-                        color: 'rgba(0, 0, 0, 0.8)',
-                        name: `P${primary.value} (Primary)`,
+                        size: 5,
+                        color: 'rgba(100, 100, 100, 0.7)',
+                        name: `P${point.percentile.value}`
                     }
                 ));
-                
-                // Add annotation
-                annotations.push(...createMarkerAnnotations(
-                    [{ x: primaryPoint.x, y: primaryPoint.y, label: `P${primary.value}` }],
-                    {
-                        xanchor: 'center',
-                        yanchor: 'bottom',
-                        yshift: 10,
-                        fontSize: 10,
-                        fontColor: 'rgba(0, 0, 0, 0.9)'
-                    }
-                ));
-            }
+            });
+        }
+        
+        // Add primary percentile
+        if (primary) {
+            // Add vertical line
+            shapes.push(createVerticalLine(
+                primary.x,
+                primary.y,
+                { 
+                    color: 'rgba(0, 0, 0, 0.7)', 
+                    width: 2,
+                    dash: 'dash'
+                }
+            ));
+            
+            // Add marker
+            data.push(createMarkers(
+                [{ x: primary.x, y: primary.y, label: `P${primary.percentile.value} (Primary)` }],
+                {
+                    size: 7,
+                    color: 'rgba(0, 0, 0, 0.8)',
+                    name: `P${primary.percentile.value} (Primary)`,
+                }
+            ));
+            
+            // Add annotation
+            annotations.push(...createMarkerAnnotations(
+                [{ x: primary.x, y: primary.y, label: `P${primary.percentile.value}` }],
+                {
+                    xanchor: 'center',
+                    yanchor: 'bottom',
+                    yshift: 10,
+                    fontSize: 10,
+                    fontColor: 'rgba(0, 0, 0, 0.9)'
+                }
+            ));
         }
     }
     
@@ -723,3 +747,6 @@ export const PlotUtils = {
     hexToRgb,
     organizePercentiles
 };
+
+
+

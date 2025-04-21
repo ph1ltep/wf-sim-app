@@ -40,7 +40,9 @@ export const Normal = {
      */
     generatePDF(parameters, xValues, percentiles = []) {
         const mean = getParam(parameters, 'value', 0);
-        const stdDev = getParam(parameters, 'stdDev', 1);
+        // Convert stdDev from percentage to absolute value
+        const stdDevPercent = getParam(parameters, 'stdDev', 10);
+        const stdDev = Math.abs(mean) * (stdDevPercent / 100);
         
         // Calculate PDF values for all x values at once
         const pdfValues = xValues.map(x => jStat.normal.pdf(x, mean, stdDev));
@@ -66,6 +68,7 @@ export const Normal = {
             median: mean, // For normal distribution, mean = median
             mode: mean,   // For normal distribution, mean = mode = median
             stdDev: stdDev,
+            stdDevPercent: stdDevPercent,
             variance: stdDev * stdDev
         };
         
@@ -101,7 +104,9 @@ export const Normal = {
      */
     generateCDF(parameters, xValues, percentiles = []) {
         const mean = getParam(parameters, 'value', 0);
-        const stdDev = getParam(parameters, 'stdDev', 1);
+        // Convert stdDev from percentage to absolute value
+        const stdDevPercent = getParam(parameters, 'stdDev', 10);
+        const stdDev = Math.abs(mean) * (stdDevPercent / 100);
         
         // Calculate CDF values for all x values at once
         const cdfValues = xValues.map(x => jStat.normal.cdf(x, mean, stdDev));
@@ -127,6 +132,7 @@ export const Normal = {
             median: mean, // For normal distribution, mean = median
             mode: mean,   // For normal distribution, mean = mode = median
             stdDev: stdDev,
+            stdDevPercent: stdDevPercent,
             variance: stdDev * stdDev
         };
         
@@ -161,7 +167,10 @@ export const Normal = {
      */
     calculateQuantile(p, parameters) {
         const mean = getParam(parameters, 'value', 0);
-        const stdDev = getParam(parameters, 'stdDev', 1);
+        // Convert stdDev from percentage to absolute value
+        const stdDevPercent = getParam(parameters, 'stdDev', 10);
+        const stdDev = Math.abs(mean) * (stdDevPercent / 100);
+        
         return jStat.normal.inv(p, mean, stdDev);
     },
 
@@ -171,7 +180,9 @@ export const Normal = {
      * @returns {number} Standard deviation
      */
     calculateStdDev(parameters) {
-        return getParam(parameters, 'stdDev', 1);
+        const mean = getParam(parameters, 'value', 0);
+        const stdDevPercent = getParam(parameters, 'stdDev', 10);
+        return Math.abs(mean) * (stdDevPercent / 100);
     },
 
     /**
@@ -200,15 +211,15 @@ export const Normal = {
                 },
                 {
                     name: "stdDev",
-                    description: "Standard deviation (σ) controlling curve width",
+                    description: "Standard deviation as percentage of mean",
                     required: true,
                     fieldType: "number",
                     fieldProps: {
-                        label: "Std Dev",
-                        tooltip: "Standard deviation controls the spread of the distribution",
+                        label: "Std Dev (%)",
+                        tooltip: "Standard deviation as percentage of the mean value",
                         min: 0.001,
                         step: 0.1,
-                        defaultValue: 1
+                        defaultValue: 10
                     }
                 }
             ]
