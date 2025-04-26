@@ -55,26 +55,29 @@ const useInputSim = () => {
             const response = await simulateDistributions(params);
 
             if (response && response.success) {
-                // Update each simulation result in context
+                // Get all simulation results
                 const results = response.data.simulationInfo;
 
-                // Map results to their respective paths in the context
-                const resultMap = [
-                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'], index: 0 },
-                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice'], index: 1 },
-                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'downtimePerEvent'], index: 2 },
-                    { path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability'], index: 3 }
-                ];
-
-                // Update each result in the scenario context
-                for (const { path, index } of resultMap) {
-                    if (results[index]) {
-                        await updateByPath(path, results[index]);
+                // Create batch updates object using the keys from the distribution objects
+                const updates = {};
+                for (const result of results) {
+                    if (result.distribution && result.distribution.key) {
+                        const key = result.distribution.key;
+                        const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
+                        updates[path.join('.')] = result;
                     }
                 }
 
-                message.success('Distributions updated successfully');
-                return true;
+                // Perform a single batch update
+                const result = await updateByPath(updates);
+
+                if (result.isValid) {
+                    message.success('Distributions updated successfully');
+                    return true;
+                } else {
+                    message.error('Failed to update distributions: ' + (result.error || 'Unknown error'));
+                    return false;
+                }
             } else {
                 message.error('Failed to update distributions: ' + (response?.error || 'Unknown error'));
                 return false;
