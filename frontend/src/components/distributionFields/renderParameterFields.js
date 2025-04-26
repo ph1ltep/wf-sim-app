@@ -18,6 +18,7 @@ import { DistributionUtils } from '../../utils/distributions';
  * @param {string} options.valueType - Type of value field (number, percentage, currency)
  * @param {boolean} options.renderValueSeparately - Whether value field is rendered separately
  * @param {string} options.label - Override for the field label
+ * @param {Object} options.currentParameters - Current parameter values to inform defaults
  * @returns {Array} Array of parameter field components
  */
 const renderParameterFields = (distributionType, parametersPath, options = {}) => {
@@ -28,11 +29,15 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
         valueType = 'number',
         renderValueSeparately = true,
         defaultValue,
-        label
+        label,
+        currentParameters = {}
     } = options;
 
-    // Get distribution metadata using the utility function
-    const metadata = DistributionUtils.getMetadata(distributionType);
+    // Get current value to pass to getMetadata
+    const currentValue = currentParameters?.value !== undefined ? currentParameters.value : undefined;
+
+    // Get distribution metadata using the utility function, passing the current value
+    const metadata = DistributionUtils.getMetadata(distributionType, currentValue);
 
     if (!metadata || !metadata.parameters) {
         return [<div key="no-params">No parameters available for this distribution</div>];

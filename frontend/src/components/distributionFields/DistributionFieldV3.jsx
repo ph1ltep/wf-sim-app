@@ -315,7 +315,8 @@ const DistributionFieldV3 = ({
                       addonAfter,
                       step,
                       colSpan,
-                      renderValueSeparately: true
+                      renderValueSeparately: true,
+                      currentParameters: { value: parameters.value } // Pass the current value from parameters
                     }).map((field, index) => (
                       <FormCol span={colSpan} key={index}>
                         {field}
