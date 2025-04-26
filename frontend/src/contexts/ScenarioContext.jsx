@@ -303,8 +303,8 @@ export const ScenarioProvider = ({ children }) => {
       };
     }
 
-    console.log(pathOrUpdates);
-    console.log(!Array.isArray(pathOrUpdates));
+    //console.log(pathOrUpdates);
+    //console.log(!Array.isArray(pathOrUpdates));
     if (typeof pathOrUpdates === 'object' && !Array.isArray(pathOrUpdates)) {
       // Batch updates
       const updates = Object.entries(pathOrUpdates);

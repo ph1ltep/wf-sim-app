@@ -1,11 +1,14 @@
 // src/utils/distributions/weibull.js
 import * as jStat from 'jstat';
-import { getParam } from '../plotUtils';
+import { DistributionBase } from './distributionBase';
 
 /**
  * Weibull Distribution
+ * Extends distributionBase with Weibull distribution implementation
  */
 export const Weibull = {
+    // Extend the base distribution template
+    ...DistributionBase.template,
     /**
      * Validate parameters for Weibull distribution
      * @param {Object} parameters - Distribution parameters
@@ -38,6 +41,92 @@ export const Weibull = {
     },
 
     /**
+     * Calculate mean value for Weibull distribution
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Mean value
+     */
+    calculateMean(parameters) {
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+        return scale * jStat.gammafn(1 + 1 / shape);
+    },
+
+    /**
+     * Calculate standard deviation for Weibull distribution
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Standard deviation
+     */
+    calculateStdDev(parameters) {
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+
+        const variance = scale * scale * (
+            jStat.gammafn(1 + 2 / shape) -
+            Math.pow(jStat.gammafn(1 + 1 / shape), 2)
+        );
+
+        return Math.sqrt(variance);
+    },
+
+    /**
+     * Calculate PDF at a specific point
+     * @param {number} x - Point to evaluate
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} PDF value
+     */
+    calculatePDF(x, parameters) {
+        if (x <= 0) return 0;
+
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+
+        try {
+            const y = (shape / scale) *
+                Math.pow(x / scale, shape - 1) *
+                Math.exp(-Math.pow(x / scale, shape));
+
+            // Handle very small or large values to avoid numerical issues
+            return isFinite(y) ? y : 0;
+        } catch (e) {
+            return 0;
+        }
+    },
+
+    /**
+     * Calculate CDF at a specific point
+     * @param {number} x - Point to evaluate
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} CDF value
+     */
+    calculateCDF(x, parameters) {
+        if (x <= 0) return 0;
+
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+
+        try {
+            const y = 1 - Math.exp(-Math.pow(x / scale, shape));
+            return isFinite(y) ? y : (x > 0 ? 1 : 0);
+        } catch (e) {
+            return x > 0 ? 1 : 0;
+        }
+    },
+
+    /**
+     * Calculate quantile (inverse CDF) for probability p
+     * @param {number} p - Probability (0-1)
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Quantile value
+     */
+    calculateQuantile(p, parameters) {
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+
+        // Weibull quantile function: scale * (-ln(1-p))^(1/shape)
+        return scale * Math.pow(-Math.log(1 - p), 1 / shape);
+    },
+
+    /**
      * Generate PDF curve and key statistics for plotting
      * @param {Object} parameters - Distribution parameters
      * @param {Array} xValues - X values to calculate for
@@ -45,54 +134,36 @@ export const Weibull = {
      * @returns {Object} PDF curve data and statistics
      */
     generatePDF(parameters, xValues, percentiles = []) {
-        const scale = getParam(parameters, 'scale', 1);
-        const shape = getParam(parameters, 'shape', 2);
-        const value = getParam(parameters, 'value', this.getMeanValue(scale, shape));
-        
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+        const value = DistributionBase.helpers.getParam(parameters, 'value', this.calculateMean(parameters));
+
         // Filter x values to avoid issues near zero for small shape values
         // This avoids performance issues with very steep curves
         const filteredXValues = xValues.filter(x => x >= 0.001);
-        
+
         // Calculate PDF values for filtered x values
-        const pdfValues = filteredXValues.map(x => {
-            return (shape / scale) * 
-                Math.pow(x / scale, shape - 1) * 
-                Math.exp(-Math.pow(x / scale, shape));
-        });
-        
+        const pdfValues = filteredXValues.map(x => this.calculatePDF(x, parameters));
+
         // Calculate mean and other statistics
-        const mean = this.getMeanValue(scale, shape);
-        
-        // Calculate variance and standard deviation
-        const variance = scale * scale * (
-            jStat.gammafn(1 + 2 / shape) - 
-            Math.pow(jStat.gammafn(1 + 1 / shape), 2)
-        );
-        const stdDev = Math.sqrt(variance);
-        
+        const mean = this.calculateMean(parameters);
+        const stdDev = this.calculateStdDev(parameters);
+
         // Calculate median and mode
         const median = scale * Math.pow(Math.log(2), 1 / shape);
         let mode = 0;
         if (shape > 1) {
             mode = scale * Math.pow((shape - 1) / shape, 1 / shape);
         }
-        
+
         // Calculate percentile x-values
         const percentilePoints = [];
         if (percentiles && percentiles.length > 0) {
             percentiles.forEach(percentile => {
                 const p = percentile.value / 100;
-                // Weibull quantile: scale * (-ln(1-p))^(1/shape)
-                const x = scale * Math.pow(-Math.log(1 - p), 1 / shape);
-                
-                // Calculate PDF at this point
-                let y = (shape / scale) * 
-                    Math.pow(x / scale, shape - 1) * 
-                    Math.exp(-Math.pow(x / scale, shape));
-                
-                // Handle very small or large values to avoid numerical issues
-                if (!isFinite(y) || y < 0) y = 0;
-                
+                const x = this.calculateQuantile(p, parameters);
+                const y = this.calculatePDF(x, parameters);
+
                 percentilePoints.push({
                     percentile: percentile,
                     x: x,
@@ -100,45 +171,45 @@ export const Weibull = {
                 });
             });
         }
-        
+
         // Create key points for markers
         const keyPoints = [];
-        
+
         // Add value point
-        const valueY = this.calculatePDFPoint(value, scale, shape);
+        const valueY = this.calculatePDF(value, parameters);
         keyPoints.push({ x: value, y: valueY, label: 'Value' });
-        
+
         // Add mean point if different from value
         if (Math.abs(value - mean) > 0.001 * mean) {
-            const meanY = this.calculatePDFPoint(mean, scale, shape);
+            const meanY = this.calculatePDF(mean, parameters);
             keyPoints.push({ x: mean, y: meanY, label: 'Mean' });
         }
-        
+
         // Add median point if significantly different from mean
         if (Math.abs(median - mean) > 0.001 * mean) {
-            const medianY = this.calculatePDFPoint(median, scale, shape);
+            const medianY = this.calculatePDF(median, parameters);
             keyPoints.push({ x: median, y: medianY, label: 'Median' });
         }
-        
+
         // Add mode point if shape > 1 and significantly different from mean
         if (shape > 1 && Math.abs(mode - mean) > 0.001 * mean) {
-            const modeY = this.calculatePDFPoint(mode, scale, shape);
+            const modeY = this.calculatePDF(mode, parameters);
             keyPoints.push({ x: mode, y: modeY, label: 'Mode' });
         }
-        
+
         // Add std dev points
         const stdDevPlus = mean + stdDev;
         // Avoid negative values for std dev points
         const stdDevMinus = Math.max(0.001, mean - stdDev);
-        
-        const stdDevPlusY = this.calculatePDFPoint(stdDevPlus, scale, shape);
-        const stdDevMinusY = this.calculatePDFPoint(stdDevMinus, scale, shape);
-        
+
+        const stdDevPlusY = this.calculatePDF(stdDevPlus, parameters);
+        const stdDevMinusY = this.calculatePDF(stdDevMinus, parameters);
+
         keyPoints.push(
             { x: stdDevPlus, y: stdDevPlusY, label: '+1σ' },
             { x: stdDevMinus, y: stdDevMinusY, label: '-1σ' }
         );
-        
+
         return {
             xValues: filteredXValues,
             pdfValues,
@@ -149,7 +220,7 @@ export const Weibull = {
                 median,
                 mode,
                 stdDev,
-                variance
+                variance: stdDev * stdDev
             }
         };
     },
@@ -162,40 +233,30 @@ export const Weibull = {
      * @returns {Object} CDF curve data and statistics
      */
     generateCDF(parameters, xValues, percentiles = []) {
-        const scale = getParam(parameters, 'scale', 1);
-        const shape = getParam(parameters, 'shape', 2);
-        const value = getParam(parameters, 'value', this.getMeanValue(scale, shape));
-        
+        const scale = DistributionBase.helpers.getParam(parameters, 'scale', 1);
+        const shape = DistributionBase.helpers.getParam(parameters, 'shape', 2);
+        const value = DistributionBase.helpers.getParam(parameters, 'value', this.calculateMean(parameters));
+
         // Filter x values to avoid issues near zero
         const filteredXValues = xValues.filter(x => x >= 0);
-        
+
         // Calculate CDF values
-        const cdfValues = filteredXValues.map(x => {
-            if (x <= 0) return 0;
-            return 1 - Math.exp(-Math.pow(x / scale, shape));
-        });
-        
+        const cdfValues = filteredXValues.map(x => this.calculateCDF(x, parameters));
+
         // Calculate mean and other statistics
-        const mean = this.getMeanValue(scale, shape);
-        
-        // Calculate variance and standard deviation
-        const variance = scale * scale * (
-            jStat.gammafn(1 + 2 / shape) - 
-            Math.pow(jStat.gammafn(1 + 1 / shape), 2)
-        );
-        const stdDev = Math.sqrt(variance);
-        
+        const mean = this.calculateMean(parameters);
+        const stdDev = this.calculateStdDev(parameters);
+
         // Calculate median
         const median = scale * Math.pow(Math.log(2), 1 / shape);
-        
+
         // Calculate percentile x-values
         const percentilePoints = [];
         if (percentiles && percentiles.length > 0) {
             percentiles.forEach(percentile => {
                 const p = percentile.value / 100;
-                // Weibull quantile: scale * (-ln(1-p))^(1/shape)
-                const x = scale * Math.pow(-Math.log(1 - p), 1 / shape);
-                
+                const x = this.calculateQuantile(p, parameters);
+
                 // For CDF, y equals percentile probability
                 percentilePoints.push({
                     percentile: percentile,
@@ -204,36 +265,36 @@ export const Weibull = {
                 });
             });
         }
-        
+
         // Create key points for markers
         const keyPoints = [];
-        
+
         // Add value point
-        const valueCDF = this.calculateCDFPoint(value, scale, shape);
+        const valueCDF = this.calculateCDF(value, parameters);
         keyPoints.push({ x: value, y: valueCDF, label: 'Value' });
-        
+
         // Add mean point if different from value
         if (Math.abs(value - mean) > 0.001 * mean) {
-            const meanCDF = this.calculateCDFPoint(mean, scale, shape);
+            const meanCDF = this.calculateCDF(mean, parameters);
             keyPoints.push({ x: mean, y: meanCDF, label: 'Mean' });
         }
-        
+
         // Add median point - CDF is exactly 0.5 at median
         keyPoints.push({ x: median, y: 0.5, label: 'Median' });
-        
+
         // Add std dev points
         const stdDevPlus = mean + stdDev;
         // Avoid negative values for std dev points
         const stdDevMinus = Math.max(0.001, mean - stdDev);
-        
-        const stdDevPlusCDF = this.calculateCDFPoint(stdDevPlus, scale, shape);
-        const stdDevMinusCDF = this.calculateCDFPoint(stdDevMinus, scale, shape);
-        
+
+        const stdDevPlusCDF = this.calculateCDF(stdDevPlus, parameters);
+        const stdDevMinusCDF = this.calculateCDF(stdDevMinus, parameters);
+
         keyPoints.push(
             { x: stdDevPlus, y: stdDevPlusCDF, label: '+1σ' },
             { x: stdDevMinus, y: stdDevMinusCDF, label: '-1σ' }
         );
-        
+
         return {
             xValues: filteredXValues,
             cdfValues,
@@ -243,108 +304,38 @@ export const Weibull = {
                 mean,
                 median,
                 stdDev,
-                variance
+                variance: stdDev * stdDev
             }
         };
     },
 
     /**
-     * Calculate a single PDF point with error handling
-     * @param {number} x - Point to evaluate
-     * @param {number} scale - Scale parameter
-     * @param {number} shape - Shape parameter
-     * @returns {number} PDF value
-     */
-    calculatePDFPoint(x, scale, shape) {
-        if (x <= 0) return 0;
-        
-        try {
-            const y = (shape / scale) * 
-                Math.pow(x / scale, shape - 1) * 
-                Math.exp(-Math.pow(x / scale, shape));
-            
-            // Handle very small or large values to avoid numerical issues
-            return isFinite(y) ? y : 0;
-        } catch (e) {
-            return 0;
-        }
-    },
-
-    /**
-     * Calculate a single CDF point with error handling
-     * @param {number} x - Point to evaluate
-     * @param {number} scale - Scale parameter
-     * @param {number} shape - Shape parameter
-     * @returns {number} CDF value
-     */
-    calculateCDFPoint(x, scale, shape) {
-        if (x <= 0) return 0;
-        
-        try {
-            const y = 1 - Math.exp(-Math.pow(x / scale, shape));
-            return isFinite(y) ? y : (x > 0 ? 1 : 0);
-        } catch (e) {
-            return x > 0 ? 1 : 0;
-        }
-    },
-
-    /**
-     * Helper to calculate mean value from scale and shape
-     * @param {number} scale - Scale parameter
-     * @param {number} shape - Shape parameter
-     * @returns {number} Mean value
-     */
-    getMeanValue(scale, shape) {
-        return scale * jStat.gammafn(1 + 1 / shape);
-    },
-
-    /**
-     * Calculate quantile (inverse CDF) for probability p
-     * @param {number} p - Probability (0-1)
-     * @param {Object} parameters - Distribution parameters
-     * @returns {number} Quantile value
-     */
-    calculateQuantile(p, parameters) {
-        const scale = getParam(parameters, 'scale', 1);
-        const shape = getParam(parameters, 'shape', 2);
-        
-        // Weibull quantile function: scale * (-ln(1-p))^(1/shape)
-        return scale * Math.pow(-Math.log(1 - p), 1 / shape);
-    },
-
-    /**
-     * Calculate standard deviation
-     * @param {Object} parameters - Distribution parameters
-     * @returns {number} Standard deviation
-     */
-    calculateStdDev(parameters) {
-        const scale = getParam(parameters, 'scale', 1);
-        const shape = getParam(parameters, 'shape', 2);
-
-        const variance = scale * scale * (
-            jStat.gammafn(1 + 2 / shape) - 
-            Math.pow(jStat.gammafn(1 + 1 / shape), 2)
-        );
-        
-        return Math.sqrt(variance);
-    },
-
-    /**
      * Get metadata for Weibull distribution
+     * @param {Object|number|null} currentValue - Optional current value to influence defaults
      * @returns {Object} Metadata
      */
-    getMetadata() {
+    getMetadata(currentValue = null) {
+        // Convert current value to number if it's an object
+        let value = null;
+        if (currentValue !== null) {
+            value = typeof currentValue === 'object'
+                ? DistributionBase.helpers.getParam(currentValue, 'value', 0)
+                : currentValue;
+        }
+
+        // Default scale based on current value or default
+        const defaultScale = value !== null && value > 0
+            ? value / jStat.gammafn(1 + 1 / 2) // Roughly align mean with current value for shape=2
+            : 1;
+
         return {
             name: "Weibull Distribution",
             description: "Versatile distribution commonly used in reliability, wind speed, and repair time modeling.",
             applications: "The standard for modeling wind speed distributions, component reliability, and repair times, including delays from aging and parts scarcity.",
             examples: "Wind speed distributions, component failure rates, turbine lifetime modeling, repair times for major components as turbines age.",
+            defaultCurve: "pdf", // Weibull is best visualized with PDF
             nonNegativeSupport: true, // Weibull only supports non-negative values
-            getMean: (parameters) => {
-                const scale = parameters.scale || 1;
-                const shape = parameters.shape || 2;
-                return scale * jStat.gammafn(1 + 1 / shape);
-            },
+            minPointsRequired: 6, // Minimum points needed for fitting
             parameters: [
                 {
                     name: "value",
@@ -353,7 +344,9 @@ export const Weibull = {
                     fieldType: "number",
                     fieldProps: {
                         label: "Mean",
-                        tooltip: "Default value"
+                        tooltip: "Default value",
+                        defaultValue: value !== null ? value : 7.5,
+                        min: 0
                     }
                 },
                 {
@@ -366,7 +359,7 @@ export const Weibull = {
                         tooltip: "Scale parameter of the Weibull distribution",
                         min: 0,
                         step: 0.01,
-                        defaultValue: 1
+                        defaultValue: value !== null ? defaultScale : 7.9
                     }
                 },
                 {
@@ -379,7 +372,7 @@ export const Weibull = {
                         tooltip: "Shape parameter of the Weibull distribution",
                         min: 0,
                         step: 0.01,
-                        defaultValue: 2
+                        defaultValue: 1.8
                     }
                 }
             ]

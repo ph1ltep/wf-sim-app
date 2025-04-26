@@ -1,11 +1,15 @@
 // src/utils/distributions/lognormal.js
 import * as jStat from 'jstat';
-import { getParam } from '../plotUtils';
+import { DistributionBase } from './distributionBase';
 
 /**
  * LogNormal Distribution
+ * Extends distributionBase with LogNormal distribution implementation
  */
 export const LogNormal = {
+    // Extend the base distribution template
+    ...DistributionBase.template,
+
     /**
      * Validate parameters for LogNormal distribution
      * @param {Object} parameters - Distribution parameters
@@ -36,6 +40,91 @@ export const LogNormal = {
     },
 
     /**
+     * Calculate mean value for LogNormal distribution
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Mean value
+     */
+    calculateMean(parameters) {
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+        return Math.exp(mu + sigma * sigma / 2);
+    },
+
+    /**
+     * Calculate standard deviation for LogNormal distribution
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Standard deviation
+     */
+    calculateStdDev(parameters) {
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+
+        // LogNormal standard deviation formula
+        const variance = Math.exp(2 * mu + sigma * sigma) * (Math.exp(sigma * sigma) - 1);
+        return Math.sqrt(variance);
+    },
+
+    /**
+     * Calculate PDF at a specific point
+     * @param {number} x - Point to evaluate
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} PDF value
+     */
+    calculatePDF(x, parameters) {
+        if (x <= 0) return 0;
+
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+
+        try {
+            // LogNormal PDF formula
+            const exponent = -Math.pow(Math.log(x) - mu, 2) / (2 * sigma * sigma);
+            const coefficient = 1 / (x * sigma * Math.sqrt(2 * Math.PI));
+            const pdf = coefficient * Math.exp(exponent);
+
+            return isFinite(pdf) ? pdf : 0;
+        } catch (e) {
+            return 0;
+        }
+    },
+
+    /**
+     * Calculate CDF at a specific point
+     * @param {number} x - Point to evaluate
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} CDF value
+     */
+    calculateCDF(x, parameters) {
+        if (x <= 0) return 0;
+
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+
+        try {
+            // LogNormal CDF formula
+            const z = (Math.log(x) - mu) / sigma;
+            const cdf = 0.5 * (1 + jStat.erf(z / Math.sqrt(2)));
+
+            return isFinite(cdf) ? cdf : (x > 0 ? 1 : 0);
+        } catch (e) {
+            return x > 0 ? 1 : 0;
+        }
+    },
+
+    /**
+     * Calculate quantile (inverse CDF) for probability p
+     * @param {number} p - Probability (0-1)
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Quantile value
+     */
+    calculateQuantile(p, parameters) {
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+
+        return jStat.lognormal.inv(p, mu, sigma);
+    },
+
+    /**
      * Generate PDF curve and key statistics for plotting
      * @param {Object} parameters - Distribution parameters
      * @param {Array} xValues - X values to calculate for
@@ -43,42 +132,34 @@ export const LogNormal = {
      * @returns {Object} PDF curve data and statistics
      */
     generatePDF(parameters, xValues, percentiles = []) {
-        const mu = getParam(parameters, 'mu', 0);
-        const sigma = getParam(parameters, 'sigma', 1);
-        const value = getParam(parameters, 'value', Math.exp(mu + sigma * sigma / 2));
-        
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+        const value = DistributionBase.helpers.getParam(parameters, 'value', this.calculateMean(parameters));
+
         // Filter x values to avoid issues near zero
         const filteredXValues = xValues.filter(x => x > 0);
-        
+
         // Calculate PDF values
-        const pdfValues = filteredXValues.map(x => {
-            return this.calculatePDFPoint(x, mu, sigma);
-        });
-        
+        const pdfValues = filteredXValues.map(x => this.calculatePDF(x, parameters));
+
         // Calculate statistics
-        // Mean = exp(mu + sigma^2/2)
-        const mean = Math.exp(mu + sigma * sigma / 2);
-        
+        const mean = this.calculateMean(parameters);
+        const stdDev = this.calculateStdDev(parameters);
+
         // Median = exp(mu)
         const median = Math.exp(mu);
-        
+
         // Mode = exp(mu - sigma^2)
         const mode = Math.exp(mu - sigma * sigma);
-        
-        // Variance = exp(2*mu + sigma^2) * (exp(sigma^2) - 1)
-        const variance = Math.exp(2 * mu + sigma * sigma) * (Math.exp(sigma * sigma) - 1);
-        const stdDev = Math.sqrt(variance);
-        
+
         // Calculate percentile x-values
         const percentilePoints = [];
         if (percentiles && percentiles.length > 0) {
             percentiles.forEach(percentile => {
                 const p = percentile.value / 100;
-                
-                // Use jStat for LogNormal quantile function
-                const x = jStat.lognormal.inv(p, mu, sigma);
-                const y = this.calculatePDFPoint(x, mu, sigma);
-                
+                const x = this.calculateQuantile(p, parameters);
+                const y = this.calculatePDF(x, parameters);
+
                 percentilePoints.push({
                     percentile: percentile,
                     x: x,
@@ -86,43 +167,43 @@ export const LogNormal = {
                 });
             });
         }
-        
+
         // Create key points for markers
         const keyPoints = [];
-        
+
         // Add value point
-        const valueY = this.calculatePDFPoint(value, mu, sigma);
+        const valueY = this.calculatePDF(value, parameters);
         keyPoints.push({ x: value, y: valueY, label: 'Value' });
-        
+
         // Add mean/median/mode points if they're significantly different
         if (Math.abs(mean - value) > 0.001 * mean) {
-            const meanY = this.calculatePDFPoint(mean, mu, sigma);
+            const meanY = this.calculatePDF(mean, parameters);
             keyPoints.push({ x: mean, y: meanY, label: 'Mean' });
         }
-        
+
         if (Math.abs(median - mean) > 0.001 * mean) {
-            const medianY = this.calculatePDFPoint(median, mu, sigma);
+            const medianY = this.calculatePDF(median, parameters);
             keyPoints.push({ x: median, y: medianY, label: 'Median' });
         }
-        
+
         if (Math.abs(mode - mean) > 0.001 * mean) {
-            const modeY = this.calculatePDFPoint(mode, mu, sigma);
+            const modeY = this.calculatePDF(mode, parameters);
             keyPoints.push({ x: mode, y: modeY, label: 'Mode' });
         }
-        
+
         // Add std dev points
         const stdDevPlus = mean + stdDev;
         // Ensure std dev minus is not negative (lognormal is strictly positive)
         const stdDevMinus = Math.max(0.001, mean - stdDev);
-        
-        const stdDevPlusY = this.calculatePDFPoint(stdDevPlus, mu, sigma);
-        const stdDevMinusY = this.calculatePDFPoint(stdDevMinus, mu, sigma);
-        
+
+        const stdDevPlusY = this.calculatePDF(stdDevPlus, parameters);
+        const stdDevMinusY = this.calculatePDF(stdDevMinus, parameters);
+
         keyPoints.push(
             { x: stdDevPlus, y: stdDevPlusY, label: '+1σ' },
             { x: stdDevMinus, y: stdDevMinusY, label: '-1σ' }
         );
-        
+
         return {
             xValues: filteredXValues,
             pdfValues,
@@ -133,7 +214,7 @@ export const LogNormal = {
                 median,
                 mode,
                 stdDev,
-                variance,
+                variance: stdDev * stdDev,
                 mu,
                 sigma
             }
@@ -148,34 +229,29 @@ export const LogNormal = {
      * @returns {Object} CDF curve data and statistics
      */
     generateCDF(parameters, xValues, percentiles = []) {
-        const mu = getParam(parameters, 'mu', 0);
-        const sigma = getParam(parameters, 'sigma', 1);
-        const value = getParam(parameters, 'value', Math.exp(mu + sigma * sigma / 2));
-        
+        const mu = DistributionBase.helpers.getParam(parameters, 'mu', 0);
+        const sigma = DistributionBase.helpers.getParam(parameters, 'sigma', 1);
+        const value = DistributionBase.helpers.getParam(parameters, 'value', this.calculateMean(parameters));
+
         // Filter x values to avoid issues near zero
         const filteredXValues = xValues.filter(x => x > 0);
-        
+
         // Calculate CDF values
-        const cdfValues = filteredXValues.map(x => {
-            return this.calculateCDFPoint(x, mu, sigma);
-        });
-        
+        const cdfValues = filteredXValues.map(x => this.calculateCDF(x, parameters));
+
         // Calculate statistics
-        const mean = Math.exp(mu + sigma * sigma / 2);
+        const mean = this.calculateMean(parameters);
         const median = Math.exp(mu);
         const mode = Math.exp(mu - sigma * sigma);
-        const variance = Math.exp(2 * mu + sigma * sigma) * (Math.exp(sigma * sigma) - 1);
-        const stdDev = Math.sqrt(variance);
-        
+        const stdDev = this.calculateStdDev(parameters);
+
         // Calculate percentile x-values
         const percentilePoints = [];
         if (percentiles && percentiles.length > 0) {
             percentiles.forEach(percentile => {
                 const p = percentile.value / 100;
-                
-                // Use jStat for LogNormal quantile function
-                const x = jStat.lognormal.inv(p, mu, sigma);
-                
+                const x = this.calculateQuantile(p, parameters);
+
                 percentilePoints.push({
                     percentile: percentile,
                     x: x,
@@ -183,38 +259,38 @@ export const LogNormal = {
                 });
             });
         }
-        
+
         // Create key points for markers
         const keyPoints = [];
-        
+
         // Add value point
-        const valueCDF = this.calculateCDFPoint(value, mu, sigma);
+        const valueCDF = this.calculateCDF(value, parameters);
         keyPoints.push({ x: value, y: valueCDF, label: 'Value' });
-        
+
         // Add mean point
-        const meanCDF = this.calculateCDFPoint(mean, mu, sigma);
+        const meanCDF = this.calculateCDF(mean, parameters);
         keyPoints.push({ x: mean, y: meanCDF, label: 'Mean' });
-        
+
         // Add median point - CDF is 0.5 at median by definition
         keyPoints.push({ x: median, y: 0.5, label: 'Median' });
-        
+
         // Add mode point
-        const modeCDF = this.calculateCDFPoint(mode, mu, sigma);
+        const modeCDF = this.calculateCDF(mode, parameters);
         keyPoints.push({ x: mode, y: modeCDF, label: 'Mode' });
-        
+
         // Add std dev points
         const stdDevPlus = mean + stdDev;
         // Ensure std dev minus is not negative
         const stdDevMinus = Math.max(0.001, mean - stdDev);
-        
-        const stdDevPlusCDF = this.calculateCDFPoint(stdDevPlus, mu, sigma);
-        const stdDevMinusCDF = this.calculateCDFPoint(stdDevMinus, mu, sigma);
-        
+
+        const stdDevPlusCDF = this.calculateCDF(stdDevPlus, parameters);
+        const stdDevMinusCDF = this.calculateCDF(stdDevMinus, parameters);
+
         keyPoints.push(
             { x: stdDevPlus, y: stdDevPlusCDF, label: '+1σ' },
             { x: stdDevMinus, y: stdDevMinusCDF, label: '-1σ' }
         );
-        
+
         return {
             xValues: filteredXValues,
             cdfValues,
@@ -225,7 +301,7 @@ export const LogNormal = {
                 median,
                 mode,
                 stdDev,
-                variance,
+                variance: stdDev * stdDev,
                 mu,
                 sigma
             }
@@ -233,91 +309,39 @@ export const LogNormal = {
     },
 
     /**
-     * Calculate a single PDF point with error handling
-     * @param {number} x - Point to evaluate
-     * @param {number} mu - Location parameter
-     * @param {number} sigma - Scale parameter
-     * @returns {number} PDF value
-     */
-    calculatePDFPoint(x, mu, sigma) {
-        if (x <= 0) return 0;
-        
-        try {
-            // LogNormal PDF formula
-            const exponent = -Math.pow(Math.log(x) - mu, 2) / (2 * sigma * sigma);
-            const coefficient = 1 / (x * sigma * Math.sqrt(2 * Math.PI));
-            const pdf = coefficient * Math.exp(exponent);
-            
-            return isFinite(pdf) ? pdf : 0;
-        } catch (e) {
-            return 0;
-        }
-    },
-
-    /**
-     * Calculate a single CDF point with error handling
-     * @param {number} x - Point to evaluate
-     * @param {number} mu - Location parameter
-     * @param {number} sigma - Scale parameter
-     * @returns {number} CDF value
-     */
-    calculateCDFPoint(x, mu, sigma) {
-        if (x <= 0) return 0;
-        
-        try {
-            // LogNormal CDF formula
-            const z = (Math.log(x) - mu) / sigma;
-            const cdf = 0.5 * (1 + jStat.erf(z / Math.sqrt(2)));
-            
-            return isFinite(cdf) ? cdf : (x > 0 ? 1 : 0);
-        } catch (e) {
-            return x > 0 ? 1 : 0;
-        }
-    },
-
-    /**
-     * Calculate quantile (inverse CDF) for probability p
-     * @param {number} p - Probability (0-1)
-     * @param {Object} parameters - Distribution parameters
-     * @returns {number} Quantile value
-     */
-    calculateQuantile(p, parameters) {
-        const mu = getParam(parameters, 'mu', 0);
-        const sigma = getParam(parameters, 'sigma', 1);
-        
-        return jStat.lognormal.inv(p, mu, sigma);
-    },
-
-    /**
-     * Calculate standard deviation
-     * @param {Object} parameters - Distribution parameters
-     * @returns {number} Standard deviation
-     */
-    calculateStdDev(parameters) {
-        const mu = getParam(parameters, 'mu', 0);
-        const sigma = getParam(parameters, 'sigma', 1);
-        
-        // LogNormal standard deviation formula
-        const variance = Math.exp(2 * mu + sigma * sigma) * (Math.exp(sigma * sigma) - 1);
-        return Math.sqrt(variance);
-    },
-
-    /**
      * Get metadata for LogNormal distribution
+     * @param {Object|number|null} currentValue - Optional current value to influence defaults
      * @returns {Object} Metadata
      */
-    getMetadata() {
+    getMetadata(currentValue = null) {
+        // Convert current value to number if it's an object
+        let value = null;
+        if (currentValue !== null) {
+            value = typeof currentValue === 'object'
+                ? DistributionBase.helpers.getParam(currentValue, 'value', 0)
+                : currentValue;
+        }
+
+        // Set appropriate defaults based on current value
+        let defaultMu = 0;
+        let defaultSigma = 1;
+
+        if (value !== null && value > 0) {
+            // Work backwards to find mu and sigma that would give this mean
+            // For lognormal, mean = exp(mu + sigma^2/2)
+            // We'll set sigma to a reasonable default and solve for mu
+            defaultSigma = 0.5; // Reasonable default sigma
+            defaultMu = Math.log(value) - defaultSigma * defaultSigma / 2;
+        }
+
         return {
             name: "Lognormal Distribution",
             description: "Right-skewed distribution for values that are the product of many independent factors.",
             applications: "Modeling naturally skewed data like repair costs, component prices, and certain failure times.",
             examples: "Repair costs, time to failure for components with wear-out characteristics, price uncertainty for major components.",
+            defaultCurve: "pdf", // LogNormal is best visualized with PDF
             nonNegativeSupport: true, // LogNormal only supports non-negative values
-            getMean: (parameters) => {
-                const mu = parameters.mu || 0;
-                const sigma = parameters.sigma || 1;
-                return Math.exp(mu + sigma * sigma / 2);
-            },
+            minPointsRequired: 5, // Minimum points needed for fitting
             parameters: [
                 {
                     name: "value",
@@ -326,7 +350,9 @@ export const LogNormal = {
                     fieldType: "number",
                     fieldProps: {
                         label: "Mean",
-                        tooltip: "Default value"
+                        tooltip: "Default value",
+                        defaultValue: value !== null ? value : Math.exp(defaultMu + defaultSigma * defaultSigma / 2),
+                        min: 0.001
                     }
                 },
                 {
@@ -338,7 +364,7 @@ export const LogNormal = {
                         label: "μ",
                         tooltip: "Location parameter of the lognormal distribution (mean of the logarithm of the variable)",
                         step: 0.1,
-                        defaultValue: 0
+                        defaultValue: defaultMu
                     }
                 },
                 {
@@ -351,7 +377,7 @@ export const LogNormal = {
                         tooltip: "Scale parameter of the lognormal distribution (standard deviation of the logarithm of the variable)",
                         min: 0.001,
                         step: 0.1,
-                        defaultValue: 1
+                        defaultValue: defaultSigma
                     }
                 }
             ]

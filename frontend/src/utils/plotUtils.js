@@ -1,4 +1,5 @@
-// src/utils/plotUtils.js
+// src/utils/plotUtils.js - Updated to use distributionBase helpers
+import { DistributionBase } from './distributions/distributionBase';
 
 /**
  * Generate evenly spaced X values
@@ -8,8 +9,7 @@
  * @returns {Array} Array of x values
  */
 export function generateXValues(min, max, count = 100) {
-    const step = (max - min) / (count - 1);
-    return Array.from({ length: count }, (_, i) => min + i * step);
+    return DistributionBase.helpers.generateRange(min, max, count);
 }
 
 /**
@@ -20,10 +20,7 @@ export function generateXValues(min, max, count = 100) {
  * @returns {*} Parameter value or default
  */
 export function getParam(params, name, defaultValue) {
-    if (!params || params[name] === undefined || params[name] === null) {
-        return defaultValue;
-    }
-    return params[name];
+    return DistributionBase.helpers.getParam(params, name, defaultValue);
 }
 
 /**
@@ -34,13 +31,18 @@ export function getParam(params, name, defaultValue) {
  * @returns {Object} Plotly trace object
  */
 export function createMainCurve(xValues, yValues, options = {}) {
-    const { name = 'Distribution', color = 'rgb(31, 119, 180)' } = options;
-    
+    const {
+        name = 'Distribution',
+        color = 'rgb(31, 119, 180)',
+        type = 'scatter',
+        mode = 'lines'
+    } = options;
+
     return {
         x: xValues,
         y: yValues,
-        type: 'scatter',
-        mode: 'lines',
+        type: type,
+        mode: mode,
         name: name,
         line: {
             color: color,
@@ -64,7 +66,7 @@ export function createMarkers(points, options = {}) {
         name = 'Key Points',
         hoverinfo = 'text'
     } = options;
-    
+
     return {
         x: points.map(p => p.x),
         y: points.map(p => p.y),
@@ -106,7 +108,7 @@ export function createMarkerAnnotations(points, options = {}) {
         ax = 20,
         ay = 0
     } = options;
-    
+
     return points.map(point => ({
         x: point.x,
         y: point.y,
@@ -119,10 +121,10 @@ export function createMarkerAnnotations(points, options = {}) {
         arrowwidth,
         ax,
         ay,
-        xanchor,
-        yanchor,
-        xshift,
-        yshift,
+        xanchor: point.xanchor || xanchor,
+        yanchor: point.yanchor || yanchor,
+        xshift: point.xshift !== undefined ? point.xshift : xshift,
+        yshift: point.yshift !== undefined ? point.yshift : yshift,
         font: {
             size: fontSize,
             color: fontColor
@@ -139,7 +141,7 @@ export function createMarkerAnnotations(points, options = {}) {
  */
 export function createVerticalLine(x, y, options = {}) {
     const { color = 'rgba(150, 150, 150, 0.5)', width = 1, dash = 'solid' } = options;
-    
+
     return {
         type: 'line',
         x0: x,
@@ -183,46 +185,70 @@ export function createParameterLabel(x, y, text, align = 'left') {
 
 /**
  * Create percentile band and markers
- * @param {Array} xValues - Full array of x values for distribution
- * @param {Array} yValues - Full array of y values for distribution
- * @param {number} lowerX - Lower x boundary of band
- * @param {number} upperX - Upper x boundary of band
+ * @param {Object} distribution - Distribution implementation
+ * @param {Object} parameters - Distribution parameters
+ * @param {number} lowerPercentile - Lower percentile value (0-100)
+ * @param {number} upperPercentile - Upper percentile value (0-100)
  * @param {Object} options - Band options
  * @returns {Object} Plotly trace for the band
  */
-export function createPercentileBand(xValues, yValues, lowerX, upperX, options = {}) {
+export function createPercentileBand(
+    distribution,
+    parameters,
+    lowerPercentile,
+    upperPercentile,
+    options = {}
+) {
     const {
         opacity = 0.33,
         bandColor = 'rgba(173, 216, 230, {{opacity}})',
         name = '',
         hoverinfo = 'name',
-        showLegend = false
+        showLegend = false,
+        xValues = null,
+        useCdf = false
     } = options;
-    
-    // Create filled area between the percentiles
-    const bandXValues = xValues.filter(x => x >= lowerX && x <= upperX);
-    
-    // Get corresponding y values
-    const bandYValues = bandXValues.map(x => {
-        const index = xValues.indexOf(x);
-        return index >= 0 ? yValues[index] : 0;
-    });
-    
+
+    // Calculate x-range based on percentiles
+    const lowerP = lowerPercentile / 100;
+    const upperP = upperPercentile / 100;
+
+    // Use distribution's quantile method to get x-values
+    const lowerX = distribution.calculateQuantile(lowerP, parameters);
+    const upperX = distribution.calculateQuantile(upperP, parameters);
+
+    // Generate or filter x-values
+    let bandXValues;
+    if (xValues) {
+        // Filter provided x-values to the range
+        bandXValues = xValues.filter(x => x >= lowerX && x <= upperX);
+    } else {
+        // Generate new x-values within the range
+        bandXValues = generateXValues(lowerX, upperX, 50);
+    }
+
     // If band is empty, return null
     if (bandXValues.length === 0) return null;
-    
+
+    // Calculate y-values using the appropriate distribution method
+    const calculateY = useCdf
+        ? x => distribution.calculateCDF(x, parameters)
+        : x => distribution.calculatePDF(x, parameters);
+
+    const bandYValues = bandXValues.map(calculateY);
+
     // Fill in bandColor with opacity
     const fillColor = bandColor.replace('{{opacity}}', opacity);
-    
+
     return {
         x: bandXValues,
         y: bandYValues,
         type: 'scatter',
         mode: 'none',
-        fill: 'tozeroy',
+        fill: useCdf ? 'tozeroy' : 'toself',
         fillcolor: fillColor,
         line: { width: 0 },
-        name,
+        name: name || `P${lowerPercentile}-P${upperPercentile}`,
         hoverinfo,
         showlegend: showLegend
     };
@@ -236,13 +262,13 @@ export function createPercentileBand(xValues, yValues, lowerX, upperX, options =
 export function hexToRgb(hex) {
     // Remove hash if it exists
     hex = hex.replace(/^#/, '');
-    
+
     // Parse hex values
     const bigint = parseInt(hex, 16);
     const r = (bigint >> 16) & 255;
     const g = (bigint >> 8) & 255;
     const b = bigint & 255;
-    
+
     return { r, g, b };
 }
 
@@ -353,93 +379,102 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
         showPercentiles = false,
         percentiles = [],
         addonAfter = '',
-        baseColor = 'rgb(31, 119, 180)'
+        baseColor = 'rgb(31, 119, 180)',
+        primaryPercentile = 50
     } = options;
 
-    // Get metadata
-    const metadata = distribution.getMetadata();
-    
     // Calculate x-range based on distribution parameters
     let minX, maxX;
-    
-    // Use value and standard deviation to determine range
-    const value = getParam(parameters, 'value', 0);
-    const stdDev = distribution.calculateStdDev(parameters);
-    
-    // Default range covers ±3 standard deviations or min/max for bounded distributions
-    if (metadata.parameters.find(p => p.name === 'min') && metadata.parameters.find(p => p.name === 'max')) {
-        // For bounded distributions like uniform
-        minX = getParam(parameters, 'min', 0);
-        maxX = getParam(parameters, 'max', 1);
-        // Add a small margin
-        const range = maxX - minX;
-        minX -= range * 0.05;
-        maxX += range * 0.05;
+
+    // Get appropriate range for this distribution
+    if (distribution.calculateXRange) {
+        // Use distribution's own method if available
+        const range = distribution.calculateXRange(parameters);
+        minX = range.min;
+        maxX = range.max;
     } else {
-        // For unbounded distributions, use standard deviations
-        minX = value - 4 * stdDev;
-        maxX = value + 4 * stdDev;
-        
-        // Ensure min is not negative for distributions that don't support negative values
-        if (metadata.nonNegativeSupport && minX < 0) {
+        // Otherwise, use a reasonable approach
+        const value = getParam(parameters, 'value', 0);
+        const stdDev = distribution.calculateStdDev(parameters);
+        const metadata = distribution.getMetadata(parameters);
+
+        // Default range covers ±3 standard deviations
+        minX = value - 3 * stdDev;
+        maxX = value + 3 * stdDev;
+
+        // If distribution doesn't support negative values, adjust the range
+        if (metadata?.nonNegativeSupport && minX < 0) {
             minX = 0;
         }
     }
-    
+
     // Generate x values
     const xValues = generateXValues(minX, maxX);
-    
-    // Generate PDF curve data using the distribution's generatePDF method
+
+    // Generate PDF data using the distribution's generatePDF method
     const pdfData = distribution.generatePDF(parameters, xValues, percentiles);
-    
+
     // Create main curve
     const data = [createMainCurve(pdfData.xValues, pdfData.pdfValues, { color: baseColor })];
-    
+
     const shapes = [];
     const annotations = [];
-    
+
     // Add percentile bands if requested
     if (showPercentiles && percentiles && percentiles.length > 0) {
         // Use updated organizePercentiles to get band structure
-        const { primary, percentilePairs, singles } = organizePercentiles(pdfData.percentilePoints, options.primaryPercentile || 50);
-        
+        const { primary, percentilePairs, singles } = organizePercentiles(
+            pdfData.percentilePoints,
+            primaryPercentile
+        );
+
         // Add band for each percentile pair
         if (percentilePairs && percentilePairs.length > 0) {
             percentilePairs.forEach(band => {
                 // Only create band if we have both lower and upper points
                 if (!band.lower || !band.upper) return;
-                
-                // Create band with proper opacity from the band object
-                const bandOpacity = band.opacity || 0.33;
-                
+
+                // Direct use of distribution methods for percentile bands
+                const lowerP = band.lower.percentile.value;
+                const upperP = band.upper.percentile.value;
+
                 const bandPlot = createPercentileBand(
-                    pdfData.xValues,
-                    pdfData.pdfValues,
-                    band.lower.x,
-                    band.upper.x,
+                    distribution,
+                    parameters,
+                    lowerP,
+                    upperP,
                     {
-                        opacity: bandOpacity,
-                        name: band.name || `P${band.lower.percentile.value}-P${band.upper.percentile.value}`
+                        opacity: band.opacity || 0.33,
+                        name: band.name,
+                        xValues: pdfData.xValues
                     }
                 );
-                
+
                 if (bandPlot) {
                     data.push(bandPlot);
                 }
-                
+
                 // Add percentile markers
                 const percentileMarkers = [
-                    { x: band.lower.x, y: band.lower.y, label: `P${band.lower.percentile.value}` },
-                    { x: band.upper.x, y: band.upper.y, label: `P${band.upper.percentile.value}` }
+                    {
+                        x: band.lower.x,
+                        y: band.lower.y,
+                        label: `P${band.lower.percentile.value}`
+                    },
+                    {
+                        x: band.upper.x,
+                        y: band.upper.y,
+                        label: `P${band.upper.percentile.value}`
+                    }
                 ];
-                
+
                 // Add markers
                 data.push(createMarkers(percentileMarkers, {
                     size: 5,
                     color: 'rgba(100, 100, 100, 0.7)',
                     name: 'Percentiles'
                 }));
-                
+
                 // Add annotations
                 annotations.push(...createMarkerAnnotations(percentileMarkers, {
                     fontSize: 9,
@@ -447,7 +482,7 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
                 }));
             });
         }
-        
+
         // Add single percentile lines
         if (singles && singles.length > 0) {
             singles.forEach(point => {
@@ -455,13 +490,13 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
                 shapes.push(createVerticalLine(
                     point.x,
                     point.y,
-                    { 
-                        color: 'rgba(100, 100, 100, 0.5)', 
+                    {
+                        color: 'rgba(100, 100, 100, 0.5)',
                         width: 1,
                         dash: 'dot'
                     }
                 ));
-                
+
                 // Add marker
                 data.push(createMarkers(
                     [{ x: point.x, y: point.y, label: `P${point.percentile.value}` }],
@@ -473,20 +508,20 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
                 ));
             });
         }
-        
+
         // Add primary percentile
         if (primary) {
             // Add vertical line
             shapes.push(createVerticalLine(
                 primary.x,
                 primary.y,
-                { 
-                    color: 'rgba(0, 0, 0, 0.7)', 
+                {
+                    color: 'rgba(0, 0, 0, 0.7)',
                     width: 2,
                     dash: 'dash'
                 }
             ));
-            
+
             // Add marker
             data.push(createMarkers(
                 [{ x: primary.x, y: primary.y, label: `P${primary.percentile.value} (Primary)` }],
@@ -496,7 +531,7 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
                     name: `P${primary.percentile.value} (Primary)`,
                 }
             ));
-            
+
             // Add annotation
             annotations.push(...createMarkerAnnotations(
                 [{ x: primary.x, y: primary.y, label: `P${primary.percentile.value}` }],
@@ -510,21 +545,20 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
             ));
         }
     }
-    
+
     // Add key point markers
     if (showMarkers && pdfData.keyPoints.length > 0) {
         // Add markers
         data.push(createMarkers(pdfData.keyPoints));
-        
+
         // Add annotations next to markers
         annotations.push(...createMarkerAnnotations(pdfData.keyPoints));
     }
-    
+
     // Add mean vertical line if needed
-    if (showMean && metadata.getMean) {
-        const mean = metadata.getMean(parameters);
+    if (showMean && pdfData.stats?.mean !== undefined) {
         const meanPoint = pdfData.keyPoints.find(p => p.label === 'Mean');
-        
+
         if (meanPoint) {
             shapes.push(createVerticalLine(
                 meanPoint.x,
@@ -533,42 +567,63 @@ export function generatePdfPlot(distribution, parameters, options = {}) {
             ));
         }
     }
-    
-    // No std dev vertical lines as requested
-    
+
+    // Add standard deviation lines if needed
+    if (showStdDev) {
+        const meanPoint = pdfData.keyPoints.find(p => p.label === 'Mean');
+        const stdDevPlusPoint = pdfData.keyPoints.find(p => p.label === '+1σ');
+        const stdDevMinusPoint = pdfData.keyPoints.find(p => p.label === '-1σ');
+
+        if (stdDevPlusPoint) {
+            shapes.push(createVerticalLine(
+                stdDevPlusPoint.x,
+                stdDevPlusPoint.y
+            ));
+        }
+
+        if (stdDevMinusPoint) {
+            shapes.push(createVerticalLine(
+                stdDevMinusPoint.x,
+                stdDevMinusPoint.y
+            ));
+        }
+    }
+
     // Add parameter summary
     if (showSummary && pdfData.stats) {
+        // Format the statistics as a string
         let summary = '';
-        
-        // Add each parameter to the summary
-        metadata.parameters.forEach(param => {
-            if (parameters[param.name] !== undefined) {
-                const label = param.fieldProps.label || param.name;
-                summary += `${label}: ${parameters[param.name].toFixed(2)}, `;
+        Object.entries(pdfData.stats).forEach(([key, value]) => {
+            if (typeof value === 'number') {
+                summary += `${key}: ${value.toFixed(2)}, `;
             }
         });
-        
-        // Add standard deviation
-        if (pdfData.stats.stdDev) {
-            summary += `StdDev: ${pdfData.stats.stdDev.toFixed(2)}`;
-        }
-        
+
+        // Remove the trailing comma and space
+        summary = summary.replace(/, $/, '');
+
+        const value = getParam(parameters, 'value', 0);
+        const y = pdfData.keyPoints[0]?.y || 0;
+
         annotations.push(createParameterLabel(
             value,
-            pdfData.keyPoints[0]?.y / 2 || 0,
+            y / 2,
             summary,
             'center'
         ));
     }
-    
+
+    // Get metadata for labels
+    const metadata = distribution.getMetadata();
+
     return {
         data,
         shapes,
         annotations,
-        title: metadata.name,
+        title: metadata?.name || 'Distribution',
         xaxisTitle: addonAfter ? `Value (${addonAfter})` : 'Value',
         yaxisTitle: 'Probability Density',
-        showLegend: false // Always hide legend
+        showLegend: false
     };
 }
 
@@ -587,92 +642,77 @@ export function generateCdfPlot(distribution, parameters, options = {}) {
         showPercentiles = false,
         percentiles = [],
         addonAfter = '',
-        baseColor = 'rgb(31, 119, 180)'
+        baseColor = 'rgb(31, 119, 180)',
+        primaryPercentile = 50
     } = options;
 
-    // Get metadata
-    const metadata = distribution.getMetadata();
-    
     // Calculate x-range based on distribution parameters
     let minX, maxX;
-    
-    // Use value and standard deviation to determine range
-    const value = getParam(parameters, 'value', 0);
-    const stdDev = distribution.calculateStdDev(parameters);
-    
-    // Default range covers ±3 standard deviations or min/max for bounded distributions
-    if (metadata.parameters.find(p => p.name === 'min') && metadata.parameters.find(p => p.name === 'max')) {
-        // For bounded distributions like uniform
-        minX = getParam(parameters, 'min', 0);
-        maxX = getParam(parameters, 'max', 1);
-        // Add a small margin
-        const range = maxX - minX;
-        minX -= range * 0.05;
-        maxX += range * 0.05;
+
+    // Get appropriate range for this distribution
+    if (distribution.calculateXRange) {
+        // Use distribution's own method if available
+        const range = distribution.calculateXRange(parameters);
+        minX = range.min;
+        maxX = range.max;
     } else {
-        // For unbounded distributions, use standard deviations
-        minX = value - 4 * stdDev;
-        maxX = value + 4 * stdDev;
-        
-        // Ensure min is not negative for distributions that don't support negative values
-        if (metadata.nonNegativeSupport && minX < 0) {
+        // Use a reasonable approach based on distribution parameters
+        const value = getParam(parameters, 'value', 0);
+        const stdDev = distribution.calculateStdDev(parameters);
+        const metadata = distribution.getMetadata(parameters);
+
+        // Default range covers ±3 standard deviations
+        minX = value - 3 * stdDev;
+        maxX = value + 3 * stdDev;
+
+        // If distribution doesn't support negative values, adjust the range
+        if (metadata?.nonNegativeSupport && minX < 0) {
             minX = 0;
         }
     }
-    
+
     // Generate x values
     const xValues = generateXValues(minX, maxX);
-    
-    // Generate CDF curve data using the distribution's generateCDF method
+
+    // Generate CDF data using the distribution's generateCDF method
     const cdfData = distribution.generateCDF(parameters, xValues, percentiles);
-    
+
     // Create main curve
-    const data = [{
-        x: cdfData.xValues,
-        y: cdfData.cdfValues,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'CDF',
-        line: {
-            color: baseColor,
-            width: 2
-        },
-        hoverinfo: 'x+y'
-    }];
-    
+    const data = [createMainCurve(cdfData.xValues, cdfData.cdfValues, { color: baseColor })];
+
     const shapes = [];
     const annotations = [];
-    
+
     // Add percentile markers if requested
     if (showPercentiles && percentiles && percentiles.length > 0) {
-        // Add markers for all percentiles
-        const percentileMarkers = cdfData.percentilePoints.map(point => ({
+        // Use updated organizePercentiles to get percentile structure
+        const { primary, percentilePairs, singles } = organizePercentiles(
+            cdfData.percentilePoints,
+            primaryPercentile
+        );
+
+        // Add all percentile points as markers
+        const allPercentilePoints = cdfData.percentilePoints.map(point => ({
             x: point.x,
             y: point.y,
             label: `P${point.percentile.value}`
         }));
-        
+
         // Add percentile markers
-        data.push(createMarkers(percentileMarkers, {
+        data.push(createMarkers(allPercentilePoints, {
             size: 6,
-            color: 'rgba(100, 100, 100, 0.8)',
+            color: 'rgba(100, 100, 100, 0.7)',
             name: 'Percentiles'
         }));
-        
-        // Add annotations for percentiles
-        annotations.push(...createMarkerAnnotations(percentileMarkers, {
-            fontSize: 9,
-            fontColor: 'rgba(100, 100, 100, 0.9)'
-        }));
-        
-        // Add horizontal lines for percentiles
-        percentileMarkers.forEach(marker => {
+
+        // Add horizontal lines for percentiles to the axis
+        allPercentilePoints.forEach(point => {
             shapes.push({
                 type: 'line',
                 x0: minX,
-                y0: marker.y,
-                x1: marker.x,
-                y1: marker.y,
+                y0: point.y,
+                x1: point.x,
+                y1: point.y,
                 line: {
                     color: 'rgba(100, 100, 100, 0.3)',
                     width: 1,
@@ -680,30 +720,56 @@ export function generateCdfPlot(distribution, parameters, options = {}) {
                 }
             });
         });
+
+        // Highlight primary percentile
+        if (primary) {
+            // Add horizontal line
+            shapes.push({
+                type: 'line',
+                x0: minX,
+                y0: primary.y,
+                x1: primary.x,
+                y1: primary.y,
+                line: {
+                    color: 'rgba(0, 0, 0, 0.5)',
+                    width: 1.5,
+                    dash: 'solid'
+                }
+            });
+
+            // Add marker
+            data.push(createMarkers(
+                [{ x: primary.x, y: primary.y, label: `P${primary.percentile.value} (Primary)` }],
+                {
+                    size: 8,
+                    color: 'rgba(0, 0, 0, 0.8)',
+                    name: `P${primary.percentile.value} (Primary)`
+                }
+            ));
+        }
     }
-    
+
     // Add key point markers
     if (showMarkers && cdfData.keyPoints.length > 0) {
         // Add markers
         data.push(createMarkers(cdfData.keyPoints));
-        
+
         // Add annotations next to markers
         annotations.push(...createMarkerAnnotations(cdfData.keyPoints));
     }
-    
+
     // Add mean vertical line if needed
-    if (showMean && metadata.getMean) {
-        const mean = metadata.getMean(parameters);
+    if (showMean && cdfData.stats?.mean !== undefined) {
         const meanPoint = cdfData.keyPoints.find(p => p.label === 'Mean');
-        
+
         if (meanPoint) {
             shapes.push(createVerticalLine(
                 meanPoint.x,
-                meanPoint.y,
+                1, // Full height for vertical line
                 { color: 'rgba(0, 0, 0, 0.5)', width: 2, dash: 'dot' }
             ));
-            
-            // Add horizontal line at CDF(mean) = 0.5 for normal distribution
+
+            // Add horizontal line at CDF(mean)
             shapes.push({
                 type: 'line',
                 x0: minX,
@@ -718,17 +784,41 @@ export function generateCdfPlot(distribution, parameters, options = {}) {
             });
         }
     }
-    
+
+    // Add standard deviation lines if needed
+    if (showStdDev) {
+        const stdDevPlusPoint = cdfData.keyPoints.find(p => p.label === '+1σ');
+        const stdDevMinusPoint = cdfData.keyPoints.find(p => p.label === '-1σ');
+
+        if (stdDevPlusPoint) {
+            shapes.push(createVerticalLine(
+                stdDevPlusPoint.x,
+                1, // Full height for vertical line
+                { color: 'rgba(150, 150, 150, 0.5)', width: 1, dash: 'solid' }
+            ));
+        }
+
+        if (stdDevMinusPoint) {
+            shapes.push(createVerticalLine(
+                stdDevMinusPoint.x,
+                1, // Full height for vertical line
+                { color: 'rgba(150, 150, 150, 0.5)', width: 1, dash: 'solid' }
+            ));
+        }
+    }
+
+    // Get metadata for labels
+    const metadata = distribution.getMetadata();
+
     return {
         data,
         shapes,
         annotations,
-        title: metadata.name + ' (CDF)',
+        title: metadata?.name || 'Distribution',
         xaxisTitle: addonAfter ? `Value (${addonAfter})` : 'Value',
         yaxisTitle: 'Cumulative Probability',
-        showLegend: false, // Always hide legend
-        // Set y-axis range for CDF (0 to 1)
-        yaxisRange: [0, 1.05]
+        showLegend: false,
+        yaxisRange: [0, 1.05] // Fixed y-axis range for CDF
     };
 }
 
@@ -747,6 +837,3 @@ export const PlotUtils = {
     hexToRgb,
     organizePercentiles
 };
-
-
-

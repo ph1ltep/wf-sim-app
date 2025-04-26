@@ -75,8 +75,8 @@ const StatisticsChart = React.memo(({
         yaxis: {
             ...(statsChartData.layout.yaxis || {}),
             title: units,
-            hoverformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision} f` : undefined,
-            tickformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision} f` : ',~s'
+            hoverformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined,
+            tickformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s'
         },
         xaxis: {
             ...(statsChartData.layout.xaxis || {}),

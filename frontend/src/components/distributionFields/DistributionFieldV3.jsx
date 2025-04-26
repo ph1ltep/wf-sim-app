@@ -1,3 +1,4 @@
+// src/components/distributionFields/DistributionFieldV3.jsx - Updated to use distributionBase
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin, message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
@@ -12,28 +13,28 @@ import useInputSim from '../../hooks/useInputSim';
 const { Title, Text, Paragraph } = Typography;
 
 /**
- * Enhanced distribution field component with time series support
+ * Enhanced distribution field component with time series support and distributionBase integration
  * @param {Object} props - Component props
  */
 const DistributionFieldV3 = ({
-    path,
-    defaultValuePath,
-    label,
-    tooltip,
-    options = distributionTypes,
-    showTitle = true,
-    titleLevel = 5,
-    valueType = 'number',
-    valueName = null,
-    addonAfter,
-    compact = false,
-    showVisualization = false,
-    showInfoBox = false,
-    infoBoxTitle,
-    showTimeSeriesToggle = true,
-    style = {},
-    step,
-    ...rest
+  path,
+  defaultValuePath,
+  label,
+  tooltip,
+  options = distributionTypes,
+  showTitle = true,
+  titleLevel = 5,
+  valueType = 'number',
+  valueName = null,
+  addonAfter,
+  compact = false,
+  showVisualization = false,
+  showInfoBox = false,
+  infoBoxTitle,
+  showTimeSeriesToggle = true,
+  style = {},
+  step,
+  ...rest
 }) => {
   const { getValueByPath, updateByPath } = useScenario();
   const { fitDistributionToData, fittingDistribution } = useInputSim();
@@ -50,9 +51,35 @@ const DistributionFieldV3 = ({
 
   const [hasFittedParams, setHasFittedParams] = useState(false);
 
-  const defaultValue = defaultValuePath ? getValueByPath(defaultValuePath, 0) : 0;
+  // Get distribution implementation based on current type
+  const distribution = useMemo(() =>
+    DistributionUtils.getDistribution(currentType), [currentType]);
+
+  // Get minimum required points from distribution metadata
+  const minRequiredPoints = useMemo(() =>
+    DistributionUtils.getMinRequiredPoints(currentType), [currentType]);
+
+  // Get metadata from distribution
+  const metadata = useMemo(() =>
+    DistributionUtils.getMetadata(currentType, parameters), [currentType, parameters]);
+
+  // Ensure we have the default value from defaultValuePath or distribution metadata
+  const defaultValue = useMemo(() => {
+    if (defaultValuePath) {
+      return getValueByPath(defaultValuePath, 0);
+    }
+    if (distribution && metadata) {
+      // Find the value parameter in metadata
+      const valueParam = metadata.parameters.find(p => p.name === 'value');
+      return valueParam?.fieldProps?.defaultValue || 0;
+    }
+    return 0;
+  }, [defaultValuePath, getValueByPath, distribution, metadata]);
+
+  // Current value from parameters or default
   const value = getValueByPath([...parametersPath, 'value'], defaultValue);
 
+  // Time series data from parameters
   const timeSeriesData = useMemo(() => {
     if (timeSeriesMode) {
       const tsData = getValueByPath([...timeSeriesParametersPath, 'value'], []);
@@ -61,12 +88,14 @@ const DistributionFieldV3 = ({
     return [];
   }, [timeSeriesMode, timeSeriesParametersPath, getValueByPath]);
 
+  // We can show the plot if not in time series mode or if we have fitted params
   const canShowPlot = useMemo(() => {
     return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
   }, [timeSeriesMode, hasFittedParams]);
 
   const colSpan = compact ? 200 : 150;
 
+  // Initialize parameters and time series as needed
   useEffect(() => {
     if (defaultValue !== undefined && defaultValue !== null) {
       if (timeSeriesMode) {
@@ -84,6 +113,7 @@ const DistributionFieldV3 = ({
     }
   }, [defaultValue, parametersPath, timeSeriesParametersPath, updateByPath, value, timeSeriesMode, getValueByPath]);
 
+  // Handle toggling time series mode
   const handleTimeSeriesModeChange = useCallback(async (checked) => {
     try {
       const currentType = getValueByPath(typePath, 'fixed');
@@ -113,7 +143,7 @@ const DistributionFieldV3 = ({
         }
 
         if (JSON.stringify(updatedDistribution.timeSeriesParameters.value) !==
-            JSON.stringify(currentTimeSeriesParameters.value)) {
+          JSON.stringify(currentTimeSeriesParameters.value)) {
           await updateByPath([...timeSeriesParametersPath, 'value'], updatedDistribution.timeSeriesParameters.value);
         }
 
@@ -127,6 +157,7 @@ const DistributionFieldV3 = ({
     }
   }, [defaultValue, timeSeriesParametersPath, parametersPath, timeSeriesModePath, typePath, updateByPath, getValueByPath, hasFittedParams]);
 
+  // Handle fitting distribution to time series data
   const handleFitDistribution = useCallback(async () => {
     if (!timeSeriesData || !Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
       return;
@@ -141,6 +172,12 @@ const DistributionFieldV3 = ({
       return;
     }
 
+    // Check if we have enough data points for fitting
+    if (validData.length < minRequiredPoints) {
+      message.warning(`Need at least ${minRequiredPoints} data points for the ${currentType} distribution.`);
+      return;
+    }
+
     const distribution = {
       type: currentType,
       parameters: { ...parameters },
@@ -148,6 +185,7 @@ const DistributionFieldV3 = ({
       timeSeriesMode: true
     };
 
+    // Use the fitDistributionToData handler from useInputSim
     const fittedParams = await fitDistributionToData(distribution, validData, async (fittedParams) => {
       if (fittedParams) {
         // Prepare batch updates
@@ -167,32 +205,26 @@ const DistributionFieldV3 = ({
     });
 
     return fittedParams;
-  }, [currentType, fitDistributionToData, parameters, parametersPath, timeSeriesData, updateByPath]);
+  }, [currentType, fitDistributionToData, parameters, parametersPath, timeSeriesData, updateByPath, minRequiredPoints]);
 
+  // Handle clearing fitted parameters
   const handleClearFit = useCallback(async () => {
-    const metadata = DistributionUtils.getMetadata(currentType);
-    if (metadata && metadata.parameters) {
-      const updates = metadata.parameters
-        .filter(param => param.name !== 'value' && param.fieldProps.defaultValue !== undefined)
-        .reduce((acc, param) => {
-          acc[[...parametersPath, param.name].join('.')] = param.fieldProps.defaultValue;
-          return acc;
-        }, {});
+    if (!metadata || !metadata.parameters) return;
 
-      await updateByPath(updates);
-      setHasFittedParams(false);
-    }
-  }, [currentType, parametersPath, updateByPath]);
+    // Reset parameters to their default values from metadata
+    const updates = metadata.parameters
+      .filter(param => param.name !== 'value' && param.fieldProps.defaultValue !== undefined)
+      .reduce((acc, param) => {
+        acc[[...parametersPath, param.name].join('.')] = param.fieldProps.defaultValue;
+        return acc;
+      }, {});
 
-  const metadata = useMemo(() => {
-    return DistributionUtils.getMetadata(currentType) || {};
-  }, [currentType]);
+    await updateByPath(updates);
+    setHasFittedParams(false);
+  }, [metadata, parametersPath, updateByPath]);
 
-  const minRequiredPoints = useMemo(() => {
-    return DistributionUtils.getMinRequiredPoints(currentType) || 3;
-  }, [currentType]);
-
-  const displayName = valueName || 'Value';
+  // Display name for the value parameter
+  const displayName = valueName || (metadata?.parameters.find(p => p.name === 'value')?.fieldProps?.label) || 'Value';
 
   return (
     <div className="distribution-field-v3" style={style}>
@@ -352,9 +384,9 @@ const DistributionFieldV3 = ({
                     ))}
                   </ul>
                 </Paragraph>
-                {metadata.axis && (
+                {metadata?.nonNegativeSupport && (
                   <Paragraph style={{ marginBottom: '2px' }}>
-                    <Text strong>Axis:</Text> {metadata.axis}
+                    <Text strong>Note:</Text> This distribution only supports non-negative values.
                   </Paragraph>
                 )}
               </div>

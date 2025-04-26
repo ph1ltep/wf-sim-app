@@ -1,4 +1,4 @@
-// src/utils/distributions/index.js - Enhanced with percentile support
+// src/utils/distributions/index.js - Enhanced with base class support
 import { Fixed } from './fixed';
 import { Normal } from './normal';
 import { LogNormal } from './lognormal';
@@ -10,14 +10,13 @@ import { Poisson } from './poisson';
 import { Kaimal } from './kaimal';
 import { GBM } from './gbm';
 import { Gamma } from './gamma';
+import { DistributionBase } from './distributionBase';
 import {
-    validateDistribution,
-    normalizeDistribution,
-    initializeTimeSeriesIfEmpty,
-    getMinRequiredPoints,
-    checkDataCompatibility
-} from './validationHelper';
-import { generatePdfPlot, hexToRgb, organizePercentiles } from '../plotUtils';
+    hexToRgb,
+    generatePdfPlot,
+    generateCdfPlot,
+    organizePercentiles
+} from '../plotUtils';
 
 // Map of distribution types to their implementations
 const DISTRIBUTIONS = {
@@ -34,6 +33,7 @@ const DISTRIBUTIONS = {
     gamma: Gamma
 };
 
+// Available distribution types for UI selection
 export const distributionTypes = [
     { value: 'fixed', label: 'Fixed Value' },
     { value: 'normal', label: 'Normal Distribution' },
@@ -63,43 +63,52 @@ export const DistributionUtils = {
     },
 
     /**
+     * Get base distribution class
+     * @returns {Object} Base distribution class
+     */
+    getDistributionBase() {
+        return DistributionBase;
+    },
+
+    /**
      * Validate distribution parameters using the new schema structure
      * @param {Object} distribution - Distribution object with type, parameters, and timeSeriesParameters
      * @param {boolean} validateTimeSeries - Whether to validate time series data
      * @returns {Object} Validation result with isValid flag and messages
      */
-    validateDistribution,
-
-    /**
-     * Validate distribution parameters (legacy method)
-     * @param {string} type - Distribution type
-     * @param {Object} parameters - Distribution parameters
-     * @returns {Object} Validation result with isValid flag and messages
-     */
-    validateDistributionParameters(type, parameters) {
-        const distribution = this.getDistribution(type);
-
+    validateDistribution(distribution, validateTimeSeries = true) {
         if (!distribution) {
             return {
                 isValid: false,
-                message: [`Unknown distribution type: ${type}`],
-                details: `The distribution type "${type}" is not supported. Please choose from the available options.`
+                message: ['Distribution object is required'],
+                details: 'No distribution object provided'
             };
         }
 
-        if (!parameters) {
+        // Validate distribution type
+        if (!distribution.type) {
             return {
                 isValid: false,
-                message: ["Parameters are required"],
-                details: "Please provide parameters for the distribution."
+                message: ['Distribution type is required'],
+                details: 'Please specify a distribution type'
             };
         }
 
-        return distribution.validate(parameters);
+        const distributionImpl = this.getDistribution(distribution.type);
+        if (!distributionImpl) {
+            return {
+                isValid: false,
+                message: [`Unknown distribution type: ${distribution.type}`],
+                details: `The distribution type "${distribution.type}" is not supported. Please choose from the available options.`
+            };
+        }
+
+        // Use distribution's own validation method for the parameters
+        return distributionImpl.validate(distribution.parameters || {});
     },
 
     /**
-     * Generate plot data for a distribution
+     * Generate plot data for a distribution, using the preferred visualization curve
      * @param {string} type - Distribution type
      * @param {Object} parameters - Distribution parameters
      * @param {Object} options - Plot options including percentile support
@@ -120,21 +129,63 @@ export const DistributionUtils = {
             };
         }
 
-        // Use plotUtils.generatePdfPlot instead of distribution.generatePlot
-        return generatePdfPlot(distribution, parameters, options);
+        // Get metadata to determine preferred visualization curve
+        const metadata = distribution.getMetadata();
+        const defaultCurve = metadata?.defaultCurve || 'pdf';
+
+        // Use the preferred curve or override with options
+        const useCdf = options.useCdf || defaultCurve === 'cdf';
+
+        // Use appropriate plotting function based on preferred curve
+        if (useCdf) {
+            return generateCdfPlot(distribution, parameters, options);
+        } else {
+            return generatePdfPlot(distribution, parameters, options);
+        }
     },
 
     /**
-     * Get list of available distribution types
-     * @returns {Array} Array of distribution types
+     * Get minimum required points for a distribution from metadata
+     * @param {string} type - Distribution type
+     * @returns {number} Minimum recommended number of data points
      */
-    getDistributionTypes() {
-        return Object.keys(DISTRIBUTIONS);
+    getMinRequiredPoints(type) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return 3; // Default fallback
+
+        const metadata = distribution.getMetadata();
+        return metadata?.minPointsRequired || 3;
     },
 
     /**
-     * Get metadata for all distributions
-     * @returns {Object} Metadata for all distributions
+     * Check if distribution supports non-negative values only
+     * @param {string} type - Distribution type
+     * @returns {boolean} Whether distribution supports only non-negative values
+     */
+    isNonNegative(type) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return false;
+
+        const metadata = distribution.getMetadata();
+        return metadata?.nonNegativeSupport || false;
+    },
+
+    /**
+     * Get appropriate visualization curve for a distribution
+     * @param {string} type - Distribution type
+     * @returns {string} Preferred visualization curve ('pdf' or 'cdf')
+     */
+    getDefaultCurve(type) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return 'pdf';
+
+        const metadata = distribution.getMetadata();
+        return metadata?.defaultCurve || 'pdf';
+    },
+
+    /**
+     * Get all available distribution types with metadata
+     * @returns {Object} Map of distribution types to their metadata
      */
     getAllDistributionMetadata() {
         const metadata = {};
@@ -147,49 +198,62 @@ export const DistributionUtils = {
     },
 
     /**
-     * Get Metadata by type
+     * Get metadata for a specific distribution type
      * @param {string} type - Distribution type
-     * @returns {Object} Metadata implementation or null if not found
+     * @param {Object|number|null} currentValue - Optional current value for dynamic defaults
+     * @returns {Object|null} Distribution metadata or null if not found
      */
-    getMetadata(type) {
-        if (!type) return null;
+    getMetadata(type, currentValue = null) {
         const distribution = this.getDistribution(type);
+        if (!distribution) return null;
 
-        return distribution ? distribution.getMetadata() : null;
+        return distribution.getMetadata(currentValue);
     },
 
     /**
-     * Normalize a distribution object to ensure it conforms to the expected schema
-     * @param {Object} distribution - Distribution object to normalize
-     * @returns {Object} Normalized distribution object
-     */
-    normalizeDistribution,
-
-    /**
-     * Initialize time series data if empty
-     * @param {Object} distribution - Distribution object
-     * @returns {Object} Distribution with initialized time series data
-     */
-    initializeTimeSeriesIfEmpty,
-
-    /**
-     * Get minimum required points for a distribution type
+     * Calculate mean value for a distribution
      * @param {string} type - Distribution type
-     * @returns {number} Minimum recommended number of data points
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Mean value
      */
-    getMinRequiredPoints,
+    calculateMean(type, parameters) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return parameters?.value || 0;
+
+        return distribution.calculateMean(parameters);
+    },
 
     /**
-     * Check compatibility of time series data with a distribution type
+     * Calculate standard deviation for a distribution
      * @param {string} type - Distribution type
-     * @param {Array} data - Time series data points
-     * @returns {Object|null} Compatibility check result or null if compatible
+     * @param {Object} parameters - Distribution parameters
+     * @returns {number} Standard deviation
      */
-    checkDataCompatibility,
+    calculateStdDev(type, parameters) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return 0;
 
+        return distribution.calculateStdDev(parameters);
+    },
+
+    /**
+     * Calculate percentile value for a distribution
+     * @param {string} type - Distribution type
+     * @param {Object} parameters - Distribution parameters
+     * @param {number} percentile - Percentile value (0-100)
+     * @returns {number} Value at percentile
+     */
+    calculatePercentile(type, parameters, percentile) {
+        const distribution = this.getDistribution(type);
+        if (!distribution) return parameters?.value || 0;
+
+        // Convert percentile to probability (0-1)
+        const p = percentile / 100;
+        return distribution.calculateQuantile(p, parameters);
+    }
 };
 
-// Export individual distributions
+// Export individual distributions and base class
 export {
     Fixed,
     Normal,
@@ -201,5 +265,6 @@ export {
     Poisson,
     Kaimal,
     GBM,
-    Gamma
+    Gamma,
+    DistributionBase
 };

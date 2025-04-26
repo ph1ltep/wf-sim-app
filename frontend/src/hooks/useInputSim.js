@@ -32,7 +32,7 @@ const useInputSim = () => {
 
             // Ensure proper structure for each distribution
             const normalizeDistribution = (dist) => {
-                return DistributionUtils.normalizeDistribution(dist);
+                return dist //DistributionUtils.normalizeDistribution(dist);
             };
 
             // Create parameters for API request
