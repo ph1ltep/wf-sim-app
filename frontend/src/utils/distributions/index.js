@@ -250,6 +250,43 @@ export const DistributionUtils = {
         // Convert percentile to probability (0-1)
         const p = percentile / 100;
         return distribution.calculateQuantile(p, parameters);
+    },
+
+    /**
+ * Ensures a distribution object conforms to the expected schema structure
+ * 
+ * @param {Object} distribution Distribution object to normalize
+ * @returns {Object} Normalized distribution object
+ */
+    normalizeDistribution(distribution) {
+        if (!distribution) {
+            return {
+                type: 'fixed',
+                timeSeriesMode: false,
+                parameters: { value: 0 },
+                timeSeriesParameters: { value: [] }
+            };
+        }
+
+        // Create a new object with defaults
+        const normalized = {
+            type: distribution.type || 'fixed',
+            timeSeriesMode: !!distribution.timeSeriesMode,
+            parameters: { ...(distribution.parameters || { value: 0 }) },
+            timeSeriesParameters: { ...(distribution.timeSeriesParameters || { value: [] }) }
+        };
+
+        // Ensure parameters.value is a number
+        if (typeof normalized.parameters.value !== 'number') {
+            normalized.parameters.value = 0;
+        }
+
+        // Ensure timeSeriesParameters.value is an array
+        if (!Array.isArray(normalized.timeSeriesParameters.value)) {
+            normalized.timeSeriesParameters.value = [];
+        }
+
+        return normalized;
     }
 };
 

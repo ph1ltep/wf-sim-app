@@ -279,7 +279,7 @@ export const Fixed = {
                     required: false,
                     fieldType: "percentage",
                     fieldProps: {
-                        label: "Growth rate",
+                        label: "Growth rate (%)",
                         tooltip: "Annual percentage growth or decline rate",
                         min: -50,
                         max: 100,

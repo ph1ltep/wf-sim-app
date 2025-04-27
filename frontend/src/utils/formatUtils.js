@@ -29,3 +29,16 @@ export function formatCompactNumber(value, precision) {
         compactDisplay: 'short'
     });
 }
+
+/**
+ * Rounds a number to a specified number of decimal places.
+ * @param {number} number - The number to round.
+ * @param {number} decimals - The number of decimal places to round to.
+ * @returns {number} The rounded number.
+ * @example
+ * roundTo(123.45678, 2); // Returns 123.46
+ */
+export function roundTo(number, decimals) {
+    const factor = Math.pow(10, decimals);
+    return Math.round(number * factor) / factor;
+}

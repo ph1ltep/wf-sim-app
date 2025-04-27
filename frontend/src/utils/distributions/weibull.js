@@ -1,6 +1,7 @@
 // src/utils/distributions/weibull.js
 import * as jStat from 'jstat';
 import { DistributionBase } from './distributionBase';
+import { roundTo } from 'utils/formatUtils';
 
 /**
  * Weibull Distribution
@@ -321,11 +322,12 @@ export const Weibull = {
             value = typeof currentValue === 'object'
                 ? DistributionBase.helpers.getParam(currentValue, 'value', 0)
                 : currentValue;
+            value = roundTo(value, 2);
         }
 
         // Default scale based on current value or default
         const defaultScale = value !== null && value > 0
-            ? value / jStat.gammafn(1 + 1 / 2) // Roughly align mean with current value for shape=2
+            ? roundTo(value / jStat.gammafn(1 + 1 / 2), 2) // Roughly align mean with current value for shape=2
             : 1;
 
         return {

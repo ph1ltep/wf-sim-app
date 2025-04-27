@@ -1,5 +1,6 @@
 // src/utils/distributions/distributionBase.js
 import * as jStat from 'jstat';
+import { roundTo } from 'utils/formatUtils';
 
 /**
  * Base class for all distribution implementations

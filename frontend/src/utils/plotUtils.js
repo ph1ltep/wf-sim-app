@@ -183,6 +183,7 @@ export function createParameterLabel(x, y, text, align = 'left') {
     };
 }
 
+
 /**
  * Create percentile band and markers
  * @param {Object} distribution - Distribution implementation
@@ -222,6 +223,19 @@ export function createPercentileBand(
     if (xValues) {
         // Filter provided x-values to the range
         bandXValues = xValues.filter(x => x >= lowerX && x <= upperX);
+
+        // Ensure we have the boundary points for accurate band edges
+        if (bandXValues.length > 0) {
+            if (bandXValues[0] > lowerX) {
+                bandXValues.unshift(lowerX);
+            }
+            if (bandXValues[bandXValues.length - 1] < upperX) {
+                bandXValues.push(upperX);
+            }
+        } else {
+            // If no points in range, create a minimal set
+            bandXValues = [lowerX, upperX];
+        }
     } else {
         // Generate new x-values within the range
         bandXValues = generateXValues(lowerX, upperX, 50);
@@ -229,6 +243,9 @@ export function createPercentileBand(
 
     // If band is empty, return null
     if (bandXValues.length === 0) return null;
+
+    // Sort x values to ensure proper rendering
+    bandXValues.sort((a, b) => a - b);
 
     // Calculate y-values using the appropriate distribution method
     const calculateY = useCdf
@@ -245,7 +262,7 @@ export function createPercentileBand(
         y: bandYValues,
         type: 'scatter',
         mode: 'none',
-        fill: useCdf ? 'tozeroy' : 'toself',
+        fill: useCdf ? 'tozeroy' : 'toself',  // Different fill types for PDF vs CDF
         fillcolor: fillColor,
         line: { width: 0 },
         name: name || `P${lowerPercentile}-P${upperPercentile}`,

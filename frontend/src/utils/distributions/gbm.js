@@ -58,7 +58,7 @@ export const GBM = {
      */
     calculateMean(parameters) {
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // Mean at time T
@@ -72,8 +72,8 @@ export const GBM = {
      */
     calculateStdDev(parameters) {
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // Variance at time T
@@ -94,8 +94,8 @@ export const GBM = {
         if (x <= 0) return 0;
 
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // For GBM, the PDF follows a lognormal distribution at time T
@@ -126,8 +126,8 @@ export const GBM = {
         if (x <= 0) return 0;
 
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // For GBM, the CDF follows a lognormal distribution at time T
@@ -155,8 +155,8 @@ export const GBM = {
      */
     calculateQuantile(p, parameters) {
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // Calculate effective mu and sigma for the lognormal
@@ -176,8 +176,8 @@ export const GBM = {
      */
     generatePDF(parameters, xValues, percentiles = []) {
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // Filter x values to avoid issues near zero
@@ -281,16 +281,14 @@ export const GBM = {
             keyPoints,
             stats: {
                 initialValue,
-                drift,
-                volatility,
+                drift: parameters.drift, // Store as percentage
+                volatility: parameters.volatility, // Store as percentage
                 timeStep,
                 mean,
                 median,
                 mode,
                 stdDev,
-                variance: stdDev * stdDev,
-                mu, // Effective lognormal param
-                sigma // Effective lognormal param
+                variance: stdDev * stdDev
             }
         };
     },
@@ -304,8 +302,8 @@ export const GBM = {
      */
     generateCDF(parameters, xValues, percentiles = []) {
         const initialValue = DistributionBase.helpers.getParam(parameters, 'value', 100);
-        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 0.05);
-        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 0.2);
+        const drift = DistributionBase.helpers.getParam(parameters, 'drift', 5) / 100; // Convert percentage to decimal
+        const volatility = DistributionBase.helpers.getParam(parameters, 'volatility', 20) / 100; // Convert percentage to decimal
         const timeStep = DistributionBase.helpers.getParam(parameters, 'timeStep', 1);
 
         // Filter x values to avoid issues near zero
@@ -388,8 +386,8 @@ export const GBM = {
             keyPoints,
             stats: {
                 initialValue,
-                drift,
-                volatility,
+                drift: parameters.drift, // Store as percentage
+                volatility: parameters.volatility, // Store as percentage
                 timeStep,
                 mean,
                 median,
@@ -440,27 +438,27 @@ export const GBM = {
                 },
                 {
                     name: "drift",
-                    description: "Drift rate (μ)",
+                    description: "Annual drift rate (% growth)",
                     required: true,
-                    fieldType: "number",
+                    fieldType: "percentage", // Changed to percentage field type
                     fieldProps: {
-                        label: "Drift",
-                        tooltip: "Annual growth rate (as decimal)",
-                        step: 0.01,
-                        defaultValue: 0.05
+                        label: "Drift (%)",
+                        tooltip: "Annual growth rate (as percentage)",
+                        step: 0.1,
+                        defaultValue: 5 // Changed from 0.05 to 5 (now as percentage)
                     }
                 },
                 {
                     name: "volatility",
-                    description: "Volatility (σ)",
+                    description: "Annual volatility (% standard deviation)",
                     required: true,
-                    fieldType: "number",
+                    fieldType: "percentage", // Changed to percentage field type
                     fieldProps: {
-                        label: "Volatility",
-                        tooltip: "Annual volatility (as decimal)",
+                        label: "Volatility (%)",
+                        tooltip: "Annual volatility (as percentage)",
                         min: 0,
-                        step: 0.01,
-                        defaultValue: 0.2
+                        step: 0.1,
+                        defaultValue: 20 // Changed from 0.2 to 20 (now as percentage)
                     }
                 },
                 {

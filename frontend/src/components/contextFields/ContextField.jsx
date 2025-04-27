@@ -1,5 +1,5 @@
 // src/components/contextFields/ContextField.jsx - Modified version
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
@@ -13,6 +13,7 @@ export const ContextField = ({
   disabled,
   validators = [], // Custom validators
   transform, // Optional transform function for the input value
+  defaultValue, // Added explicit support for defaultValue
 
   // New props for form mode
   formMode = false,
@@ -47,6 +48,23 @@ export const ContextField = ({
 
     return result;
   }, [path, updateValue, transform]);
+
+  // Initialize with defaultValue if current value is null/undefined and defaultValue is provided
+  useEffect(() => {
+    const shouldInitialize =
+      defaultValue !== undefined &&
+      defaultValue !== null &&
+      (value === undefined || value === null);
+
+    if (shouldInitialize && !disabled) {
+      // Use a small timeout to ensure this doesn't interfere with other initialization
+      const timeoutId = setTimeout(() => {
+        handleChange(defaultValue);
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [defaultValue, value, handleChange, disabled]);
 
   return (
     <Form.Item

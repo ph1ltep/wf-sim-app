@@ -252,7 +252,7 @@ export const Normal = {
                     name: "stdDev",
                     description: "Standard deviation as percentage of mean",
                     required: true,
-                    fieldType: "number",
+                    fieldType: "percentage", // Explicitly mark as percentage field type
                     fieldProps: {
                         label: "Std Dev (%)",
                         tooltip: "Standard deviation as percentage of the mean value",
