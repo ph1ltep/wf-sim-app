@@ -22,7 +22,7 @@ router.get('/:id', getOEMScopeById);
 router.post('/', validateMiddleware(OEMScopeSchema), createOEMScope);
 
 // POST /api/oemscopes/generate-name - Generate a name based on scope selections
-router.post('/generate-name', generateName);
+router.post('/generate-name', validateMiddleware(OEMScopeSchema), generateName);
 
 // PUT /api/oemscopes/:id - Update OEM scope
 router.put('/:id', validateMiddleware(OEMScopeSchema), updateOEMScope);

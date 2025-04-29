@@ -1,6 +1,6 @@
 const OEMScope = require('../../schemas/mongoose/oemScope');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
-const { OEMScopeSchema } = require('../../schemas/yup/oemScope');
+const OEMScopeSchema = require('../../schemas/yup/oemScope');
 
 // Get all OEM scopes
 const getAllOEMScopes = async (req, res) => {
@@ -51,17 +51,54 @@ const createOEMScope = async (req, res) => {
 const generateName = async (req, res) => {
   try {
     // Validate request body
-    const validatedData = await OEMScopeSchema.validate(req.body, { stripUnknown: true });
+    //const validatedData = await OEMScopeSchema.validateSync(req.body, { stripUnknown: true });
 
     // Create a temporary document to use the generateName method
-    const tempScope = new OEMScope(validatedData);
-    const generatedName = tempScope.generateName();
+    const generatedName = generateOEMScopeName(req.body);
 
     res.json(formatSuccess({ name: generatedName }, 'Name generated successfully', 'default'));
   } catch (error) {
-    res.status(500).json(formatError('Failed to generate name', 500, [error.message]));
+    res.status(500).json(formatError(error, 500, [error.message]));
   }
 };
+
+// Helper function to generate name based on OEM scope features
+function generateOEMScopeName(data) {
+  const parts = [];
+
+  if (data.preventiveMaintenance) parts.push('PM');
+  if (data.bladeInspections) parts.push('BI');
+  if (data.blade) parts.push('BL');
+  if (data.bladeLEP) parts.push('LEP');
+  if (data.remoteMonitoring) parts.push('RM');
+  if (data.remoteTechnicalSupport) parts.push('RTS');
+
+  if (data.sitePersonnel === 'full') parts.push('FSP');
+  else if (data.sitePersonnel === 'partial') parts.push('PSP');
+
+  if (data.correctiveMinor) parts.push('CMin');
+
+  if (data.correctiveMajor) {
+    const majorParts = [];
+    if (data.correctiveMajorDetails?.crane) majorParts.push('C');
+    if (data.correctiveMajorDetails?.tooling) majorParts.push('T');
+    if (data.correctiveMajorDetails?.manpower) majorParts.push('M');
+    if (data.correctiveMajorDetails?.parts) majorParts.push('P');
+
+    if (majorParts.length > 0) {
+      parts.push(`CMaj(${majorParts.join('')})`);
+    } else {
+      parts.push('CMaj');
+    }
+  }
+
+  // If no parts selected, use a default name
+  if (parts.length === 0) {
+    return 'Basic-OEM-Scope';
+  }
+
+  return parts.join('-');
+}
 
 // Update OEM scope
 const updateOEMScope = async (req, res) => {

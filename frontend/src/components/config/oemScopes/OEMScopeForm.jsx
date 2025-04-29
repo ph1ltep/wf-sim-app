@@ -1,17 +1,6 @@
 // src/components/config/oemScopes/OEMScopeForm.jsx
 import React, { useState, useEffect } from 'react';
-import {
-  Form,
-  Input,
-  Row,
-  Col,
-  Button,
-  Checkbox,
-  Divider,
-  Typography,
-  InputNumber,
-  Select
-} from 'antd';
+import { Form, Input, Row, Col, Button, Checkbox, Divider, Typography, InputNumber, Select } from 'antd';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -92,6 +81,7 @@ const OEMScopeForm = ({
 
   const handleGenerateName = () => {
     try {
+      // Simply pass the raw form values to the hook
       const values = form.getFieldsValue();
       onGenerateName(values);
     } catch (error) {
@@ -192,7 +182,6 @@ const OEMScopeForm = ({
               formatter={value => `${value}%`}
               parser={value => value.replace('%', '')}
               style={{ width: '100%' }}
-              disabled={!form.getFieldValue('siteManagement')}
             />
           </Form.Item>
         </Col>

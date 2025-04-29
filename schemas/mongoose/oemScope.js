@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const yupToMongoose = require('./generator');
-const OEMScopeSchemaYup = require('../yup/oemScope');
+const { OEMScopeSchema: OEMScopeSchemaYup } = require('../yup/oemScope');
 
 // Generate Mongoose schema from Yup schema
 const OEMScopeSchema = yupToMongoose(OEMScopeSchemaYup);
