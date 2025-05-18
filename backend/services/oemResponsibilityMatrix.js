@@ -18,7 +18,7 @@ const generateResponsibilityMatrix = (projectLife, numWTGs, oemContracts) => {
       numWTGs,
       yearlyResponsibilities: [],
       oemContracts: []
-    };
+    }; 
   
     // Create a map of contract coverage by year
     const contractsByYear = {};
