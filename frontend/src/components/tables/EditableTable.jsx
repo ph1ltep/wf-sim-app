@@ -84,7 +84,11 @@ const EditableTable = ({
         // We just need to close the modal
       } else {
         // For new items, we need to add to the array
-        const newItem = formValues;
+        let newItem = {
+          [keyField]: `${itemName.toLowerCase()}_${Date.now()}`, // Set id FIRST
+          ...formValues
+        };
+        //const newItem = formValues;
 
         // Generate a unique ID if needed
         if (keyField && !newItem[keyField]) {
