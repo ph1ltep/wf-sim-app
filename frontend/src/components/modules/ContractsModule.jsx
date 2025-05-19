@@ -1,7 +1,15 @@
 // src/components/modules/ContractsModule.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Select, Space, Table, Modal, Form, Input, InputNumber, Checkbox } from 'antd';
-import { ContractOutlined, InfoCircleOutlined, ReloadOutlined, ExclamationCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useEffect } from 'react';
+import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space, Table } from 'antd';
+import { 
+  ContractOutlined, 
+  InfoCircleOutlined, 
+  ReloadOutlined, 
+  ExclamationCircleOutlined,
+  DollarCircleOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined
+} from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import useOEMScopes from '../../hooks/useOEMScopes';
 import OEMScopeTag from '../config/oemScopes/OEMScopeTag';
@@ -16,11 +24,20 @@ import {
   NumberField,
   SelectField,
   CheckboxField,
-  EditableTable
+  CurrencyField,
+  PercentageField
 } from '../contextFields';
+import EditableTable from '../../components/tables/EditableTable';
+
+// Import column utilities
+import {
+  createTextColumn,
+  createCustomTagsColumn,
+  createCurrencyColumn,
+  createIconColumn
+} from '../tables/columns';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 
 const ContractsModule = () => {
   // Base path for contracts in the context
@@ -33,24 +50,11 @@ const ContractsModule = () => {
   // Current project life for year range
   const projectLife = getValueByPath(['settings', 'general', 'projectLife'], 20);
   
-  // Local state
-  const [selectedContract, setSelectedContract] = useState(null);
-  
   // Get contracts from context or initialize empty array
   const contracts = getValueByPath(contractsPath, []);
 
-  // Get scope options for dropdown
-  const scopeOptions = oemScopes.map(scope => ({
-    value: scope.key,
-    label: scope.name,
-    scope: scope
-  }));
-
-  // Create an array of year options for the dropdown
-  const yearOptions = Array.from({ length: projectLife }, (_, i) => ({
-    value: i + 1,
-    label: `Year ${i + 1}`
-  }));
+  // Get currency
+  const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
 
   // Refresh scopes
   useEffect(() => {
@@ -59,49 +63,66 @@ const ContractsModule = () => {
 
   // Define columns for the contracts table
   const contractColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
+    // Name column
+    createTextColumn('name', 'Name', {
       width: '20%',
-    },
-    {
-      title: 'OEM Scope',
-      key: 'oemScopeId',
-      width: '30%',
-      render: (_, record) => {
-        // Find the associated scope
-        const scope = oemScopes.find(s => s.key === record.oemScopeId);
-        
-        if (!scope) {
-          return <Tag color="error">Scope not found</Tag>;
+      sorter: true,
+    }),
+
+    // OEM Scope column using createCustomTagsColumn
+    createCustomTagsColumn('oemScopeId', 'OEM Scope', 
+      (tag, index) => (
+        <Tooltip key={tag.id} title={tag.content}>
+          <OEMScopeTag color={tag.color}>
+            {tag.content}
+          </OEMScopeTag>
+        </Tooltip>
+      ),
+      {
+        width: '25%',
+        getTagsFromRecord: (record) => {
+          // Find the associated scope
+          const scope = oemScopes.find(s => s.key === record.oemScopeId);
+          if (!scope) return [];
+          
+          // Return tags based on scope features
+          return renderScopeTags(scope);
+        },
+        render: (_, record) => {
+          // Find the associated scope
+          const scope = oemScopes.find(s => s.key === record.oemScopeId);
+          
+          if (!scope) {
+            return <Tag color="error">Scope not found</Tag>;
+          }
+          
+          // Generate tags from scope features
+          const tags = renderScopeTags(scope);
+          
+          return (
+            <Space size={[0, 4]} wrap direction="vertical">
+              <Text strong>{scope.name}</Text>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                {tags.map(tag => (
+                  <Tooltip key={tag.id} title={tag.content}>
+                    <OEMScopeTag color={tag.color}>
+                      {tag.content}
+                    </OEMScopeTag>
+                  </Tooltip>
+                ))}
+              </div>
+            </Space>
+          );
         }
-        
-        // Render tags for the scope features
-        const tags = renderScopeTags(scope, OEMScopeTag);
-        
-        return (
-          <Space size={[0, 4]} wrap>
-            <Text strong>{scope.name}</Text>
-            <br />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-              {tags.map(tag => (
-                <Tooltip key={tag.id} title={tag.content}>
-                  <OEMScopeTag color={tag.color}>
-                    {tag.content}
-                  </OEMScopeTag>
-                </Tooltip>
-              ))}
-            </div>
-          </Space>
-        );
       }
-    },
+    ),
+
+    // Years column
     {
       title: 'Years',
       dataIndex: 'years',
       key: 'years',
-      width: '25%',
+      width: '20%',
       render: (years) => {
         if (!years || years.length === 0) {
           return <Text type="secondary">No years assigned</Text>;
@@ -135,129 +156,120 @@ const ContractsModule = () => {
         );
       }
     },
-    {
-      title: 'Fee',
-      key: 'fee',
-      width: '25%',
-      render: (_, record) => {
-        const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
-        return (
-          <div>
-            {record.fixedFee ? (
-              <>
-                <Tag color="green">
-                  {record.fixedFee.toLocaleString()} {currency}
-                  {record.isPerTurbine ? '/turbine' : ''}
-                </Tag>
-                {record.isPerTurbine && (
-                  <Tooltip title="This fee is applied per turbine">
-                    <InfoCircleOutlined style={{ marginLeft: 4 }} />
-                  </Tooltip>
-                )}
-              </>
-            ) : (
-              <Text type="secondary">No fee defined</Text>
-            )}
-          </div>
-        );
+
+    // Fee column using createCurrencyColumn
+    createCurrencyColumn('fixedFee', 'Fee', {
+      width: '15%',
+      currency,
+      precision: 0,
+    }),
+
+    // Icon column for additional indicators
+    createIconColumn('', [
+      {
+        key: 'isPerTurbine',
+        icon: <DollarCircleOutlined />,
+        tooltip: 'Fee is applied per turbine',
+        color: '#52c41a'  // Green
+      },
+      {
+        key: record => record.escalation?.useMin,
+        icon: <ArrowDownOutlined />,
+        tooltip: record => `Minimum escalation limit: ${record.escalation?.minValue}%`,
+        color: '#1890ff' // Blue
+      },
+      {
+        key: record => record.escalation?.useMax,
+        icon: <ArrowUpOutlined />,
+        tooltip: record => `Maximum escalation limit: ${record.escalation?.maxValue}%`,
+        color: '#faad14' // Gold
       }
-    }
+    ], {
+      width: 100
+    })
   ];
 
-// ContractsTable component handles add/edit/delete of contracts
-const ContractsTable = ({ 
-  contracts,
-  columns, 
-  oemScopes, 
-  yearOptions, 
-  projectLife, 
-  path, 
-  updateByPath, 
-  getValueByPath 
-}) => {
-  const [form] = Form.useForm();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingContract, setEditingContract] = useState(null);
-  const [editingContractIndex, setEditingContractIndex] = useState(null);
+  // Define form fields for the contracts form
+  const contractFormFields = [
+    <TextField
+      key="name"
+      path="name"
+      label="Contract Name"
+      placeholder="e.g., OEM Full Service Contract"
+      required
+    />,
+    
+    <SelectField
+      key="oemScopeId"
+      path="oemScopeId"
+      label="OEM Scope"
+      placeholder="Select an OEM scope"
+      options={oemScopes.map(scope => ({
+        value: scope.key,
+        label: scope.name
+      }))}
+      required
+    />,
+    
+    <CurrencyField
+      key="fixedFee"
+      path="fixedFee"
+      label="Fixed Fee"
+      min={0}
+      step={1000}
+      currencyOverride={currency}
+    />,
+    
+    <CheckboxField
+      key="isPerTurbine"
+      path="isPerTurbine"
+      label="Fee is applied per turbine"
+    />,
+    
+    <SelectField
+      key="years"
+      path="years"
+      label="Contract Years"
+      mode="multiple"
+      placeholder="Select years"
+      options={Array.from({ length: projectLife }, (_, i) => ({
+        value: i + 1,
+        label: `Year ${i + 1}`
+      }))}
+    />,
+    
+    <CheckboxField
+      key="useMin"
+      path="escalation.useMin"
+      label="Use minimum escalation limit"
+    />,
+    
+    <PercentageField
+      key="minValue"
+      path="escalation.minValue"
+      label="Minimum escalation"
+      min={-20}
+      max={0}
+      step={0.1}
+    />,
+    
+    <CheckboxField
+      key="useMax"
+      path="escalation.useMax"
+      label="Use maximum escalation limit"
+    />,
+    
+    <PercentageField
+      key="maxValue"
+      path="escalation.maxValue"
+      label="Maximum escalation"
+      min={0}
+      max={20}
+      step={0.1}
+    />
+  ];
 
-  // Handle adding new contract
-  const handleAdd = () => {
-    form.resetFields();
-    setEditingContract(null);
-    setEditingContractIndex(null);
-    setModalVisible(true);
-  };
-
-  // Handle editing existing contract
-  const handleEdit = (record, index) => {
-    form.setFieldsValue(record);
-    setEditingContract(record);
-    setEditingContractIndex(index);
-    setModalVisible(true);
-  };
-
-  // Handle deleting contract
-  const handleDelete = (index) => {
-    const newContracts = [...contracts];
-    newContracts.splice(index, 1);
-    updateByPath(path, newContracts);
-  };
-
-  // Handle saving the form
-  const handleSave = () => {
-    form.validateFields().then(values => {
-      const newContracts = [...contracts];
-      
-      // Find the OEM scope name if it wasn't set in the onChange
-      if (!values.oemScopeName) {
-        const scope = oemScopes.find(s => s.key === values.oemScopeId);
-        values.oemScopeName = scope?.name || '';
-      }
-
-      // Generate an ID for new contracts
-      if (editingContractIndex === null) {
-        values.id = `contract_${Date.now()}`;
-        newContracts.push(values);
-      } else {
-        newContracts[editingContractIndex] = {
-          ...newContracts[editingContractIndex],
-          ...values
-        };
-      }
-      
-      updateByPath(path, newContracts);
-      setModalVisible(false);
-    });
-  };
-  
-  // Add actions column if not already present
-  const tableColumns = columns.find(col => col.key === 'actions') ? 
-    columns : 
-    [
-      ...columns, 
-      {
-        title: 'Actions',
-        key: 'actions',
-        width: 120,
-        render: (_, record, index) => (
-          <Space>
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record, index)}
-            />
-            <Button 
-              type="text" 
-              danger 
-              icon={<DeleteOutlined />} 
-              onClick={() => handleDelete(index)}
-            />
-          </Space>
-        )
-      }
-    ];
-
-  // Expandable row renderer
+  // Expandable row renderer for contract details
   const expandedRowRender = (record) => {
     // Find the associated scope
     const scope = oemScopes.find(s => s.key === record.oemScopeId);
@@ -267,123 +279,24 @@ const ContractsTable = ({
       <Card size="small" title="Contract Details" bordered={false}>
         <p><strong>Contract Name:</strong> {record.name}</p>
         <p><strong>OEM Scope:</strong> {scope.name}</p>
-        <p><strong>Fixed Fee:</strong> {record.fixedFee?.toLocaleString() || 'N/A'} {getValueByPath(['settings', 'project', 'currency', 'local'], 'USD')} {record.isPerTurbine ? 'per turbine' : 'total'}</p>
+        <p><strong>Fixed Fee:</strong> {record.fixedFee?.toLocaleString() || 'N/A'} {currency} {record.isPerTurbine ? 'per turbine' : 'total'}</p>
         <p><strong>Active Years:</strong> {record.years?.join(', ') || 'None'}</p>
+        
+        {/* Escalation details */}
+        {(record.escalation?.useMin || record.escalation?.useMax) && (
+          <div>
+            <p><strong>Escalation Limits:</strong></p>
+            {record.escalation?.useMin && (
+              <p>- Minimum: {record.escalation.minValue}%</p>
+            )}
+            {record.escalation?.useMax && (
+              <p>- Maximum: {record.escalation.maxValue}%</p>
+            )}
+          </div>
+        )}
       </Card>
     );
   };
-
-  // Render contract form for the modal
-  const renderContractForm = () => (
-    <Form form={form} layout="vertical">
-      <Form.Item
-        name="name"
-        label="Contract Name"
-        rules={[{ required: true, message: 'Please enter a contract name' }]}
-      >
-        <Input placeholder="e.g., OEM Full Service Contract" />
-      </Form.Item>
-      
-      <Form.Item
-        name="oemScopeId"
-        label="OEM Scope"
-        rules={[{ required: true, message: 'Please select an OEM scope' }]}
-      >
-        <Select 
-          placeholder="Select an OEM scope" 
-          style={{ width: '100%' }}
-          onChange={(value, option) => {
-            // When OEM scope is selected, also set the scope name
-            if (option) {
-              form.setFieldsValue({ 
-                oemScopeName: option.children
-              });
-            }
-          }}
-        >
-          {oemScopes.map(scope => (
-            <Select.Option key={scope.key} value={scope.key}>
-              {scope.name}
-            </Select.Option>
-          ))}
-        </Select>
-      </Form.Item>
-      
-      <Form.Item name="oemScopeName" hidden>
-        <Input />
-      </Form.Item>
-      
-      <Form.Item
-        name="fixedFee"
-        label="Fixed Fee"
-      >
-        <InputNumber
-          min={0}
-          step={1000}
-          style={{ width: '100%' }}
-          formatter={value => value ? `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '$0'}
-          parser={value => value.replace(/\$\s?|(,*)/g, '')}
-        />
-      </Form.Item>
-      
-      <Form.Item 
-        name="isPerTurbine" 
-        valuePropName="checked"
-      >
-        <Checkbox>Fee is per turbine</Checkbox>
-      </Form.Item>
-      
-      <Form.Item
-        name="years"
-        label="Contract Years"
-      >
-        <Select
-          mode="multiple"
-          placeholder="Select years"
-          style={{ width: '100%' }}
-        >
-          {yearOptions.map(year => (
-            <Select.Option key={year.value} value={year.value}>
-              {year.label}
-            </Select.Option>
-          ))}
-        </Select>
-      </Form.Item>
-    </Form>
-  );
-
-  return (
-    <>
-      <div style={{ marginBottom: 16, textAlign: 'right' }}>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={handleAdd}
-        >
-          Add Contract
-        </Button>
-      </div>
-      
-      <Table 
-        dataSource={contracts} 
-        columns={tableColumns}
-        rowKey="id"
-        expandable={{ expandedRowRender }}
-        pagination={false}
-      />
-
-      <Modal
-        title={editingContract ? "Edit Contract" : "Add Contract"}
-        open={modalVisible}
-        onOk={handleSave}
-        onCancel={() => setModalVisible(false)}
-        destroyOnClose={true}
-      >
-        {renderContractForm()}
-      </Modal>
-    </>
-  );
-};
 
   // Check if there's an active scenario
   if (!scenarioData) {
@@ -449,15 +362,13 @@ const ContractsTable = ({
                   style={{ marginBottom: 16 }}
                 />
                 
-                <ContractsTable 
-                  contracts={contracts}
+                <EditableTable
                   columns={contractColumns}
-                  oemScopes={oemScopes}
-                  yearOptions={yearOptions}
-                  projectLife={projectLife}
                   path={contractsPath}
-                  updateByPath={updateByPath}
-                  getValueByPath={getValueByPath}
+                  formFields={contractFormFields}
+                  keyField="id"
+                  itemName="Contract"
+                  expandedRowRender={expandedRowRender}
                 />
               </FormSection>
               

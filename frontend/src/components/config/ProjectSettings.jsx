@@ -143,31 +143,43 @@ const ProjectSettings = () => {
   const loadLocationDefaults = () => {
     if (!selectedLocation) return;
 
-    // Update capacity factor
-    updateByPath([...windFarmPath, 'capacityFactor'], selectedLocation.capacityFactor);
+    // Prepare all updates in a single object
+    const updates = {
+      // Wind farm capacity factor
+      [`${windFarmPath.join('.')}.capacityFactor`]: selectedLocation.capacityFactor,
 
-    // Update currency information
-    updateByPath([...currencyPath, 'local'], selectedLocation.currency);
-    updateByPath([...currencyPath, 'foreign'], selectedLocation.foreignCurrency);
-    updateByPath([...currencyPath, 'exchangeRate'], selectedLocation.exchangeRate);
+      // Currency information
+      [`${currencyPath.join('.')}.local`]: selectedLocation.currency,
+      [`${currencyPath.join('.')}.foreign`]: selectedLocation.foreignCurrency,
+      [`${currencyPath.join('.')}.exchangeRate`]: selectedLocation.exchangeRate,
 
-    // Update revenue module values with location defaults
-    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'distribution', 'parameters', 'value'],
-      selectedLocation.energyPrice);
-    updateByPath(['settings', 'modules', 'revenue', 'electricityPrice', 'distribution', 'parameters', 'drift'],
-      selectedLocation.inflationRate);
+      // Revenue module values
+      'settings.modules.revenue.electricityPrice.parameters.value': selectedLocation.energyPrice,
+      'settings.modules.revenue.electricityPrice.parameters.drift': selectedLocation.inflationRate,
 
-    // Update cost module values with location defaults
-    updateByPath(['settings', 'modules', 'cost', 'escalationRate'],
-      selectedLocation.inflationRate);
+      // Cost module values
+      'settings.modules.cost.escalationRate.parameters.value': 1,
+      'settings.modules.cost.escalationRate.parameters.drift': selectedLocation.inflationRate
+    };
 
-    // Mark fields as being from location defaults
-    setFieldsFromLocations({
-      capacityFactor: true,
-      currency: true,
-      foreignCurrency: true,
-      exchangeRate: true
-    });
+    // Apply all updates in a single call
+    updateByPath(updates)
+      .then(result => {
+        if (!result.isValid) {
+          console.error('Error applying location defaults:', result.errors);
+        } else {
+          // Mark fields as being from location defaults
+          setFieldsFromLocations({
+            capacityFactor: true,
+            currency: true,
+            foreignCurrency: true,
+            exchangeRate: true
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error applying location defaults:', error);
+      });
   };
 
   // Get currency options from currencyConstants

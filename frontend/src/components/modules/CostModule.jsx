@@ -8,6 +8,7 @@ import {
   ScheduleOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { DistributionFieldV3 } from 'components/distributionFields';
 
 // Import context field components
 import {
@@ -148,48 +149,29 @@ const CostModule = () => {
 
   const tabItems = [
     {
-      key: "baseOM",
+      key: "escalation",
       label: (
         <span>
-          <DollarOutlined /> Base O&M
+          <DollarOutlined /> Escalation
         </span>
       ),
       children: (
-        <FormSection title="Base O&M Costs" style={{ marginBottom: 24 }}>
+        <FormSection title="Cost Escalation" style={{ marginBottom: 24 }}>
           <FormRow>
-            <FormCol span={12}>
-              <CurrencyField
-                path={[...basePath, 'annualBaseOM']}
-                label="Annual Base O&M Cost"
-                tooltip="Base annual operations and maintenance cost"
-                min={0}
-                step={10000}
-                currencyOverride={currency}
-              />
-            </FormCol>
-            <FormCol span={12}>
-              <PercentageField
+            <FormCol >
+              <DistributionFieldV3
                 path={[...basePath, 'escalationRate']}
-                label="O&M Cost Escalation Rate"
                 tooltip="Annual rate of increase in O&M costs"
-                min={0}
-                max={20}
+                showVisualization={true}
+                showInfoBox={true}
+                valueType="percent"
+                valueName="Index (starting value)"
+                //addonAfter="GWh/year"
                 step={0.1}
-              />
-            </FormCol>
-          </FormRow>
-
-          <FormRow>
-            <FormCol span={12}>
-              <SelectField
-                path={[...basePath, 'escalationDistribution']}
-                label="Escalation Distribution"
-                tooltip="Statistical distribution for cost escalation"
                 options={[
-                  { value: 'Normal', label: 'Normal' },
-                  { value: 'Lognormal', label: 'Lognormal' },
-                  { value: 'Triangular', label: 'Triangular' },
-                  { value: 'Uniform', label: 'Uniform' }
+                  { value: 'fixed', label: 'Fixed Value' },
+                  { value: 'normal', label: 'Normal Distribution' },
+                  { value: 'uniform', label: 'Uniform Distribution' }
                 ]}
               />
             </FormCol>

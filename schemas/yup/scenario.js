@@ -137,16 +137,17 @@ const SettingsSchema = Yup.object().shape({
             minimumDSCR: Yup.number().default(1.3),
         }),
         cost: Yup.object().shape({
-            annualBaseOM: Yup.number().default(5000000),
+            //annualBaseOM: Yup.number().default(5000000),
             // Updated to be a DistributionTypeSchema of Fixed type (to match getDefaultSettings)
-            escalationRate: Yup.object().shape({
-                distribution: DistributionTypeSchema.default(() => ({
-                    type: 'fixed',
-                    timeSeriesMode: false,
-                    parameters: { value: 0.025 } // Matches getDefaultSettings value
-                })),
-                data: Yup.array().default([])
-            }),
+            escalationRate: DistributionTypeSchema.default(() => ({
+                key: 'escalationRate',
+                type: 'fixed',
+                timeSeriesMode: false,
+                parameters: {
+                    value: 1,
+                    drift: 2.5
+                }
+            })),
             // Removed escalationDistribution as requested
             oemTerm: Yup.number().default(5),
             fixedOMFee: Yup.number().default(4000000),
@@ -224,6 +225,12 @@ const SettingsSchema = Yup.object().shape({
                 isPerTurbine: Yup.boolean().default(false),
                 oemScopeId: Yup.string().required('OEM scope ID is required'),
                 oemScopeName: Yup.string(),
+                escalation: Yup.object().shape({
+                    minValue: Yup.number().default(0),
+                    maxValue: Yup.number().default(0),
+                    useMin: Yup.boolean().default(false),
+                    useMax: Yup.boolean().default(false),
+                }).default() ,
             })).default([]),
         }),
     }),

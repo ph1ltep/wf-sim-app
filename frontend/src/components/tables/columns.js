@@ -446,6 +446,88 @@ export const createNestedColumn = (path, title, columnCreator = createTextColumn
   };
 };
 
+/**
+ * Create a column that displays multiple icons with tooltips based on record properties
+ * @param {string} title Column title
+ * @param {Array} iconConfigs Array of icon configurations
+ * @param {Object} options Configuration options
+ * @returns {Object} Column definition
+ * 
+ * Each icon config should have:
+ * - key: property path or function to determine whether to show the icon
+ * - icon: React element (Ant Design icon)
+ * - tooltip: Text or function to generate tooltip content
+ * - color: (optional) Color for the icon
+ */
+export const createIconColumn = (title, iconConfigs = [], options = {}) => {
+  const {
+    key = 'icons',
+    width = 80,
+    align = 'center',
+    tooltipPlacement = 'top',
+  } = options;
+
+  return {
+    title,
+    key,
+    width,
+    align,
+    render: (_, record) => {
+      // Filter icons to display based on record properties
+      const iconsToDisplay = iconConfigs.filter(config => {
+        if (typeof config.key === 'function') {
+          return config.key(record);
+        }
+        
+        // Handle nested paths with dot notation
+        if (typeof config.key === 'string' && config.key.includes('.')) {
+          const parts = config.key.split('.');
+          let value = record;
+          for (const part of parts) {
+            if (value === undefined || value === null) return false;
+            value = value[part];
+          }
+          return Boolean(value);
+        }
+        
+        return Boolean(record[config.key]);
+      });
+      
+      if (iconsToDisplay.length === 0) {
+        return null;
+      }
+      
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+          {iconsToDisplay.map((config, index) => {
+            // Generate tooltip content
+            const tooltipContent = typeof config.tooltip === 'function' 
+              ? config.tooltip(record) 
+              : config.tooltip;
+            
+            // Clone the icon with color prop if specified
+            const icon = config.color 
+              ? React.cloneElement(config.icon, { style: { color: config.color } }) 
+              : config.icon;
+            
+            return (
+              <Tooltip 
+                key={index} 
+                title={tooltipContent}
+                placement={tooltipPlacement}
+              >
+                <span className="icon-column-item">
+                  {icon}
+                </span>
+              </Tooltip>
+            );
+          })}
+        </div>
+      );
+    }
+  };
+};
+
 export const locationColumns = (handleEdit, handleDelete) => [
   createTextColumn('country', 'Country', {
     sorter: true,
