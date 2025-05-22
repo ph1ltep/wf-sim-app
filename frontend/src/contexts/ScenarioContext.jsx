@@ -66,6 +66,41 @@ export const ScenarioProvider = ({ children }) => {
 
     setIsInitializing(true);
 
+    // Check if we should load a specific scenario in development
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const defaultScenarioId = process.env.REACT_APP_DEFAULT_SCENARIO;
+
+    if (isDevelopment && defaultScenarioId) {
+      console.log(`[DEV] Attempting to load default scenario: ${defaultScenarioId}`);
+
+      try {
+        // Try to load the specific scenario
+        const scenarioResponse = await apiRequest(
+          () => apiGetScenarioById(defaultScenarioId),
+          null // Don't show success message yet
+        );
+
+        if (scenarioResponse.success && scenarioResponse.data) {
+          const loadedScenario = ScenarioSchema.cast(scenarioResponse.data);
+          setScenarioData(loadedScenario);
+          setIsModified(false);
+          console.log(`[DEV] Successfully loaded default scenario: ${loadedScenario.name || 'Unnamed'}`);
+          message.success(`Development scenario loaded: ${loadedScenario.name || 'Unnamed'}`);
+          setIsInitializing(false);
+          return loadedScenario;
+        } else {
+          console.warn(`[DEV] Failed to load default scenario ${defaultScenarioId}, falling back to defaults:`, scenarioResponse.error);
+        }
+      } catch (error) {
+        console.warn(`[DEV] Error loading default scenario ${defaultScenarioId}, falling back to defaults:`, error);
+      }
+    }
+
+    // Fallback to original behavior - load defaults
+    if (isDevelopment && defaultScenarioId) {
+      console.log(`[DEV] Falling back to loading defaults instead of scenario ${defaultScenarioId}`);
+    }
+
     const response = await apiRequest(
       () => apiGetDefaults()
     );
@@ -75,7 +110,12 @@ export const ScenarioProvider = ({ children }) => {
       const newScenario = ScenarioSchema.cast(response.data);
       setScenarioData(newScenario);
       setIsModified(false);
-      message.success('New scenario initialized');
+
+      const successMessage = isDevelopment && defaultScenarioId
+        ? 'New scenario initialized (fallback from development scenario)'
+        : 'New scenario initialized';
+
+      message.success(successMessage);
       setIsInitializing(false);
       return newScenario;
     } else {
