@@ -181,13 +181,13 @@ export const createPercentageColumn = (dataIndex, title, options = {}) => {
 export const createCurrencyColumn = (dataIndex, title, options = {}) => {
   const {
     currency = '$',
-    currencyPosition = 'prefix',
+    currencyPosition = 'suffix',
     ...restOptions
   } = options;
 
   return createNumberColumn(dataIndex, title, {
     precision: 2,
-    prefix: currencyPosition === 'prefix' ? currency : '',
+    prefix: currencyPosition === 'prefix' ? `${currency} ` : '',
     suffix: currencyPosition === 'suffix' ? ` ${currency}` : '',
     ...restOptions
   });

@@ -178,6 +178,7 @@ export const ContextField = ({
       validateStatus={error ? 'error' : undefined}
       help={error}
       required={required}
+      layout='horizontal'
       style={getDebugStyle()}
     >
       <Component disabled={disabled}

@@ -259,7 +259,7 @@ const ContractsModule = () => {
       <PercentageField
         path={['escalation', 'maxValue']}
         label="Max %"
-        min={0}
+        Pmin={0}
         max={20}
         step={0.10}
       />
