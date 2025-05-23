@@ -1,13 +1,21 @@
-// src/components/contextFields/index.js
+// src/components/contextFields/index.js - Updated with new layout components
 import React from 'react';
 import { Input, InputNumber, Select, Switch, Radio, Checkbox, DatePicker, Slider } from 'antd';
 import { ContextField } from './ContextField';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import CompactFieldGroup from './CompactFieldGroup';
 
 // Import layout components
-import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
+import { 
+  FormSection, 
+  FormRow, 
+  FormCol, 
+  FormDivider,
+  CompactFieldGroup,
+  FieldGroup,
+  ResponsiveFieldRow,
+  InlineFieldGroup,
+  FieldCard
+} from './layouts';
 
 // Import special components
 import EditableTable from '../tables/EditableTable';
@@ -317,13 +325,20 @@ export const createTimeSeriesDataPoint = (year, value) => ({
   value
 });
 
-// Export both individual components and the special components
+// Export all field components and layout components
 export {
+  // Layout components
   FormSection,
   FormRow,
   FormCol,
   FormDivider,
+  CompactFieldGroup,
+  FieldGroup,
+  ResponsiveFieldRow,
+  InlineFieldGroup,
+  FieldCard,
+  
+  // Special components
   EditableTable,
-  PrimaryPercentileSelectField,
-  CompactFieldGroup
+  PrimaryPercentileSelectField
 };

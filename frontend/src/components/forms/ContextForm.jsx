@@ -1,24 +1,32 @@
-// src/components/contextFields/ContextForm.jsx
-import React, { useState, useEffect } from 'react';
-import { Form, Button, Space } from 'antd';
+// src/components/forms/ContextForm.jsx - Complete form lifecycle and best practices implementation
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Form, Button, Space, Modal, Spin, Alert, message } from 'antd';
+import { ExclamationCircleOutlined, ReloadOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { produce } from 'immer';
-import { get, set } from 'lodash';
+import { get } from 'lodash';
+
+const { confirm } = Modal;
 
 /**
- * ContextForm - A form that collects changes from ContextField components
- * and only updates the scenario context when submitted
+ * ContextForm - A form that integrates with Ant Design Form while maintaining
+ * context-aware capabilities with proper form isolation and lifecycle management
  * 
  * @param {string[]|string} path - Base path in the context for this form
  * @param {Function} onSubmit - Callback when form is submitted successfully
  * @param {Function} onCancel - Callback when form is cancelled
  * @param {React.ReactNode} children - Form field components
- * @param {string} layout - Form layout: 'vertical' (default), 'horizontal', 'inline'
- * @param {Object} labelCol - Label column configuration for horizontal layout
- * @param {Object} wrapperCol - Wrapper column configuration for horizontal layout
- * @param {boolean} compact - Whether to use compact spacing
- * @param {boolean} responsive - Whether to enable responsive behavior
- * @param {Object} formProps - Props to pass to the antd Form component
+ * @param {string} submitText - Text for submit button
+ * @param {string} cancelText - Text for cancel button
+ * @param {boolean} showActions - Whether to show action buttons
+ * @param {boolean} confirmOnCancel - Whether to show confirmation when cancelling with unsaved changes
+ * @param {boolean} resetOnMount - Whether to reset form when component mounts
+ * @param {boolean} resetOnUnmount - Whether to reset form when component unmounts
+ * @param {boolean} warnOnUnload - Whether to warn user about unsaved changes on page unload
+ * @param {boolean} validateOnSubmit - Whether to validate form before submission
+ * @param {number} autoSaveInterval - Auto-save interval in milliseconds (0 to disable)
+ * @param {Function} onError - Callback when form encounters an error
+ * @param {Function} onLoadingChange - Callback when loading state changes
+ * @param {Object} formProps - Props to pass to the Ant Design Form component
  */
 const ContextForm = ({
     path,
@@ -28,170 +36,451 @@ const ContextForm = ({
     submitText = "Save",
     cancelText = "Cancel",
     showActions = true,
-    layout = "vertical",
-    labelCol,
-    wrapperCol,
-    compact = false,
-    responsive = false,
+    confirmOnCancel = true,
+    resetOnMount = true,
+    resetOnUnmount = true,
+    warnOnUnload = true,
+    validateOnSubmit = true,
+    autoSaveInterval = 0,
+    onError,
+    onLoadingChange,
     ...formProps
 }) => {
     const { getValueByPath, updateByPath } = useScenario();
+    const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
+    const [validationErrors, setValidationErrors] = useState([]);
+    const [lastSaveTime, setLastSaveTime] = useState(null);
+    const [isValidating, setIsValidating] = useState(false);
+    
+    const initialValuesRef = useRef(null);
+    const mountedRef = useRef(true);
+    const autoSaveTimerRef = useRef(null);
+    const unloadListenerRef = useRef(null);
 
     // Convert path to array if it's a string
     const basePath = Array.isArray(path) ? path : path.split('.');
 
-    // Initialize form state from context
-    const [formState, setFormState] = useState({});
-    const [isInitialized, setIsInitialized] = useState(false);
+    // Helper to resolve field path relative to form's base path
+    const resolveFieldPath = useCallback((fieldPath) => {
+        if (!fieldPath) return [];
+        
+        // Convert to array if string
+        const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
+        
+        // If field path is relative (doesn't start with base path), prepend base path
+        if (fieldPathArray.length < basePath.length ||
+            !basePath.every((segment, index) => segment === fieldPathArray[index])) {
+            return [...basePath, ...fieldPathArray];
+        }
+        
+        // Field path already includes base path
+        return fieldPathArray;
+    }, [basePath]);
 
-    // Load initial values from context
+    // Helper to get relative field path (remove base path)
+    const getRelativeFieldPath = useCallback((fieldPath) => {
+        if (!fieldPath) return [];
+        
+        const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
+        
+        // If field path starts with base path, remove it
+        if (fieldPathArray.length >= basePath.length &&
+            basePath.every((segment, index) => segment === fieldPathArray[index])) {
+            return fieldPathArray.slice(basePath.length);
+        }
+        
+        // Field path is already relative
+        return fieldPathArray;
+    }, [basePath]);
+
+    // Update loading state and notify parent
+    const updateLoadingState = useCallback((newLoading) => {
+        setLoading(newLoading);
+        if (onLoadingChange) {
+            onLoadingChange(newLoading);
+        }
+    }, [onLoadingChange]);
+
+    // Handle errors and notify parent
+    const handleError = useCallback((error, context = 'form operation') => {
+        console.error(`ContextForm ${context} error:`, error);
+        
+        const errorMessage = error?.message || error?.error || `An error occurred during ${context}`;
+        setValidationErrors(prev => [...prev, errorMessage]);
+        
+        if (onError) {
+            onError(error, context);
+        }
+    }, [onError]);
+
+    // Initialize form with context data
+    const initializeForm = useCallback(async () => {
+        try {
+            updateLoadingState(true);
+            
+            let initialValue = getValueByPath(basePath);
+            
+            // Handle both direct object references and array indices
+            if (initialValue === undefined || initialValue === null) {
+                // If we're editing a temp item (new item), initialize with empty object  
+                if (basePath[basePath.length - 1] === 'temp_new_item') {
+                    initialValue = {};
+                } else {
+                    console.warn(`No value found at path: ${basePath.join('.')}`);
+                    initialValue = {};
+                }
+            }
+
+            // Make a deep copy to avoid reference issues
+            const initialValues = JSON.parse(JSON.stringify(initialValue));
+            
+            // Store initial values for comparison
+            initialValuesRef.current = initialValues;
+            
+            // Set form values
+            form.setFieldsValue(initialValues);
+            
+            // Reset states
+            setHasUnsavedChanges(false);
+            setValidationErrors([]);
+            setIsInitialized(true);
+            setLastSaveTime(new Date());
+            
+        } catch (error) {
+            handleError(error, 'form initialization');
+        } finally {
+            updateLoadingState(false);
+        }
+    }, [basePath, getValueByPath, form, updateLoadingState, handleError]);
+
+    // Reset form to initial state
+    const resetForm = useCallback(() => {
+        if (initialValuesRef.current) {
+            form.setFieldsValue(initialValuesRef.current);
+            setHasUnsavedChanges(false);
+            setValidationErrors([]);
+        } else {
+            // If no initial values stored, reinitialize
+            initializeForm();
+        }
+    }, [form, initializeForm]);
+
+    // Validate form fields
+    const validateForm = useCallback(async () => {
+        if (!validateOnSubmit) return { isValid: true, values: form.getFieldsValue() };
+
+        try {
+            setIsValidating(true);
+            const values = await form.validateFields();
+            setValidationErrors([]);
+            return { isValid: true, values };
+        } catch (errorInfo) {
+            const errors = errorInfo.errorFields?.map(field => 
+                `${field.name.join('.')}: ${field.errors.join(', ')}`
+            ) || ['Form validation failed'];
+            
+            setValidationErrors(errors);
+            return { isValid: false, errors };
+        } finally {
+            setIsValidating(false);
+        }
+    }, [form, validateOnSubmit]);
+
+    // Auto-save functionality
+    const performAutoSave = useCallback(async () => {
+        if (!hasUnsavedChanges || loading) return;
+
+        try {
+            const validation = await validateForm();
+            if (!validation.isValid) return; // Skip auto-save if validation fails
+
+            const result = await updateByPath(basePath, validation.values);
+            
+            if (result.isValid) {
+                // Update initial values to reflect successful save
+                initialValuesRef.current = JSON.parse(JSON.stringify(validation.values));
+                setHasUnsavedChanges(false);
+                setLastSaveTime(new Date());
+                message.success('Auto-saved', 1); // Show for 1 second
+            }
+        } catch (error) {
+            // Auto-save failures are logged but don't show user errors
+            console.warn('Auto-save failed:', error);
+        }
+    }, [hasUnsavedChanges, loading, validateForm, updateByPath, basePath]);
+
+    // Set up auto-save timer
     useEffect(() => {
-        let initialValue = getValueByPath(basePath);
-        // Handle both direct object references and array indices
-        if (initialValue === undefined || initialValue === null) {
-            // If we're editing a temp item (new item), initialize with empty object
-            if (basePath[basePath.length - 1] === 'temp_new_item') {
-                initialValue = {};
+        if (autoSaveInterval > 0 && hasUnsavedChanges && isInitialized) {
+            autoSaveTimerRef.current = setTimeout(performAutoSave, autoSaveInterval);
+        }
+
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+        };
+    }, [autoSaveInterval, hasUnsavedChanges, isInitialized, performAutoSave]);
+
+    // Set up page unload warning
+    useEffect(() => {
+        if (!warnOnUnload) return;
+
+        const handleBeforeUnload = (event) => {
+            if (hasUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return event.returnValue;
+            }
+        };
+
+        if (hasUnsavedChanges) {
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            unloadListenerRef.current = handleBeforeUnload;
+        }
+
+        return () => {
+            if (unloadListenerRef.current) {
+                window.removeEventListener('beforeunload', unloadListenerRef.current);
+                unloadListenerRef.current = null;
+            }
+        };
+    }, [hasUnsavedChanges, warnOnUnload]);
+
+    // Initialize form on mount and when path changes
+    useEffect(() => {
+        if (resetOnMount || !isInitialized) {
+            initializeForm();
+        }
+    }, [initializeForm, resetOnMount, isInitialized]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+            
+            // Clear timers
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+            
+            // Clear event listeners
+            if (unloadListenerRef.current) {
+                window.removeEventListener('beforeunload', unloadListenerRef.current);
+            }
+            
+            // Reset form if requested
+            if (resetOnUnmount) {
+                setHasUnsavedChanges(false);
+                setIsInitialized(false);
+                setValidationErrors([]);
+                initialValuesRef.current = null;
+            }
+        };
+    }, [resetOnUnmount]);
+
+    // Handle form submission
+    const handleFinish = async (values) => {
+        try {
+            updateLoadingState(true);
+            setValidationErrors([]);
+            
+            // Validate form if required
+            const validation = await validateForm();
+            if (!validation.isValid) {
+                return; // Validation errors are already set
+            }
+            
+            // Update the context with all form values in a single batch
+            const result = await updateByPath(basePath, validation.values);
+            
+            if (result.isValid) {
+                // Update initial values to reflect successful save
+                initialValuesRef.current = JSON.parse(JSON.stringify(validation.values));
+                
+                // Reset dirty state
+                setHasUnsavedChanges(false);
+                setLastSaveTime(new Date());
+                
+                // Show success message
+                message.success('Changes saved successfully');
+                
+                // Call the onSubmit callback if provided
+                if (onSubmit) {
+                    onSubmit(validation.values);
+                }
             } else {
-                console.warn(`No value found at path: ${basePath.join('.')}`);
-                initialValue = {};
+                // Handle validation errors from context
+                const contextErrors = result.errors || ['Context validation failed'];
+                setValidationErrors(contextErrors);
+                
+                // Set form-level error if needed
+                form.setFields([{
+                    name: [],
+                    errors: contextErrors
+                }]);
+            }
+        } catch (error) {
+            handleError(error, 'form submission');
+            
+            // Set form-level error
+            form.setFields([{
+                name: [],
+                errors: ['An unexpected error occurred during submission']
+            }]);
+        } finally {
+            if (mountedRef.current) {
+                updateLoadingState(false);
             }
         }
-
-        // Make a deep copy to avoid reference issues
-        setFormState(JSON.parse(JSON.stringify(initialValue)));
-        setIsInitialized(true);
-    }, [basePath, getValueByPath]);
-
-    // Form submission handler
-    const handleSubmit = () => {
-        // Update the context with all collected changes
-        updateByPath(basePath, formState);
-
-        // Call the onSubmit callback if provided
-        if (onSubmit) {
-            onSubmit(formState);
-        }
     };
 
-    // Form cancel handler
-    const handleCancel = () => {
-        if (onCancel) {
-            onCancel();
-        }
-    };
+    // Handle form cancellation with confirmation
+    const handleCancel = useCallback(() => {
+        const performCancel = () => {
+            // Reset form to initial values
+            resetForm();
+            
+            // Call the onCancel callback if provided
+            if (onCancel) {
+                onCancel();
+            }
+        };
 
-    // Field value getter (for form state)
-    const getFormValue = (fieldPath) => {
-        console.log('getFormValue called with fieldPath:', fieldPath, 'basePath:', basePath, 'formState:', formState);
-
-        // Split dot notation strings into arrays before processing
-        let fieldPathArray;
-        if (typeof fieldPath === 'string' && fieldPath.includes('.')) {
-            fieldPathArray = fieldPath.split('.');
-        } else if (Array.isArray(fieldPath)) {
-            fieldPathArray = fieldPath;
+        // Show confirmation if there are unsaved changes and confirmation is enabled
+        if (hasUnsavedChanges && confirmOnCancel) {
+            confirm({
+                title: 'Unsaved Changes',
+                icon: <ExclamationCircleOutlined />,
+                content: 'You have unsaved changes. Are you sure you want to cancel? Your changes will be lost.',
+                okText: 'Yes, Cancel',
+                okType: 'danger',
+                cancelText: 'Keep Editing',
+                onOk: performCancel
+            });
         } else {
-            fieldPathArray = [fieldPath];
+            performCancel();
         }
+    }, [hasUnsavedChanges, confirmOnCancel, resetForm, onCancel]);
 
-        // Handle simple property name (single element array)
-        if (fieldPathArray.length === 1) {
-            return formState[fieldPathArray[0]];
-        }
-
-        // Check if fieldPath already contains basePath elements
-        let relativePath;
-        if (fieldPathArray.length < basePath.length ||
-            !basePath.every((segment, index) => segment === fieldPathArray[index])) {
-            // fieldPath doesn't contain basePath, use it directly
-            relativePath = fieldPathArray;
+    // Handle manual reset
+    const handleReset = useCallback(() => {
+        if (hasUnsavedChanges) {
+            confirm({
+                title: 'Reset Form',
+                icon: <ExclamationCircleOutlined />,
+                content: 'This will reset all fields to their original values. Any unsaved changes will be lost.',
+                okText: 'Reset',
+                okType: 'danger',
+                cancelText: 'Cancel',
+                onOk: resetForm
+            });
         } else {
-            // fieldPath contains basePath, extract relativePath
-            relativePath = fieldPathArray.slice(basePath.length);
+            resetForm();
+        }
+    }, [hasUnsavedChanges, resetForm]);
+
+    // Enhanced form value change handler
+    const handleValuesChange = useCallback((changedValues, allValues) => {
+        if (!isInitialized || !initialValuesRef.current) {
+            return;
         }
 
-        return get(formState, relativePath);
-    };
-
-    // Field update handler
-    const updateFormValue = (fieldPath, value) => {
-        console.log('updateFormValue called with fieldPath:', fieldPath, 'value:', value, 'basePath:', basePath);
-
-        // Split dot notation strings into arrays before processing
-        let fieldPathArray;
-        if (typeof fieldPath === 'string' && fieldPath.includes('.')) {
-            fieldPathArray = fieldPath.split('.');
-        } else if (Array.isArray(fieldPath)) {
-            fieldPathArray = fieldPath;
-        } else {
-            fieldPathArray = [fieldPath];
+        // Compare current values with initial values
+        const hasChanges = JSON.stringify(allValues) !== JSON.stringify(initialValuesRef.current);
+        
+        if (hasChanges !== hasUnsavedChanges) {
+            setHasUnsavedChanges(hasChanges);
         }
 
-        // Handle simple property name (single element array)
-        if (fieldPathArray.length === 1) {
-            setFormState(produce(formState, draft => {
-                draft[fieldPathArray[0]] = value;
-            }));
-            return { isValid: true, applied: true, value };
+        // Clear validation errors when user starts typing
+        if (validationErrors.length > 0) {
+            setValidationErrors([]);
         }
 
-        // Check if fieldPath already contains basePath elements
-        let relativePath;
-        if (fieldPathArray.length < basePath.length ||
-            !basePath.every((segment, index) => segment === fieldPathArray[index])) {
-            // fieldPath doesn't contain basePath, use it directly
-            relativePath = fieldPathArray;
-        } else {
-            // fieldPath contains basePath, extract relativePath
-            relativePath = fieldPathArray.slice(basePath.length);
+        // Call parent's onValuesChange if provided
+        if (formProps.onValuesChange) {
+            formProps.onValuesChange(changedValues, allValues);
+        }
+    }, [isInitialized, hasUnsavedChanges, validationErrors.length, formProps]);
+
+    // Enhanced value getter for ContextFields in form mode
+    const getFormValue = useCallback((fieldPath, defaultValue = null) => {
+        if (!isInitialized) {
+            return defaultValue;
         }
 
-        // Update form state immutably using Immer
-        setFormState(produce(formState, draft => {
+        // Get relative path for form field access
+        const relativePath = getRelativeFieldPath(fieldPath);
+        
+        // Handle simple property name (single level)
+        if (relativePath.length === 1) {
+            return form.getFieldValue(relativePath[0]) ?? defaultValue;
+        }
+        
+        // Handle nested paths
+        if (relativePath.length > 1) {
+            const allValues = form.getFieldsValue();
+            return get(allValues, relativePath, defaultValue);
+        }
+        
+        // Handle empty path (return all form values)
+        if (relativePath.length === 0) {
+            return form.getFieldsValue();
+        }
+
+        return defaultValue;
+    }, [form, isInitialized, getRelativeFieldPath]);
+
+    // Enhanced value updater for ContextFields in form mode
+    const updateFormValue = useCallback((fieldPath, value) => {
+        if (!isInitialized) {
+            return { isValid: false, applied: 0, error: 'Form not initialized' };
+        }
+
+        try {
+            // Get relative path for form field access
+            const relativePath = getRelativeFieldPath(fieldPath);
+            
+            // Handle simple property name (single level)
+            if (relativePath.length === 1) {
+                form.setFieldValue(relativePath[0], value);
+                return { isValid: true, applied: 1, value };
+            }
+            
+            // Handle nested paths
+            if (relativePath.length > 1) {
+                form.setFieldValue(relativePath, value);
+                return { isValid: true, applied: 1, value };
+            }
+            
+            // Handle empty path (update all form values)
             if (relativePath.length === 0) {
-                // If no relative path, replace the entire state
-                return value;
-            } else {
-                set(draft, relativePath, value);
+                form.setFieldsValue(value);
+                return { isValid: true, applied: 1, value };
             }
-        }));
 
-        // Return success object to match updateByPathV2 format
-        return { isValid: true, applied: true, value };
-    };
-
-    // Calculate form layout configuration
-    const getFormLayoutConfig = () => {
-        const config = {
-            layout: layout === 'horizontal' ? 'vertical' : layout, // Use vertical for Form, handle horizontal in ContextField
-            ...formProps
-        };
-
-        // Only apply labelCol/wrapperCol for true Ant Design horizontal layout
-        // Our custom horizontal layout is handled in ContextField
-        if (layout === 'horizontal' && (labelCol || wrapperCol)) {
-            // If specific column config is provided, use Ant Design's horizontal layout
-            config.layout = 'horizontal';
-            config.labelCol = labelCol;
-            config.wrapperCol = wrapperCol;
+            return { isValid: false, applied: 0, error: 'Invalid field path' };
+        } catch (error) {
+            console.error('Form value update error:', error);
+            return { 
+                isValid: false, 
+                applied: 0, 
+                error: 'Failed to update form value',
+                errors: [error.message]
+            };
         }
+    }, [form, isInitialized, getRelativeFieldPath]);
 
-        return config;
-    };
-
-    // Get form item style for compact mode
-    const getFormItemStyle = () => {
-        if (!compact) return {};
-
-        return {
-            marginBottom: layout === 'inline' ? 8 : 12 // Reduced from default 24px
-        };
-    };
-
-    // Clone children with form props
+    // Clone children with enhanced form props
     const renderChildren = () => {
-        if (!isInitialized) return null;
+        if (!isInitialized) {
+            return null; // Don't render children until form is initialized
+        }
 
         return React.Children.map(children, child => {
             // Skip non-element children
@@ -199,62 +488,140 @@ const ContextForm = ({
                 return child;
             }
 
-            // Clone the element with form props
-            return React.cloneElement(child, {
-                formMode: true, // This should be set to true
-                getValueOverride: getFormValue,
-                updateValueOverride: updateFormValue,
-                // Pass layout configuration to child fields
-                layout,
-                compact,
-                responsive,
-                formItemStyle: getFormItemStyle()
-            });
+            // Only enhance ContextField components and components that accept formMode
+            const isContextField = child.type && (
+                child.type.name === 'ContextField' || 
+                child.type.displayName === 'ContextField' ||
+                child.props.path !== undefined
+            );
+
+            if (isContextField) {
+                // Clone ContextField with enhanced form props
+                return React.cloneElement(child, {
+                    formMode: true,
+                    getValueOverride: getFormValue,
+                    updateValueOverride: updateFormValue,
+                    // Add Form.Item name for Ant Design form integration
+                    name: getRelativeFieldPath(child.props.path)
+                });
+            }
+
+            // For non-ContextField components, pass through unchanged
+            return child;
         });
     };
 
-    // Debug border styling - controlled by environment variable
-    const getDebugStyle = () => {
-        if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-            return {
-                border: '1px solid #1890ff',
-                borderRadius: '4px',
-                padding: '8px',
-                margin: '4px 0'
-            };
-        }
-        return {};
-    };
+    // Debug border support
+    const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
+    const debugStyle = debugBorders ? {
+        border: '2px dashed blue',
+        padding: '8px',
+        margin: '4px'
+    } : {};
+
+    // Don't render until initialized
+    if (!isInitialized) {
+        return (
+            <div style={debugStyle}>
+                <Spin tip="Initializing form...">
+                    <Form layout={formProps.layout || "vertical"}>
+                        <Form.Item>
+                            <div style={{ minHeight: 100 }} />
+                        </Form.Item>
+                    </Form>
+                </Spin>
+            </div>
+        );
+    }
 
     return (
-        <div style={getDebugStyle()}>
-            <Form
-                onFinish={handleSubmit}
-                {...getFormLayoutConfig()}
-            >
-                {renderChildren()}
+        <Form
+            form={form}
+            onFinish={handleFinish}
+            onValuesChange={handleValuesChange}
+            layout={formProps.layout || "vertical"}
+            style={debugBorders ? { ...formProps.style, ...debugStyle } : formProps.style}
+            {...formProps}
+        >
+            {/* Validation errors display */}
+            {validationErrors.length > 0 && (
+                <Alert
+                    message="Form Validation Errors"
+                    description={
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {validationErrors.map((error, index) => (
+                                <li key={index}>{error}</li>
+                            ))}
+                        </ul>
+                    }
+                    type="error"
+                    closable
+                    onClose={() => setValidationErrors([])}
+                    style={{ marginBottom: 16 }}
+                />
+            )}
 
-                {showActions && (
-                    <Form.Item
-                        className="form-actions"
-                        style={getFormItemStyle()}
-                    >
-                        <Space>
-                            {cancelText && (
-                                <Button onClick={handleCancel}>
-                                    {cancelText}
-                                </Button>
-                            )}
-                            {submitText && (
-                                <Button type="primary" htmlType="submit">
-                                    {submitText}
-                                </Button>
-                            )}
-                        </Space>
-                    </Form.Item>
-                )}
-            </Form>
-        </div>
+            {renderChildren()}
+
+            {showActions && (
+                <Form.Item style={{ marginTop: 24 }}>
+                    <Space>
+                        {cancelText && (
+                            <Button 
+                                icon={<CloseOutlined />}
+                                onClick={handleCancel} 
+                                disabled={loading || isValidating}
+                            >
+                                {cancelText}
+                            </Button>
+                        )}
+                        
+                        <Button 
+                            icon={<ReloadOutlined />}
+                            onClick={handleReset}
+                            disabled={loading || isValidating}
+                            title="Reset form to original values"
+                        >
+                            Reset
+                        </Button>
+                        
+                        {submitText && (
+                            <Button 
+                                type="primary"
+                                icon={<SaveOutlined />}
+                                htmlType="submit" 
+                                loading={loading || isValidating}
+                            >
+                                {submitText}
+                                {hasUnsavedChanges && ' *'}
+                            </Button>
+                        )}
+                    </Space>
+                    
+                    {/* Status information */}
+                    <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                        {hasUnsavedChanges && (
+                            <div style={{ color: '#faad14' }}>
+                                * You have unsaved changes
+                                {autoSaveInterval > 0 && (
+                                    <span> (auto-save enabled)</span>
+                                )}
+                            </div>
+                        )}
+                        {lastSaveTime && !hasUnsavedChanges && (
+                            <div style={{ color: '#52c41a' }}>
+                                Last saved: {lastSaveTime.toLocaleTimeString()}
+                            </div>
+                        )}
+                        {isValidating && (
+                            <div style={{ color: '#1890ff' }}>
+                                Validating form...
+                            </div>
+                        )}
+                    </div>
+                </Form.Item>
+            )}
+        </Form>
     );
 };
 
