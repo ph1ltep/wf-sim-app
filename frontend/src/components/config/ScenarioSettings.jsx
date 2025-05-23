@@ -62,7 +62,7 @@ const ScenarioSettings = () => {
 
       <FormSection title="Basic Scenario Information">
         <FormRow>
-          <FormCol span={24}>
+          <FormCol>
             <TextField
               path={[...scenarioPath, 'name']}
               label="Scenario Name"
@@ -74,7 +74,7 @@ const ScenarioSettings = () => {
         </FormRow>
         
         <FormRow>
-          <FormCol span={24}>
+          <FormCol>
             <TextAreaField
               path={[...scenarioPath, 'description']}
               label="Description"
@@ -85,9 +85,9 @@ const ScenarioSettings = () => {
         </FormRow>
       </FormSection>
       
-      <FormSection title="Scenario Details">
+      {/* <FormSection title="Scenario Details">
         <FormRow>
-          <FormCol span={12}>
+          <FormCol>
             <SelectField
               path={[...scenarioPath, 'scenarioType']}
               label="Scenario Type"
@@ -96,7 +96,7 @@ const ScenarioSettings = () => {
             />
           </FormCol>
         </FormRow>
-      </FormSection>
+      </FormSection> */}
     </div>
   );
 };

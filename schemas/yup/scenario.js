@@ -105,7 +105,7 @@ const SettingsSchema = Yup.object().shape({
     general: Yup.object().shape({
         projectName: Yup.string().default('Wind Farm Project'),
         startDate: Yup.date(),
-        projectLife: Yup.number().default(20),
+        projectLife: Yup.number().default(20)
     }),
     project: Yup.object().shape({
         windFarm: Yup.object().shape({

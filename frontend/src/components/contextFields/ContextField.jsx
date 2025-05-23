@@ -1,191 +1,235 @@
-// src/components/contextFields/ContextField.jsx - Modified version
-import React, { useState, useCallback, useEffect } from 'react';
-import { Form, Tooltip } from 'antd';
+// src/components/contextFields/ContextField.jsx - Enhanced version with improved default value handling
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
-// Enhanced ContextField with formMode and layout support
+// Enhanced ContextField with better Ant Design integration
 export const ContextField = ({
+  // Context-specific props (not passed to Form.Item)
   path,
-  label,
   component: Component,
-  tooltip,
-  required,
-  disabled,
-  validators = [], // Custom validators
-  transform, // Optional transform function for the input value
-  defaultValue, // Added explicit support for defaultValue
-
-  // New props for form mode
+  transform,
+  defaultValue,
   formMode = false,
   getValueOverride = null,
   updateValueOverride = null,
+  validators = [],
 
-  // New props for layout support
-  layout,
-  compact = false,
-  responsive = false,
-  formItemStyle = {},
+  // Form.Item props that we handle specially
+  label,
+  tooltip,
+  required,
+  disabled,
 
-  ...rest
+  // All other props are forwarded to Form.Item
+  ...formItemProps
 }) => {
-  const [error, setError] = useState(null);
+  const [validationState, setValidationState] = useState({
+    status: undefined,
+    message: null,
+    isValidating: false
+  });
+  
+  const [isInitialized, setIsInitialized] = useState(false);
+  const initializationRef = useRef(false);
   const { getValueByPath, updateByPath } = useScenario();
 
   // Use provided overrides when in form mode, or context functions otherwise
   const getValue = formMode && getValueOverride ? getValueOverride : getValueByPath;
   const updateValue = formMode && updateValueOverride ? updateValueOverride : updateByPath;
 
-  // Get current value using the correct path handling
-  console.log('ContextField - formMode:', formMode, 'path:', path);
-  const value = getValue(path, null);
-  console.log('ContextField - got value:', value);
+  // Get current value - handle initialization state
+  const currentValue = getValue(path, null);
+  
+  // Determine effective value considering initialization
+  const effectiveValue = isInitialized ? currentValue : (currentValue ?? defaultValue);
 
   // Handle change with validation
   const handleChange = useCallback(async (newValue) => {
-    // Apply transform function if provided (e.g., for checkbox which returns event)
-    const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
+    // Set validating state
+    setValidationState(prev => ({
+      ...prev,
+      isValidating: true
+    }));
 
-    // Use the appropriate update method
-    const result = await updateValue(path, actualValue);
+    try {
+      // Apply transform function if provided (e.g., for checkbox which returns event)
+      const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
 
-    if (!result.isValid) {
-      setError(result.error);
-    } else {
-      setError(null);
+      // Use the appropriate update method
+      const result = await updateValue(path, actualValue);
+
+      // Update validation state based on result
+      if (!result.isValid) {
+        setValidationState({
+          status: 'error',
+          message: result.error || 'Validation failed',
+          isValidating: false
+        });
+      } else {
+        // Clear validation state on success
+        setValidationState({
+          status: 'success',
+          message: null,
+          isValidating: false
+        });
+        
+        // Clear success status after a short delay for better UX
+        setTimeout(() => {
+          setValidationState(prev => ({
+            ...prev,
+            status: undefined
+          }));
+        }, 1000);
+      }
+
+      return result;
+    } catch (error) {
+      // Handle unexpected errors
+      setValidationState({
+        status: 'error',
+        message: 'An unexpected error occurred',
+        isValidating: false
+      });
+      
+      console.error('ContextField validation error:', error);
+      return {
+        isValid: false,
+        applied: 0,
+        errors: ['An unexpected error occurred'],
+        error: 'An unexpected error occurred'
+      };
     }
-
-    return result;
   }, [path, updateValue, transform]);
 
-  // Initialize with defaultValue if current value is null/undefined and defaultValue is provided
+  // Enhanced default value initialization
   useEffect(() => {
-    const shouldInitialize =
-      defaultValue !== undefined &&
-      defaultValue !== null &&
-      (value === undefined || value === null);
+    const initializeDefaultValue = async () => {
+      // Prevent multiple initializations
+      if (initializationRef.current) {
+        return;
+      }
 
-    if (shouldInitialize && !disabled) {
-      // Use a small timeout to ensure this doesn't interfere with other initialization
+      const needsInitialization = 
+        defaultValue !== undefined &&
+        defaultValue !== null &&
+        (currentValue === undefined || currentValue === null);
+
+      if (needsInitialization) {
+        initializationRef.current = true;
+        
+        try {
+          // Initialize the path with default value (even for disabled fields)
+          const result = await updateValue(path, defaultValue);
+          
+          if (result.isValid) {
+            setIsInitialized(true);
+          } else {
+            // If initialization fails, still mark as initialized to prevent loops
+            setIsInitialized(true);
+            console.warn(`Failed to initialize default value for path ${Array.isArray(path) ? path.join('.') : path}:`, result.error);
+          }
+        } catch (error) {
+          setIsInitialized(true);
+          console.error(`Error initializing default value for path ${Array.isArray(path) ? path.join('.') : path}:`, error);
+        }
+      } else {
+        // No initialization needed
+        setIsInitialized(true);
+      }
+    };
+
+    // Use requestAnimationFrame to ensure this runs after initial render
+    const rafId = requestAnimationFrame(() => {
+      initializeDefaultValue();
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [path, defaultValue, currentValue, updateValue]); // Removed 'disabled' dependency
+
+
+  // Reset initialization state when path changes
+  useEffect(() => {
+    initializationRef.current = false;
+    setIsInitialized(false);
+  }, [path]);
+
+  // Clear validation state when value changes externally (not through this field)
+  useEffect(() => {
+    if (validationState.status === 'error' && !validationState.isValidating && isInitialized) {
+      // If we have an error but the value has changed externally, clear the error
+      // This happens when the context is updated from elsewhere
       const timeoutId = setTimeout(() => {
-        handleChange(defaultValue);
-      }, 0);
+        setValidationState(prev => ({
+          ...prev,
+          status: undefined,
+          message: null
+        }));
+      }, 100);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [defaultValue, value, handleChange, disabled]);
+  }, [currentValue, validationState.status, validationState.isValidating, isInitialized]);
 
-  // Simplified label rendering - no truncation
-  const renderLabel = () => {
-    return label;
+  // Debug border support
+  const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
+  const debugStyle = debugBorders ? {
+    border: '1px dashed red',
+    padding: '2px',
+    margin: '1px'
+  } : {};
+
+  // Map context validation to Ant Design validation props
+  const validationProps = {
+    validateStatus: validationState.status,
+    help: validationState.message,
+    hasFeedback: validationState.isValidating || validationState.status === 'success'
   };
 
-  // Debug border styling - controlled by environment variable
-  const getDebugStyle = () => {
-    if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-      return {
-        ...formItemStyle,
-        border: '1px solid #52c41a',
-        borderRadius: '2px',
-        padding: '4px',
-        margin: '2px 0'
-      };
-    }
-    return formItemStyle;
+  // Handle required field validation display
+  const effectiveRequired = required || (formItemProps.rules && formItemProps.rules.some(rule => rule.required));
+
+  // Combine all Form.Item props
+  const finalFormItemProps = {
+    label,
+    tooltip,
+    required: effectiveRequired,
+    style: debugBorders ? { ...formItemProps.style, ...debugStyle } : formItemProps.style,
+    ...validationProps,
+    ...formItemProps // This allows override of our defaults, but validation props take precedence
   };
 
-  // Custom horizontal layout for better control
-  if (layout === 'horizontal') {
-    const containerStyle = {
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '8px',
-      marginBottom: compact ? '12px' : '16px',
-      width: '100%', // Ensure full width usage
-      ...getDebugStyle()
-    };
+  // Determine component status for visual feedback
+  const componentStatus = validationState.status === 'error' ? 'error' : 
+                         validationState.status === 'validating' ? 'validating' : 
+                         undefined;
 
-    const labelStyle = {
-      flexShrink: 0,
-      paddingTop: '4px', // Align with input field
-      paddingRight: '8px',
-      fontSize: '14px',
-      lineHeight: '1.5',
-      color: error ? '#ff4d4f' : undefined,
-      // Removed whiteSpace: 'nowrap' to allow natural wrapping
-      wordBreak: 'break-word', // Allow breaking long words if needed
-      minWidth: 'auto' // Let label size naturally
-    };
-
-    const fieldContainerStyle = {
-      flex: 1,
-      minWidth: 0, // Allow shrinking below content size
-      width: '100%' // Ensure field container takes available space
-    };
-
-    const requiredStyle = required ? {
-      color: '#ff4d4f',
-      fontSize: '14px',
-      fontFamily: 'SimSun, sans-serif',
-      lineHeight: 1,
-      content: '*'
-    } : {};
-
+  // Don't render until initialization is complete to avoid flicker
+  if (!isInitialized) {
     return (
-      <div style={containerStyle}>
-        {label && (
-          <div style={labelStyle}>
-            {required && <span style={requiredStyle}>* </span>}
-            {tooltip ? (
-              <Tooltip title={tooltip}>
-                <span style={{ cursor: 'help', textDecoration: 'underline dotted' }}>
-                  {renderLabel()}
-                </span>
-              </Tooltip>
-            ) : (
-              renderLabel()
-            )}
-          </div>
-        )}
-        <div style={fieldContainerStyle}>
-          <Component 
-            disabled={disabled}
-            value={value}
-            onChange={handleChange}
-            status={error ? 'error' : undefined}
-            style={{ width: '100%' }}
-            {...rest}
-          />
-          {error && (
-            <div style={{ 
-              color: '#ff4d4f', 
-              fontSize: '12px', 
-              marginTop: '4px',
-              lineHeight: '1.5'
-            }}>
-              {error}
-            </div>
-          )}
-        </div>
-      </div>
+      <Form.Item {...finalFormItemProps}>
+        <Component 
+          disabled={true} // Always disabled during initialization
+          value={effectiveValue}
+          onChange={() => {}} // No-op during initialization
+          status="validating"
+          placeholder="Initializing..."
+          {...(formItemProps.componentProps || {})}
+        />
+      </Form.Item>
     );
   }
 
-  // Default vertical layout using Form.Item
   return (
-    <Form.Item
-      label={renderLabel()}
-      tooltip={tooltip}
-      validateStatus={error ? 'error' : undefined}
-      help={error}
-      required={required}
-      layout='horizontal'
-      style={getDebugStyle()}
-    >
-      <Component disabled={disabled}
-        value={value}
+    <Form.Item {...finalFormItemProps}>
+      <Component 
+        disabled={disabled}
+        value={effectiveValue}
         onChange={handleChange}
-        status={error ? 'error' : undefined}
-        {...rest}
+        status={componentStatus}
+        {...(formItemProps.componentProps || {})} // Allow passing props specifically to the component
       />
     </Form.Item>
   );

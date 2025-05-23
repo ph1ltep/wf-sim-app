@@ -234,7 +234,7 @@ const ProjectSettings = () => {
       {/* Project Identification */}
       <FormSection title="Project Identification">
         <FormRow>
-          <FormCol span={16}>
+          <FormCol>
             <TextField
               path={[...generalPath, 'projectName']}
               label="Project Name"
@@ -243,7 +243,7 @@ const ProjectSettings = () => {
               required
             />
           </FormCol>
-          <FormCol span={8}>
+          <FormCol>
             <DateField
               path={[...generalPath, 'startDate']}
               label="Project Start Date"
@@ -256,7 +256,7 @@ const ProjectSettings = () => {
       {/* Project Timeline */}
       <FormSection title="Project Timeline">
         <FormRow>
-          <FormCol span={8}>
+          <FormCol>
             <NumberField
               path={[...generalPath, 'projectLife']}
               label="Project Life (Years)"
@@ -272,7 +272,7 @@ const ProjectSettings = () => {
       {/* Currency Settings */}
       <FormSection title="Currency Settings">
         <FormRow>
-          <FormCol span={8}>
+          <FormCol>
             <SelectField
               path={[...currencyPath, 'local']}
               label={
@@ -284,7 +284,7 @@ const ProjectSettings = () => {
               required
             />
           </FormCol>
-          <FormCol span={8}>
+          <FormCol>
             <SelectField
               path={[...currencyPath, 'foreign']}
               label={
@@ -296,7 +296,7 @@ const ProjectSettings = () => {
               required
             />
           </FormCol>
-          <FormCol span={8}>
+          <FormCol>
             <NumberField
               path={[...currencyPath, 'exchangeRate']}
               label={
@@ -316,7 +316,7 @@ const ProjectSettings = () => {
       {/* Wind Farm Specifications */}
       <FormSection title="Wind Farm Specifications">
         <FormRow>
-          <FormCol span={8}>
+          <FormCol>
             <NumberField
               path={[...windFarmPath, 'numWTGs']}
               label="Number of WTGs"
@@ -326,7 +326,7 @@ const ProjectSettings = () => {
               required
             />
           </FormCol>
-          <FormCol span={8}>
+          <FormCol>
             <NumberField
               path={[...windFarmPath, 'mwPerWTG']}
               label="Megawatts per WTG"
@@ -337,7 +337,7 @@ const ProjectSettings = () => {
               required
             />
           </FormCol>
-          <FormCol span={8}>
+          <FormCol>
             <SelectField
               path={[...windFarmPath, 'wtgPlatformType']}
               label="WTG Platform Type"
@@ -352,7 +352,7 @@ const ProjectSettings = () => {
         </FormRow>
 
         <FormRow>
-          <FormCol span={8}>
+          <FormCol>
             <PercentageField
               path={[...windFarmPath, 'capacityFactor']}
               label={
@@ -371,7 +371,7 @@ const ProjectSettings = () => {
         </FormRow>
 
         <FormRow>
-          <FormCol span={12}>
+          <FormCol>
             <PercentageField
               path={[...windFarmPath, 'curtailmentLosses']}
               label="Curtailment Losses"
@@ -382,7 +382,7 @@ const ProjectSettings = () => {
               precision={1}
             />
           </FormCol>
-          <FormCol span={12}>
+          <FormCol>
             <PercentageField
               path={[...windFarmPath, 'electricalLosses']}
               label="Electrical Losses"
