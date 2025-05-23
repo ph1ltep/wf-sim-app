@@ -1,19 +1,19 @@
-// src/components/contextFields/layouts/index.js - Modernized layout system
+// src/components/contextFields/layouts/index.js - Complete layout system
 import React from 'react';
 import { Typography, Divider, Row, Col, Space, Card, Flex } from 'antd';
 
 const { Title } = Typography;
 
 // Form Section with title and optional extra content
-export const FormSection = ({ 
-  title, 
-  level = 4, 
-  extra, 
-  children, 
+export const FormSection = ({
+  title,
+  level = 4,
+  extra,
+  children,
   style,
   bordered = false,
   size = 'default',
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -25,11 +25,11 @@ export const FormSection = ({
   const content = (
     <>
       {title && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 16 
+          marginBottom: 16
         }}>
           <Title level={level} style={{ margin: 0 }}>
             {title}
@@ -43,9 +43,9 @@ export const FormSection = ({
 
   if (bordered) {
     return (
-      <Card 
+      <Card
         size={size}
-        style={{ ...debugStyle, ...style }} 
+        style={{ ...debugStyle, ...style }}
         {...rest}
       >
         {content}
@@ -61,14 +61,14 @@ export const FormSection = ({
 };
 
 // Form Row - wraps Ant Design Row with responsive defaults
-export const FormRow = ({ 
+export const FormRow = ({
   gutter = [16, 16], // Default responsive gutter
-  children, 
+  children,
   style,
   align = 'top',
   justify = 'start',
   wrap = true,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -77,7 +77,7 @@ export const FormRow = ({
   } : {};
 
   return (
-    <Row 
+    <Row
       gutter={gutter}
       align={align}
       justify={justify}
@@ -91,7 +91,7 @@ export const FormRow = ({
 };
 
 // Form Col - wraps Ant Design Col with responsive defaults
-export const FormCol = ({ 
+export const FormCol = ({
   span = 24,
   xs,
   sm,
@@ -99,14 +99,14 @@ export const FormCol = ({
   lg,
   xl,
   xxl,
-  children, 
+  children,
   style,
   flex,
   offset,
   order,
   pull,
   push,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -115,7 +115,7 @@ export const FormCol = ({
   } : {};
 
   return (
-    <Col 
+    <Col
       span={span}
       xs={xs}
       sm={sm}
@@ -137,33 +137,31 @@ export const FormCol = ({
 };
 
 // Form Divider with consistent margins
-export const FormDivider = ({ 
+export const FormDivider = ({
   margin = '24px 0',
   orientation = 'left',
   orientationMargin,
   dashed = false,
   plain = false,
-  ...rest 
+  ...rest
 }) => (
-  <Divider 
+  <Divider
     style={{ margin }}
     orientation={orientation}
     orientationMargin={orientationMargin}
     dashed={dashed}
     plain={plain}
-    {...rest} 
+    {...rest}
   />
 );
 
-// Compact Field Group - Replacement for old CompactFieldGroup using Ant Design patterns
-export const CompactFieldGroup = ({ 
-  children, 
+// Compact Field Group - Uses Space.Compact for tight layouts
+export const CompactFieldGroup = ({
+  children,
   direction = 'horizontal',
   size = 'small',
-  align = 'center',
-  wrap = false,
   style,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -185,15 +183,15 @@ export const CompactFieldGroup = ({
 };
 
 // Field Group - For grouping related fields with spacing
-export const FieldGroup = ({ 
-  children, 
+export const FieldGroup = ({
+  children,
   direction = 'vertical',
   size = 'middle',
   align,
   wrap = true,
   split,
   style,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -218,12 +216,12 @@ export const FieldGroup = ({
 };
 
 // Responsive Field Row - Preset responsive layouts for common form patterns
-export const ResponsiveFieldRow = ({ 
-  children, 
+export const ResponsiveFieldRow = ({
+  children,
   layout = 'twoColumn', // 'oneColumn', 'twoColumn', 'threeColumn', 'fourColumn', 'auto'
   gutter = [16, 16],
   style,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -243,7 +241,7 @@ export const ResponsiveFieldRow = ({
   const colProps = layouts[layout] || layouts.twoColumn;
 
   return (
-    <Row 
+    <Row
       gutter={gutter}
       style={{ ...debugStyle, ...style }}
       {...rest}
@@ -258,12 +256,12 @@ export const ResponsiveFieldRow = ({
 };
 
 // Inline Field Group - For compact inline layouts
-export const InlineFieldGroup = ({ 
-  children, 
+export const InlineFieldGroup = ({
+  children,
   size = 'small',
   align = 'center',
   style,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -286,14 +284,14 @@ export const InlineFieldGroup = ({
 };
 
 // Field Card - For grouping fields in a card layout
-export const FieldCard = ({ 
+export const FieldCard = ({
   title,
   extra,
-  children, 
+  children,
   size = 'default',
   bordered = true,
   style,
-  ...rest 
+  ...rest
 }) => {
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {

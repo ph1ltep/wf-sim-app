@@ -8,7 +8,7 @@ The `contextFields` components are specialized form field components that automa
 
 Instead of manually handling form state, validation, and updates, these components use a path-based approach to connect directly to the application state. Each component is given a path (an array of string keys or a dot-notation string) that specifies where in the state object the field value should be read from and updated to.
 
-These components extend Ant Design's Form components, inheriting all their capabilities while adding automatic state binding and path-based addressing. This means you can use any props that Ant Design's Form.Item accepts, plus the specialized props for context integration.
+These components extend Ant Design's Form components, inheriting all their capabilities while adding automatic state binding and path-based addressing.
 
 ## Key Components
 
@@ -30,7 +30,6 @@ These components extend Ant Design's Form components, inheriting all their capab
 - `RadioGroupField` - Radio button group
 - `DateField` - Date picker
 - `SliderField` - Slider control
-- `DistributionFieldV2` - Complex field for statistical distribution configuration
 
 ### Layout Components
 
@@ -38,16 +37,20 @@ These components extend Ant Design's Form components, inheriting all their capab
 - `FormRow` - Layout row (wraps Ant Design Row)
 - `FormCol` - Layout column (wraps Ant Design Col)
 - `FormDivider` - Divider with margin control
+- `CompactFieldGroup` - Compact layout using Space.Compact
+- `FieldGroup` - Grouped fields with consistent spacing
+- `ResponsiveFieldRow` - Preset responsive layouts
+- `InlineFieldGroup` - Flexible inline layouts
+- `FieldCard` - Card-based field organization
 
 ### Specialized Components
 
 - `PrimaryPercentileSelectField` - Selection field for primary percentile from existing percentiles
-- `DistributionPlot` - Visualization for statistical distributions
 - `EditableTable` - Tabular data editor
 
 ## Common Props
 
-All context field components are built on top of Ant Design's `Form.Item` component and accept all of its props, plus these additional props:
+All context field components accept all Ant Design Form.Item props, plus these additional props:
 
 | Prop | Type | Description |
 |------|------|-------------|
@@ -56,13 +59,12 @@ All context field components are built on top of Ant Design's `Form.Item` compon
 | `tooltip` | `string` | Optional help tooltip |
 | `required` | `boolean` | Whether the field is required |
 | `disabled` | `boolean` | Whether the field is disabled |
-| `formMode` | `boolean` | Whether the field is used within a ContextForm (instead of directly with context) |
-| `defaultValue` | `any` | Default value to use if the context path doesn't exist or is undefined. This will be saved to the context if no value is found at the specified path. |
+| `formMode` | `boolean` | Whether the field is used within a ContextForm |
+| `defaultValue` | `any` | Default value to use if the context path doesn't exist |
 
-## Field-Specific Props
+## Field-Specific Examples
 
 ### NumberField
-
 ```jsx
 <NumberField
   path={['settings', 'simulation', 'iterations']}
@@ -71,13 +73,11 @@ All context field components are built on top of Ant Design's `Form.Item` compon
   max={100000}
   step={1000}
   precision={0}
-  addonBefore="Iterations:"
   addonAfter="runs"
 />
 ```
 
 ### SelectField
-
 ```jsx
 <SelectField
   path={['settings', 'project', 'currency', 'local']}
@@ -85,76 +85,110 @@ All context field components are built on top of Ant Design's `Form.Item` compon
   options={[
     { value: 'USD', label: 'US Dollar (USD)' },
     { value: 'EUR', label: 'Euro (EUR)' },
-    // More options...
   ]}
   placeholder="Select currency"
 />
 ```
 
-### DistributionFieldV2
-
+### CurrencyField
 ```jsx
-<DistributionFieldV2
-  path={['settings', 'modules', 'revenue', 'electricityPrice', 'distribution']}
-  label="Electricity Price Distribution"
-  valueType="currency"
-  showVisualization={true}
-  showInfoBox={true}
+<CurrencyField
+  path={['project', 'budget']}
+  label="Project Budget"
+  min={0}
+  step={1000}
 />
 ```
 
-## Integration with Forms
+## Layout Examples
+
+### ResponsiveFieldRow
+```jsx
+<ResponsiveFieldRow layout="twoColumn">
+  <TextField path="firstName" label="First Name" />
+  <TextField path="lastName" label="Last Name" />
+</ResponsiveFieldRow>
+```
+
+### FormSection with Fields
+```jsx
+<FormSection title="Project Settings">
+  <FormRow gutter={[16, 16]}>
+    <FormCol span={12}>
+      <TextField path="name" label="Project Name" required />
+    </FormCol>
+    <FormCol span={12}>
+      <NumberField path="capacity" label="Capacity (MW)" />
+    </FormCol>
+  </FormRow>
+</FormSection>
+```
+
+### CompactFieldGroup
+```jsx
+<CompactFieldGroup>
+  <SelectField path="countryCode" options={countryCodes} />
+  <TextField path="phoneNumber" label="Phone Number" />
+</CompactFieldGroup>
+```
+
+## Integration Modes
 
 Context fields can be used in two ways:
 
-1. **Direct Context Connection**: Fields directly read/write to the context state
-2. **Form Mode**: Fields can be used within a `ContextForm` which collects changes and only updates the context when submitted
-
-Example with ContextForm:
+### 1. Direct Context Connection
+Fields directly read/write to the context state:
 
 ```jsx
-<ContextForm
-  path={['settings', 'project']}
-  onSubmit={(values) => console.log('Saved:', values)}
-  onCancel={() => console.log('Cancelled')}
->
-  <TextField
-    path={'projectName'}
-    label="Project Name"
-    required
-  />
-  <NumberField
-    path={'windFarm.numWTGs'}
-    label="Number of Wind Turbines"
-    min={1}
-  />
+<TextField
+  path={['settings', 'project', 'name']}
+  label="Project Name"
+  required
+/>
+```
+
+### 2. Form Mode (with ContextForm)
+Fields work within a ContextForm which batches updates:
+
+```jsx
+<ContextForm path={['settings', 'project']}>
+  <TextField path="name" label="Project Name" required />
+  <NumberField path="capacity" label="Capacity (MW)" />
 </ContextForm>
 ```
 
-## Advanced Features
+## Validation
 
-- **Auto-sizing** - Fields calculate appropriate widths based on their content and constraints
-- **Validation** - Integrated with Yup schemas for validation
-- **Value transformation** - Support for transforming values before storing them
-- **Calculated defaults** - Fields can use the context to calculate default values
-- **Default Value Handling** - When a field's path doesn't exist in the context or is undefined, the component will:
-  1. Use the `defaultValue` prop if provided
-  2. Initialize the context path with this default value
-  3. Display this value in the field
-  
-  This creates a seamless experience when dealing with optional or new data
+- **Direct Mode**: Validation occurs immediately when values change via context validation
+- **Form Mode**: Validation occurs on form submission via `updateByPath`
+- Uses existing Yup schemas and validation infrastructure
+- Validation errors are displayed using Ant Design's built-in error display
+
+## Default Value Handling
+
+When a field's path doesn't exist in the context or is undefined, the component will:
+1. Use the `defaultValue` prop if provided
+2. Initialize the context path with this default value
+3. Display this value in the field
+
+This creates a seamless experience when dealing with optional or new data.
+
+## Debug Mode
+
+Set `REACT_APP_DEBUG_FORM_BORDERS=true` in your environment to see layout boundaries:
+
+```bash
+REACT_APP_DEBUG_FORM_BORDERS=true npm start
+```
+
+This will show colored borders around all layout components to help with debugging.
 
 ## Best Practices
 
-1. Use array notation for paths when possible (`['settings', 'general', 'name']`) for better type safety
-2. Group related fields in sections using `FormSection`
-3. Use `ContextForm` for multi-field edits that should be saved together
-4. Provide tooltips for complex fields to improve user experience
-5. Leverage Ant Design Form.Item props like `rules`, `dependencies`, and `help` for advanced form behavior
-6. Use `defaultValue` for initializing new paths in the context or providing fallback values
-
-## Future Update Prompt
-
-If you need to update this guide with the latest features, use the following prompt:
-
-"Please analyze the current implementation of the components in src/components/contextFields and update the Context Fields Guide markdown. Pay special attention to any new components, props, or features that have been added since the last update. Make sure the examples, prop descriptions, and best practices are still accurate and relevant."
+1. **Use array notation for paths** - `['settings', 'general', 'name']` for better type safety
+2. **Group related fields in sections** - Use `FormSection` for organization
+3. **Use ContextForm for multi-field edits** - Batches updates for better performance
+4. **Leverage Ant Design layout props** - Use `wrapperCol`, `labelCol`, etc. for layout control
+5. **Provide tooltips for complex fields** - Improve user experience
+6. **Use `defaultValue` for initialization** - Handle optional or new data gracefully
+7. **Use responsive layouts** - `ResponsiveFieldRow` and responsive Col props for mobile-first design

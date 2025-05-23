@@ -30,7 +30,7 @@ export const ContextField = ({
     message: null,
     isValidating: false
   });
-  
+
   const [isInitialized, setIsInitialized] = useState(false);
   const initializationRef = useRef(false);
   const { getValueByPath, updateByPath } = useScenario();
@@ -57,7 +57,7 @@ export const ContextField = ({
 
   // Get current value - handle initialization state
   const currentValue = getValue(effectivePath, null);
-  
+
   // Determine effective value considering initialization
   const effectiveValue = isInitialized ? currentValue : (currentValue ?? defaultValue);
 
@@ -71,14 +71,14 @@ export const ContextField = ({
       try {
         // Update form value directly - this will not touch the context
         const result = updateValueOverride(effectivePath, actualValue);
-        
+
         // Clear any existing validation errors since form handles validation
         setValidationState({
           status: undefined,
           message: null,
           isValidating: false
         });
-        
+
         return result;
       } catch (error) {
         console.error('Form field update error:', error);
@@ -115,7 +115,7 @@ export const ContextField = ({
           message: null,
           isValidating: false
         });
-        
+
         // Clear success status after a short delay for better UX
         setTimeout(() => {
           setValidationState(prev => ({
@@ -133,7 +133,7 @@ export const ContextField = ({
         message: 'An unexpected error occurred',
         isValidating: false
       });
-      
+
       console.error('ContextField validation error:', error);
       return {
         isValid: false,
@@ -152,7 +152,7 @@ export const ContextField = ({
         return;
       }
 
-      const needsInitialization = 
+      const needsInitialization =
         defaultValue !== undefined &&
         defaultValue !== null &&
         (currentValue === undefined || currentValue === null);
@@ -160,11 +160,11 @@ export const ContextField = ({
       if (needsInitialization && !formMode) {
         // Only initialize in non-form mode
         initializationRef.current = true;
-        
+
         try {
           // Initialize the path with default value
           const result = await updateValue(effectivePath, defaultValue);
-          
+
           if (result.isValid) {
             setIsInitialized(true);
           } else {
@@ -252,19 +252,19 @@ export const ContextField = ({
   };
 
   // Determine component status for visual feedback (skip in form mode)
-  const componentStatus = formMode ? undefined : 
-                         (validationState.status === 'error' ? 'error' : 
-                          validationState.status === 'validating' ? 'validating' : 
-                          undefined);
+  const componentStatus = formMode ? undefined :
+    (validationState.status === 'error' ? 'error' :
+      validationState.status === 'validating' ? 'validating' :
+        undefined);
 
   // Don't render until initialization is complete to avoid flicker (except in form mode)
   if (!isInitialized && !formMode) {
     return (
       <Form.Item {...finalFormItemProps}>
-        <Component 
+        <Component
           disabled={true}
           value={effectiveValue}
-          onChange={() => {}} // No-op during initialization
+          onChange={() => { }} // No-op during initialization
           status="validating"
           placeholder="Initializing..."
           {...(formItemProps.componentProps || {})}
@@ -275,7 +275,7 @@ export const ContextField = ({
 
   return (
     <Form.Item {...finalFormItemProps}>
-      <Component 
+      <Component
         disabled={disabled}
         value={effectiveValue}
         onChange={handleChange}

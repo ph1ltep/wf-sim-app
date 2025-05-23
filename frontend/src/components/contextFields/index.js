@@ -5,10 +5,10 @@ import { ContextField } from './ContextField';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import layout components
-import { 
-  FormSection, 
-  FormRow, 
-  FormCol, 
+import {
+  FormSection,
+  FormRow,
+  FormCol,
   FormDivider,
   CompactFieldGroup,
   FieldGroup,
@@ -337,7 +337,7 @@ export {
   ResponsiveFieldRow,
   InlineFieldGroup,
   FieldCard,
-  
+
   // Special components
   EditableTable,
   PrimaryPercentileSelectField
