@@ -35,7 +35,7 @@ export const CompactFieldGroup = ({
     return baseStyle;
   };
 
-  // Clone children and pass compact mode to them
+// Clone children and pass compact mode to them
   const renderChildren = () => {
     const childrenArray = React.Children.toArray(children);
     
@@ -54,17 +54,17 @@ export const CompactFieldGroup = ({
             flex: direction === 'horizontal' ? '0 0 auto' : '1 1 auto' // Auto-size based on content
           };
 
-      // Clone the element with form props
+      // Clone the element with form props - PRESERVE ALL EXISTING PROPS FIRST
       return React.cloneElement(child, {
+        ...child.props, // PRESERVE ALL EXISTING PROPS FIRST
         key: child.key || index,
         compact: true,
-        //layout: 'horizontal', // Force horizontal layout for grouped fields
+        layout: 'horizontal', // Force horizontal layout for grouped fields
         formItemStyle: {
           marginBottom: 8, // Reduced margin for compact group
           ...(child.props.formItemStyle || {}),
           ...childStyle
-        },
-        ...child.props // This preserves formMode, getValueOverride, updateValueOverride
+        }
       });
     });
   };
