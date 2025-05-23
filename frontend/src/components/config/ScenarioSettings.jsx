@@ -1,6 +1,6 @@
 // src/components/config/ScenarioSettings.jsx
 import React from 'react';
-import { Typography, Alert } from 'antd';
+import { Typography, Alert, Input } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import context field components
@@ -79,7 +79,8 @@ const ScenarioSettings = () => {
               path={[...scenarioPath, 'description']}
               label="Description"
               placeholder="Provide a brief description of this scenario"
-              rows={4}
+              rows={4}    
+              wrapperCol={{ span: 20 }}        
             />
           </FormCol>
         </FormRow>
