@@ -32,6 +32,14 @@ const EditableTable = ({
   showSummary = false,
   renderSummary = null,
 
+  // Form layout props - NEW
+  formLayout = 'vertical',
+  formCompact = false,
+  formResponsive = false,
+  formLabelCol,
+  formWrapperCol,
+  formProps = {},
+
   // Additional props
   modalProps = {},
   tableProps = {}
@@ -166,6 +174,21 @@ const EditableTable = ({
     );
   } : undefined;
 
+  // Calculate modal width based on layout
+  const getModalWidth = () => {
+    if (modalProps.width) return modalProps.width;
+    
+    // Adjust modal width based on form layout
+    switch (formLayout) {
+      case 'horizontal':
+        return formCompact ? 600 : 800;
+      case 'inline':
+        return formCompact ? 500 : 700;
+      default: // vertical
+        return formCompact ? 400 : 520;
+    }
+  };
+
   return (
     <div className="editable-table">
       {/* Error messages */}
@@ -211,6 +234,7 @@ const EditableTable = ({
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
+        width={getModalWidth()}
         {...modalProps}
       >
         <ContextForm
@@ -220,7 +244,12 @@ const EditableTable = ({
           }
           onSubmit={handleSave}
           onCancel={handleCancel}
-          layout="vertical"
+          layout={formLayout}
+          compact={formCompact}
+          responsive={formResponsive}
+          labelCol={formLabelCol}
+          wrapperCol={formWrapperCol}
+          {...formProps}
         >
           {formFields}
 

@@ -13,6 +13,11 @@ import { get, set } from 'lodash';
  * @param {Function} onSubmit - Callback when form is submitted successfully
  * @param {Function} onCancel - Callback when form is cancelled
  * @param {React.ReactNode} children - Form field components
+ * @param {string} layout - Form layout: 'vertical' (default), 'horizontal', 'inline'
+ * @param {Object} labelCol - Label column configuration for horizontal layout
+ * @param {Object} wrapperCol - Wrapper column configuration for horizontal layout
+ * @param {boolean} compact - Whether to use compact spacing
+ * @param {boolean} responsive - Whether to enable responsive behavior
  * @param {Object} formProps - Props to pass to the antd Form component
  */
 const ContextForm = ({
@@ -23,6 +28,11 @@ const ContextForm = ({
     submitText = "Save",
     cancelText = "Cancel",
     showActions = true,
+    layout = "vertical",
+    labelCol,
+    wrapperCol,
+    compact = false,
+    responsive = false,
     ...formProps
 }) => {
     const { getValueByPath, updateByPath } = useScenario();
@@ -73,13 +83,22 @@ const ContextForm = ({
 
     // Field value getter (for form state)
     const getFormValue = (fieldPath) => {
-        // Handle simple property name (without full path)
-        if (typeof fieldPath === 'string' && !fieldPath.includes('.')) {
-            return formState[fieldPath];
+        console.log('getFormValue called with fieldPath:', fieldPath, 'basePath:', basePath, 'formState:', formState);
+
+        // Split dot notation strings into arrays before processing
+        let fieldPathArray;
+        if (typeof fieldPath === 'string' && fieldPath.includes('.')) {
+            fieldPathArray = fieldPath.split('.');
+        } else if (Array.isArray(fieldPath)) {
+            fieldPathArray = fieldPath;
+        } else {
+            fieldPathArray = [fieldPath];
         }
 
-        // Convert to array if string with dots
-        const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
+        // Handle simple property name (single element array)
+        if (fieldPathArray.length === 1) {
+            return formState[fieldPathArray[0]];
+        }
 
         // Check if fieldPath already contains basePath elements
         let relativePath;
@@ -92,27 +111,30 @@ const ContextForm = ({
             relativePath = fieldPathArray.slice(basePath.length);
         }
 
-        // Handle numeric indices in string form
-        if (relativePath.length === 1 && !isNaN(Number(relativePath[0]))) {
-            // It's a numeric index as string, convert to number for array access
-            return formState;
-        }
-
         return get(formState, relativePath);
     };
 
     // Field update handler
     const updateFormValue = (fieldPath, value) => {
-        // Handle simple property name (without full path)
-        if (typeof fieldPath === 'string' && !fieldPath.includes('.')) {
+        console.log('updateFormValue called with fieldPath:', fieldPath, 'value:', value, 'basePath:', basePath);
+
+        // Split dot notation strings into arrays before processing
+        let fieldPathArray;
+        if (typeof fieldPath === 'string' && fieldPath.includes('.')) {
+            fieldPathArray = fieldPath.split('.');
+        } else if (Array.isArray(fieldPath)) {
+            fieldPathArray = fieldPath;
+        } else {
+            fieldPathArray = [fieldPath];
+        }
+
+        // Handle simple property name (single element array)
+        if (fieldPathArray.length === 1) {
             setFormState(produce(formState, draft => {
-                draft[fieldPath] = value;
+                draft[fieldPathArray[0]] = value;
             }));
             return { isValid: true, applied: true, value };
         }
-
-        // Convert to array if string with dots
-        const fieldPathArray = Array.isArray(fieldPath) ? fieldPath : fieldPath.split('.');
 
         // Check if fieldPath already contains basePath elements
         let relativePath;
@@ -139,6 +161,34 @@ const ContextForm = ({
         return { isValid: true, applied: true, value };
     };
 
+    // Calculate form layout configuration
+    const getFormLayoutConfig = () => {
+        const config = {
+            layout: layout === 'horizontal' ? 'vertical' : layout, // Use vertical for Form, handle horizontal in ContextField
+            ...formProps
+        };
+
+        // Only apply labelCol/wrapperCol for true Ant Design horizontal layout
+        // Our custom horizontal layout is handled in ContextField
+        if (layout === 'horizontal' && (labelCol || wrapperCol)) {
+            // If specific column config is provided, use Ant Design's horizontal layout
+            config.layout = 'horizontal';
+            config.labelCol = labelCol;
+            config.wrapperCol = wrapperCol;
+        }
+
+        return config;
+    };
+
+    // Get form item style for compact mode
+    const getFormItemStyle = () => {
+        if (!compact) return {};
+
+        return {
+            marginBottom: layout === 'inline' ? 8 : 12 // Reduced from default 24px
+        };
+    };
+
     // Clone children with form props
     const renderChildren = () => {
         if (!isInitialized) return null;
@@ -151,38 +201,60 @@ const ContextForm = ({
 
             // Clone the element with form props
             return React.cloneElement(child, {
-                formMode: true,
+                formMode: true, // This should be set to true
                 getValueOverride: getFormValue,
-                updateValueOverride: updateFormValue
+                updateValueOverride: updateFormValue,
+                // Pass layout configuration to child fields
+                layout,
+                compact,
+                responsive,
+                formItemStyle: getFormItemStyle()
             });
         });
     };
 
-    return (
-        <Form
-            onFinish={handleSubmit}
-            layout={formProps.layout || "vertical"}
-            {...formProps}
-        >
-            {renderChildren()}
+    // Debug border styling - controlled by environment variable
+    const getDebugStyle = () => {
+        if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+            return {
+                border: '1px solid #1890ff',
+                borderRadius: '4px',
+                padding: '8px',
+                margin: '4px 0'
+            };
+        }
+        return {};
+    };
 
-            {showActions && (
-                <Form.Item className="form-actions">
-                    <Space>
-                        {cancelText && (
-                            <Button onClick={handleCancel}>
-                                {cancelText}
-                            </Button>
-                        )}
-                        {submitText && (
-                            <Button type="primary" htmlType="submit">
-                                {submitText}
-                            </Button>
-                        )}
-                    </Space>
-                </Form.Item>
-            )}
-        </Form>
+    return (
+        <div style={getDebugStyle()}>
+            <Form
+                onFinish={handleSubmit}
+                {...getFormLayoutConfig()}
+            >
+                {renderChildren()}
+
+                {showActions && (
+                    <Form.Item
+                        className="form-actions"
+                        style={getFormItemStyle()}
+                    >
+                        <Space>
+                            {cancelText && (
+                                <Button onClick={handleCancel}>
+                                    {cancelText}
+                                </Button>
+                            )}
+                            {submitText && (
+                                <Button type="primary" htmlType="submit">
+                                    {submitText}
+                                </Button>
+                            )}
+                        </Space>
+                    </Form.Item>
+                )}
+            </Form>
+        </div>
     );
 };
 

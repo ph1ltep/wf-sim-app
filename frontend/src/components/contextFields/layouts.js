@@ -1,100 +1,167 @@
-// src/components/contextFields/layouts.js
+// src/components/contextFields/layouts.jsx
 import React from 'react';
-import { Card, Row, Col, Divider } from 'antd';
+import { Row, Col, Divider, Typography } from 'antd';
+
+const { Title } = Typography;
 
 /**
- * Form section component that wraps fields in a card
+ * FormSection - A section container with optional title and extra content
  */
 export const FormSection = ({ 
   title, 
-  subtitle, 
+  level = 4, 
+  extra, 
   children, 
-  extra,
-  variant = 'outlined',
   style = {},
-  ...rest 
-}) => (
-  <Card 
-    title={title} 
-    extra={extra}
-    style={{ marginBottom: 24, ...style }}
-    variant={variant}
-    {...rest}
-  >
-    {subtitle && <p className="form-section-subtitle">{subtitle}</p>}
-    {children}
-  </Card>
-);
+  compact = false,
+  ...props 
+}) => {
+  // Debug border styling - controlled by environment variable
+  const getDebugStyle = () => {
+    const baseStyle = compact ? { 
+      padding: '8px', 
+      margin: '4px 0' 
+    } : { 
+      padding: '12px', 
+      margin: '8px 0' 
+    };
+
+    if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+      return {
+        ...baseStyle,
+        border: '2px solid #722ed1',
+        borderRadius: '6px',
+        ...style
+      };
+    }
+    return { ...baseStyle, ...style };
+  };
+
+  const titleMarginBottom = compact ? 8 : (extra ? 16 : 8);
+
+  return (
+    <div style={getDebugStyle()} {...props}>
+      {title && (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: titleMarginBottom
+        }}>
+          <Title level={level} style={{ margin: 0 }}>
+            {title}
+          </Title>
+          {extra && <div>{extra}</div>}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+};
 
 /**
- * Form divider with optional title
- */
-export const FormDivider = ({ 
-  title, 
-  orientation = 'left',
-  ...rest 
-}) => (
-  <Divider 
-    orientation={orientation}
-    {...rest}
-  >
-    {title}
-  </Divider>
-);
-
-/**
- * Form row with columns for field layout
+ * FormRow - Layout row component with optional tighter spacing
  */
 export const FormRow = ({ 
   children, 
-  gutter = 24,
-  ...rest 
-}) => (
-  <Row 
-    gutter={gutter}
-    {...rest}
-  >
-    {React.Children.map(children, child => {
-      // If child already has a Col wrapper, return as is
-      if (child && child.type === Col) {
-        return child;
-      }
-      // Otherwise wrap with a Col
-      return <Col span={24}>{child}</Col>;
-    })}
-  </Row>
-);
+  gutter = 16, 
+  compact = false,
+  ...props 
+}) => {
+  // Reduce gutter for compact mode
+  const effectiveGutter = compact ? Math.max(8, gutter / 2) : gutter;
+  
+  // Debug border styling - controlled by environment variable
+  const getDebugStyle = () => {
+    const baseStyle = compact ? {
+      padding: '3px',
+      margin: '2px 0'
+    } : {
+      padding: '6px',
+      margin: '3px 0'
+    };
+
+    if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+      return {
+        ...baseStyle,
+        border: '1px solid #fa8c16',
+        borderRadius: '3px'
+      };
+    }
+    return baseStyle;
+  };
+
+  return (
+    <div style={getDebugStyle()}>
+      <Row gutter={effectiveGutter} {...props}>
+        {children}
+      </Row>
+    </div>
+  );
+};
 
 /**
- * Form column component for consistent layouts
+ * FormCol - Layout column component
  */
 export const FormCol = ({ 
   children, 
   span = 24,
-  xs = 24,
-  sm,
-  md,
-  lg,
-  xl,
-  ...rest 
-}) => (
-  <Col 
-    span={span}
-    xs={xs}
-    sm={sm || (span < 24 ? span : 24)}
-    md={md || span}
-    lg={lg || span}
-    xl={xl || span}
-    {...rest}
-  >
-    {children}
-  </Col>
-);
+  compact = false,
+  ...props 
+}) => {
+  // Debug border styling - controlled by environment variable
+  const getDebugStyle = () => {
+    const baseStyle = compact ? {
+      padding: '2px',
+      margin: '1px'
+    } : {
+      padding: '4px',
+      margin: '1px'
+    };
 
-// Export the layout components
-export default {
-  FormSection,
-  FormRow,
-  FormCol,
-  FormDivider
+    if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+      return {
+        ...baseStyle,
+        border: '1px solid #13c2c2',
+        borderRadius: '2px'
+      };
+    }
+    return baseStyle;
+  };
+
+  return (
+    <div style={getDebugStyle()}>
+      <Col span={span} {...props}>
+        {children}
+      </Col>
+    </div>
+  );
+};
+
+/**
+ * FormDivider - Styled divider with margin control
+ */
+export const FormDivider = ({ 
+  margin = 'default',
+  compact = false,
+  ...props 
+}) => {
+  const getMarginStyle = () => {
+    // Reduce margins in compact mode
+    const multiplier = compact ? 0.5 : 1;
+    
+    switch (margin) {
+      case 'small': return { margin: `${8 * multiplier}px 0` };
+      case 'large': return { margin: `${32 * multiplier}px 0` };
+      case 'none': return { margin: 0 };
+      default: return { margin: `${16 * multiplier}px 0` };
+    }
+  };
+
+  return (
+    <Divider 
+      style={getMarginStyle()} 
+      {...props} 
+    />
+  );
 };

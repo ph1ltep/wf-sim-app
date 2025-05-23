@@ -7,6 +7,7 @@ import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 
 // Import layout components
 import { FormSection, FormRow, FormCol, FormDivider } from './layouts';
+import CompactFieldGroup from './CompactFieldGroup';
 
 // Import special components
 import EditableTable from '../tables/EditableTable';
@@ -466,6 +467,7 @@ export {
   FormRow,
   FormCol,
   FormDivider,
+  CompactFieldGroup,
   EditableTable,
   PrimaryPercentileSelectField,
   getTextFieldWidth

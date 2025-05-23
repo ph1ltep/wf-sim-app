@@ -1,10 +1,10 @@
 // src/components/modules/ContractsModule.jsx
 import React, { useEffect } from 'react';
 import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space, Table } from 'antd';
-import { 
-  ContractOutlined, 
-  InfoCircleOutlined, 
-  ReloadOutlined, 
+import {
+  ContractOutlined,
+  InfoCircleOutlined,
+  ReloadOutlined,
   ExclamationCircleOutlined,
   DollarCircleOutlined,
   ArrowUpOutlined,
@@ -25,7 +25,8 @@ import {
   SelectField,
   CheckboxField,
   CurrencyField,
-  PercentageField
+  PercentageField,
+  CompactFieldGroup
 } from '../contextFields';
 import EditableTable from '../../components/tables/EditableTable';
 
@@ -42,14 +43,14 @@ const { Title, Text } = Typography;
 const ContractsModule = () => {
   // Base path for contracts in the context
   const contractsPath = ['settings', 'modules', 'contracts', 'oemContracts'];
-  
+
   // Get scenario context and OEM scopes
   const { scenarioData, getValueByPath, updateByPath } = useScenario();
   const { oemScopes, loading: loadingScopes, fetchScopes } = useOEMScopes();
-  
+
   // Current project life for year range
   const projectLife = getValueByPath(['settings', 'general', 'projectLife'], 20);
-  
+
   // Get contracts from context or initialize empty array
   const contracts = getValueByPath(contractsPath, []);
 
@@ -70,7 +71,7 @@ const ContractsModule = () => {
     }),
 
     // OEM Scope column using createCustomTagsColumn
-    createCustomTagsColumn('oemScopeId', 'OEM Scope', 
+    createCustomTagsColumn('oemScopeId', 'OEM Scope',
       (tag, index) => (
         <Tooltip key={tag.id} title={tag.content}>
           <OEMScopeTag color={tag.color}>
@@ -84,21 +85,21 @@ const ContractsModule = () => {
           // Find the associated scope
           const scope = oemScopes.find(s => s.key === record.oemScopeId);
           if (!scope) return [];
-          
+
           // Return tags based on scope features
           return renderScopeTags(scope);
         },
         render: (_, record) => {
           // Find the associated scope
           const scope = oemScopes.find(s => s.key === record.oemScopeId);
-          
+
           if (!scope) {
             return <Tag color="error">Scope not found</Tag>;
           }
-          
+
           // Generate tags from scope features
           const tags = renderScopeTags(scope);
-          
+
           return (
             <Space size={[0, 4]} wrap direction="vertical">
               <Text strong>{scope.name}</Text>
@@ -127,15 +128,15 @@ const ContractsModule = () => {
         if (!years || years.length === 0) {
           return <Text type="secondary">No years assigned</Text>;
         }
-        
+
         // Sort years for display
         const sortedYears = [...years].sort((a, b) => a - b);
-        
+
         // Format consecutive years as ranges
         const ranges = [];
         let rangeStart = sortedYears[0];
         let rangeEnd = rangeStart;
-        
+
         for (let i = 1; i < sortedYears.length; i++) {
           if (sortedYears[i] === rangeEnd + 1) {
             rangeEnd = sortedYears[i];
@@ -144,9 +145,9 @@ const ContractsModule = () => {
             rangeStart = rangeEnd = sortedYears[i];
           }
         }
-        
+
         ranges.push(rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}-${rangeEnd}`);
-        
+
         return (
           <Space wrap>
             {ranges.map((range, index) => (
@@ -189,7 +190,7 @@ const ContractsModule = () => {
     })
   ];
 
-  // Define form fields for the contracts form
+  // Define form fields for the contracts form - simplified approach
   const contractFormFields = [
     <TextField
       key="name"
@@ -198,7 +199,7 @@ const ContractsModule = () => {
       placeholder="e.g., OEM Full Service Contract"
       required
     />,
-    
+
     <SelectField
       key="oemScopeId"
       path="oemScopeId"
@@ -210,7 +211,7 @@ const ContractsModule = () => {
       }))}
       required
     />,
-    
+
     <CurrencyField
       key="fixedFee"
       path="fixedFee"
@@ -219,13 +220,13 @@ const ContractsModule = () => {
       step={1000}
       currencyOverride={currency}
     />,
-    
+
     <CheckboxField
       key="isPerTurbine"
       path="isPerTurbine"
       label="Fee is applied per turbine"
     />,
-    
+
     <SelectField
       key="years"
       path="years"
@@ -237,36 +238,32 @@ const ContractsModule = () => {
         label: `Year ${i + 1}`
       }))}
     />,
-    
-    <CheckboxField
-      key="useMin"
-      path="escalation.useMin"
-      label="Use minimum escalation limit"
-    />,
-    
-    <PercentageField
-      key="minValue"
-      path="escalation.minValue"
-      label="Minimum escalation"
-      min={-20}
-      max={0}
-      step={0.1}
-    />,
-    
-    <CheckboxField
-      key="useMax"
-      path="escalation.useMax"
-      label="Use maximum escalation limit"
-    />,
-    
-    <PercentageField
-      key="maxValue"
-      path="escalation.maxValue"
-      label="Maximum escalation"
-      min={0}
-      max={20}
-      step={0.1}
-    />
+
+    // Use CompactFieldGroup only for related escalation options
+    //<CompactFieldGroup key="escalation-group" direction="horizontal" size="small">
+      <CheckboxField
+        path={['escalation', 'useMin']}
+        label="Use min limit"
+      />,
+      <PercentageField
+        path={['escalation', 'minValue']}
+        label="Min %"
+        min={-20}
+        max={0}
+        step={0.1}
+      />,
+      <CheckboxField
+        path={['escalation', 'useMax']}
+        label="Use max limit"
+      />,
+      <PercentageField
+        path={['escalation', 'maxValue']}
+        label="Max %"
+        min={0}
+        max={20}
+        step={0.1}
+      />
+    //</CompactFieldGroup>
   ];
 
   // Expandable row renderer for contract details
@@ -274,14 +271,14 @@ const ContractsModule = () => {
     // Find the associated scope
     const scope = oemScopes.find(s => s.key === record.oemScopeId);
     if (!scope) return <Typography.Text>No scope details available</Typography.Text>;
-    
+
     return (
       <Card size="small" title="Contract Details" bordered={false}>
         <p><strong>Contract Name:</strong> {record.name}</p>
         <p><strong>OEM Scope:</strong> {scope.name}</p>
         <p><strong>Fixed Fee:</strong> {record.fixedFee?.toLocaleString() || 'N/A'} {currency} {record.isPerTurbine ? 'per turbine' : 'total'}</p>
         <p><strong>Active Years:</strong> {record.years?.join(', ') || 'None'}</p>
-        
+
         {/* Escalation details */}
         {(record.escalation?.useMin || record.escalation?.useMax) && (
           <div>
@@ -303,10 +300,10 @@ const ContractsModule = () => {
     return (
       <div>
         <Title level={2}>OEM Contracts</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -343,10 +340,10 @@ const ContractsModule = () => {
             />
           ) : (
             <div>
-              <FormSection title="Contracts Configuration" 
+              <FormSection title="Contracts Configuration"
                 extra={
-                  <Button 
-                    icon={<ReloadOutlined />} 
+                  <Button
+                    icon={<ReloadOutlined />}
                     onClick={fetchScopes}
                     loading={loadingScopes}
                   >
@@ -361,7 +358,7 @@ const ContractsModule = () => {
                   showIcon
                   style={{ marginBottom: 16 }}
                 />
-                
+
                 <EditableTable
                   columns={contractColumns}
                   path={contractsPath}
@@ -369,12 +366,16 @@ const ContractsModule = () => {
                   keyField="id"
                   itemName="Contract"
                   expandedRowRender={expandedRowRender}
+                  // New form layout props
+                  formLayout="horizontal"
+                  formCompact={true}
+                  formResponsive={true}
                 />
               </FormSection>
-              
+
               <FormSection title="Contract Coverage Visualization">
                 <p>The table below shows which contracts are applied to each project year.</p>
-                
+
                 {contracts.length > 0 ? (
                   <Table
                     dataSource={Array.from({ length: projectLife }, (_, i) => ({
@@ -405,7 +406,7 @@ const ContractsModule = () => {
                               </Space>
                             );
                           }
-                          
+
                           return (
                             <Space wrap>
                               {contracts.map(contract => {
