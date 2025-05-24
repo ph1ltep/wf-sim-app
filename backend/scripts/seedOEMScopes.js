@@ -1,7 +1,7 @@
 // backend/scripts/seedOEMScopes.js
 require('dotenv').config();
 const mongoose = require('mongoose');
-const OEMScope = require('../models/OEMScope');
+const OEMScope = require('../../schemas/mongoose/oemScope');
 const { connectDB } = require('../config/db');
 
 // Default OEM service scope data

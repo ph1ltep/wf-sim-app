@@ -1,9 +1,9 @@
-// src/components/contextFields/ContextField.jsx - Enhanced with automatic path mapping and context isolation
+// src/components/contextFields/ContextField.jsx - Simplified using Ant Design's built-in validation
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
-// Enhanced ContextField with better Ant Design integration and context isolation
+// Enhanced ContextField with automatic path mapping and context isolation
 export const ContextField = ({
   // Context-specific props (not passed to Form.Item)
   path,
@@ -15,6 +15,7 @@ export const ContextField = ({
   updateValueOverride = null,
   validators = [],
   name, // Form.Item name for Ant Design integration
+  children, // Add children prop
 
   // Form.Item props that we handle specially
   label,
@@ -25,12 +26,6 @@ export const ContextField = ({
   // All other props are forwarded to Form.Item
   ...formItemProps
 }) => {
-  const [validationState, setValidationState] = useState({
-    status: undefined,
-    message: null,
-    isValidating: false
-  });
-
   const [isInitialized, setIsInitialized] = useState(false);
   const initializationRef = useRef(false);
   const { getValueByPath, updateByPath } = useScenario();
@@ -61,88 +56,23 @@ export const ContextField = ({
   // Determine effective value considering initialization
   const effectiveValue = isInitialized ? currentValue : (currentValue ?? defaultValue);
 
-  // Handle change with validation
+  // Handle change - let Ant Design handle validation display
   const handleChange = useCallback(async (newValue) => {
     // Apply transform function if provided
     const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
 
-    // In form mode, validation is handled by the form, so we can skip async validation
+    // In form mode, skip all context validation - let Ant Design handle it
     if (formMode && updateValueOverride) {
-      try {
-        // Update form value directly - this will not touch the context
-        const result = updateValueOverride(effectivePath, actualValue);
-
-        // Clear any existing validation errors since form handles validation
-        setValidationState({
-          status: undefined,
-          message: null,
-          isValidating: false
-        });
-
-        return result;
-      } catch (error) {
-        console.error('Form field update error:', error);
-        return {
-          isValid: false,
-          applied: 0,
-          errors: ['Form update failed'],
-          error: 'Form update failed'
-        };
-      }
+      return updateValueOverride(effectivePath, actualValue);
     }
 
-    // Non-form mode: handle with full async validation and context updates
-    setValidationState(prev => ({
-      ...prev,
-      isValidating: true
-    }));
-
+    // Non-form mode: Update context directly
     try {
-      // Use the appropriate update method (this will update context)
-      const result = await updateValue(effectivePath, actualValue);
-
-      // Update validation state based on result
-      if (!result.isValid) {
-        setValidationState({
-          status: 'error',
-          message: result.error || 'Validation failed',
-          isValidating: false
-        });
-      } else {
-        // Clear validation state on success
-        setValidationState({
-          status: 'success',
-          message: null,
-          isValidating: false
-        });
-
-        // Clear success status after a short delay for better UX
-        setTimeout(() => {
-          setValidationState(prev => ({
-            ...prev,
-            status: undefined
-          }));
-        }, 1000);
-      }
-
-      return result;
+      await updateValue(effectivePath, actualValue);
     } catch (error) {
-      // Handle unexpected errors
-      setValidationState({
-        status: 'error',
-        message: 'An unexpected error occurred',
-        isValidating: false
-      });
-
-      console.error('ContextField validation error:', error);
-      return {
-        isValid: false,
-        applied: 0,
-        errors: ['An unexpected error occurred'],
-        error: 'An unexpected error occurred'
-      };
+      console.error('ContextField update error:', error);
     }
-  }, [effectivePath, updateValue, updateValueOverride, transform, formMode]);
+  }, [effectivePath, updateValueOverride, transform, formMode, updateValue]);
 
   // Enhanced default value initialization
   useEffect(() => {
@@ -204,24 +134,6 @@ export const ContextField = ({
     setIsInitialized(formMode); // In form mode, consider initialized immediately
   }, [effectivePath, formMode]);
 
-  // Clear validation state when value changes externally (not through this field)
-  useEffect(() => {
-    if (validationState.status === 'error' && !validationState.isValidating && isInitialized && !formMode) {
-      // If we have an error but the value has changed externally, clear the error
-      // This happens when the context is updated from elsewhere
-      // Skip this in form mode as the form handles validation
-      const timeoutId = setTimeout(() => {
-        setValidationState(prev => ({
-          ...prev,
-          status: undefined,
-          message: null
-        }));
-      }, 100);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [currentValue, validationState.status, validationState.isValidating, isInitialized, formMode]);
-
   // Debug border support
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
@@ -230,32 +142,18 @@ export const ContextField = ({
     margin: '1px'
   } : {};
 
-  // Map context validation to Ant Design validation props (skip in form mode)
-  const validationProps = formMode ? {} : {
-    validateStatus: validationState.status,
-    help: validationState.message,
-    hasFeedback: validationState.isValidating || validationState.status === 'success'
-  };
-
   // Handle required field validation display
   const effectiveRequired = required || (formItemProps.rules && formItemProps.rules.some(rule => rule.required));
 
-  // Combine all Form.Item props
+  // Combine all Form.Item props - let Ant Design handle all validation display
   const finalFormItemProps = {
     label,
     tooltip,
     required: effectiveRequired,
     name: formMode ? name : undefined, // Only set name in form mode
     style: debugBorders ? { ...formItemProps.style, ...debugStyle } : formItemProps.style,
-    ...validationProps,
-    ...formItemProps // This allows override of our defaults, but validation props take precedence
+    ...formItemProps // All Ant Design props pass through unchanged
   };
-
-  // Determine component status for visual feedback (skip in form mode)
-  const componentStatus = formMode ? undefined :
-    (validationState.status === 'error' ? 'error' :
-      validationState.status === 'validating' ? 'validating' :
-        undefined);
 
   // Don't render until initialization is complete to avoid flicker (except in form mode)
   if (!isInitialized && !formMode) {
@@ -265,10 +163,11 @@ export const ContextField = ({
           disabled={true}
           value={effectiveValue}
           onChange={() => { }} // No-op during initialization
-          status="validating"
           placeholder="Initializing..."
           {...(formItemProps.componentProps || {})}
-        />
+        >
+          {children}
+        </Component>
       </Form.Item>
     );
   }
@@ -279,9 +178,10 @@ export const ContextField = ({
         disabled={disabled}
         value={effectiveValue}
         onChange={handleChange}
-        status={componentStatus}
-        {...(formItemProps.componentProps || {})} // Allow passing props specifically to the component
-      />
+        {...(formItemProps.componentProps || {})}
+      >
+        {children}
+      </Component>
     </Form.Item>
   );
 };
