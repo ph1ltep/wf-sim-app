@@ -1,4 +1,4 @@
-// src/components/forms/ContextForm.jsx - Fixed validation and reset issues
+// src/components/forms/ContextForm.jsx - Fixed loading state reset
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Button, Space, Modal, Alert, message } from 'antd';
 import { ExclamationCircleOutlined, ReloadOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
@@ -49,14 +49,24 @@ const ContextForm = ({
 
     // Initialize form with context data - ALWAYS reset form
     const initializeForm = useCallback(() => {
+        // ALWAYS reset loading state on initialization
+        setLoading(false);
+
         let initialValue = getValueByPath(basePath);
 
         // Handle both direct object references and array indices
         if (initialValue === undefined || initialValue === null) {
-            if (basePath[basePath.length - 1] === 'temp_new_item') {
-                initialValue = {};
+            // Check if this looks like a new array item
+            const parentPath = basePath.slice(0, -1);
+            const itemIndex = basePath[basePath.length - 1];
+            const parentArray = getValueByPath(parentPath);
+
+            if (Array.isArray(parentArray) && typeof itemIndex === 'number' && itemIndex === parentArray.length) {
+                // This is a new array item - start with generated ID
+                initialValue = {
+                    id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+                };
             } else {
-                console.warn(`No value found at path: ${basePath.join('.')}`);
                 initialValue = {};
             }
         }
@@ -74,7 +84,7 @@ const ContextForm = ({
         // Reset all states to clean slate
         setHasUnsavedChanges(false);
         setValidationErrors([]);
-        setLoading(false); // Ensure loading is reset
+        setLoading(false); // Ensure loading is reset here too
         setIsInitialized(true);
     }, [basePath, getValueByPath, form]);
 
@@ -85,7 +95,7 @@ const ContextForm = ({
             form.setFieldsValue(initialValuesRef.current);
             setHasUnsavedChanges(false);
             setValidationErrors([]);
-            setLoading(false);
+            setLoading(false); // Reset loading state
         } else {
             initializeForm();
         }
@@ -93,6 +103,9 @@ const ContextForm = ({
 
     // Initialize form on mount and when path changes
     useEffect(() => {
+        // Reset loading state whenever path changes (new form instance)
+        setLoading(false);
+        setIsInitialized(false);
         initializeForm();
     }, [initializeForm]);
 
@@ -118,7 +131,9 @@ const ContextForm = ({
                 console.error('Ant Design validation failed in onFinish:', antdError);
                 // This shouldn't happen since onFinish only fires after validation passes
                 // but if it does, we stop here
-                setLoading(false);
+                if (mountedRef.current) {
+                    setLoading(false);
+                }
                 return;
             }
 
@@ -159,7 +174,7 @@ const ContextForm = ({
         ) || ['Please fix the validation errors above'];
 
         setValidationErrors(fieldErrors);
-        setLoading(false);
+        setLoading(false); // Ensure loading is cleared on validation failure
     };
 
     // Handle form cancellation with confirmation
@@ -334,11 +349,11 @@ const ContextForm = ({
         <Form
             form={form}
             onFinish={handleFinish}
-            onFinishFailed={handleFinishFailed} // Handle Ant Design validation failures
+            onFinishFailed={handleFinishFailed}
             onValuesChange={handleValuesChange}
             layout={formProps.layout || "vertical"}
             style={debugBorders ? { ...formProps.style, ...debugStyle } : formProps.style}
-            validateTrigger={['onChange', 'onBlur']} // Enable real-time validation
+            validateTrigger={['onChange', 'onBlur']}
             {...formProps}
         >
             {/* Validation error display */}
@@ -388,7 +403,6 @@ const ContextForm = ({
                                 icon={<SaveOutlined />}
                                 htmlType="submit"
                                 loading={loading}
-                            // Don't disable based on unsaved changes - let user try to save
                             >
                                 {submitText}
                                 {hasUnsavedChanges && ' *'}
