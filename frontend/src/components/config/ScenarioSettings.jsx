@@ -10,7 +10,9 @@ import {
   FormCol,
   TextField,
   SelectField,
-  TextAreaField
+  TextAreaField,
+  CompactFieldGroup,
+  ResponsiveFieldRow
 } from '../contextFields';
 
 const { Title } = Typography;
@@ -18,7 +20,7 @@ const { Title } = Typography;
 const ScenarioSettings = () => {
   // Base paths for scenario settings
   const scenarioPath = ['settings', 'scenario'];
-  
+
   // Get scenario context
   const { scenarioData, selectedLocation } = useScenario();
 
@@ -36,10 +38,10 @@ const ScenarioSettings = () => {
     return (
       <div>
         <Title level={2}>Scenario Settings</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -61,8 +63,8 @@ const ScenarioSettings = () => {
       )}
 
       <FormSection title="Basic Scenario Information">
-        <FormRow>
-          <FormCol>
+        <ResponsiveFieldRow layout="twoColumn">
+          <CompactFieldGroup direction="vertical" size="middle">
             <TextField
               path={[...scenarioPath, 'name']}
               label="Scenario Name"
@@ -70,22 +72,16 @@ const ScenarioSettings = () => {
               tooltip="Unique name for this scenario"
               required
             />
-          </FormCol>
-        </FormRow>
-        
-        <FormRow>
-          <FormCol>
             <TextAreaField
               path={[...scenarioPath, 'description']}
               label="Description"
               placeholder="Provide a brief description of this scenario"
-              rows={4}    
-              wrapperCol={{ span: 20 }}        
+              rows={4}
             />
-          </FormCol>
-        </FormRow>
+          </CompactFieldGroup>
+        </ResponsiveFieldRow>
       </FormSection>
-      
+
       {/* <FormSection title="Scenario Details">
         <FormRow>
           <FormCol>

@@ -3,6 +3,8 @@ import React from 'react';
 import { Input, InputNumber, Select, Switch, Radio, Checkbox, DatePicker, Slider } from 'antd';
 import { ContextField } from './ContextField';
 import { useScenario } from '../../contexts/ScenarioContext';
+import dayjs from 'dayjs';
+
 
 // Import layout components
 import {
@@ -282,16 +284,44 @@ export const DateField = ({
   path,
   label,
   tooltip,
+  format = 'YYYY-MM-DD',
   ...rest
-}) => (
-  <ContextField
-    path={path}
-    label={label}
-    tooltip={tooltip}
-    component={DatePicker}
-    {...rest}
-  />
-);
+}) => {
+  // Bidirectional transform object
+  const dateTransform = {
+    // Convert Date object FROM context TO dayjs for DatePicker
+    toDisplay: (value) => {
+      if (!value) return null;
+      if (value instanceof Date) return dayjs(value);
+      if (typeof value === 'string') return dayjs(value);
+      return value; // Already dayjs
+    },
+
+    // Convert dayjs FROM DatePicker TO Date object for context storage
+    toStorage: (value) => {
+      if (!value) return null;
+      if (value && typeof value === 'object' && value.toDate) {
+        return value.toDate(); // dayjs to Date
+      }
+      return value;
+    }
+  };
+
+  return (
+    <ContextField
+      path={path}
+      label={label}
+      tooltip={tooltip}
+      component={DatePicker}
+      transform={dateTransform}
+      componentProps={{
+        format,
+        style: { width: '100%' }
+      }}
+      {...rest}
+    />
+  );
+};
 
 // Slider Field
 export const SliderField = ({

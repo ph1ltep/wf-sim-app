@@ -1,11 +1,11 @@
-// src/components/contextFields/ContextField.jsx - Simplified using Ant Design's built-in validation
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+// src/components/contextFields/ContextField.jsx - Complete with customValidator support
+import React, { useCallback, useState } from 'react';
 import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
-// Enhanced ContextField with automatic path mapping and context isolation
+// In ContextField.jsx - Make transform bidirectional
 export const ContextField = ({
-  // Context-specific props (not passed to Form.Item)
+  // Context-specific props
   path,
   component: Component,
   transform,
@@ -13,128 +13,134 @@ export const ContextField = ({
   formMode = false,
   getValueOverride = null,
   updateValueOverride = null,
-  validators = [],
-  name, // Form.Item name for Ant Design integration
-  children, // Add children prop
+  name,
+  children,
 
-  // Form.Item props that we handle specially
+  // Custom validation function prop
+  customValidator,
+
+  // Form.Item props
   label,
   tooltip,
   required,
   disabled,
+  rules = [],
+  componentProps = {},
 
-  // All other props are forwarded to Form.Item
+  // All other props forwarded to Form.Item
   ...formItemProps
 }) => {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const initializationRef = useRef(false);
   const { getValueByPath, updateByPath } = useScenario();
+  const [directModeError, setDirectModeError] = useState(null);
 
-  // Determine the effective path for this field
-  const effectivePath = path;
-
-  // Use form overrides when in form mode, or context functions otherwise
-  const getValue = useCallback((fieldPath, fallback = null) => {
+  // Get current value based on mode
+  const getRawValue = useCallback(() => {
     if (formMode && getValueOverride) {
-      return getValueOverride(fieldPath, fallback);
-    }
-    return getValueByPath(fieldPath, fallback);
-  }, [formMode, getValueOverride, getValueByPath]);
-
-  const updateValue = useCallback(async (fieldPath, value) => {
-    if (formMode && updateValueOverride) {
-      // In form mode, prevent any context updates
-      return updateValueOverride(fieldPath, value);
-    }
-    // Only update context when not in form mode
-    return updateByPath(fieldPath, value);
-  }, [formMode, updateValueOverride, updateByPath]);
-
-  // Get current value - handle initialization state
-  const currentValue = getValue(effectivePath, null);
-
-  // Determine effective value considering initialization
-  const effectiveValue = isInitialized ? currentValue : (currentValue ?? defaultValue);
-
-  // Handle change - let Ant Design handle validation display
-  const handleChange = useCallback(async (newValue) => {
-    // Apply transform function if provided
-    const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
-
-    // In form mode, skip all context validation - let Ant Design handle it
-    if (formMode && updateValueOverride) {
-      return updateValueOverride(effectivePath, actualValue);
+      return getValueOverride(path, defaultValue);
     }
 
-    // Non-form mode: Update context directly
-    try {
-      await updateValue(effectivePath, actualValue);
-    } catch (error) {
-      console.error('ContextField update error:', error);
-    }
-  }, [effectivePath, updateValueOverride, transform, formMode, updateValue]);
+    const contextValue = getValueByPath(path);
 
-  // Enhanced default value initialization
-  useEffect(() => {
-    const initializeDefaultValue = async () => {
-      // Prevent multiple initializations
-      if (initializationRef.current) {
-        return;
+    // If context value doesn't exist and we have a default, initialize it immediately
+    if ((contextValue === undefined || contextValue === null) && defaultValue !== undefined) {
+      // Fire and forget - don't block rendering
+      updateByPath(path, defaultValue).catch(console.error);
+      return defaultValue;
+    }
+
+    return contextValue;
+  }, [formMode, getValueOverride, getValueByPath, path, defaultValue, updateByPath]);
+
+  // Transform value FOR DISPLAY (context -> component)
+  const getDisplayValue = useCallback(() => {
+    const rawValue = getRawValue();
+
+    // If transform function exists and has a toDisplay method, use it
+    if (transform && typeof transform === 'object' && transform.toDisplay) {
+      try {
+        return transform.toDisplay(rawValue);
+      } catch (error) {
+        console.error('Transform toDisplay error:', error);
+        return rawValue;
       }
+    }
 
-      const needsInitialization =
-        defaultValue !== undefined &&
-        defaultValue !== null &&
-        (currentValue === undefined || currentValue === null);
+    // If transform is a function, assume it's the old onChange transform
+    return rawValue;
+  }, [getRawValue, transform]);
 
-      if (needsInitialization && !formMode) {
-        // Only initialize in non-form mode
-        initializationRef.current = true;
+  // Transform value FOR STORAGE (component -> context)
+  const transformForStorage = useCallback((value) => {
+    // If transform function exists and has a toStorage method, use it
+    if (transform && typeof transform === 'object' && transform.toStorage) {
+      try {
+        return transform.toStorage(value);
+      } catch (error) {
+        console.error('Transform toStorage error:', error);
+        return value;
+      }
+    }
 
-        try {
-          // Initialize the path with default value
-          const result = await updateValue(effectivePath, defaultValue);
+    // If transform is a function, use it as before (backward compatibility)
+    if (transform && typeof transform === 'function') {
+      return transform(value);
+    }
 
-          if (result.isValid) {
-            setIsInitialized(true);
-          } else {
-            // If initialization fails, still mark as initialized to prevent loops
-            setIsInitialized(true);
-            console.warn(`Failed to initialize default value for path ${Array.isArray(effectivePath) ? effectivePath.join('.') : effectivePath}:`, result.error);
-          }
-        } catch (error) {
-          setIsInitialized(true);
-          console.error(`Error initializing default value for path ${Array.isArray(effectivePath) ? effectivePath.join('.') : effectivePath}:`, error);
+    // Handle event objects
+    return value?.target ? value.target.value : value;
+  }, [transform]);
+
+  // Validation logic stays the same...
+  const validateDirectMode = useCallback((value) => {
+    if (required) {
+      const isEmpty = value === undefined ||
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && value.trim() === '');
+
+      if (isEmpty) {
+        return `${label || 'This field'} is required`;
+      }
+    }
+
+    if (customValidator && typeof customValidator === 'function') {
+      try {
+        const customError = customValidator(value);
+        if (customError) {
+          return customError;
         }
-      } else {
-        // No initialization needed or in form mode
-        setIsInitialized(true);
+      } catch (error) {
+        console.error('Custom validator error:', error);
+        return 'Validation error';
       }
-    };
+    }
 
-    // In form mode, skip default value initialization as the form handles initial values
-    if (formMode) {
-      setIsInitialized(true);
+    return null;
+  }, [required, label, customValidator]);
+
+  const handleChange = useCallback((newValue) => {
+    const actualValue = transformForStorage(newValue);
+
+    if (formMode && updateValueOverride) {
+      updateValueOverride(path, actualValue);
       return;
     }
 
-    // Use requestAnimationFrame to ensure this runs after initial render
-    const rafId = requestAnimationFrame(() => {
-      initializeDefaultValue();
-    });
+    const validationError = validateDirectMode(actualValue);
 
-    return () => {
-      cancelAnimationFrame(rafId);
-    };
-  }, [effectivePath, defaultValue, currentValue, updateValue, formMode]);
+    if (validationError) {
+      setDirectModeError(validationError);
+      return;
+    }
 
-  // Reset initialization state when path changes
-  useEffect(() => {
-    initializationRef.current = false;
-    setIsInitialized(formMode); // In form mode, consider initialized immediately
-  }, [effectivePath, formMode]);
+    setDirectModeError(null);
+    updateByPath(path, actualValue).catch(console.error);
+  }, [path, transformForStorage, formMode, updateValueOverride, updateByPath, validateDirectMode]);
 
-  // Debug border support
+  // Get the display value
+  const currentValue = getDisplayValue();
+
+  // Debug styling
   const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
   const debugStyle = debugBorders ? {
     border: '1px dashed red',
@@ -142,43 +148,35 @@ export const ContextField = ({
     margin: '1px'
   } : {};
 
-  // Handle required field validation display
-  const effectiveRequired = required || (formItemProps.rules && formItemProps.rules.some(rule => rule.required));
+  // Build rules array for form mode
+  const finalRules = [...rules];
+  if (required) {
+    finalRules.push({
+      required: true,
+      message: `${label || 'This field'} is required`
+    });
+  }
 
-  // Combine all Form.Item props - let Ant Design handle all validation display
+  // Form.Item props
   const finalFormItemProps = {
     label,
     tooltip,
-    required: effectiveRequired,
-    name: formMode ? name : undefined, // Only set name in form mode
+    required,
+    name: formMode ? name : undefined,
+    rules: formMode ? (finalRules.length > 0 ? finalRules : undefined) : undefined,
+    validateStatus: !formMode && directModeError ? 'error' : undefined,
+    help: !formMode && directModeError ? directModeError : undefined,
     style: debugBorders ? { ...formItemProps.style, ...debugStyle } : formItemProps.style,
-    ...formItemProps // All Ant Design props pass through unchanged
+    ...formItemProps
   };
-
-  // Don't render until initialization is complete to avoid flicker (except in form mode)
-  if (!isInitialized && !formMode) {
-    return (
-      <Form.Item {...finalFormItemProps}>
-        <Component
-          disabled={true}
-          value={effectiveValue}
-          onChange={() => { }} // No-op during initialization
-          placeholder="Initializing..."
-          {...(formItemProps.componentProps || {})}
-        >
-          {children}
-        </Component>
-      </Form.Item>
-    );
-  }
 
   return (
     <Form.Item {...finalFormItemProps}>
       <Component
+        {...componentProps}
         disabled={disabled}
-        value={effectiveValue}
+        value={currentValue}
         onChange={handleChange}
-        {...(formItemProps.componentProps || {})}
       >
         {children}
       </Component>

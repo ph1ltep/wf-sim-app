@@ -1,4 +1,4 @@
-// src/components/forms/ContextForm.jsx - Final simplified implementation with form actions
+// src/components/forms/ContextForm.jsx - Fixed validation and reset issues
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Button, Space, Modal, Alert, message } from 'antd';
 import { ExclamationCircleOutlined, ReloadOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
@@ -7,19 +7,6 @@ import { get } from 'lodash';
 
 const { confirm } = Modal;
 
-/**
- * ContextForm - Simplified form with context integration and basic validation
- * 
- * @param {string[]|string} path - Base path in the context for this form
- * @param {Function} onSubmit - Callback when form is submitted successfully
- * @param {Function} onCancel - Callback when form is cancelled
- * @param {React.ReactNode} children - Form field components
- * @param {string} submitText - Text for submit button
- * @param {string} cancelText - Text for cancel button
- * @param {boolean} showActions - Whether to show action buttons
- * @param {boolean} confirmOnCancel - Whether to show confirmation when cancelling with unsaved changes
- * @param {Object} formProps - Props to pass to the Ant Design Form component
- */
 const ContextForm = ({
     path,
     onSubmit,
@@ -60,7 +47,7 @@ const ContextForm = ({
         return fieldPathArray;
     }, [basePath]);
 
-    // Initialize form with context data (always on mount)
+    // Initialize form with context data - ALWAYS reset form
     const initializeForm = useCallback(() => {
         let initialValue = getValueByPath(basePath);
 
@@ -80,21 +67,25 @@ const ContextForm = ({
         // Store initial values for comparison
         initialValuesRef.current = initialValues;
 
-        // Set form values
+        // ALWAYS reset form fields - this ensures clean state on reopen
+        form.resetFields();
         form.setFieldsValue(initialValues);
 
-        // Reset states
+        // Reset all states to clean slate
         setHasUnsavedChanges(false);
         setValidationErrors([]);
+        setLoading(false); // Ensure loading is reset
         setIsInitialized(true);
     }, [basePath, getValueByPath, form]);
 
     // Reset form to initial state
     const resetForm = useCallback(() => {
         if (initialValuesRef.current) {
+            form.resetFields();
             form.setFieldsValue(initialValuesRef.current);
             setHasUnsavedChanges(false);
             setValidationErrors([]);
+            setLoading(false);
         } else {
             initializeForm();
         }
@@ -112,32 +103,40 @@ const ContextForm = ({
         };
     }, []);
 
-    // FAL-1: Use Ant Design Form's onFinish for submission
+    // Handle form submission with proper Ant Design validation FIRST
     const handleFinish = async (values) => {
         try {
             setLoading(true);
             setValidationErrors([]);
 
-            // FAL-2: Implement batched context updates on form submission only
+            // This should never be called if Ant Design validation fails
+            // but let's double-check by explicitly validating
+            try {
+                const validatedValues = await form.validateFields();
+                console.log('Ant Design validation passed:', validatedValues);
+            } catch (antdError) {
+                console.error('Ant Design validation failed in onFinish:', antdError);
+                // This shouldn't happen since onFinish only fires after validation passes
+                // but if it does, we stop here
+                setLoading(false);
+                return;
+            }
+
+            // Now proceed with schema validation via updateByPath
             const result = await updateByPath(basePath, values);
 
             if (result.isValid) {
-                // Update initial values to reflect successful save
+                // Success path
                 initialValuesRef.current = JSON.parse(JSON.stringify(values));
-
-                // Reset states
                 setHasUnsavedChanges(false);
-
-                // Show success message
                 message.success('Changes saved successfully');
 
-                // FAL-4: Maintain custom onSubmit callback support
                 if (onSubmit) {
                     onSubmit(values);
                 }
             } else {
-                // Display validation errors from updateByPath
-                const errors = result.errors || [result.error || 'Validation failed'];
+                // Schema validation failed
+                const errors = result.errors || [result.error || 'Schema validation failed'];
                 setValidationErrors(errors);
             }
         } catch (error) {
@@ -150,11 +149,23 @@ const ContextForm = ({
         }
     };
 
+    // Make sure onFinishFailed is properly handling validation failures
+    const handleFinishFailed = (errorInfo) => {
+        console.log('Ant Design validation failed - onFinish should not be called:', errorInfo);
+
+        // Extract field errors
+        const fieldErrors = errorInfo.errorFields?.map(field =>
+            `${field.name.join('.')}: ${field.errors.join(', ')}`
+        ) || ['Please fix the validation errors above'];
+
+        setValidationErrors(fieldErrors);
+        setLoading(false);
+    };
+
     // Handle form cancellation with confirmation
     const handleCancel = useCallback(() => {
         const performCancel = () => {
             resetForm();
-            // FAL-4: Maintain custom onCancel callback support
             if (onCancel) {
                 onCancel();
             }
@@ -175,7 +186,7 @@ const ContextForm = ({
         }
     }, [hasUnsavedChanges, confirmOnCancel, resetForm, onCancel]);
 
-    // FAL-3: Support Ant Design Form's reset method
+    // Handle reset with confirmation
     const handleReset = useCallback(() => {
         if (hasUnsavedChanges) {
             confirm({
@@ -186,28 +197,13 @@ const ContextForm = ({
                 okType: 'danger',
                 cancelText: 'Cancel',
                 onOk: () => {
-                    form.resetFields();
                     resetForm();
                 }
             });
         } else {
-            form.resetFields();
             resetForm();
         }
-    }, [hasUnsavedChanges, resetForm, form]);
-
-    // FAL-3: Support Ant Design Form's validate method
-    const validateFields = useCallback(async () => {
-        try {
-            const values = await form.validateFields();
-            return { isValid: true, values };
-        } catch (errorInfo) {
-            const errors = errorInfo.errorFields?.map(field =>
-                `${field.name.join('.')}: ${field.errors.join(', ')}`
-            ) || ['Form validation failed'];
-            return { isValid: false, errors };
-        }
-    }, [form]);
+    }, [hasUnsavedChanges, resetForm]);
 
     // Handle form value changes
     const handleValuesChange = useCallback((changedValues, allValues) => {
@@ -316,29 +312,6 @@ const ContextForm = ({
         });
     };
 
-    // Expose form methods for external access (FAL-3)
-    const formRef = useCallback((instance) => {
-        if (instance && formProps.ref) {
-            if (typeof formProps.ref === 'function') {
-                formProps.ref({
-                    ...instance,
-                    validateContextFields: validateFields,
-                    resetToInitial: resetForm,
-                    getInitialValues: () => initialValuesRef.current,
-                    hasUnsavedChanges: () => hasUnsavedChanges
-                });
-            } else {
-                formProps.ref.current = {
-                    ...instance,
-                    validateContextFields: validateFields,
-                    resetToInitial: resetForm,
-                    getInitialValues: () => initialValuesRef.current,
-                    hasUnsavedChanges: () => hasUnsavedChanges
-                };
-            }
-        }
-    }, [formProps.ref, validateFields, resetForm, hasUnsavedChanges]);
-
     // Debug border support
     const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
     const debugStyle = debugBorders ? {
@@ -360,14 +333,15 @@ const ContextForm = ({
     return (
         <Form
             form={form}
-            ref={formRef}
             onFinish={handleFinish}
+            onFinishFailed={handleFinishFailed} // Handle Ant Design validation failures
             onValuesChange={handleValuesChange}
             layout={formProps.layout || "vertical"}
             style={debugBorders ? { ...formProps.style, ...debugStyle } : formProps.style}
+            validateTrigger={['onChange', 'onBlur']} // Enable real-time validation
             {...formProps}
         >
-            {/* Simple validation error display */}
+            {/* Validation error display */}
             {validationErrors.length > 0 && (
                 <Alert
                     message="Validation Errors"
@@ -414,6 +388,7 @@ const ContextForm = ({
                                 icon={<SaveOutlined />}
                                 htmlType="submit"
                                 loading={loading}
+                            // Don't disable based on unsaved changes - let user try to save
                             >
                                 {submitText}
                                 {hasUnsavedChanges && ' *'}

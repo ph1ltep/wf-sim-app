@@ -23,7 +23,8 @@ import {
   ResponsiveFieldRow,
   FormDivider,
   FieldGroup,
-  CompactFieldGroup
+  CompactFieldGroup,
+  FieldCard
 } from '../contextFields';
 
 const { Title } = Typography;
@@ -237,148 +238,149 @@ const ProjectSettings = () => {
       />
 
       {/* Project Identification */}
-      <FormSection title="Project Identification">
-        <ResponsiveFieldRow layout="twoColumn">
-          <TextField
-            path={[...generalPath, 'projectName']}
-            label="Project Name"
-            tooltip="Name of the wind farm project"
-            placeholder="e.g., Windward Valley Wind Farm"
-            required
-          />
-          <DateField
-            path={[...generalPath, 'startDate']}
-            label="Project Start Date"
-            required
-          />
-        </ResponsiveFieldRow>
-      </FormSection>
+      <FieldCard >
+        <FormSection title="Project Identification">
+          <ResponsiveFieldRow layout="twoColumn">
+            <TextField
+              path={[...generalPath, 'projectName']}
+              label="Project Name"
+              tooltip="Name of the wind farm project"
+              placeholder="e.g., Windward Valley Wind Farm"
+              required
+            />
+            <DateField
+              path={[...generalPath, 'startDate']}
+              label="Project Start Date"
+              required
+            />
+          </ResponsiveFieldRow>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
 
-      {/* Project Timeline */}
-      <FormSection title="Project Timeline">
-        <ResponsiveFieldRow layout="oneColumn">
-          <NumberField
-            path={[...generalPath, 'projectLife']}
-            label="Project Life (Years)"
-            tooltip="The total operational lifetime of the wind farm project"
-            min={1}
-            max={50}
-            required
-          />
-        </ResponsiveFieldRow>
-      </FormSection>
+        {/* Project Timeline */}
+        <FormSection title="Project Timeline">
+          <ResponsiveFieldRow layout="oneColumn">
+            <NumberField
+              path={[...generalPath, 'projectLife']}
+              label="Project Life (Years)"
+              tooltip="The total operational lifetime of the wind farm project"
+              min={1}
+              max={50}
+              required
+            />
+          </ResponsiveFieldRow>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
+        {/* Currency Settings */}
+        <FormSection title="Currency Settings">
+          <CompactFieldGroup direction="vertical" size="middle">
+            <SelectField
+              path={[...currencyPath, 'local']}
+              label={
+                fieldsFromLocations.currency ?
+                  <>Local Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Local Currency"
+              }
+              options={currencyOptions}
+              required
+            />
+            <SelectField
+              path={[...currencyPath, 'foreign']}
+              label={
+                fieldsFromLocations.foreignCurrency ?
+                  <>Foreign Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Foreign Currency"
+              }
+              options={currencyOptions}
+              required
+            />
+            <NumberField
+              path={[...currencyPath, 'exchangeRate']}
+              label={
+                fieldsFromLocations.exchangeRate ?
+                  <>Foreign/Local Exchange Rate <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Foreign/Local Exchange Rate"
+              }
+              tooltip="Enter rate as: 1 foreign currency = ? local currency"
+              min={0}
+              step={0.01}
+              required
+            />
+          </CompactFieldGroup>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
+        {/* Wind Farm Specifications */}
+        <FormSection title="Wind Farm Specifications">
+          <ResponsiveFieldRow layout="threeColumn">
+            <NumberField
+              path={[...windFarmPath, 'numWTGs']}
+              label="Number of WTGs"
+              tooltip="Number of wind turbine generators in the project"
+              min={1}
+              step={1}
+              required
+            />
+            <NumberField
+              path={[...windFarmPath, 'mwPerWTG']}
+              label="Megawatts per WTG"
+              tooltip="Nameplate capacity of each wind turbine in megawatts"
+              min={0.1}
+              step={0.1}
+              precision={2}
+              required
+            />
+            <SelectField
+              path={[...windFarmPath, 'wtgPlatformType']}
+              label="WTG Platform Type"
+              tooltip="Type of wind turbine generator platform"
+              options={[
+                { value: 'geared', label: 'Geared' },
+                { value: 'direct-drive', label: 'Direct Drive' }
+              ]}
+              required
+            />
+          </ResponsiveFieldRow>
+          <ResponsiveFieldRow layout="oneColumn">
+            <NumberField
+              path={[...windFarmPath, 'capacityFactor']}
+              label={
+                fieldsFromLocations.capacityFactor ?
+                  <>Capacity Factor (%) <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Capacity Factor (%)"
+              }
+              tooltip="Expected capacity factor as a percentage of nameplate capacity"
+              min={1}
+              max={60}
+              step={0.5}
+              precision={1}
+              required
+            />
+          </ResponsiveFieldRow>
 
-      {/* Currency Settings */}
-      <FormSection title="Currency Settings">
-        <CompactFieldGroup direction="vertical" size="middle">
-          <SelectField
-            path={[...currencyPath, 'local']}
-            label={
-              fieldsFromLocations.currency ?
-                <>Local Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                "Local Currency"
-            }
-            options={currencyOptions}
-            required
-          />
-          <SelectField
-            path={[...currencyPath, 'foreign']}
-            label={
-              fieldsFromLocations.foreignCurrency ?
-                <>Foreign Currency <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                "Foreign Currency"
-            }
-            options={currencyOptions}
-            required
-          />
-          <NumberField
-            path={[...currencyPath, 'exchangeRate']}
-            label={
-              fieldsFromLocations.exchangeRate ?
-                <>Foreign/Local Exchange Rate <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                "Foreign/Local Exchange Rate"
-            }
-            tooltip="Enter rate as: 1 foreign currency = ? local currency"
-            min={0}
-            step={0.01}
-            required
-          />
-        </CompactFieldGroup>
-      </FormSection>
+          <FormDivider margin="small" orientation="left"></FormDivider>
 
-      {/* Wind Farm Specifications */}
-      <FormSection title="Wind Farm Specifications">
-        <ResponsiveFieldRow layout="threeColumn">
-          <NumberField
-            path={[...windFarmPath, 'numWTGs']}
-            label="Number of WTGs"
-            tooltip="Number of wind turbine generators in the project"
-            min={1}
-            step={1}
-            required
-          />
-          <NumberField
-            path={[...windFarmPath, 'mwPerWTG']}
-            label="Megawatts per WTG"
-            tooltip="Nameplate capacity of each wind turbine in megawatts"
-            min={0.1}
-            step={0.1}
-            precision={2}
-            required
-          />
-          <SelectField
-            path={[...windFarmPath, 'wtgPlatformType']}
-            label="WTG Platform Type"
-            tooltip="Type of wind turbine generator platform"
-            options={[
-              { value: 'geared', label: 'Geared' },
-              { value: 'direct-drive', label: 'Direct Drive' }
-            ]}
-            required
-          />
-        </ResponsiveFieldRow>
-
-        <ResponsiveFieldRow layout="oneColumn">
-          <NumberField
-            path={[...windFarmPath, 'capacityFactor']}
-            label={
-              fieldsFromLocations.capacityFactor ?
-                <>Capacity Factor (%) <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                "Capacity Factor (%)"
-            }
-            tooltip="Expected capacity factor as a percentage of nameplate capacity"
-            min={1}
-            max={60}
-            step={0.5}
-            precision={1}
-            required
-          />
-        </ResponsiveFieldRow>
-
-        <FormDivider margin="small" orientation="left">Energy Losses</FormDivider>
-
-        <ResponsiveFieldRow layout="twoColumn">
-          <PercentageField
-            path={[...windFarmPath, 'curtailmentLosses']}
-            label="Curtailment Losses"
-            tooltip="Energy losses due to grid curtailment or operational restrictions"
-            min={0}
-            max={30}
-            step={0.5}
-            precision={1}
-          />
-          <PercentageField
-            path={[...windFarmPath, 'electricalLosses']}
-            label="Electrical Losses"
-            tooltip="Energy losses in electrical systems, transformers, and transmission"
-            min={0}
-            max={15}
-            step={0.5}
-            precision={1}
-          />
-        </ResponsiveFieldRow>
-      </FormSection>
-
+          <ResponsiveFieldRow layout="twoColumn">
+            <PercentageField
+              path={[...windFarmPath, 'curtailmentLosses']}
+              label="Curtailment Losses"
+              tooltip="Energy losses due to grid curtailment or operational restrictions"
+              min={0}
+              max={30}
+              step={0.5}
+              precision={1}
+            />
+            <PercentageField
+              path={[...windFarmPath, 'electricalLosses']}
+              label="Electrical Losses"
+              tooltip="Energy losses in electrical systems, transformers, and transmission"
+              min={0}
+              max={15}
+              step={0.5}
+              precision={1}
+            />
+          </ResponsiveFieldRow>
+        </FormSection>
+      </FieldCard>
       {/* Project Metrics */}
       <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>
