@@ -5,6 +5,7 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
 import { getAllLocations } from '../../api/locations';
 
+
 // Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
 import ProjectMetrics from './projectSettings/ProjectMetrics';
@@ -18,7 +19,12 @@ import {
   NumberField,
   SelectField,
   DateField,
-  PercentageField
+  PercentageField,
+  ResponsiveFieldRow,
+  FormDivider,
+  FieldGroup,
+  CompactFieldGroup,
+  FieldCard
 } from '../contextFields';
 
 const { Title } = Typography;
@@ -232,9 +238,9 @@ const ProjectSettings = () => {
       />
 
       {/* Project Identification */}
-      <FormSection title="Project Identification">
-        <FormRow>
-          <FormCol span={16}>
+      <FieldCard >
+        <FormSection title="Project Identification">
+          <ResponsiveFieldRow layout="twoColumn">
             <TextField
               path={[...generalPath, 'projectName']}
               label="Project Name"
@@ -242,21 +248,18 @@ const ProjectSettings = () => {
               placeholder="e.g., Windward Valley Wind Farm"
               required
             />
-          </FormCol>
-          <FormCol span={8}>
             <DateField
               path={[...generalPath, 'startDate']}
               label="Project Start Date"
               required
             />
-          </FormCol>
-        </FormRow>
-      </FormSection>
+          </ResponsiveFieldRow>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
 
-      {/* Project Timeline */}
-      <FormSection title="Project Timeline">
-        <FormRow>
-          <FormCol span={8}>
+        {/* Project Timeline */}
+        <FormSection title="Project Timeline">
+          <ResponsiveFieldRow layout="oneColumn">
             <NumberField
               path={[...generalPath, 'projectLife']}
               label="Project Life (Years)"
@@ -265,14 +268,12 @@ const ProjectSettings = () => {
               max={50}
               required
             />
-          </FormCol>
-        </FormRow>
-      </FormSection>
-
-      {/* Currency Settings */}
-      <FormSection title="Currency Settings">
-        <FormRow>
-          <FormCol span={8}>
+          </ResponsiveFieldRow>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
+        {/* Currency Settings */}
+        <FormSection title="Currency Settings">
+          <CompactFieldGroup direction="vertical" size="middle">
             <SelectField
               path={[...currencyPath, 'local']}
               label={
@@ -283,8 +284,6 @@ const ProjectSettings = () => {
               options={currencyOptions}
               required
             />
-          </FormCol>
-          <FormCol span={8}>
             <SelectField
               path={[...currencyPath, 'foreign']}
               label={
@@ -295,8 +294,6 @@ const ProjectSettings = () => {
               options={currencyOptions}
               required
             />
-          </FormCol>
-          <FormCol span={8}>
             <NumberField
               path={[...currencyPath, 'exchangeRate']}
               label={
@@ -309,14 +306,12 @@ const ProjectSettings = () => {
               step={0.01}
               required
             />
-          </FormCol>
-        </FormRow>
-      </FormSection>
-
-      {/* Wind Farm Specifications */}
-      <FormSection title="Wind Farm Specifications">
-        <FormRow>
-          <FormCol span={8}>
+          </CompactFieldGroup>
+        </FormSection>
+        <FormDivider margin="small" orientation="left"></FormDivider>
+        {/* Wind Farm Specifications */}
+        <FormSection title="Wind Farm Specifications">
+          <ResponsiveFieldRow layout="threeColumn">
             <NumberField
               path={[...windFarmPath, 'numWTGs']}
               label="Number of WTGs"
@@ -325,8 +320,6 @@ const ProjectSettings = () => {
               step={1}
               required
             />
-          </FormCol>
-          <FormCol span={8}>
             <NumberField
               path={[...windFarmPath, 'mwPerWTG']}
               label="Megawatts per WTG"
@@ -336,8 +329,6 @@ const ProjectSettings = () => {
               precision={2}
               required
             />
-          </FormCol>
-          <FormCol span={8}>
             <SelectField
               path={[...windFarmPath, 'wtgPlatformType']}
               label="WTG Platform Type"
@@ -348,17 +339,14 @@ const ProjectSettings = () => {
               ]}
               required
             />
-          </FormCol>
-        </FormRow>
-
-        <FormRow>
-          <FormCol span={8}>
-            <PercentageField
+          </ResponsiveFieldRow>
+          <ResponsiveFieldRow layout="oneColumn">
+            <NumberField
               path={[...windFarmPath, 'capacityFactor']}
               label={
                 fieldsFromLocations.capacityFactor ?
-                  <>Capacity Factor <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                  "Capacity Factor"
+                  <>Capacity Factor (%) <GlobalOutlined style={{ color: '#1890ff' }} /></> :
+                  "Capacity Factor (%)"
               }
               tooltip="Expected capacity factor as a percentage of nameplate capacity"
               min={1}
@@ -367,11 +355,11 @@ const ProjectSettings = () => {
               precision={1}
               required
             />
-          </FormCol>
-        </FormRow>
+          </ResponsiveFieldRow>
 
-        <FormRow>
-          <FormCol span={12}>
+          <FormDivider margin="small" orientation="left"></FormDivider>
+
+          <ResponsiveFieldRow layout="twoColumn">
             <PercentageField
               path={[...windFarmPath, 'curtailmentLosses']}
               label="Curtailment Losses"
@@ -381,8 +369,6 @@ const ProjectSettings = () => {
               step={0.5}
               precision={1}
             />
-          </FormCol>
-          <FormCol span={12}>
             <PercentageField
               path={[...windFarmPath, 'electricalLosses']}
               label="Electrical Losses"
@@ -392,10 +378,9 @@ const ProjectSettings = () => {
               step={0.5}
               precision={1}
             />
-          </FormCol>
-        </FormRow>
-      </FormSection>
-
+          </ResponsiveFieldRow>
+        </FormSection>
+      </FieldCard>
       {/* Project Metrics */}
       <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>

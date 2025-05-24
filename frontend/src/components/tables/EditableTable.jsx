@@ -1,6 +1,6 @@
-// src/components/tables/EditableTable.jsx - Modified version
+// src/components/tables/EditableTable.jsx - Always include hidden ID field
 import React, { useState, useCallback } from 'react';
-import { Table, Button, Modal, Alert, Space } from 'antd';
+import { Table, Button, Modal, Alert, Space, Form, Input } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import ContextForm from '../forms/ContextForm';
@@ -32,7 +32,7 @@ const EditableTable = ({
   showSummary = false,
   renderSummary = null,
 
-  // Form layout props - NEW
+  // Form layout props
   formLayout = 'vertical',
   formCompact = false,
   formResponsive = false,
@@ -55,6 +55,13 @@ const EditableTable = ({
   // Get data safely - ensure it's always an array
   const dataFromContext = getValueByPath(path, null);
   const dataSource = Array.isArray(dataFromContext) ? dataFromContext : [];
+
+  // Generate a unique ID for new items
+  const generateUniqueId = useCallback(() => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).slice(2, 9);
+    return `${itemName.toLowerCase()}_${timestamp}_${random}`;
+  }, [itemName]);
 
   // Handle adding new item
   const handleAdd = useCallback(() => {
@@ -82,38 +89,30 @@ const EditableTable = ({
     }
   }, [dataSource, path, updateByPath]);
 
-  // Handle saving changes
+  // Handle saving changes - Generate ID for new items before validation
   const handleSave = useCallback((formValues) => {
     try {
       const newArray = [...dataSource];
 
-      if (editingItemIndex !== null) {
-        // If editing an existing item, the context is already updated
-        // We just need to close the modal
-      } else {
-        // For new items, we need to add to the array
-        let newItem = {
-          [keyField]: `${itemName.toLowerCase()}_${Date.now()}`, // Set id FIRST
+      if (editingItemIndex !== null && editingItemIndex >= 0) {
+        // Editing existing item - update in place
+        newArray[editingItemIndex] = {
+          ...newArray[editingItemIndex],
           ...formValues
         };
-        //const newItem = formValues;
-
-        // Generate a unique ID if needed
-        if (keyField && !newItem[keyField]) {
-          newItem[keyField] = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        }
-
-        newArray.push(newItem);
-        updateByPath(path, newArray);
+      } else {
+        // Adding new item - the ID should already be in formValues from hidden field
+        newArray.push(formValues);
       }
 
+      updateByPath(path, newArray);
       setModalVisible(false);
       setEditingItemIndex(null);
     } catch (error) {
       console.error("Save error:", error);
       setError(`Error: ${error.message || "Failed to save"}`);
     }
-  }, [dataSource, editingItemIndex, keyField, path, updateByPath]);
+  }, [dataSource, editingItemIndex, path, updateByPath]);
 
   // Handle modal cancel
   const handleCancel = useCallback(() => {
@@ -177,7 +176,7 @@ const EditableTable = ({
   // Calculate modal width based on layout
   const getModalWidth = () => {
     if (modalProps.width) return modalProps.width;
-    
+
     // Adjust modal width based on form layout
     switch (formLayout) {
       case 'horizontal':
@@ -186,6 +185,24 @@ const EditableTable = ({
         return formCompact ? 500 : 700;
       default: // vertical
         return formCompact ? 400 : 520;
+    }
+  };
+
+  // Determine if we're in add mode
+  const isAddMode = editingItemIndex === null;
+  const formPath = isAddMode
+    ? [...path, dataSource.length]
+    : [...path, editingItemIndex];
+
+  // Get the initial ID value
+  const getInitialIdValue = () => {
+    if (isAddMode) {
+      // Add mode: generate new ID
+      return generateUniqueId();
+    } else {
+      // Edit mode: use existing ID from the record
+      const existingRecord = dataSource[editingItemIndex];
+      return existingRecord?.[keyField] || generateUniqueId();
     }
   };
 
@@ -230,7 +247,7 @@ const EditableTable = ({
 
       {/* Add/Edit Modal */}
       <Modal
-        title={editingItemIndex !== null ? `Edit ${itemName}` : `Add ${itemName}`}
+        title={isAddMode ? `Add ${itemName}` : `Edit ${itemName}`}
         open={modalVisible}
         onCancel={handleCancel}
         footer={null}
@@ -238,10 +255,8 @@ const EditableTable = ({
         {...modalProps}
       >
         <ContextForm
-          path={editingItemIndex !== null
-            ? [...path, editingItemIndex]
-            : [...path, 'temp_new_item']
-          }
+          key={`${isAddMode ? 'add' : 'edit'}-${editingItemIndex}`}
+          path={formPath}
           onSubmit={handleSave}
           onCancel={handleCancel}
           layout={formLayout}
@@ -251,6 +266,15 @@ const EditableTable = ({
           wrapperCol={formWrapperCol}
           {...formProps}
         >
+          {/* Always include hidden ID field - populated based on mode */}
+          <Form.Item
+            name={keyField}
+            initialValue={getInitialIdValue()}
+            style={{ display: 'none' }}
+          >
+            <Input type="hidden" />
+          </Form.Item>
+
           {formFields}
 
           {error && (

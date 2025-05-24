@@ -1,192 +1,185 @@
-// src/components/contextFields/ContextField.jsx - Modified version
-import React, { useState, useCallback, useEffect } from 'react';
-import { Form, Tooltip } from 'antd';
+// src/components/contextFields/ContextField.jsx - Complete with customValidator support
+import React, { useCallback, useState } from 'react';
+import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
-// Enhanced ContextField with formMode and layout support
+// In ContextField.jsx - Make transform bidirectional
 export const ContextField = ({
+  // Context-specific props
   path,
-  label,
   component: Component,
-  tooltip,
-  required,
-  disabled,
-  validators = [], // Custom validators
-  transform, // Optional transform function for the input value
-  defaultValue, // Added explicit support for defaultValue
-
-  // New props for form mode
+  transform,
+  defaultValue,
   formMode = false,
   getValueOverride = null,
   updateValueOverride = null,
+  name,
+  children,
 
-  // New props for layout support
-  layout,
-  compact = false,
-  responsive = false,
-  formItemStyle = {},
+  // Custom validation function prop
+  customValidator,
 
-  ...rest
+  // Form.Item props
+  label,
+  tooltip,
+  required,
+  disabled,
+  rules = [],
+  componentProps = {},
+
+  // All other props forwarded to Form.Item
+  ...formItemProps
 }) => {
-  const [error, setError] = useState(null);
   const { getValueByPath, updateByPath } = useScenario();
+  const [directModeError, setDirectModeError] = useState(null);
 
-  // Use provided overrides when in form mode, or context functions otherwise
-  const getValue = formMode && getValueOverride ? getValueOverride : getValueByPath;
-  const updateValue = formMode && updateValueOverride ? updateValueOverride : updateByPath;
-
-  // Get current value using the correct path handling
-  console.log('ContextField - formMode:', formMode, 'path:', path);
-  const value = getValue(path, null);
-  console.log('ContextField - got value:', value);
-
-  // Handle change with validation
-  const handleChange = useCallback(async (newValue) => {
-    // Apply transform function if provided (e.g., for checkbox which returns event)
-    const actualValue = transform ? transform(newValue) : (newValue && newValue.target ? newValue.target.value : newValue);
-
-    // Use the appropriate update method
-    const result = await updateValue(path, actualValue);
-
-    if (!result.isValid) {
-      setError(result.error);
-    } else {
-      setError(null);
+  // Get current value based on mode
+  const getRawValue = useCallback(() => {
+    if (formMode && getValueOverride) {
+      return getValueOverride(path, defaultValue);
     }
 
-    return result;
-  }, [path, updateValue, transform]);
+    const contextValue = getValueByPath(path);
 
-  // Initialize with defaultValue if current value is null/undefined and defaultValue is provided
-  useEffect(() => {
-    const shouldInitialize =
-      defaultValue !== undefined &&
-      defaultValue !== null &&
-      (value === undefined || value === null);
-
-    if (shouldInitialize && !disabled) {
-      // Use a small timeout to ensure this doesn't interfere with other initialization
-      const timeoutId = setTimeout(() => {
-        handleChange(defaultValue);
-      }, 0);
-
-      return () => clearTimeout(timeoutId);
+    // If context value doesn't exist and we have a default, initialize it immediately
+    if ((contextValue === undefined || contextValue === null) && defaultValue !== undefined) {
+      // Fire and forget - don't block rendering
+      updateByPath(path, defaultValue).catch(console.error);
+      return defaultValue;
     }
-  }, [defaultValue, value, handleChange, disabled]);
 
-  // Simplified label rendering - no truncation
-  const renderLabel = () => {
-    return label;
-  };
+    return contextValue;
+  }, [formMode, getValueOverride, getValueByPath, path, defaultValue, updateByPath]);
 
-  // Debug border styling - controlled by environment variable
-  const getDebugStyle = () => {
-    if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-      return {
-        ...formItemStyle,
-        border: '1px solid #52c41a',
-        borderRadius: '2px',
-        padding: '4px',
-        margin: '2px 0'
-      };
+  // Transform value FOR DISPLAY (context -> component)
+  const getDisplayValue = useCallback(() => {
+    const rawValue = getRawValue();
+
+    // If transform function exists and has a toDisplay method, use it
+    if (transform && typeof transform === 'object' && transform.toDisplay) {
+      try {
+        return transform.toDisplay(rawValue);
+      } catch (error) {
+        console.error('Transform toDisplay error:', error);
+        return rawValue;
+      }
     }
-    return formItemStyle;
-  };
 
-  // Custom horizontal layout for better control
-  if (layout === 'horizontal') {
-    const containerStyle = {
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '8px',
-      marginBottom: compact ? '12px' : '16px',
-      width: '100%', // Ensure full width usage
-      ...getDebugStyle()
-    };
+    // If transform is a function, assume it's the old onChange transform
+    return rawValue;
+  }, [getRawValue, transform]);
 
-    const labelStyle = {
-      flexShrink: 0,
-      paddingTop: '4px', // Align with input field
-      paddingRight: '8px',
-      fontSize: '14px',
-      lineHeight: '1.5',
-      color: error ? '#ff4d4f' : undefined,
-      // Removed whiteSpace: 'nowrap' to allow natural wrapping
-      wordBreak: 'break-word', // Allow breaking long words if needed
-      minWidth: 'auto' // Let label size naturally
-    };
+  // Transform value FOR STORAGE (component -> context)
+  const transformForStorage = useCallback((value) => {
+    // If transform function exists and has a toStorage method, use it
+    if (transform && typeof transform === 'object' && transform.toStorage) {
+      try {
+        return transform.toStorage(value);
+      } catch (error) {
+        console.error('Transform toStorage error:', error);
+        return value;
+      }
+    }
 
-    const fieldContainerStyle = {
-      flex: 1,
-      minWidth: 0, // Allow shrinking below content size
-      width: '100%' // Ensure field container takes available space
-    };
+    // If transform is a function, use it as before (backward compatibility)
+    if (transform && typeof transform === 'function') {
+      return transform(value);
+    }
 
-    const requiredStyle = required ? {
-      color: '#ff4d4f',
-      fontSize: '14px',
-      fontFamily: 'SimSun, sans-serif',
-      lineHeight: 1,
-      content: '*'
-    } : {};
+    // Handle event objects
+    return value?.target ? value.target.value : value;
+  }, [transform]);
 
-    return (
-      <div style={containerStyle}>
-        {label && (
-          <div style={labelStyle}>
-            {required && <span style={requiredStyle}>* </span>}
-            {tooltip ? (
-              <Tooltip title={tooltip}>
-                <span style={{ cursor: 'help', textDecoration: 'underline dotted' }}>
-                  {renderLabel()}
-                </span>
-              </Tooltip>
-            ) : (
-              renderLabel()
-            )}
-          </div>
-        )}
-        <div style={fieldContainerStyle}>
-          <Component 
-            disabled={disabled}
-            value={value}
-            onChange={handleChange}
-            status={error ? 'error' : undefined}
-            style={{ width: '100%' }}
-            {...rest}
-          />
-          {error && (
-            <div style={{ 
-              color: '#ff4d4f', 
-              fontSize: '12px', 
-              marginTop: '4px',
-              lineHeight: '1.5'
-            }}>
-              {error}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  // Validation logic stays the same...
+  const validateDirectMode = useCallback((value) => {
+    if (required) {
+      const isEmpty = value === undefined ||
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && value.trim() === '');
+
+      if (isEmpty) {
+        return `${label || 'This field'} is required`;
+      }
+    }
+
+    if (customValidator && typeof customValidator === 'function') {
+      try {
+        const customError = customValidator(value);
+        if (customError) {
+          return customError;
+        }
+      } catch (error) {
+        console.error('Custom validator error:', error);
+        return 'Validation error';
+      }
+    }
+
+    return null;
+  }, [required, label, customValidator]);
+
+  const handleChange = useCallback((newValue) => {
+    const actualValue = transformForStorage(newValue);
+
+    if (formMode && updateValueOverride) {
+      updateValueOverride(path, actualValue);
+      return;
+    }
+
+    const validationError = validateDirectMode(actualValue);
+
+    if (validationError) {
+      setDirectModeError(validationError);
+      return;
+    }
+
+    setDirectModeError(null);
+    updateByPath(path, actualValue).catch(console.error);
+  }, [path, transformForStorage, formMode, updateValueOverride, updateByPath, validateDirectMode]);
+
+  // Get the display value
+  const currentValue = getDisplayValue();
+
+  // Debug styling
+  const debugBorders = process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true';
+  const debugStyle = debugBorders ? {
+    border: '1px dashed red',
+    padding: '2px',
+    margin: '1px'
+  } : {};
+
+  // Build rules array for form mode
+  const finalRules = [...rules];
+  if (required) {
+    finalRules.push({
+      required: true,
+      message: `${label || 'This field'} is required`
+    });
   }
 
-  // Default vertical layout using Form.Item
+  // Form.Item props
+  const finalFormItemProps = {
+    label,
+    tooltip,
+    required,
+    name: formMode ? name : undefined,
+    rules: formMode ? (finalRules.length > 0 ? finalRules : undefined) : undefined,
+    validateStatus: !formMode && directModeError ? 'error' : undefined,
+    help: !formMode && directModeError ? directModeError : undefined,
+    style: debugBorders ? { ...formItemProps.style, ...debugStyle } : formItemProps.style,
+    ...formItemProps
+  };
+
   return (
-    <Form.Item
-      label={renderLabel()}
-      tooltip={tooltip}
-      validateStatus={error ? 'error' : undefined}
-      help={error}
-      required={required}
-      layout='horizontal'
-      style={getDebugStyle()}
-    >
-      <Component disabled={disabled}
-        value={value}
+    <Form.Item {...finalFormItemProps}>
+      <Component
+        {...componentProps}
+        disabled={disabled}
+        value={currentValue}
         onChange={handleChange}
-        status={error ? 'error' : undefined}
-        {...rest}
-      />
+      >
+        {children}
+      </Component>
     </Form.Item>
   );
 };

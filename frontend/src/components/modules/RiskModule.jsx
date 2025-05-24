@@ -61,7 +61,7 @@ const RiskModule = () => {
         >
           <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
             <FormRow>
-              <FormCol span={12}>
+              <FormCol>
                 <SwitchField
                   path={[...basePath, 'insuranceEnabled']}
                   label="Enable Insurance"
@@ -75,7 +75,7 @@ const RiskModule = () => {
                 <FormDivider orientation="left">Insurance Parameters</FormDivider>
                 
                 <FormRow>
-                  <FormCol span={12}>
+                  <FormCol>
                     <CurrencyField
                       path={[...basePath, 'insurancePremium']}
                       label="Insurance Premium"
@@ -84,7 +84,7 @@ const RiskModule = () => {
                       step={10000}
                     />
                   </FormCol>
-                  <FormCol span={12}>
+                  <FormCol>
                     <CurrencyField
                       path={[...basePath, 'insuranceDeductible']}
                       label="Insurance Deductible"
@@ -96,7 +96,7 @@ const RiskModule = () => {
                 </FormRow>
                 
                 <FormRow>
-                  <FormCol span={12}>
+                  <FormCol>
                     <PercentageField
                       path={[...basePath, 'coverageLimit']}
                       label="Coverage Limit (%)"
@@ -106,7 +106,7 @@ const RiskModule = () => {
                       step={5}
                     />
                   </FormCol>
-                  <FormCol span={12}>
+                  <FormCol>
                     <CurrencyField
                       path={[...basePath, 'annualCoverageCap']}
                       label="Annual Coverage Cap"
@@ -131,7 +131,7 @@ const RiskModule = () => {
         >
           <FormSection title="Reserve Funds" style={{ marginBottom: 24 }}>
             <FormRow>
-              <FormCol span={12}>
+              <FormCol>
                 <CurrencyField
                   path={[...basePath, 'reserveFunds']}
                   label="Initial Reserve Funds"
@@ -140,7 +140,7 @@ const RiskModule = () => {
                   step={100000}
                 />
               </FormCol>
-              <FormCol span={12}>
+              <FormCol>
                 <PercentageField
                   path={[...basePath, 'annualContribution']}
                   label="Annual Contribution (%)"
@@ -154,7 +154,7 @@ const RiskModule = () => {
             </FormRow>
             
             <FormRow>
-              <FormCol span={12}>
+              <FormCol>
                 <CurrencyField
                   path={[...basePath, 'targetReserveLevel']}
                   label="Target Reserve Level"
@@ -163,7 +163,7 @@ const RiskModule = () => {
                   step={100000}
                 />
               </FormCol>
-              <FormCol span={12}>
+              <FormCol>
                 <NumberField
                   path={[...basePath, 'minimumReserveCoverage']}
                   label="Minimum Coverage (months)"
@@ -187,14 +187,14 @@ const RiskModule = () => {
         >
           <FormSection title="Other Risk Mitigations" style={{ marginBottom: 24 }}>
             <FormRow>
-              <FormCol span={12}>
+              <FormCol>
                 <SwitchField
                   path={[...basePath, 'performanceGuarantees']}
                   label="Performance Guarantees"
                   tooltip="Enable or disable performance guarantees"
                 />
               </FormCol>
-              <FormCol span={12}>
+              <FormCol>
                 <SwitchField
                   path={[...basePath, 'contingencyBudget']}
                   label="Contingency Budget"
@@ -204,7 +204,7 @@ const RiskModule = () => {
             </FormRow>
             
             <FormRow>
-              <FormCol span={12}>
+              <FormCol>
                 <PercentageField
                   path={[...basePath, 'contingencyPercentage']}
                   label="Contingency Percentage"

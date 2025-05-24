@@ -25,8 +25,7 @@ import {
   SelectField,
   CheckboxField,
   CurrencyField,
-  PercentageField,
-  CompactFieldGroup
+  PercentageField
 } from '../contextFields';
 import EditableTable from '../../components/tables/EditableTable';
 
@@ -240,22 +239,22 @@ const ContractsModule = () => {
     />,
 
     // Use CompactFieldGroup only for related escalation options
-    <CompactFieldGroup key="escalation-group" direction="horizontal" size="small">
+    //<CompactFieldGroup key="escalation-group" direction="horizontal" size="small">
       <CheckboxField
         path={['escalation', 'useMin']}
         label="Use min limit"
-      />
+      />,
       <PercentageField
         path={['escalation', 'minValue']}
         label="Min %"
         min={-20}
         max={0}
         step={0.1}
-      />
+      />,
       <CheckboxField
         path={['escalation', 'useMax']}
         label="Use max limit"
-      />
+      />,
       <PercentageField
         path={['escalation', 'maxValue']}
         label="Max %"
@@ -263,7 +262,7 @@ const ContractsModule = () => {
         max={20}
         step={0.10}
       />
-    </CompactFieldGroup>
+    //</CompactFieldGroup>
   ];
 
   // Expandable row renderer for contract details

@@ -11,7 +11,7 @@ async function connectDB() {
   try {
     // Construct MongoDB connection string - with or without authentication
     let MONGODB_URI;
-    
+
     if (MONGO_USER && MONGO_PASS) {
       // Use authentication if credentials are provided
       MONGODB_URI = `mongodb://${encodeURIComponent(MONGO_USER)}:${encodeURIComponent(MONGO_PASS)}@${MONGO_URL}/${DATABASE}?authSource=admin`;
@@ -22,14 +22,14 @@ async function connectDB() {
     console.log(MONGODB_URI);
     // Log the connection URI (without exposing credentials)
     console.log(`Connecting to MongoDB at ${MONGO_URL}/${DATABASE}`);
-    
+
     // Connect to MongoDB
-    await mongoose.connect(MONGODB_URI, { 
-      useNewUrlParser: true, 
-      useUnifiedTopology: true, 
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000 // Increase timeout to 30 seconds
     });
-    
+
     console.log('Connected to MongoDB successfully');
   } catch (err) {
     console.error('MongoDB connection error:', err);

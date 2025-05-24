@@ -1,6 +1,6 @@
 // src/components/config/ScenarioSettings.jsx
 import React from 'react';
-import { Typography, Alert } from 'antd';
+import { Typography, Alert, Input } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import context field components
@@ -10,7 +10,9 @@ import {
   FormCol,
   TextField,
   SelectField,
-  TextAreaField
+  TextAreaField,
+  CompactFieldGroup,
+  ResponsiveFieldRow
 } from '../contextFields';
 
 const { Title } = Typography;
@@ -18,7 +20,7 @@ const { Title } = Typography;
 const ScenarioSettings = () => {
   // Base paths for scenario settings
   const scenarioPath = ['settings', 'scenario'];
-  
+
   // Get scenario context
   const { scenarioData, selectedLocation } = useScenario();
 
@@ -36,10 +38,10 @@ const ScenarioSettings = () => {
     return (
       <div>
         <Title level={2}>Scenario Settings</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -61,8 +63,8 @@ const ScenarioSettings = () => {
       )}
 
       <FormSection title="Basic Scenario Information">
-        <FormRow>
-          <FormCol span={24}>
+        <ResponsiveFieldRow layout="twoColumn">
+          <CompactFieldGroup direction="vertical" size="middle">
             <TextField
               path={[...scenarioPath, 'name']}
               label="Scenario Name"
@@ -70,24 +72,19 @@ const ScenarioSettings = () => {
               tooltip="Unique name for this scenario"
               required
             />
-          </FormCol>
-        </FormRow>
-        
-        <FormRow>
-          <FormCol span={24}>
             <TextAreaField
               path={[...scenarioPath, 'description']}
               label="Description"
               placeholder="Provide a brief description of this scenario"
               rows={4}
             />
-          </FormCol>
-        </FormRow>
+          </CompactFieldGroup>
+        </ResponsiveFieldRow>
       </FormSection>
-      
-      <FormSection title="Scenario Details">
+
+      {/* <FormSection title="Scenario Details">
         <FormRow>
-          <FormCol span={12}>
+          <FormCol>
             <SelectField
               path={[...scenarioPath, 'scenarioType']}
               label="Scenario Type"
@@ -96,7 +93,7 @@ const ScenarioSettings = () => {
             />
           </FormCol>
         </FormRow>
-      </FormSection>
+      </FormSection> */}
     </div>
   );
 };

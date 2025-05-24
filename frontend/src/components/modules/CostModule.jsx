@@ -189,7 +189,7 @@ const CostModule = () => {
       children: (
         <FormSection title="OEM Contract" style={{ marginBottom: 24 }}>
           <FormRow>
-            <FormCol span={12}>
+            <FormCol>
               <NumberField
                 path={[...basePath, 'oemTerm']}
                 label="OEM Term (Years)"
@@ -199,7 +199,9 @@ const CostModule = () => {
                 step={1}
               />
             </FormCol>
-            <FormCol span={12}>
+          </FormRow>
+          <FormRow>
+            <FormCol>
               <CurrencyField
                 path={[...basePath, 'fixedOMFee']}
                 label="Fixed O&M Fee during OEM Term"
@@ -224,7 +226,7 @@ const CostModule = () => {
       children: (
         <FormSection title="Failure Events" style={{ marginBottom: 24 }}>
           <FormRow>
-            <FormCol span={12}>
+            <FormCol>
               <PercentageField
                 path={[...basePath, 'failureEventProbability']}
                 label="Failure Event Probability"
@@ -234,7 +236,7 @@ const CostModule = () => {
                 step={0.1}
               />
             </FormCol>
-            <FormCol span={12}>
+            <FormCol>
               <CurrencyField
                 path={[...basePath, 'failureEventCost']}
                 label="Average Failure Event Cost"
