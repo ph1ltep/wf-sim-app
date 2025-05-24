@@ -9,38 +9,67 @@ import { Empty, Spin } from 'antd';
  * Uses schema-safe contract structure from settings.modules.contracts.oemContracts
  */
 const VISUALIZATION_STRATEGIES = {
-    fee: {
-        name: 'Fee',
+    'fee-total': {
+        name: 'Fee (total)',
         unit: '',  // Will be populated with currency
+        colorScheme: [
+            [0, 'rgba(0,0,0,0)'],           // Transparent for null values
+            [0.001, 'rgba(24,144,255,0.1)'], // Very light blue
+            [0.3, 'rgba(24,144,255,0.3)'],   // Light blue
+            [0.5, 'rgba(24,144,255,0.5)'],   // Medium blue
+            [0.7, 'rgba(24,144,255,0.7)'],   // Darker blue
+            [1, 'rgba(24,144,255,0.9)']      // Dark blue
+        ],
         calculateValue: (oemContract, year, context) => {
             const { numWTGs } = context;
             // Schema: years: Yup.array().of(Yup.number()).required('Years are required')
-            if (!oemContract.years?.includes(year)) return 0;
+            if (!oemContract.years?.includes(year)) return null; // Return null for empty years
 
             // Schema: fixedFee: Yup.number().required('Fixed fee is required')
             const baseFee = oemContract.fixedFee || 0;
             // Schema: isPerTurbine: Yup.boolean().default(false)
             return oemContract.isPerTurbine ? baseFee * numWTGs : baseFee;
         },
-        getColorScale: () => [
-            [0, 'rgb(255,255,255)'],      // White for no contract
-            [0.1, 'rgb(240,249,255)'],    // Very light blue
-            [0.3, 'rgb(186,228,255)'],    // Light blue  
-            [0.5, 'rgb(120,198,255)'],    // Medium blue
-            [0.7, 'rgb(66,165,245)'],     // Darker blue
-            [1, 'rgb(25,118,210)']        // Dark blue
-        ],
         formatValue: (value, context) => {
             const { currency } = context;
+            if (value === null || value === undefined) return 'No Contract';
             if (value === 0) return 'No Contract';
             return `${currency}${value.toLocaleString()}`;
         }
+    },
+
+    'fee-per-unit': {
+        name: 'Fee (per unit)',
+        unit: '',  // Will be populated with currency
+        colorScheme: [
+            [0, 'rgba(0,0,0,0)'],           // Transparent for null values
+            [0.001, 'rgba(82,196,26,0.1)'],  // Very light green
+            [0.3, 'rgba(82,196,26,0.3)'],    // Light green
+            [0.5, 'rgba(82,196,26,0.5)'],    // Medium green
+            [0.7, 'rgba(82,196,26,0.7)'],    // Darker green
+            [1, 'rgba(82,196,26,0.9)']       // Dark green
+        ],
+        calculateValue: (oemContract, year, context) => {
+            const { numWTGs } = context;
+            // Schema: years: Yup.array().of(Yup.number()).required('Years are required')
+            if (!oemContract.years?.includes(year)) return null; // Return null for empty years
+
+            // Schema: fixedFee: Yup.number().required('Fixed fee is required')
+            const baseFee = oemContract.fixedFee || 0;
+            // Always return per-unit fee regardless of isPerTurbine setting
+            return baseFee;
+        },
+        formatValue: (value, context) => {
+            const { currency } = context;
+            if (value === null || value === undefined) return 'No Contract';
+            if (value === 0) return 'No Contract';
+            return `${currency}${value.toLocaleString()}/unit`;
+        }
     }
 
-    // Future strategies can be added here:
-    // coverage: { ... },
-    // scope: { ... },
-    // escalation: { ... }
+    // Future strategies can be added here with their own color schemes
+    // coverage: { colorScheme: [...using #faad14], ... },
+    // scope: { colorScheme: [...using #eb2f96], ... },
 };
 
 /**
@@ -67,6 +96,11 @@ const transformContractsToHeatmapData = (oemContracts, projectLife, visualizatio
     const textMatrix = [];
     const maxValue = { current: 0 };
 
+    // Arrays to store summation row data
+    const summationValues = [];
+    const summationText = [];
+    const summationMaxValue = { current: 0 };
+
     // Single pass through oemContracts to build all data
     oemContracts.forEach((oemContract, contractIndex) => {
         const valueRow = [];
@@ -80,8 +114,8 @@ const transformContractsToHeatmapData = (oemContracts, projectLife, visualizatio
             valueRow.push(value);
             textRow.push(formattedValue);
 
-            // Track maximum value for color scaling
-            if (value > maxValue.current) {
+            // Track maximum value for color scaling (only for non-null values)
+            if (value !== null && value !== undefined && value > maxValue.current) {
                 maxValue.current = value;
             }
         });
@@ -90,12 +124,50 @@ const transformContractsToHeatmapData = (oemContracts, projectLife, visualizatio
         textMatrix.push(textRow);
     });
 
+    // Calculate summation row
+    years.forEach((year, yearIndex) => {
+        let yearSum = 0;
+        let hasValues = false;
+
+        // Sum all contract values for this year
+        oemContracts.forEach((oemContract) => {
+            const value = strategy.calculateValue(oemContract, year, context);
+            if (value !== null && value !== undefined) {
+                yearSum += value;
+                hasValues = true;
+            }
+        });
+
+        // If no contracts active this year, show null
+        const summationValue = hasValues ? yearSum : null;
+        const summationFormattedValue = hasValues ?
+            strategy.formatValue(yearSum, context) :
+            'No Contracts';
+
+        summationValues.push(summationValue);
+        summationText.push(summationFormattedValue);
+
+        // Track max summation value for separate color scaling
+        if (summationValue !== null && summationValue > summationMaxValue.current) {
+            summationMaxValue.current = summationValue;
+        }
+    });
+
+    // Add summation row to the matrices - AT THE BEGINNING
+    valueMatrix.unshift(summationValues);  // Add to beginning
+    textMatrix.unshift(summationText);     // Add to beginning
+
+    // Add summation row name - AT THE BEGINNING
+    contractNames.unshift('📊 Total');
+
     return {
         x: years,
         y: contractNames,
         z: valueMatrix,
         text: textMatrix,
         maxValue: maxValue.current,
+        summationMaxValue: summationMaxValue.current,
+        summationRowIndex: 0,  // Now it's the first row
         strategy
     };
 };
@@ -107,6 +179,7 @@ const transformContractsToHeatmapData = (oemContracts, projectLife, visualizatio
  * @param {number} numWTGs - Number of wind turbine generators
  * @param {string} currency - Currency code for display
  * @param {string} visualizationMode - Visualization strategy key
+ * @param {string} colorTheme - Color theme for the heatmap ('default', 'blue', 'green', 'purple')
  * @param {number} height - Chart height in pixels
  * @param {string} color - Base color theme (for future use)
  * @param {boolean} loading - Loading state
@@ -117,6 +190,7 @@ const ContractScopeChart = ({
     numWTGs = 20,
     currency = 'USD',
     visualizationMode = 'fee',
+    colorTheme = 'default',
     height = 400,
     color = '#1890ff',
     loading = false
@@ -156,29 +230,41 @@ const ContractScopeChart = ({
         );
     }
 
-    const { x, y, z, text, maxValue, strategy } = heatmapData;
+    const { x, y, z, text, maxValue, summationMaxValue, summationRowIndex, strategy } = heatmapData;
 
-    // Build Plotly heatmap configuration
-    const plotData = [{
+    // Build unified heatmap traces - all using same color scale based on summation max
+    const summationData = {
         type: 'heatmap',
         x,
-        y,
-        z,
-        text,
-        texttemplate: '%{text}',
-        textfont: {
-            size: 10,
-            color: 'rgba(0,0,0,0.8)'
-        },
-        hoverongaps: false,
+        y: [y[summationRowIndex]], // Only summation row (now first)
+        z: [z[summationRowIndex]], // Only summation row values
+        text: [text[summationRowIndex]], // Only summation row text
         hovertemplate:
             '<b>%{y}</b><br>' +
             'Year %{x}<br>' +
             '%{text}<br>' +
             '<extra></extra>',
-        colorscale: strategy.getColorScale(),
+        colorscale: strategy.colorScheme,
         zmin: 0,
-        zmax: maxValue || 1,
+        zmax: summationMaxValue || 1,  // Use summation max for all color scaling
+        showscale: false,  // No color bar for summation
+        connectgaps: false
+    };
+
+    const contractData = {
+        type: 'heatmap',
+        x,
+        y: y.slice(1), // All except summation row (skip first)
+        z: z.slice(1), // All except summation row (skip first)
+        text: text.slice(1), // All except summation row (skip first)
+        hovertemplate:
+            '<b>%{y}</b><br>' +
+            'Year %{x}<br>' +
+            '%{text}<br>' +
+            '<extra></extra>',
+        colorscale: strategy.colorScheme,
+        zmin: 0,
+        zmax: summationMaxValue || 1,  // Use summation max for unified scaling
         showscale: true,
         colorbar: {
             title: {
@@ -186,41 +272,62 @@ const ContractScopeChart = ({
                 side: 'right'
             },
             thickness: 15,
-            len: 0.7
-        }
-    }];
+            len: 0.6  // Single color bar for entire chart
+        },
+        connectgaps: false,
+        yaxis: 'y2'  // Use secondary y-axis for contracts
+    };
+
+    const plotData = [summationData, contractData];
 
     const layout = {
-        title: {
-            text: `Contract ${strategy.name} Heatmap`,
-            font: { size: 16 }
-        },
+        // title: {
+        //     text: `Contract ${strategy.name} Heatmap`,
+        //     font: { size: 16 }
+        // },
         xaxis: {
-            title: 'Project Year',
             dtick: 1,
             tickmode: 'linear',
-            side: 'bottom'
+            side: 'bottom',
+            showgrid: true,
+            gridcolor: 'rgba(0,0,0,0.1)',
+            gridwidth: 1,
+            zeroline: false
         },
         yaxis: {
-            title: 'Contracts',
             automargin: true,
             tickmode: 'array',
-            tickvals: Array.from({ length: y.length }, (_, i) => i),
-            ticktext: y
+            tickvals: [0],
+            ticktext: [y[summationRowIndex]], // Only summation row (now first)
+            tickfont: { size: 12, weight: 'bold' },
+            showgrid: false,
+            zeroline: false,
+            domain: [0.85, 1.0]  // Top 15% for summation row
+        },
+        yaxis2: {
+            automargin: true,
+            tickmode: 'array',
+            tickvals: Array.from({ length: y.length - 1 }, (_, i) => i),
+            ticktext: y.slice(1), // All except summation row (skip first)
+            tickfont: { size: 12 },
+            showgrid: true,
+            gridcolor: 'rgba(0,0,0,0.1)',
+            gridwidth: 1,
+            zeroline: false,
+            domain: [0, 0.7],  // Bottom 70% for individual contracts (reduced from 80%)
+            anchor: 'x'
         },
         height,
-        margin: { l: 150, r: 80, t: 60, b: 60 },
+        margin: { l: 150, r: 80, t: 60, b: 60 }, // Reduced right margin (single color bar)
         font: { family: 'Arial, sans-serif' },
         plot_bgcolor: 'rgba(0,0,0,0)',
-        paper_bgcolor: 'rgba(0,0,0,0)'
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        bargap: 0,
+        bargroupgap: 0
     };
 
     const config = {
-        displayModeBar: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: [
-            'pan2d', 'select2d', 'lasso2d', 'autoScale2d', 'resetScale2d'
-        ],
+        displayModeBar: false,  // Hide all plotly controls
         responsive: true
     };
 

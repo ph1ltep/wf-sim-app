@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space, Table } from 'antd';
 import {
-  ContractOutlined,
+  FileTextOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
   ExclamationCircleOutlined,
@@ -25,7 +25,9 @@ import {
   SelectField,
   CheckboxField,
   CurrencyField,
-  PercentageField
+  PercentageField,
+  FormDivider,
+  FieldCard
 } from '../contextFields';
 import EditableTable from '../../components/tables/EditableTable';
 
@@ -36,6 +38,9 @@ import {
   createCurrencyColumn,
   createIconColumn
 } from '../tables/columns';
+
+// Import the new ContractScopeCard
+import { ContractScopeCard } from '../cards';
 
 const { Title, Text } = Typography;
 
@@ -55,6 +60,9 @@ const ContractsModule = () => {
 
   // Get currency
   const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
+
+  // Get number of WTGs for contract scope visualization
+  const numWTGs = getValueByPath(['settings', 'project', 'windFarm', 'numWTGs'], 20);
 
   // Refresh scopes
   useEffect(() => {
@@ -240,28 +248,28 @@ const ContractsModule = () => {
 
     // Use CompactFieldGroup only for related escalation options
     //<CompactFieldGroup key="escalation-group" direction="horizontal" size="small">
-      <CheckboxField
-        path={['escalation', 'useMin']}
-        label="Use min limit"
-      />,
-      <PercentageField
-        path={['escalation', 'minValue']}
-        label="Min %"
-        min={-20}
-        max={0}
-        step={0.1}
-      />,
-      <CheckboxField
-        path={['escalation', 'useMax']}
-        label="Use max limit"
-      />,
-      <PercentageField
-        path={['escalation', 'maxValue']}
-        label="Max %"
-        Pmin={0}
-        max={20}
-        step={0.10}
-      />
+    <CheckboxField
+      path={['escalation', 'useMin']}
+      label="Use min limit"
+    />,
+    <PercentageField
+      path={['escalation', 'minValue']}
+      label="Min %"
+      min={-20}
+      max={0}
+      step={0.1}
+    />,
+    <CheckboxField
+      path={['escalation', 'useMax']}
+      label="Use max limit"
+    />,
+    <PercentageField
+      path={['escalation', 'maxValue']}
+      label="Max %"
+      Pmin={0}
+      max={20}
+      step={0.10}
+    />
     //</CompactFieldGroup>
   ];
 
@@ -339,7 +347,7 @@ const ContractsModule = () => {
             />
           ) : (
             <div>
-              <FormSection title="Contracts Configuration"
+              <FieldCard title="Contracts Configuration"
                 extra={
                   <Button
                     icon={<ReloadOutlined />}
@@ -350,13 +358,13 @@ const ContractsModule = () => {
                   </Button>
                 }
               >
-                <Alert
+                {/* <Alert
                   message="Contract Assignment"
                   description="Contracts define which OEM service scope applies in each year of the project. You can assign different contracts to different years to model changing O&M strategies over time."
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
-                />
+                /> */}
 
                 <EditableTable
                   columns={contractColumns}
@@ -370,69 +378,21 @@ const ContractsModule = () => {
                   formCompact={true}
                   formResponsive={true}
                 />
-              </FormSection>
+              </FieldCard>
+              {/* NEW: Contract Scope Analysis Card */}
+              <FormDivider margin="middle" orientation="left"></FormDivider>
+              <ContractScopeCard
+                oemContracts={contracts}
+                projectLife={projectLife}
+                numWTGs={numWTGs}
+                currency={currency}
+                title="Contract Fee Heatmap"
+                icon={<FileTextOutlined />}
+                height={Math.max(300, contracts.length * 60 + 150)} // Dynamic height based on contract count
+                showMetadata={true}
+                loading={loadingScopes}
+              />
 
-              <FormSection title="Contract Coverage Visualization">
-                <p>The table below shows which contracts are applied to each project year.</p>
-
-                {contracts.length > 0 ? (
-                  <Table
-                    dataSource={Array.from({ length: projectLife }, (_, i) => ({
-                      key: i + 1,
-                      year: i + 1,
-                      contracts: contracts.filter(c => c.years && c.years.includes(i + 1))
-                    }))}
-                    columns={[
-                      {
-                        title: 'Project Year',
-                        dataIndex: 'year',
-                        key: 'year',
-                        width: '15%',
-                        render: year => <Tag color="blue">Year {year}</Tag>
-                      },
-                      {
-                        title: 'Applied Contracts',
-                        dataIndex: 'contracts',
-                        key: 'contracts',
-                        render: (contracts) => {
-                          if (!contracts || contracts.length === 0) {
-                            return (
-                              <Space>
-                                <Tag color="red">No Contract</Tag>
-                                <Tooltip title="No OEM service contract defined for this year">
-                                  <ExclamationCircleOutlined style={{ color: 'red' }} />
-                                </Tooltip>
-                              </Space>
-                            );
-                          }
-
-                          return (
-                            <Space wrap>
-                              {contracts.map(contract => {
-                                const scope = oemScopes.find(s => s.key === contract.oemScopeId);
-                                return (
-                                  <Tag key={contract.id} color="green">
-                                    {contract.name} ({scope?.name || 'Unknown Scope'})
-                                  </Tag>
-                                );
-                              })}
-                            </Space>
-                          );
-                        }
-                      }
-                    ]}
-                    pagination={false}
-                    size="small"
-                  />
-                ) : (
-                  <Alert
-                    message="No Contracts Defined"
-                    description="Add contracts above to see the coverage visualization."
-                    type="info"
-                    showIcon
-                  />
-                )}
-              </FormSection>
             </div>
           )}
         </>

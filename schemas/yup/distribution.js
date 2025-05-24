@@ -3,7 +3,7 @@ const Yup = require('yup');
 
 // Schema for a data point with year and value
 const DataPointSchema = Yup.object().shape({
-    year: Yup.number().min(0).required('Year is required'),
+    year: Yup.number().min(-10).required('Year is required'),
     value: Yup.number().required('Value is required'),
 });
 
