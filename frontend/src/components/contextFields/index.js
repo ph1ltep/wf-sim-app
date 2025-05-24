@@ -15,7 +15,7 @@ import {
   ResponsiveFieldRow,
   InlineFieldGroup,
   FieldCard
-} from './layouts';
+} from './layouts/index';
 
 // Import special components
 import EditableTable from '../tables/EditableTable';

@@ -5,11 +5,11 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import EditableTable from '../../components/tables/EditableTable';
 import { createTextColumn, createPercentileColumn } from '../../components/tables/columns';
 
-// Import context field components
+// Import enhanced context field components with layouts
 import {
   FormSection,
-  FormRow,
-  FormCol,
+  ResponsiveFieldRow,
+  FieldGroup,
   NumberField,
   TextField,
   PercentileField,
@@ -33,18 +33,22 @@ const percentileColumns = [
 // Define form fields for percentiles using context field components
 const percentileFormFields = [
   <PercentileField
+    key="value"
     path={['value']}
     label="Percentile Value"
     min={1}
     max={99}
     step={1}
     tooltip="Enter a value between 1 and 99"
+    required
   />,
   <TextField
+    key="description"
     path={['description']}
     label="Description"
     placeholder="E.g., primary, upper_bound"
     tooltip="Used to identify the role of this percentile in visualizations"
+    required
   />
 ];
 
@@ -53,7 +57,7 @@ const SimulationSettings = () => {
   const basePath = ['settings', 'simulation'];
 
   // Get scenario data
-  const { scenarioData, updateByPath } = useScenario();
+  const { scenarioData } = useScenario();
   const [isModified, setIsModified] = useState(false);
 
   // Check if we have an active scenario
@@ -94,54 +98,44 @@ const SimulationSettings = () => {
       <p>Configure simulation parameters and probability levels for visualization.</p>
 
       <FormSection title="Monte Carlo Simulation Settings" style={{ marginBottom: 24 }}>
-        <FormRow>
-          <FormCol span={12}>
-            <NumberField
-              path={[...basePath, 'iterations']}
-              label="Number of Monte Carlo Iterations"
-              min={100}
-              max={100000}
-              step={1000}
-              style={{ width: 200 }}
-              tooltip="Higher values provide more statistical accuracy at the cost of longer computation time"
-            />
-          </FormCol>
-        </FormRow>
-
-        <FormRow>
-          <FormCol span={12}>
-            <NumberField
-              path={[...basePath, 'seed']}
-              label="Random Seed"
-              min={1}
-              step={1}
-              style={{ width: 120 }}
-              tooltip="Using the same seed ensures reproducible results"
-            />
-          </FormCol>
-        </FormRow>
+        <ResponsiveFieldRow layout="twoColumn">
+          <NumberField
+            path={[...basePath, 'iterations']}
+            label="Number of Monte Carlo Iterations"
+            min={100}
+            max={100000}
+            step={1000}
+            tooltip="Higher values provide more statistical accuracy at the cost of longer computation time"
+          />
+          <NumberField
+            path={[...basePath, 'seed']}
+            label="Random Seed"
+            min={1}
+            step={1}
+            tooltip="Using the same seed ensures reproducible results"
+          />
+        </ResponsiveFieldRow>
       </FormSection>
 
-      <FormSection
-        title="Percentiles for Visualization"
-        style={{ marginBottom: 24 }}
-      >
+      <FormSection title="Percentiles for Visualization" style={{ marginBottom: 24 }}>
         <p>Configure which percentiles (P-values) to display in charts and results.</p>
 
-        <FormRow>
-          <FormCol span={12}>
-            <PrimaryPercentileSelectField basePath={basePath} />
-          </FormCol>
-        </FormRow>
+        <FieldGroup direction="vertical" size="middle">
+          <PrimaryPercentileSelectField basePath={basePath} />
 
-        {/* EditableTable component for percentiles */}
-        <EditableTable
-          columns={percentileColumns}
-          path={[...basePath, 'percentiles']}
-          formFields={percentileFormFields}
-          keyField="value"
-          itemName="Percentile"
-        />
+          {/* EditableTable component for percentiles */}
+          <EditableTable
+            columns={percentileColumns}
+            path={[...basePath, 'percentiles']}
+            formFields={percentileFormFields}
+            keyField="value"
+            itemName="Percentile"
+            // Use enhanced form layout props
+            formLayout="vertical"
+            formCompact={false}
+            formResponsive={true}
+          />
+        </FieldGroup>
 
         <Alert
           message="Percentile Definitions"
