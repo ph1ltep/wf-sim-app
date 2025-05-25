@@ -5,6 +5,8 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
 import { getAllLocations } from '../../api/locations';
 
+// Import metrics utilities
+import { refreshAllMetrics } from '../../utils/metricsUtils';
 
 // Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
@@ -35,14 +37,6 @@ const ProjectSettings = () => {
   const windFarmPath = ['settings', 'project', 'windFarm'];
   const currencyPath = ['settings', 'project', 'currency'];
 
-  // State for calculated metrics
-  const [calculatedMetrics, setCalculatedMetrics] = useState({
-    totalMW: 0,
-    grossAEP: 0,
-    netAEP: 0,
-    componentQuantities: {}
-  });
-
   // Get scenario context
   const {
     scenarioData,
@@ -64,6 +58,9 @@ const ProjectSettings = () => {
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
+  // Get calculated metrics from context (now calculated by metricsUtils)
+  const calculatedMetrics = getValueByPath(['settings', 'metrics'], {});
+
   // Fetch locations
   useEffect(() => {
     const fetchLocations = async () => {
@@ -84,57 +81,31 @@ const ProjectSettings = () => {
     fetchLocations();
   }, []);
 
-  // Calculate metrics when relevant values change
+  // Refresh metrics when relevant values change
   useEffect(() => {
     if (scenarioData) {
-      const numWTGs = getValueByPath([...windFarmPath, 'numWTGs'], 0);
-      const mwPerWTG = getValueByPath([...windFarmPath, 'mwPerWTG'], 0);
-      const capacityFactor = getValueByPath([...windFarmPath, 'capacityFactor'], 0);
-      const curtailmentLosses = getValueByPath([...windFarmPath, 'curtailmentLosses'], 0);
-      const electricalLosses = getValueByPath([...windFarmPath, 'electricalLosses'], 0);
-      const wtgPlatformType = getValueByPath([...windFarmPath, 'wtgPlatformType'], 'geared');
+      // Use debouncing to avoid excessive calculations
+      const timeoutId = setTimeout(() => {
+        refreshAllMetrics(scenarioData, updateByPath);
+      }, 300);
 
-      const totalMW = numWTGs * mwPerWTG;
-      const grossAEP = totalMW * (capacityFactor / 100) * 8760;
-
-      const afterCurtailment = grossAEP * (1 - curtailmentLosses / 100);
-      const netAEP = afterCurtailment * (1 - electricalLosses / 100);
-
-      const componentQuantities = {
-        blades: numWTGs * 3,
-        bladeBearings: numWTGs * 3,
-        transformers: numWTGs,
-        gearboxes: wtgPlatformType === 'geared' ? numWTGs : 0,
-        generators: numWTGs,
-        converters: numWTGs,
-        mainBearings: numWTGs,
-        yawSystems: numWTGs,
-      };
-
-      const metrics = {
-        totalMW,
-        grossAEP,
-        netAEP,
-        componentQuantities
-      };
-
-      setCalculatedMetrics(metrics);
-
-      // Only update the context if values have changed
-      const currentMetrics = getValueByPath(['settings', 'metrics'], {});
-      if (JSON.stringify(currentMetrics) !== JSON.stringify(metrics)) {
-        updateByPath(['settings', 'metrics'], metrics);
-      }
+      return () => clearTimeout(timeoutId);
     }
   }, [
-    getValueByPath,
+    scenarioData,
     updateByPath,
+    // Dependencies that trigger metric recalculation
     getValueByPath([...windFarmPath, 'numWTGs']),
     getValueByPath([...windFarmPath, 'mwPerWTG']),
     getValueByPath([...windFarmPath, 'capacityFactor']),
     getValueByPath([...windFarmPath, 'curtailmentLosses']),
     getValueByPath([...windFarmPath, 'electricalLosses']),
-    getValueByPath([...windFarmPath, 'wtgPlatformType'])
+    getValueByPath([...windFarmPath, 'wtgPlatformType']),
+    // Financing parameters that affect WACC
+    getValueByPath(['settings', 'modules', 'financing', 'debtRatio']),
+    getValueByPath(['settings', 'modules', 'financing', 'costOfEquity']),
+    getValueByPath(['settings', 'modules', 'financing', 'costOfOperationalDebt']),
+    getValueByPath(['settings', 'modules', 'financing', 'effectiveTaxRate'])
   ]);
 
   // Handle location selection change
@@ -165,7 +136,14 @@ const ProjectSettings = () => {
 
       // Cost module values
       'settings.modules.cost.escalationRate.parameters.value': 1,
-      'settings.modules.cost.escalationRate.parameters.drift': selectedLocation.inflationRate
+      'settings.modules.cost.escalationRate.parameters.drift': selectedLocation.inflationRate,
+
+      // Financing module values (new WACC parameters)
+      'settings.modules.financing.costOfConstructionDebt': selectedLocation.costOfConstructionDebt,
+      'settings.modules.financing.costOfOperationalDebt': selectedLocation.costOfOperationalDebt,
+      'settings.modules.financing.costOfEquity': selectedLocation.costofEquity,
+      'settings.modules.financing.debtRatio': selectedLocation.debtRatio,
+      'settings.modules.financing.effectiveTaxRate': selectedLocation.effectiveTaxRate
     };
 
     // Apply all updates in a single call
@@ -181,6 +159,11 @@ const ProjectSettings = () => {
             foreignCurrency: true,
             exchangeRate: true
           });
+
+          // Refresh metrics after location defaults are loaded
+          setTimeout(() => {
+            refreshAllMetrics(scenarioData, updateByPath);
+          }, 100);
         }
       })
       .catch(error => {
