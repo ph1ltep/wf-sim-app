@@ -1,7 +1,7 @@
 // src/components/config/LocationDefaults.jsx
 import React from 'react';
 import { Typography, Card, Alert, Button } from 'antd';
-import { GlobalOutlined, ReloadOutlined, BankOutlined, LineChartOutlined, PieChartOutlined, FileTextOutlined } from '@ant-design/icons';
+import { GlobalOutlined, ReloadOutlined } from '@ant-design/icons';
 
 // Custom hook for location data management
 import useLocations from '../../hooks/useLocations';
@@ -9,62 +9,10 @@ import useLocations from '../../hooks/useLocations';
 // Components
 import DatabaseTable from '../tables/DatabaseTable';
 import LocationForm from './locations/LocationForm';
-import { createTextColumn, createPercentageColumn, createNumberColumn, createIconColumn } from '../tables/columns';
+import { getLocationColumns } from './locations/locationColumns';
 import { currencies } from './locations/currencyConstants';
 
 const { Title } = Typography;
-
-// Location columns definition
-const locationColumns = () => [
-  createTextColumn('country', 'Country', {
-    sorter: true,
-  }),
-  createTextColumn('countryCode', 'Country Code'),
-  createPercentageColumn('inflationRate', 'Inflation Rate'),
-  createPercentageColumn('capacityFactor', 'Capacity Factor'),
-  createNumberColumn('energyPrice', 'Energy Price', {
-    render: (value, record) => `${value} ${record.currency}/MWh`,
-  }),
-  createTextColumn('currency', 'Local Currency'),
-  createTextColumn('foreignCurrency', 'Foreign Currency'),
-  createTextColumn('exchangeRate', 'Foreign/Local FX', {
-    render: (value, record) => `1 ${record.foreignCurrency} = ${value} ${record.currency}`,
-  }),
-  createIconColumn('Financial Parameters', [
-    {
-      key: 'costOfConstructionDebt',
-      icon: <BankOutlined />,
-      tooltip: (record) => `Construction Debt: ${record.costOfConstructionDebt}%`,
-      color: '#1890ff'
-    },
-    {
-      key: 'costOfOperationalDebt',
-      icon: <BankOutlined />,
-      tooltip: (record) => `Operational Debt: ${record.costOfOperationalDebt}%`,
-      color: '#52c41a'
-    },
-    {
-      key: 'costofEquity',
-      icon: <LineChartOutlined />,
-      tooltip: (record) => `Cost of Equity: ${record.costofEquity}%`,
-      color: '#fa8c16'
-    },
-    {
-      key: 'debtRatio',
-      icon: <PieChartOutlined />,
-      tooltip: (record) => `Debt Ratio: ${record.debtRatio}%`,
-      color: '#722ed1'
-    },
-    {
-      key: 'effectiveTaxRate',
-      icon: <FileTextOutlined />,
-      tooltip: (record) => `Tax Rate: ${record.effectiveTaxRate}%`,
-      color: '#eb2f96'
-    }
-  ], {
-    width: 150
-  })
-];
 
 const LocationDefaults = () => {
   // Use the custom hook for location data and operations
@@ -127,7 +75,7 @@ const LocationDefaults = () => {
         style={{ marginBottom: 24 }}
       >
         <DatabaseTable
-          columns={locationColumns()}
+          columns={getLocationColumns()}
           dataSource={locations}
           rowKey="key"
           loading={loading}
@@ -141,6 +89,9 @@ const LocationDefaults = () => {
             showTotal: (total) => `Total ${total} locations`
           }}
           addActions={true}
+          modalProps={{
+            width: 620  // Increased from default (~520px) to 900px
+          }}
         />
       </Card>
     </div>

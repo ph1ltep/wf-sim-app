@@ -1,21 +1,15 @@
 // src/components/modules/FinancingModule.jsx
 import React from 'react';
 import { Typography, Alert, Tabs, Statistic, Row, Col, Card } from 'antd';
-import { DollarOutlined, BankOutlined, LineChartOutlined, CalculatorOutlined } from '@ant-design/icons';
+import { BankOutlined, LineChartOutlined, CalculatorOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 
 // Import context field components
 import {
   FormSection,
-  FormRow,
-  FormCol,
   NumberField,
-  CurrencyField,
   SelectField,
-  RadioGroupField,
-  SwitchField,
   PercentageField,
-  FormDivider,
   ResponsiveFieldRow,
   CompactFieldGroup
 } from '../contextFields';
@@ -49,34 +43,6 @@ const FinancingModule = () => {
   }
 
   const tabItems = [
-    {
-      key: "investment",
-      label: (
-        <span>
-          <DollarOutlined /> Investment
-        </span>
-      ),
-      children: (
-        <FormSection title="Capital & Development Investment" style={{ marginBottom: 24 }}>
-          <ResponsiveFieldRow layout="twoColumn">
-            <CurrencyField
-              path={[...basePath, 'capex']}
-              label="CAPEX Investment"
-              tooltip="Total capital expenditure for plant construction"
-              min={0}
-              step={1000000}
-            />
-            <CurrencyField
-              path={[...basePath, 'devex']}
-              label="DEVEX Investment"
-              tooltip="Development expenditure incurred prior to construction"
-              min={0}
-              step={100000}
-            />
-          </ResponsiveFieldRow>
-        </FormSection>
-      )
-    },
     {
       key: "financing",
       label: (
@@ -142,7 +108,8 @@ const FinancingModule = () => {
                 min={0}
                 max={100}
                 step={1}
-                precision={1}
+                precision={2}
+                affectedMetrics={['wacc', 'debtToEquityRatio']}
               />
               <PercentageField
                 path={[...basePath, 'costOfConstructionDebt']}
@@ -161,6 +128,7 @@ const FinancingModule = () => {
                 max={20}
                 step={0.1}
                 precision={2}
+                affectedMetrics={['wacc']}
               />
             </CompactFieldGroup>
           </FormSection>
@@ -175,6 +143,7 @@ const FinancingModule = () => {
                 max={30}
                 step={0.1}
                 precision={2}
+                affectedMetrics={['wacc']}
               />
               <PercentageField
                 path={[...basePath, 'effectiveTaxRate']}
@@ -183,7 +152,8 @@ const FinancingModule = () => {
                 min={0}
                 max={50}
                 step={0.5}
-                precision={1}
+                precision={2}
+                affectedMetrics={['wacc']}
               />
             </CompactFieldGroup>
           </FormSection>
@@ -230,7 +200,7 @@ const FinancingModule = () => {
               min={0}
               max={30}
               step={0.5}
-              precision={1}
+              precision={2}
             />
             <PercentageField
               path={[...basePath, 'projectIRRTarget']}
@@ -239,7 +209,7 @@ const FinancingModule = () => {
               min={0}
               max={20}
               step={0.5}
-              precision={1}
+              precision={2}
             />
           </ResponsiveFieldRow>
 
@@ -265,7 +235,7 @@ const FinancingModule = () => {
       <Title level={2}>Financing Module</Title>
       <p>Configure investment parameters and financing structure for your wind farm project.</p>
 
-      <Tabs defaultActiveKey="investment" items={tabItems} type="card" />
+      <Tabs defaultActiveKey="financing" items={tabItems} type="card" />
     </div>
   );
 };

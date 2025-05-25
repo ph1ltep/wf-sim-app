@@ -1,8 +1,9 @@
-// src/components/forms/ContextForm.jsx - Fixed loading state reset
+// src/components/forms/ContextForm.jsx - Enhanced with metrics support
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Button, Space, Modal, Alert, message } from 'antd';
 import { ExclamationCircleOutlined, ReloadOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { calculateAffectedMetrics } from '../../utils/metricsUtils';
 import { get } from 'lodash';
 
 const { confirm } = Modal;
@@ -16,9 +17,10 @@ const ContextForm = ({
     cancelText = "Cancel",
     showActions = true,
     confirmOnCancel = true,
+    affectedMetrics = null, // New prop for form-level affected metrics
     ...formProps
 }) => {
-    const { getValueByPath, updateByPath } = useScenario();
+    const { getValueByPath, updateByPath, scenarioData } = useScenario();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -116,6 +118,30 @@ const ContextForm = ({
         };
     }, []);
 
+    // Convert form values to full context paths for prospective changes
+    const buildProspectiveChanges = useCallback((formValues) => {
+        const prospectiveChanges = {};
+
+        // Convert all form field values to full context paths
+        const convertToFullPaths = (obj, currentPath = []) => {
+            Object.keys(obj).forEach(key => {
+                const fullPath = [...basePath, ...currentPath, key];
+                const value = obj[key];
+
+                if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                    // Nested object - recurse
+                    convertToFullPaths(value, [...currentPath, key]);
+                } else {
+                    // Leaf value - add to prospective changes
+                    prospectiveChanges[fullPath.join('.')] = value;
+                }
+            });
+        };
+
+        convertToFullPaths(formValues);
+        return prospectiveChanges;
+    }, [basePath]);
+
     // Handle form submission with proper Ant Design validation FIRST
     const handleFinish = async (values) => {
         try {
@@ -137,8 +163,24 @@ const ContextForm = ({
                 return;
             }
 
-            // Now proceed with schema validation via updateByPath
-            const result = await updateByPath(basePath, values);
+            // Prepare updates - form values + affected metrics
+            let updates = { [basePath.join('.')]: values };
+
+            // Calculate affected metrics if declared (form mode)
+            if (affectedMetrics && affectedMetrics.length > 0) {
+                const prospectiveChanges = buildProspectiveChanges(values);
+                const metricUpdates = calculateAffectedMetrics(
+                    affectedMetrics,
+                    scenarioData,
+                    prospectiveChanges
+                );
+
+                // Merge form update with metric updates
+                updates = { ...updates, ...metricUpdates };
+            }
+
+            // Single batch updateByPath call with form + metrics
+            const result = await updateByPath(updates);
 
             if (result.isValid) {
                 // Success path

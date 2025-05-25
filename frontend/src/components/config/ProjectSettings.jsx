@@ -5,9 +5,6 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
 import { getAllLocations } from '../../api/locations';
 
-// Import metrics utilities
-import { refreshAllMetrics } from '../../utils/metricsUtils';
-
 // Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
 import ProjectMetrics from './projectSettings/ProjectMetrics';
@@ -81,33 +78,6 @@ const ProjectSettings = () => {
     fetchLocations();
   }, []);
 
-  // Refresh metrics when relevant values change
-  useEffect(() => {
-    if (scenarioData) {
-      // Use debouncing to avoid excessive calculations
-      const timeoutId = setTimeout(() => {
-        refreshAllMetrics(scenarioData, updateByPath);
-      }, 300);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [
-    scenarioData,
-    updateByPath,
-    // Dependencies that trigger metric recalculation
-    getValueByPath([...windFarmPath, 'numWTGs']),
-    getValueByPath([...windFarmPath, 'mwPerWTG']),
-    getValueByPath([...windFarmPath, 'capacityFactor']),
-    getValueByPath([...windFarmPath, 'curtailmentLosses']),
-    getValueByPath([...windFarmPath, 'electricalLosses']),
-    getValueByPath([...windFarmPath, 'wtgPlatformType']),
-    // Financing parameters that affect WACC
-    getValueByPath(['settings', 'modules', 'financing', 'debtRatio']),
-    getValueByPath(['settings', 'modules', 'financing', 'costOfEquity']),
-    getValueByPath(['settings', 'modules', 'financing', 'costOfOperationalDebt']),
-    getValueByPath(['settings', 'modules', 'financing', 'effectiveTaxRate'])
-  ]);
-
   // Handle location selection change
   const handleLocationChange = (locationId) => {
     const locationData = locations.find(loc => loc._id === locationId);
@@ -159,11 +129,6 @@ const ProjectSettings = () => {
             foreignCurrency: true,
             exchangeRate: true
           });
-
-          // Refresh metrics after location defaults are loaded
-          setTimeout(() => {
-            refreshAllMetrics(scenarioData, updateByPath);
-          }, 100);
         }
       })
       .catch(error => {
@@ -302,6 +267,7 @@ const ProjectSettings = () => {
               min={1}
               step={1}
               required
+              affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
             />
             <NumberField
               path={[...windFarmPath, 'mwPerWTG']}
@@ -311,6 +277,7 @@ const ProjectSettings = () => {
               step={0.1}
               precision={2}
               required
+              affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
             />
             <SelectField
               path={[...windFarmPath, 'wtgPlatformType']}
@@ -321,6 +288,7 @@ const ProjectSettings = () => {
                 { value: 'direct-drive', label: 'Direct Drive' }
               ]}
               required
+              affectedMetrics={['componentQuantities']}
             />
           </ResponsiveFieldRow>
           <ResponsiveFieldRow layout="oneColumn">
@@ -335,8 +303,9 @@ const ProjectSettings = () => {
               min={1}
               max={60}
               step={0.5}
-              precision={1}
+              precision={2}
               required
+              affectedMetrics={['grossAEP', 'netAEP']}
             />
           </ResponsiveFieldRow>
 
@@ -350,7 +319,8 @@ const ProjectSettings = () => {
               min={0}
               max={30}
               step={0.5}
-              precision={1}
+              precision={2}
+              affectedMetrics={['netAEP']}
             />
             <PercentageField
               path={[...windFarmPath, 'electricalLosses']}
@@ -359,7 +329,8 @@ const ProjectSettings = () => {
               min={0}
               max={15}
               step={0.5}
-              precision={1}
+              precision={2}
+              affectedMetrics={['netAEP']}
             />
           </ResponsiveFieldRow>
         </FormSection>
