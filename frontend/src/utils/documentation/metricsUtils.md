@@ -2,13 +2,14 @@
 
 ## Overview
 
-The metricsUtils.js module provides a centralized, extensible system for calculating and managing project metrics. It integrates with ContextFields to automatically update calculated values when dependencies change, supporting both direct field updates and form-based batch updates.
+The metricsUtils.js module provides a centralized, extensible system for calculating and managing project metrics. It integrates seamlessly with ContextFields and ContextForm to automatically update calculated values when dependencies change, supporting both direct field updates and form-based batch updates.
 
 ## Core Features
 
 - Centralized Calculations: All metric calculations in one place
-- Prospective State Support: Calculate metrics with pending changes before committing
+- Automatic Updates: Metrics update automatically when field dependencies change
 - Dual Mode Operation: Handles both direct field updates and form batch updates
+- Prospective State Support: Calculate metrics with pending changes before committing
 - Context Integration: Seamless updates to scenario context
 - Extensible Registry: Easy to add new metrics
 - Batch Updates: Efficient single-context update for all metrics
@@ -24,6 +25,46 @@ The metricsUtils.js module provides a centralized, extensible system for calcula
 | netAEP | Net AEP after losses | wind farm | settings.metrics.netAEP |
 | componentQuantities | Component counts by type | wind farm | settings.metrics.componentQuantities |
 | debtToEquityRatio | Debt-to-equity ratio | financing | settings.metrics.debtToEquityRatio |
+
+## Integration with ContextFields
+
+### Direct Mode (Immediate Updates)
+ContextFields with affectedMetrics prop automatically calculate and update metrics when field values change:
+
+```jsx
+// Single metric affected
+<NumberField 
+  path={['settings', 'modules', 'financing', 'debtRatio']}
+  label="Debt Ratio"
+  affectedMetrics={['wacc']}
+/>
+
+// Multiple metrics affected
+<NumberField 
+  path={['settings', 'project', 'windFarm', 'numWTGs']}
+  label="Number of WTGs"
+  affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
+/>
+```
+
+Behavior: When user changes the field value, metrics are calculated with the new value and both field + metrics are updated in a single batch call to updateByPath.
+
+### Form Mode (Batch Updates on Submit)
+ContextForm with affectedMetrics prop calculates metrics using ALL form field values when the form is submitted:
+
+```jsx
+// Form-level metric declaration
+<ContextForm 
+  path={['settings', 'modules', 'financing']}
+  affectedMetrics={['wacc', 'debtToEquityRatio']}
+>
+  <NumberField path="debtRatio" label="Debt Ratio" />
+  <NumberField path="costOfEquity" label="Cost of Equity" />
+  <NumberField path="effectiveTaxRate" label="Tax Rate" />
+</ContextForm>
+```
+
+Behavior: Metrics are calculated with the complete form state (all field values) when form is submitted, ensuring accurate calculations based on the full prospective state.
 
 ## Prospective Changes Format
 
@@ -49,7 +90,7 @@ const prospectiveChanges = {
 
 Important: In form mode, include ALL form field values so metrics calculate with the complete prospective state, not just individual field changes.
 
-## Usage Examples
+## Advanced Usage Examples
 
 ### Calculate Individual Metric
 ```javascript
@@ -64,7 +105,7 @@ const wacc = calculateMetric('wacc', scenarioData, {
 const wacc = calculateMetric('wacc', null, allFormFieldValues);
 ```
 
-### Calculate Affected Metrics (Recommended for ContextFields)
+### Calculate Affected Metrics (Used by ContextFields)
 ```javascript
 import { calculateAffectedMetrics } from '../utils/metricsUtils';
 
@@ -90,60 +131,192 @@ const updates = calculateAffectedMetrics(
 );
 ```
 
-### Batch Update with Field Changes
+### Batch Update Pattern (Used Internally)
 ```javascript
 // ContextField integration pattern
 const fieldUpdate = { 'settings.modules.financing.debtRatio': 80 };
 const metricUpdates = calculateAffectedMetrics(['wacc'], null, fieldUpdate);
 const batchUpdate = { ...fieldUpdate, ...metricUpdates };
 
- // Single updateByPath call with field + metrics
+// Single updateByPath call with field + metrics
 await updateByPath(batchUpdate);
+```
+
+## Real-World Integration Examples
+
+### Financing Module with Real-Time WACC
+```jsx
+const FinancingModule = () => {
+  const wacc = getValueByPath(['settings', 'metrics', 'wacc'], 0);
+  
+  return (
+    <div>
+      {/* Real-time WACC display */}
+      <Statistic title="WACC" value={wacc} suffix="%" />
+      
+      {/* Fields that affect WACC */}
+      <PercentageField
+        path={['settings', 'modules', 'financing', 'debtRatio']}
+        label="Debt Ratio"
+        affectedMetrics={['wacc', 'debtToEquityRatio']}
+      />
+      <PercentageField
+        path={['settings', 'modules', 'financing', 'costOfEquity']}
+        label="Cost of Equity"
+        affectedMetrics={['wacc']}
+      />
+    </div>
+  );
+};
+```
+
+### Project Settings with Multiple Metrics
+```jsx
+const ProjectSettings = () => {
+  const calculatedMetrics = getValueByPath(['settings', 'metrics'], {});
+  
+  return (
+    <div>
+      {/* Fields affecting project metrics */}
+      <NumberField
+        path={['settings', 'project', 'windFarm', 'numWTGs']}
+        label="Number of WTGs"
+        affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
+      />
+      <NumberField
+        path={['settings', 'project', 'windFarm', 'mwPerWTG']}
+        label="MW per WTG"
+        affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
+      />
+      
+      {/* Display calculated metrics */}
+      <ProjectMetrics calculatedValues={calculatedMetrics} />
+    </div>
+  );
+};
+```
+
+### Form Mode with Complex Dependencies
+```jsx
+const FinancingForm = () => {
+  return (
+    <ContextForm 
+      path={['settings', 'modules', 'financing']}
+      affectedMetrics={['wacc', 'debtToEquityRatio']}
+    >
+      <FormSection title="Debt Parameters">
+        <NumberField path="debtRatio" label="Debt Ratio" />
+        <NumberField path="costOfOperationalDebt" label="Cost of Debt" />
+      </FormSection>
+      
+      <FormSection title="Equity Parameters">
+        <NumberField path="costOfEquity" label="Cost of Equity" />
+        <NumberField path="effectiveTaxRate" label="Tax Rate" />
+      </FormSection>
+      
+      {/* Metrics calculated with ALL form values on submit */}
+    </ContextForm>
+  );
+};
 ```
 
 ## Adding New Metrics
 
-### Registry Addition (Recommended)
+### Step 1: Create Calculator Function
 ```javascript
-// In metricsUtils.js METRIC_CALCULATORS
-lcoe: {
-  calculator: calculateLCOE,
-  dependencies: ['settings.modules.financing', 'settings.project.windFarm'],
-  storePath: ['settings', 'metrics', 'lcoe']
-}
-
-// Add the calculator function
+// Add to metricsUtils.js
 export const calculateLCOE = (financingParams, windFarmParams) => {
-  // calculation logic using both parameter sets
-  return lcoeValue;
+  if (!financingParams || !windFarmParams) return 0;
+  
+  const { capex, opex } = financingParams;
+  const { netAEP } = windFarmParams;
+  const projectLife = 20; // years
+  
+  const totalCosts = capex + (opex * projectLife);
+  const totalEnergy = netAEP * projectLife;
+  
+  return totalCosts / totalEnergy; // $/MWh
 };
 ```
 
-## ContextField Integration
-
-ContextFields use the affectedMetrics prop to declare which metrics they affect:
-
+### Step 2: Add to Registry
 ```javascript
-// Direct mode - immediate calculation and update
-<NumberField 
-  path={['settings', 'modules', 'financing', 'debtRatio']}
-  affectedMetrics={['wacc', 'debtToEquityRatio']}
-  label="Debt Ratio"
-/>
-
-// Form mode - metrics calculated with all form values on submit
-<ContextForm affectedMetrics={['wacc', 'totalMW', 'netAEP']}>
-  <NumberField path={[...]} />
-  <NumberField path={[...]} />
-  <NumberField path={[...]} />
-</ContextForm>
+// Add to METRIC_CALCULATORS in metricsUtils.js
+const METRIC_CALCULATORS = {
+  // existing metrics...
+  lcoe: {
+    calculator: calculateLCOE,
+    dependencies: ['settings.modules.financing', 'settings.project.windFarm'],
+    storePath: ['settings', 'metrics', 'lcoe']
+  }
+};
 ```
+
+### Step 3: Use in Component
+```jsx
+<NumberField 
+  path={['settings', 'modules', 'financing', 'capex']}
+  label="CAPEX"
+  affectedMetrics={['lcoe']} // Now includes your new metric
+/>
+```
+
+## Performance Considerations
+
+- Automatic Batching: All metric updates use single updateByPath calls
+- Prospective Calculations: Metrics calculated before context updates
+- Efficient Dependencies: Only declared metrics are calculated
+- Form Isolation: Form mode prevents unnecessary recalculations during editing
+- Error Isolation: Failed metric calculations don't break field updates
 
 ## Best Practices
 
-- Form Mode: Always include ALL form field values in prospectiveChanges
-- Direct Mode: Include only the changing field in prospectiveChanges
-- Batch Updates: Use single updateByPath call with field + metric updates
-- Dependencies: Clearly define what data each metric needs
-- Storage Paths: Use consistent metric storage location
-- Error Handling: Handle edge cases and null values in calculators
+### Do's
+- Declare metrics at appropriate level: Field-level for individual impacts, form-level for complex dependencies
+- Use prospective state: Always calculate metrics with pending changes, not current state
+- Keep calculators pure: No side effects in calculator functions
+- Handle edge cases: Check for null/undefined values in calculators
+- Use descriptive metric names: Clear, meaningful names for easy identification
+
+### Don'ts
+- Don't mix modes: Avoid both field-level and form-level metrics in same form
+- Don't calculate manually: Let ContextFields handle metric updates automatically
+- Don't ignore dependencies: Ensure all required data paths are in dependencies array
+- Don't mutate input data: Keep calculator functions pure and immutable
+
+## Troubleshooting
+
+### Metrics not updating
+```jsx
+// ✅ Correct: Declare affectedMetrics
+<NumberField 
+  path="debtRatio" 
+  affectedMetrics={['wacc']}
+/>
+
+// ❌ Incorrect: Missing affectedMetrics
+<NumberField path="debtRatio" />
+```
+
+### Form metrics calculating too early
+```jsx
+// ✅ Correct: Form-level declaration
+<ContextForm affectedMetrics={['wacc']}>
+  <NumberField path="debtRatio" />
+  <NumberField path="costOfEquity" />
+</ContextForm>
+
+// ❌ Incorrect: Field-level in form mode
+<ContextForm>
+  <NumberField path="debtRatio" affectedMetrics={['wacc']} />
+</ContextForm>
+```
+
+### Metrics showing stale values
+```jsx
+// ✅ Correct: Get metrics from context
+const metrics = getValueByPath(['settings', 'metrics'], {});
+
+// ❌ Incorrect: Manual calculation
+const wacc = calculateWACC(financingData); // Bypasses automatic system
+```

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The layout components provide a consistent, responsive design system for organizing form fields. All components support debug borders via REACT_APP_DEBUG_FORM_BORDERS=true.
+The layout components provide a consistent, responsive design system for organizing form fields with automatic metric calculation support. All components support debug borders via REACT_APP_DEBUG_FORM_BORDERS=true and can integrate with the automatic metrics system.
 
 ## Core Layout Components
 
@@ -72,6 +72,7 @@ Layout Breakpoints:
 
 ### FieldGroup
 Purpose: Vertical or horizontal grouping of related fields with consistent spacing
+Replaces
 Replaces: Manual spacing between related form fields
 Nesting: Inside FormSection, FieldCard, FormCol; contains form fields
 
@@ -130,19 +131,88 @@ Nesting: Inside FormSection, FieldCard; standalone element
 | dashed | boolean | true/false / false | Dashed line style |
 | plain | boolean | true/false / false | Plain text style |
 
-## Component Hierarchy & Nesting Rules
+## Automatic Metrics Integration
 
+Layout components work seamlessly with the automatic metrics system through field-level affectedMetrics declarations:
+
+### Field-Level Metric Declarations
+```jsx
+<FormSection title="Wind Farm Configuration">
+  <ResponsiveFieldRow layout="threeColumn">
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'numWTGs']}
+      label="Number of WTGs"
+      affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
+    />
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'mwPerWTG']}
+      label="MW per WTG"
+      affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
+    />
+    <SelectField 
+      path={['settings', 'project', 'windFarm', 'wtgPlatformType']}
+      label="Platform Type"
+      affectedMetrics={['componentQuantities']}
+    />
+  </ResponsiveFieldRow>
+</FormSection>
+```
+
+### Organized Metric Groups
+```jsx
+<FormSection title="Financing Parameters">
+  <CompactFieldGroup direction="vertical" size="middle">
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'debtRatio']}
+      label="Debt Ratio"
+      affectedMetrics={['wacc', 'debtToEquityRatio']}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfEquity']}
+      label="Cost of Equity"
+      affectedMetrics={['wacc']}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'effectiveTaxRate']}
+      label="Tax Rate"
+      affectedMetrics={['wacc']}
+    />
+  </CompactFieldGroup>
+</FormSection>
+```
+
+### Mixed Metric Dependencies
+```jsx
+<FormSection title="Project Parameters">
+  <ResponsiveFieldRow layout="twoColumn">
+    {/* Wind farm metrics */}
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'capacityFactor']}
+      label="Capacity Factor"
+      affectedMetrics={['grossAEP', 'netAEP']}
+    />
+    {/* Financing metrics */}
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'debtRatio']}
+      label="Debt Ratio"
+      affectedMetrics={['wacc']}
+    />
+  </ResponsiveFieldRow>
+</FormSection>
+```
+
+## Component Hierarchy & Nesting Rules
 
 FormSection (root organization)
 ```
 ├── ResponsiveFieldRow (quick layouts)
-│   └── [form fields directly]
+│   └── [form fields with affectedMetrics]
 ├── FormRow (manual grid control)
 │   └── FormCol
 │       ├── FieldGroup (related field grouping)
 │       ├── CompactFieldGroup (connected inputs)  
 │       ├── InlineFieldGroup (mixed content)
-│       └── [form fields]
+│       └── [form fields with affectedMetrics]
 ├── FieldCard (visual emphasis)
 │   └── [any layout components + fields]
 └── FormDivider (separation)
@@ -160,175 +230,144 @@ FormSection (root organization)
 | InlineFieldGroup | Search bars, toolbars, action rows | Vertical field organization |
 | FieldCard | Distinct sections, optional/advanced settings | Basic content organization |
 
-## Common Layout Patterns
+## Common Layout Patterns with Metrics
 
-### FormSection
-Basic section with title and content organization:
+### WACC Calculation Section
 ```jsx 
-<FormSection title="Project Settings" extra={<Button>Reset</Button>}> 
-  <TextField path="name" label="Project Name" />
-  <NumberField path="capacity" label="Capacity (MW)" /> 
-</FormSection>
-
-```
-
-### FormRow and FormCol
-Manual grid control with responsive breakpoints:
-```jsx 
-<FormRow gutter={[16, 16]}> 
-  <FormCol xs={24} sm={12} md={8}> 
-    <TextField path="firstName" label="First Name" /> 
-  </FormCol>
-  <FormCol xs={24} sm={12} md={8}> 
-    <TextField path="lastName" label="Last Name" /> 
-  </FormCol>
-  <FormCol xs={24} sm={24} md={8}>
-    <TextField path="email" label="Email" /> 
-  </FormCol> 
-</FormRow> 
-```
-
-### ResponsiveFieldRow
-Preset responsive layouts for common patterns:
-```jsx 
-<ResponsiveFieldRow layout="twoColumn"> 
-  <TextField path="firstName" label="First Name" /> 
-  <TextField path="lastName" label="Last Name" /> 
-</ResponsiveFieldRow>
-```
-
-### CompactFieldGroup
-No spacing between fields (connected inputs):
-```jsx 
-<CompactFieldGroup> 
-  <SelectField path="countryCode" options={countryCodes} /> 
-  <TextField path="phoneNumber" label="Phone Number" /> 
-</CompactFieldGroup>
-```
-
-### FieldGroup
-Consistent spacing between related fields:
-```jsx
-<FieldGroup direction="vertical" size="middle"> 
-  <CheckboxField path="option1" label="Enable Feature A" /> 
-  <CheckboxField path="option2" label="Enable Feature B" /> 
-  <CheckboxField path="option3" label="Enable Feature C" /> 
-</FieldGroup>
-```
-
-### InlineFieldGroup
-Flexible inline layout that wraps:
-```jsx 
-<InlineFieldGroup size="small" align="center"> 
-  <TextField path="search" label="Search" /> 
-  <SelectField path="category" options={categories} /> 
-  <Button>Filter</Button> 
-  <Button>Clear</Button> 
-</InlineFieldGroup>
-```
-
-### FieldCard
-Card-based section grouping:
-```jsx
-<FieldCard title="Contact Information" size="small">
+<FormSection title="WACC Parameters">
   <ResponsiveFieldRow layout="twoColumn">
-    <TextField path="email" label="Email" />
-    <TextField path="phone" label="Phone" />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'debtRatio']}
+      label="Debt Ratio"
+      affectedMetrics={['wacc', 'debtToEquityRatio']}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfEquity']}
+      label="Cost of Equity"
+      affectedMetrics={['wacc']}
+    />
   </ResponsiveFieldRow>
+  
+  <ResponsiveFieldRow layout="twoColumn">
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfOperationalDebt']}
+      label="Cost of Debt"
+      affectedMetrics={['wacc']}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'effectiveTaxRate']}
+      label="Tax Rate"
+      affectedMetrics={['wacc']}
+    />
+  </ResponsiveFieldRow>
+</FormSection>
+```
+
+### Project Capacity Configuration
+```jsx 
+<FormSection title="Wind Farm Specifications">
+  <ResponsiveFieldRow layout="threeColumn"> 
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'numWTGs']}
+      label="Number of WTGs"
+      affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
+    />
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'mwPerWTG']}
+      label="MW per WTG"
+      affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
+    />
+    <SelectField 
+      path={['settings', 'project', 'windFarm', 'wtgPlatformType']}
+      label="Platform Type"
+      options={platformOptions}
+      affectedMetrics={['componentQuantities']}
+    />
+  </ResponsiveFieldRow>
+</FormSection>
+```
+
+### Energy Production Factors
+```jsx
+<FormSection title="Energy Production">
+  <ResponsiveFieldRow layout="oneColumn">
+    <NumberField 
+      path={['settings', 'project', 'windFarm', 'capacityFactor']}
+      label="Capacity Factor (%)"
+      affectedMetrics={['grossAEP', 'netAEP']}
+    />
+  </ResponsiveFieldRow>
+  
+  <ResponsiveFieldRow layout="twoColumn">
+    <PercentageField
+      path={['settings', 'project', 'windFarm', 'curtailmentLosses']}
+      label="Curtailment Losses"
+      affectedMetrics={['netAEP']}
+    />
+    <PercentageField
+      path={['settings', 'project', 'windFarm', 'electricalLosses']}
+      label="Electrical Losses"
+      affectedMetrics={['netAEP']}
+    />
+  </ResponsiveFieldRow>
+</FormSection>
+```
+
+### Compact Financial Parameters
+```jsx
+<FieldCard title="Financial Rates" size="small">
+  <CompactFieldGroup direction="vertical" size="middle">
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfConstructionDebt']}
+      label="Construction Debt Rate"
+      precision={2}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfOperationalDebt']}
+      label="Operational Debt Rate"
+      affectedMetrics={['wacc']}
+      precision={2}
+    />
+    <PercentageField
+      path={['settings', 'modules', 'financing', 'costOfEquity']}
+      label="Cost of Equity"
+      affectedMetrics={['wacc']}
+      precision={2}
+    />
+  </CompactFieldGroup>
 </FieldCard>
 ```
 
-### FormDivider
-Section separation with different margin options:
+### Form Mode with Layout Organization
 ```jsx
-<FormDivider margin="large" orientation="left">Advanced Settings</FormDivider>
-```
-
-## Complex Layout Example
-
-Here's a comprehensive example showing proper nesting and component usage:
-
-```jsx
-<Form layout="vertical">
-  {/* Root organization */}
-  <FormSection title="Project Configuration">
-    {/* Quick responsive layout for basic info */}
+<ContextForm 
+  path={['settings', 'modules', 'financing']}
+  affectedMetrics={['wacc', 'debtToEquityRatio']}
+>
+  <FormSection title="Debt Parameters">
     <ResponsiveFieldRow layout="twoColumn">
-      <TextField path="name" label="Project Name" required />
-      <TextField path="code" label="Project Code" />
+      <PercentageField path="debtRatio" label="Debt Ratio" />
+      <PercentageField path="costOfOperationalDebt" label="Cost of Debt" />
     </ResponsiveFieldRow>
-    
-    <TextAreaField path="description" label="Description" rows={3} />
-    
-    {/* Visual separation */}
-    <FormDivider margin="default" orientation="left">Location & Contact</FormDivider>
-    
-    {/* Custom responsive layout for complex address */}
-    <FormRow gutter={[16, 16]}>
-      <FormCol xs={24} sm={24} md={16}>
-        <TextField path="address" label="Address" />
-      </FormCol>
-      <FormCol xs={24} sm={12} md={4}>
-        <TextField path="zip" label="ZIP" />
-      </FormCol>
-      <FormCol xs={24} sm={12} md={4}>
-        <SelectField path="country" options={countries} />
-      </FormCol>
-    </FormRow>
-    
-    {/* Connected input group */}
-    <CompactFieldGroup>
-      <SelectField path="countryCode" options={countryCodes} style={{ width: 100 }} />
-      <TextField path="phoneNumber" label="Phone Number" />
-    </CompactFieldGroup>
   </FormSection>
   
-  {/* Another root section */}
-  <FormSection title="Technical Specifications">
-    <ResponsiveFieldRow layout="threeColumn">
-      <NumberField path="capacity" label="Capacity (MW)" />
-      <NumberField path="turbineCount" label="Number of Turbines" />
-      <NumberField path="hubHeight" label="Hub Height (m)" />
-    </ResponsiveFieldRow>
-    
-    <FormDivider margin="small" />
-    
-    {/* Grouped related checkboxes */}
-    <FieldGroup direction="vertical" size="small">
-      <CheckboxField path="features.monitoring" label="Remote Monitoring" />
-      <CheckboxField path="features.predictive" label="Predictive Maintenance" />
-      <CheckboxField path="features.scada" label="SCADA Integration" />
-    </FieldGroup>
-  </FormSection>
+  <FormDivider margin="default" />
   
-  {/* Visually distinct card section */}
-  <FieldCard 
-    title="Financial Settings" 
-    extra={<Button size="small">Calculate</Button>}
-    size="small"
-  >
+  <FormSection title="Equity & Tax">
     <ResponsiveFieldRow layout="twoColumn">
-      <CurrencyField path="budget" label="Project Budget" />
-      <PercentageField path="contingency" label="Contingency %" />
+      <PercentageField path="costOfEquity" label="Cost of Equity" />
+      <PercentageField path="effectiveTaxRate" label="Tax Rate" />
     </ResponsiveFieldRow>
-    
-    {/* Inline toolbar with mixed content */}
-    <InlineFieldGroup align="center" style={{ marginTop: 16 }}>
-      <TextField path="discountRate" label="Discount Rate" style={{ width: 120 }} />
-      <Button type="primary">Run Analysis</Button>
-      <Button>Reset</Button>
-    </InlineFieldGroup>
-  </FieldCard>
-</Form>
+  </FormSection>
+</ContextForm>
 ```
 
-## Best Practices
+## Best Practices with Metrics
 
-1. Start with FormSection - Use for top-level organization
-2. Use ResponsiveFieldRow for common layouts - Saves manual breakpoint management
-3. Use FormRow/FormCol for complex responsive needs - When presets don't fit
-4. Group related fields with FieldGroup - Maintains logical and visual relationships
-5. Use CompactFieldGroup sparingly - Only for truly connected inputs
-6. Use FieldCard for emphasis - When sections need visual distinction
-7. Test responsive behavior - Always verify layouts work on mobile devices
-8. Enable debug borders during development - Set REACT_APP_DEBUG_FORM_BORDERS=true
+1. Group related metrics - Use FormSection to organize fields that affect the same metrics
+2. Use appropriate layouts - ResponsiveFieldRow for most cases, custom FormRow/FormCol for special needs
+3. Declare metrics consistently - Field-level for immediate feedback, form-level for batch calculations
+4. Test responsive behavior - Always verify layouts work on mobile devices with metric calculations
+5. Enable debug borders during development - Set REACT_APP_DEBUG_FORM_BORDERS=true
+6. Consider metric performance - Group fields that affect expensive calculations
+7. Provide visual feedback - Use cards or sections to highlight metric-affecting areas
