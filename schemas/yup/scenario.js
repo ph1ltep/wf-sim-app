@@ -127,14 +127,19 @@ const SettingsSchema = Yup.object().shape({
         financing: Yup.object().shape({
             capex: Yup.number().default(50000000),
             devex: Yup.number().default(10000000),
-            model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Balance-Sheet'),
-            debtToEquityRatio: Yup.number().default(1.5),
-            debtToCapexRatio: Yup.number().default(0.7),
+            model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
+            //debtToEquityRatio: Yup.number().default(1.5),
+            //debtToCapexRatio: Yup.number().default(0.7),
             loanDuration: Yup.number().default(15),
-            loanInterestRateBS: Yup.number().default(5),
-            loanInterestRatePF: Yup.number().default(6),
-            equityInvestment: Yup.number(),
+            //loanInterestRateBS: Yup.number().default(5),
+            //loanInterestRatePF: Yup.number().default(6),
+            //equityInvestment: Yup.number(),
             minimumDSCR: Yup.number().default(1.3),
+            costOfConstructionDebt: Yup.number().default(4),
+            costOfOperationalDebt: Yup.number().default(5),
+            debtRatio: Yup.number().default(70),
+            effectiveTaxRate: Yup.number().default(25),
+            costOfEquity: Yup.number().default(5),
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),
@@ -250,6 +255,8 @@ const SettingsSchema = Yup.object().shape({
         totalMW: Yup.number().default(70), // Matches getDefaultSettings
         grossAEP: Yup.number().default(214032), // Matches getDefaultSettings
         netAEP: Yup.number().default(214032), // Matches getDefaultSettings
+        debtToEquityRatio: Yup.number().default(1.5), // Matches getDefaultSettings
+        wacc: Yup.number().default(5), // Matches getDefaultSettings
         componentQuantities: Yup.object().shape({
             blades: Yup.number().default(60), // Matches getDefaultSettings
             bladeBearings: Yup.number().default(60), // Matches getDefaultSettings

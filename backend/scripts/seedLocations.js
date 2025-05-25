@@ -1,4 +1,6 @@
 // backend/scripts/seedLocations.js
+
+//command to execute: MONGO_URL=mdb.fthome.org MONGO_PASS= MONGO_USER= node backend/scripts/seedOEMScopes.js
 require('dotenv').config();
 const mongoose = require('mongoose');
 const LocationDefaults = require('../models/LocationDefaults');
@@ -126,7 +128,7 @@ const seedDatabase = async () => {
     // Disconnect
     await mongoose.disconnect();
     console.log('Database connection closed');
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error seeding database:', error);

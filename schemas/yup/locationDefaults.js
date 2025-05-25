@@ -18,10 +18,35 @@ const LocationDefaultsSchema = Yup.object().shape({
         .required('Country code is required')
         .trim(),
     inflationRate: Yup.number()
-        .min(0, 'Inflation rate must be at least 0')
+        .min(-5, 'Inflation rate must be at least -5')
         .max(100, 'Inflation rate must not exceed 100')
         .required('Inflation rate is required')
         .default(2.0),
+    costOfConstructionDebt: Yup.number()
+        .min(-5, 'Inflation rate must be at least -5')
+        .max(100, 'Inflation rate must not exceed 100')
+        .required('Inflation rate is required')
+        .default(2.5),
+    costOfOperationalDebt: Yup.number()
+        .min(-5, 'Inflation rate must be at least -5')
+        .max(100, 'Inflation rate must not exceed 100')
+        .required('Inflation rate is required')
+        .default(2.5),
+    costofEquity: Yup.number()
+        .min(-5, 'Inflation rate must be at least -5')
+        .max(100, 'Inflation rate must not exceed 100')
+        .required('Inflation rate is required')
+        .default(2.0),
+    debtRatio: Yup.number()
+        .min(0, 'Inflation rate must be at least -5')
+        .max(100, 'Inflation rate must not exceed 100')
+        .required('Inflation rate is required')
+        .default(70.0),
+    effectiveTaxRate: Yup.number()
+        .min(-5, 'Inflation rate must be at least -5')
+        .max(100, 'Inflation rate must not exceed 100')
+        .required('Inflation rate is required')
+        .default(15.0),
     capacityFactor: Yup.number()
         .min(0, 'Capacity factor must be at least 0')
         .max(100, 'Capacity factor must not exceed 100')
