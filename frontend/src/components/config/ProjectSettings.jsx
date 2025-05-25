@@ -5,7 +5,6 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
 import { getAllLocations } from '../../api/locations';
 
-
 // Import project-specific components
 import LocationSelector from './projectSettings/LocationSelector';
 import ProjectMetrics from './projectSettings/ProjectMetrics';
@@ -35,14 +34,6 @@ const ProjectSettings = () => {
   const windFarmPath = ['settings', 'project', 'windFarm'];
   const currencyPath = ['settings', 'project', 'currency'];
 
-  // State for calculated metrics
-  const [calculatedMetrics, setCalculatedMetrics] = useState({
-    totalMW: 0,
-    grossAEP: 0,
-    netAEP: 0,
-    componentQuantities: {}
-  });
-
   // Get scenario context
   const {
     scenarioData,
@@ -64,6 +55,9 @@ const ProjectSettings = () => {
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
+  // Get calculated metrics from context (now calculated by metricsUtils)
+  const calculatedMetrics = getValueByPath(['settings', 'metrics'], {});
+
   // Fetch locations
   useEffect(() => {
     const fetchLocations = async () => {
@@ -83,59 +77,6 @@ const ProjectSettings = () => {
 
     fetchLocations();
   }, []);
-
-  // Calculate metrics when relevant values change
-  useEffect(() => {
-    if (scenarioData) {
-      const numWTGs = getValueByPath([...windFarmPath, 'numWTGs'], 0);
-      const mwPerWTG = getValueByPath([...windFarmPath, 'mwPerWTG'], 0);
-      const capacityFactor = getValueByPath([...windFarmPath, 'capacityFactor'], 0);
-      const curtailmentLosses = getValueByPath([...windFarmPath, 'curtailmentLosses'], 0);
-      const electricalLosses = getValueByPath([...windFarmPath, 'electricalLosses'], 0);
-      const wtgPlatformType = getValueByPath([...windFarmPath, 'wtgPlatformType'], 'geared');
-
-      const totalMW = numWTGs * mwPerWTG;
-      const grossAEP = totalMW * (capacityFactor / 100) * 8760;
-
-      const afterCurtailment = grossAEP * (1 - curtailmentLosses / 100);
-      const netAEP = afterCurtailment * (1 - electricalLosses / 100);
-
-      const componentQuantities = {
-        blades: numWTGs * 3,
-        bladeBearings: numWTGs * 3,
-        transformers: numWTGs,
-        gearboxes: wtgPlatformType === 'geared' ? numWTGs : 0,
-        generators: numWTGs,
-        converters: numWTGs,
-        mainBearings: numWTGs,
-        yawSystems: numWTGs,
-      };
-
-      const metrics = {
-        totalMW,
-        grossAEP,
-        netAEP,
-        componentQuantities
-      };
-
-      setCalculatedMetrics(metrics);
-
-      // Only update the context if values have changed
-      const currentMetrics = getValueByPath(['settings', 'metrics'], {});
-      if (JSON.stringify(currentMetrics) !== JSON.stringify(metrics)) {
-        updateByPath(['settings', 'metrics'], metrics);
-      }
-    }
-  }, [
-    getValueByPath,
-    updateByPath,
-    getValueByPath([...windFarmPath, 'numWTGs']),
-    getValueByPath([...windFarmPath, 'mwPerWTG']),
-    getValueByPath([...windFarmPath, 'capacityFactor']),
-    getValueByPath([...windFarmPath, 'curtailmentLosses']),
-    getValueByPath([...windFarmPath, 'electricalLosses']),
-    getValueByPath([...windFarmPath, 'wtgPlatformType'])
-  ]);
 
   // Handle location selection change
   const handleLocationChange = (locationId) => {
@@ -165,7 +106,14 @@ const ProjectSettings = () => {
 
       // Cost module values
       'settings.modules.cost.escalationRate.parameters.value': 1,
-      'settings.modules.cost.escalationRate.parameters.drift': selectedLocation.inflationRate
+      'settings.modules.cost.escalationRate.parameters.drift': selectedLocation.inflationRate,
+
+      // Financing module values (new WACC parameters)
+      'settings.modules.financing.costOfConstructionDebt': selectedLocation.costOfConstructionDebt,
+      'settings.modules.financing.costOfOperationalDebt': selectedLocation.costOfOperationalDebt,
+      'settings.modules.financing.costOfEquity': selectedLocation.costofEquity,
+      'settings.modules.financing.debtRatio': selectedLocation.debtRatio,
+      'settings.modules.financing.effectiveTaxRate': selectedLocation.effectiveTaxRate
     };
 
     // Apply all updates in a single call
@@ -319,6 +267,7 @@ const ProjectSettings = () => {
               min={1}
               step={1}
               required
+              affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
             />
             <NumberField
               path={[...windFarmPath, 'mwPerWTG']}
@@ -328,6 +277,7 @@ const ProjectSettings = () => {
               step={0.1}
               precision={2}
               required
+              affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
             />
             <SelectField
               path={[...windFarmPath, 'wtgPlatformType']}
@@ -338,6 +288,7 @@ const ProjectSettings = () => {
                 { value: 'direct-drive', label: 'Direct Drive' }
               ]}
               required
+              affectedMetrics={['componentQuantities']}
             />
           </ResponsiveFieldRow>
           <ResponsiveFieldRow layout="oneColumn">
@@ -352,8 +303,9 @@ const ProjectSettings = () => {
               min={1}
               max={60}
               step={0.5}
-              precision={1}
+              precision={2}
               required
+              affectedMetrics={['grossAEP', 'netAEP']}
             />
           </ResponsiveFieldRow>
 
@@ -367,7 +319,8 @@ const ProjectSettings = () => {
               min={0}
               max={30}
               step={0.5}
-              precision={1}
+              precision={2}
+              affectedMetrics={['netAEP']}
             />
             <PercentageField
               path={[...windFarmPath, 'electricalLosses']}
@@ -376,7 +329,8 @@ const ProjectSettings = () => {
               min={0}
               max={15}
               step={0.5}
-              precision={1}
+              precision={2}
+              affectedMetrics={['netAEP']}
             />
           </ResponsiveFieldRow>
         </FormSection>

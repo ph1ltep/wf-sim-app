@@ -104,8 +104,8 @@ const FailureModelSchema = Yup.object().shape({
 const SettingsSchema = Yup.object().shape({
     general: Yup.object().shape({
         projectName: Yup.string().default('Wind Farm Project'),
+        projectLife: Yup.number().default(20),
         startDate: Yup.date(),
-        projectLife: Yup.number().default(20)
     }),
     project: Yup.object().shape({
         windFarm: Yup.object().shape({
@@ -115,6 +115,8 @@ const SettingsSchema = Yup.object().shape({
             capacityFactor: Yup.number().default(35),
             curtailmentLosses: Yup.number().default(0),
             electricalLosses: Yup.number().default(0),
+            ntpDate: Yup.date(),
+            codDate: Yup.date(),
         }),
         currency: Yup.object().shape({
             local: Yup.string().default('USD'),
@@ -128,18 +130,14 @@ const SettingsSchema = Yup.object().shape({
             capex: Yup.number().default(50000000),
             devex: Yup.number().default(10000000),
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
-            //debtToEquityRatio: Yup.number().default(1.5),
-            //debtToCapexRatio: Yup.number().default(0.7),
             loanDuration: Yup.number().default(15),
-            //loanInterestRateBS: Yup.number().default(5),
-            //loanInterestRatePF: Yup.number().default(6),
-            //equityInvestment: Yup.number(),
             minimumDSCR: Yup.number().default(1.3),
             costOfConstructionDebt: Yup.number().default(4),
             costOfOperationalDebt: Yup.number().default(5),
             debtRatio: Yup.number().default(70),
             effectiveTaxRate: Yup.number().default(25),
             costOfEquity: Yup.number().default(5),
+            gracePeriod: Yup.number().default(1),
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),

@@ -21,6 +21,7 @@ import { createActionsColumn } from './columns';
  * @param {Object} props.actionsConfig Configuration for the actions column
  * @param {React.ReactNode} props.headerExtra Extra content for the table header
  * @param {Object} props.expandable Expandable row configuration
+ * @param {Object} props.modalProps Additional props for the Modal component
  */
 const DatabaseTable = ({
   columns,
@@ -37,8 +38,10 @@ const DatabaseTable = ({
   headerExtra,
   expandable,
   rowKey = 'id',
+  modalProps = {}, // New prop
   ...tableProps
 }) => {
+
   const [form] = Form.useForm();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -64,7 +67,7 @@ const DatabaseTable = ({
     try {
       setConfirmLoading(true);
       const values = await form.validateFields();
-      
+
       if (editingRecord) {
         // Update existing record
         await onUpdate(editingRecord.id || editingRecord._id || editingRecord.key, values);
@@ -72,7 +75,7 @@ const DatabaseTable = ({
         // Create new record
         await onCreate(values);
       }
-      
+
       setModalVisible(false);
       form.resetFields();
     } catch (error) {
@@ -93,19 +96,19 @@ const DatabaseTable = ({
 
   // Create columns with actions if needed
   const tableColumns = [...columns];
-  
+
   if (addActions && onUpdate && onDelete) {
     // Check if actions column already exists
-    const hasActionsColumn = columns.some(col => 
+    const hasActionsColumn = columns.some(col =>
       col.key === 'actions' || col.dataIndex === 'actions'
     );
-    
+
     if (!hasActionsColumn) {
       // Add actions column
       tableColumns.push(
         createActionsColumn(
-          handleEdit, 
-          handleDelete, 
+          handleEdit,
+          handleDelete,
           actionsConfig
         )
       );
@@ -115,12 +118,12 @@ const DatabaseTable = ({
   return (
     <div className="database-table">
       {/* Table header with add button */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 16 
+          marginBottom: 16
         }}
       >
         <div>
@@ -163,9 +166,11 @@ const DatabaseTable = ({
           confirmLoading={confirmLoading}
           destroyOnClose={true}
           maskClosable={false}
+          {...modalProps} // Added modalProps spread
         >
           {renderForm(form, editingRecord)}
         </Modal>
+
       )}
     </div>
   );

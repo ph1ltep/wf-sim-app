@@ -20,7 +20,8 @@ import {
   FormSection,
   FormRow,
   FormCol,
-  EditableTable
+  EditableTable,
+  ResponsiveFieldRow
 } from '../contextFields';
 
 const { Title } = Typography;
@@ -148,6 +149,34 @@ const CostModule = () => {
   ];
 
   const tabItems = [
+    {
+      key: "investment",
+      label: (
+        <span>
+          <DollarOutlined /> Investment
+        </span>
+      ),
+      children: (
+        <FormSection title="Capital & Development Investment" style={{ marginBottom: 24 }}>
+          <ResponsiveFieldRow layout="twoColumn">
+            <CurrencyField
+              path={[...basePath, 'capex']}
+              label="CAPEX Investment"
+              tooltip="Total capital expenditure for plant construction"
+              min={0}
+              step={1000000}
+            />
+            <CurrencyField
+              path={[...basePath, 'devex']}
+              label="DEVEX Investment"
+              tooltip="Development expenditure incurred prior to construction"
+              min={0}
+              step={100000}
+            />
+          </ResponsiveFieldRow>
+        </FormSection>
+      )
+    },
     {
       key: "escalation",
       label: (

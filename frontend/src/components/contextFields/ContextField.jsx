@@ -1,7 +1,8 @@
-// src/components/contextFields/ContextField.jsx - Complete with customValidator support
+// src/components/contextFields/ContextField.jsx - Complete with customValidator support and metrics
 import React, { useCallback, useState } from 'react';
 import { Form } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { calculateAffectedMetrics } from '../../utils/metricsUtils';
 
 // In ContextField.jsx - Make transform bidirectional
 export const ContextField = ({
@@ -19,6 +20,9 @@ export const ContextField = ({
   // Custom validation function prop
   customValidator,
 
+  // Metrics prop
+  affectedMetrics = null,
+
   // Form.Item props
   label,
   tooltip,
@@ -30,7 +34,7 @@ export const ContextField = ({
   // All other props forwarded to Form.Item
   ...formItemProps
 }) => {
-  const { getValueByPath, updateByPath } = useScenario();
+  const { getValueByPath, updateByPath, scenarioData } = useScenario();
   const [directModeError, setDirectModeError] = useState(null);
 
   // Get current value based on mode
@@ -118,24 +122,51 @@ export const ContextField = ({
     return null;
   }, [required, label, customValidator]);
 
-  const handleChange = useCallback((newValue) => {
+  const handleChange = useCallback(async (newValue) => {
     const actualValue = transformForStorage(newValue);
 
+    // Form mode - delegate to form handler (metrics handled at form level)
     if (formMode && updateValueOverride) {
       updateValueOverride(path, actualValue);
       return;
     }
 
+    // Direct mode validation
     const validationError = validateDirectMode(actualValue);
-
     if (validationError) {
       setDirectModeError(validationError);
       return;
     }
 
     setDirectModeError(null);
-    updateByPath(path, actualValue).catch(console.error);
-  }, [path, transformForStorage, formMode, updateValueOverride, updateByPath, validateDirectMode]);
+
+    // Direct mode - handle metrics here
+    try {
+      // Convert path array to dot notation string
+      const pathString = Array.isArray(path) ? path.join('.') : path;
+
+      // Prepare base update
+      let updates = { [pathString]: actualValue };
+
+      // Calculate affected metrics if declared (direct mode only)
+      if (affectedMetrics && affectedMetrics.length > 0) {
+        const prospectiveChanges = { [pathString]: actualValue };
+        const metricUpdates = calculateAffectedMetrics(
+          affectedMetrics,
+          scenarioData,
+          prospectiveChanges
+        );
+
+        // Merge field update with metric updates
+        updates = { ...updates, ...metricUpdates };
+      }
+
+      // Single batch updateByPath call
+      await updateByPath(updates);
+    } catch (error) {
+      console.error('Error updating field and metrics:', error);
+    }
+  }, [path, transformForStorage, formMode, updateValueOverride, updateByPath, validateDirectMode, affectedMetrics, scenarioData]);
 
   // Get the display value
   const currentValue = getDisplayValue();
