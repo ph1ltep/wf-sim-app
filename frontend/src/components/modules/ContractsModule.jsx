@@ -39,8 +39,8 @@ import {
   createIconColumn
 } from '../tables/columns';
 
-// Import the new ContractScopeCard
-import { ContractScopeCard } from '../cards';
+// Import the cards
+import { ContractScopeCard, ContractEditorCard } from '../cards';
 
 const { Title, Text } = Typography;
 
@@ -165,12 +165,35 @@ const ContractsModule = () => {
       }
     },
 
-    // Fee column using createCurrencyColumn
-    createCurrencyColumn('fixedFee', 'Fee', {
+    // Enhanced fee column showing time series information
+    {
+      title: 'Fee',
+      dataIndex: 'fixedFee',
+      key: 'fixedFee',
       width: '15%',
-      currency,
-      precision: 0,
-    }),
+      render: (value, record) => {
+        const timeSeries = record.fixedFeeTimeSeries || [];
+        const hasTimeSeries = timeSeries.length > 0;
+        
+        return (
+          <div>
+            <div style={{ fontWeight: 500 }}>
+              {currency}{(value || 0).toLocaleString()}
+            </div>
+            {hasTimeSeries && (
+              <div style={{ fontSize: '10px', color: '#8c8c8c' }}>
+                {timeSeries.length} year schedule
+              </div>
+            )}
+            {record.isPerTurbine && (
+              <div style={{ fontSize: '10px', color: '#1890ff' }}>
+                per turbine
+              </div>
+            )}
+          </div>
+        );
+      }
+    },
 
     // Icon column for additional indicators
     createIconColumn('', [
@@ -197,7 +220,7 @@ const ContractsModule = () => {
     })
   ];
 
-  // Define form fields for the contracts form - simplified approach
+  // Define form fields for the contracts form
   const contractFormFields = [
     <TextField
       key="name"
@@ -222,7 +245,8 @@ const ContractsModule = () => {
     <CurrencyField
       key="fixedFee"
       path="fixedFee"
-      label="Fixed Fee"
+      label="Base Fixed Fee"
+      tooltip="This will be used as the default value for all years when creating the fee schedule"
       min={0}
       step={1000}
       currencyOverride={currency}
@@ -246,45 +270,77 @@ const ContractsModule = () => {
       }))}
     />,
 
-    // Use CompactFieldGroup only for related escalation options
-    //<CompactFieldGroup key="escalation-group" direction="horizontal" size="small">
     <CheckboxField
+      key="escalation.useMin"
       path={['escalation', 'useMin']}
       label="Use min limit"
     />,
+    
     <PercentageField
+      key="escalation.minValue"
       path={['escalation', 'minValue']}
       label="Min %"
       min={-20}
       max={0}
       step={0.1}
     />,
+    
     <CheckboxField
+      key="escalation.useMax"
       path={['escalation', 'useMax']}
       label="Use max limit"
     />,
+    
     <PercentageField
+      key="escalation.maxValue"
       path={['escalation', 'maxValue']}
       label="Max %"
-      Pmin={0}
+      min={0}
       max={20}
-      step={0.10}
+      step={0.1}
     />
-    //</CompactFieldGroup>
   ];
+
+  // Calculate average of time series values for expanded row display
+  const calculateTimeSeriesAverage = (timeSeries) => {
+    if (!timeSeries || timeSeries.length === 0) return 0;
+    
+    const values = timeSeries
+      .map(dp => parseFloat(dp.value))
+      .filter(val => !isNaN(val));
+    
+    if (values.length === 0) return 0;
+    
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    return Math.round(sum / values.length);
+  };
 
   // Expandable row renderer for contract details
   const expandedRowRender = (record) => {
     // Find the associated scope
     const scope = oemScopes.find(s => s.key === record.oemScopeId);
+    const timeSeries = record.fixedFeeTimeSeries || [];
+    
     if (!scope) return <Typography.Text>No scope details available</Typography.Text>;
 
     return (
       <Card size="small" title="Contract Details" bordered={false}>
         <p><strong>Contract Name:</strong> {record.name}</p>
         <p><strong>OEM Scope:</strong> {scope.name}</p>
-        <p><strong>Fixed Fee:</strong> {record.fixedFee?.toLocaleString() || 'N/A'} {currency} {record.isPerTurbine ? 'per turbine' : 'total'}</p>
+        <p><strong>Base Fee:</strong> {currency}{(record.fixedFee || 0).toLocaleString()} {record.isPerTurbine ? 'per turbine' : 'total'}</p>
         <p><strong>Active Years:</strong> {record.years?.join(', ') || 'None'}</p>
+
+        {/* Enhanced fee schedule information */}
+        {timeSeries.length > 0 && (
+          <div>
+            <p><strong>Fee Schedule:</strong></p>
+            <div style={{ marginLeft: '16px' }}>
+              <p>• {timeSeries.length} years with custom fees</p>
+              <p>• Range: {currency}{Math.min(...timeSeries.map(ts => ts.value)).toLocaleString()} - {currency}{Math.max(...timeSeries.map(ts => ts.value)).toLocaleString()}</p>
+              <p>• Average: {currency}{calculateTimeSeriesAverage(timeSeries).toLocaleString()}</p>
+            </div>
+          </div>
+        )}
 
         {/* Escalation details */}
         {(record.escalation?.useMin || record.escalation?.useMax) && (
@@ -347,6 +403,7 @@ const ContractsModule = () => {
             />
           ) : (
             <div>
+              {/* Contract Configuration Table */}
               <FieldCard title="Contracts Configuration"
                 extra={
                   <Button
@@ -358,14 +415,6 @@ const ContractsModule = () => {
                   </Button>
                 }
               >
-                {/* <Alert
-                  message="Contract Assignment"
-                  description="Contracts define which OEM service scope applies in each year of the project. You can assign different contracts to different years to model changing O&M strategies over time."
-                  type="info"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                /> */}
-
                 <EditableTable
                   columns={contractColumns}
                   path={contractsPath}
@@ -373,14 +422,23 @@ const ContractsModule = () => {
                   keyField="id"
                   itemName="Contract"
                   expandedRowRender={expandedRowRender}
-                  // New form layout props
                   formLayout="horizontal"
                   formCompact={true}
                   formResponsive={true}
                 />
               </FieldCard>
-              {/* NEW: Contract Scope Analysis Card */}
-              <FormDivider margin="middle" orientation="left"></FormDivider>
+
+              {/* Contract Fee Schedule Editor */}
+              <FormDivider margin="default" />
+              <ContractEditorCard
+                path={contractsPath}
+                projectLife={projectLife}
+                currency={currency}
+                affectedMetrics={['contractCosts']}
+              />
+
+              {/* Contract Scope Analysis */}
+              <FormDivider margin="default" />
               <ContractScopeCard
                 oemContracts={contracts}
                 projectLife={projectLife}
@@ -388,7 +446,7 @@ const ContractsModule = () => {
                 currency={currency}
                 title="Contract Fee Heatmap"
                 icon={<FileTextOutlined />}
-                height={Math.max(300, contracts.length * 60 + 150)} // Dynamic height based on contract count
+                height={Math.max(300, contracts.length * 60 + 150)}
                 showMetadata={true}
                 loading={loadingScopes}
               />

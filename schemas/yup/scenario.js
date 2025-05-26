@@ -225,6 +225,7 @@ const SettingsSchema = Yup.object().shape({
                 name: Yup.string().required('Name is required'),
                 years: Yup.array().of(Yup.number()).required('Years are required'),
                 fixedFee: Yup.number().required('Fixed fee is required'),
+                fixedFeeTimeSeries: Yup.array().of(DataPointSchema).default([]),
                 isPerTurbine: Yup.boolean().default(false),
                 oemScopeId: Yup.string().required('OEM scope ID is required'),
                 oemScopeName: Yup.string().default(''),

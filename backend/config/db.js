@@ -2,8 +2,8 @@
 const mongoose = require('mongoose');
 
 // Get MongoDB connection details from environment variables
-const MONGO_USER = process.env.MONGO_USER;
-const MONGO_PASS = process.env.MONGO_PASS;
+const MONGO_USER = process.env.MONGO_USER || '';
+const MONGO_PASS = process.env.MONGO_PASS || '';
 const MONGO_URL = process.env.MONGO_URL || 'localhost:27017';
 const DATABASE = process.env.DB_NAME || 'wfsimdb';
 
