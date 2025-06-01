@@ -78,6 +78,42 @@ const ProjectSettings = () => {
     fetchLocations();
   }, []);
 
+  // Calculate timeline metrics when dates change
+  useEffect(() => {
+    const updateTimelineMetrics = async () => {
+      if (!scenarioData) return;
+
+      const codDate = getValueByPath([...windFarmPath, 'codDate']);
+      const ntpDate = getValueByPath([...windFarmPath, 'ntpDate']);
+      const devDate = getValueByPath([...windFarmPath, 'devDate']);
+
+      if (codDate) {
+        const updates = {};
+        const codYear = codDate.getFullYear();
+
+        if (devDate) {
+          const devStartYear = devDate.getFullYear() - codYear;
+          updates['settings.metrics.developmentStartYear'] = devStartYear;
+        }
+
+        if (ntpDate) {
+          const ntpYear = ntpDate.getFullYear() - codYear;
+          updates['settings.metrics.ntpYear'] = ntpYear;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          try {
+            await updateByPath(updates);
+          } catch (error) {
+            console.error('Error updating timeline metrics:', error);
+          }
+        }
+      }
+    };
+
+    updateTimelineMetrics();
+  }, [scenarioData, getValueByPath, updateByPath]);
+
   // Handle location selection change
   const handleLocationChange = (locationId) => {
     const locationData = locations.find(loc => loc._id === locationId);
@@ -186,7 +222,7 @@ const ProjectSettings = () => {
       />
 
       {/* Project Identification */}
-      <FieldCard >
+      <FieldCard>
         <FormSection title="Project Identification">
           <ResponsiveFieldRow layout="twoColumn">
             <TextField
@@ -203,11 +239,30 @@ const ProjectSettings = () => {
             />
           </ResponsiveFieldRow>
         </FormSection>
-        <FormDivider margin="small" orientation="left"></FormDivider>
+
+        <FormDivider margin="small" orientation="left" />
 
         {/* Project Timeline */}
         <FormSection title="Project Timeline">
-          <ResponsiveFieldRow layout="oneColumn">
+          <ResponsiveFieldRow layout="twoColumn">
+            <DateField
+              path={[...windFarmPath, 'devDate']}
+              label="Development Start Date"
+              tooltip="When development activities begin"
+            />
+            <DateField
+              path={[...windFarmPath, 'ntpDate']}
+              label="Notice to Proceed (NTP)"
+              tooltip="When construction can begin"
+            />
+          </ResponsiveFieldRow>
+          <ResponsiveFieldRow layout="twoColumn">
+            <DateField
+              path={[...windFarmPath, 'codDate']}
+              label="Commercial Operation Date (COD)"
+              tooltip="When the project begins commercial operation"
+              required
+            />
             <NumberField
               path={[...generalPath, 'projectLife']}
               label="Project Life (Years)"
@@ -218,7 +273,9 @@ const ProjectSettings = () => {
             />
           </ResponsiveFieldRow>
         </FormSection>
-        <FormDivider margin="small" orientation="left"></FormDivider>
+
+        <FormDivider margin="small" orientation="left" />
+
         {/* Currency Settings */}
         <FormSection title="Currency Settings">
           <CompactFieldGroup direction="vertical" size="middle">
@@ -256,7 +313,9 @@ const ProjectSettings = () => {
             />
           </CompactFieldGroup>
         </FormSection>
-        <FormDivider margin="small" orientation="left"></FormDivider>
+
+        <FormDivider margin="small" orientation="left" />
+
         {/* Wind Farm Specifications */}
         <FormSection title="Wind Farm Specifications">
           <ResponsiveFieldRow layout="threeColumn">
@@ -309,7 +368,7 @@ const ProjectSettings = () => {
             />
           </ResponsiveFieldRow>
 
-          <FormDivider margin="small" orientation="left"></FormDivider>
+          <FormDivider margin="small" orientation="left" />
 
           <ResponsiveFieldRow layout="twoColumn">
             <PercentageField
@@ -335,6 +394,7 @@ const ProjectSettings = () => {
           </ResponsiveFieldRow>
         </FormSection>
       </FieldCard>
+
       {/* Project Metrics */}
       <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>

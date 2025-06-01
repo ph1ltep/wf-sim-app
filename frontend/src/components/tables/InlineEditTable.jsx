@@ -26,6 +26,7 @@ const { confirm } = Modal;
  * @param {Array} dataFieldOptions - Array of field configuration objects for editing
  * @param {Object} yearRange - Year range configuration { min: number, max: number }
  * @param {boolean} trimBlanks - Whether to remove entries with null/empty values on save (default: true)
+ * @param {any} trimValue - Specific value to remove on save (e.g., 0 for default percentages)
  * @param {boolean} showMetadata - Whether to show expandable row metadata with statistics (default: true)
  * @param {boolean} hideEmptyItems - Whether to hide empty rows/columns in read mode (default: false)
  * @param {Function} metadataRenderer - Custom metadata renderer function
@@ -40,6 +41,7 @@ const InlineEditTable = ({
     dataFieldOptions = [],
     yearRange = { min: 1, max: 20 },
     trimBlanks = true,
+    trimValue = null,
     showMetadata = true,
     hideEmptyItems = false,
     metadataRenderer,
@@ -206,7 +208,7 @@ const InlineEditTable = ({
             setSaveLoading(true);
 
             // Process data
-            let processedData = trimTimeSeriesData(formData, selectedDataField, trimBlanks);
+            let processedData = trimTimeSeriesData(formData, selectedDataField, trimBlanks, trimValue);
             if (onBeforeSave) {
                 processedData = await onBeforeSave(processedData);
             }

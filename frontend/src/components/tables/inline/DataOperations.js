@@ -32,19 +32,29 @@ export const normalizeTimeSeriesData = (contracts, selectedField, fieldConfig, y
 };
 
 /**
- * Trim blank entries from time series
+ * Trim blank entries and specific values from time series
+ * @param {Array} contracts - Array of contract objects
+ * @param {string} selectedField - Field name to trim
+ * @param {boolean} trimBlanks - Whether to remove null/empty values
+ * @param {any} trimValue - Specific value to remove (e.g., 0 for percentages)
+ * @returns {Array} Processed contracts
  */
-export const trimTimeSeriesData = (contracts, selectedField, trimBlanks) => {
-    if (!trimBlanks) return contracts;
-
+export const trimTimeSeriesData = (contracts, selectedField, trimBlanks = true, trimValue = null) => {
     return contracts.map(contract => ({
         ...contract,
-        [selectedField]: (contract[selectedField] || []).filter(dp =>
-            dp.value !== null &&
-            dp.value !== undefined &&
-            dp.value !== '' &&
-            !isNaN(dp.value)
-        )
+        [selectedField]: (contract[selectedField] || []).filter(dp => {
+            // Always keep if not trimming anything
+            if (!trimBlanks && trimValue === null) return true;
+
+            // Check for blank values
+            const isBlank = dp.value === null || dp.value === undefined || dp.value === '' || isNaN(dp.value);
+            if (trimBlanks && isBlank) return false;
+
+            // Check for specific trim value
+            if (trimValue !== null && dp.value === trimValue) return false;
+
+            return true;
+        })
     }));
 };
 

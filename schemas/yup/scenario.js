@@ -115,8 +115,22 @@ const SettingsSchema = Yup.object().shape({
             capacityFactor: Yup.number().default(35),
             curtailmentLosses: Yup.number().default(0),
             electricalLosses: Yup.number().default(0),
-            ntpDate: Yup.date(),
-            codDate: Yup.date(),
+            // Project timeline dates - set relative to today
+            devDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() - 2); // 2 years ago (4 years before default COD)
+                return date;
+            }),
+            ntpDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear()); // Current year (2 years before default COD)
+                return date;
+            }),
+            codDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() + 2); // 2 years from now
+                return date;
+            }),
         }),
         currency: Yup.object().shape({
             local: Yup.string().default('USD'),
@@ -162,45 +176,13 @@ const SettingsSchema = Yup.object().shape({
             contingencyCost: Yup.number().default(0),
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
             failureModels: Yup.array().of(FailureModelSchema).default([]),
-            developmentPhase: Yup.object().shape({
-                devex: Yup.number().default(10000000)
-            }),
             constructionPhase: Yup.object().shape({
                 costSources: Yup.array().of(Yup.object().shape({
                     id: Yup.string().required('ID is required'),
                     name: Yup.string().required('Name is required'),
                     totalAmount: Yup.number().default(0),
                     drawdownSchedule: Yup.array().of(DataPointSchema).default([])
-                })).default([
-                    {
-                        id: 'wtg',
-                        name: 'Wind Turbine Generators',
-                        totalAmount: 35000000,
-                        drawdownSchedule: [
-                            { year: -3, value: 10 },
-                            { year: -2, value: 40 },
-                            { year: -1, value: 45 },
-                            { year: 0, value: 5 }
-                        ]
-                    },
-                    {
-                        id: 'bop',
-                        name: 'Balance of Plant',
-                        totalAmount: 12000000,
-                        drawdownSchedule: [
-                            { year: -3, value: 30 },
-                            { year: -2, value: 70 }
-                        ]
-                    },
-                    {
-                        id: 'other',
-                        name: 'Other Costs',
-                        totalAmount: 3000000,
-                        drawdownSchedule: [
-                            { year: 0, value: 100 }
-                        ]
-                    }
-                ])
+                })).default([]) // Empty default, will be populated dynamically
             }),
         }),
         revenue: Yup.object().shape({

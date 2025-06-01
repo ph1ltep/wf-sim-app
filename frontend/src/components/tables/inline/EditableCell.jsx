@@ -29,14 +29,14 @@ export const validateCellValue = (value, fieldConfig) => {
   if (value === null || value === undefined || value === '') {
     return null; // Allow empty values
   }
-  
+
   if (fieldConfig.type === 'currency' || fieldConfig.type === 'number' || fieldConfig.type === 'percentage') {
     const num = parseFloat(value);
-    
+
     if (isNaN(num)) {
       return 'Must be a number';
     }
-    
+
     if (fieldConfig.validation) {
       if (fieldConfig.validation.min !== undefined && num < fieldConfig.validation.min) {
         return `Minimum value is ${fieldConfig.validation.min}`;
@@ -52,7 +52,7 @@ export const validateCellValue = (value, fieldConfig) => {
       }
     }
   }
-  
+
   return null;
 };
 
@@ -87,12 +87,12 @@ export const navigateToCell = (table, rowIndex, cellIndex) => {
  * @param {Function} onCellValidation - Validation handler
  * @param {Function} onCellModification - Modification tracking handler
  */
-const EditableCell = ({ 
-  value, 
-  onChange, 
-  rowIndex, 
-  year, 
-  fieldConfig, 
+const EditableCell = ({
+  value,
+  onChange,
+  rowIndex,
+  year,
+  fieldConfig,
   disabled = false,
   modifiedCells = new Set(),
   validationErrors = new Map(),
@@ -102,23 +102,23 @@ const EditableCell = ({
   const cellKey = `${rowIndex}-${year}`;
   const hasError = validationErrors.has(cellKey);
   const isModified = modifiedCells.has(cellKey);
-  
+
   const handleChange = (newValue) => {
     // Mark as modified
     if (onCellModification) {
       onCellModification(cellKey);
     }
-    
+
     // Validate
     const error = validateCellValue(newValue, fieldConfig);
     if (onCellValidation) {
       onCellValidation(cellKey, error);
     }
-    
+
     // Update data
     onChange(newValue);
   };
-  
+
   const handleKeyDown = (e) => {
     // Keyboard navigation
     const currentCell = e.target;
@@ -126,7 +126,7 @@ const EditableCell = ({
     const currentRow = currentCell.closest('tr');
     const currentCellIndex = Array.from(currentRow.cells).indexOf(currentCell.closest('td'));
     const currentRowIndex = Array.from(table.rows).indexOf(currentRow) - 1; // Subtract header row
-    
+
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
@@ -157,45 +157,49 @@ const EditableCell = ({
         break;
     }
   };
-  
+
   const cellStyle = {
-    backgroundColor: isModified 
+    backgroundColor: isModified
       ? (hasError ? 'rgba(255, 77, 79, 0.1)' : 'rgba(24, 144, 255, 0.1)')
       : 'transparent',
     borderColor: hasError ? '#ff4d4f' : undefined,
     transition: 'all 0.2s',
     width: '100%'
   };
-  
+
   const componentProps = {
     value,
     onChange: handleChange,
     onKeyDown: handleKeyDown,
     disabled,
     size: 'small',
-    style: cellStyle,
+    style: {
+      ...cellStyle,
+      width: fieldConfig.type === 'percentage' ? '80px' : '100%' // Make percentage fields smaller
+    },
     placeholder: disabled ? '-' : '0'
   };
-  
+
   // Add field-specific props
   if (fieldConfig.type === 'currency' || fieldConfig.type === 'number') {
     componentProps.min = fieldConfig.validation?.min;
     componentProps.max = fieldConfig.validation?.max;
     componentProps.precision = fieldConfig.validation?.precision;
-    componentProps.step = fieldConfig.type === 'currency' ? 1000 : 
-                          fieldConfig.type === 'percentage' ? 0.1 : 1;
-    
+    componentProps.step = fieldConfig.type === 'currency' ? 1000 :
+      fieldConfig.type === 'percentage' ? 0.1 : 1;
+
     if (fieldConfig.type === 'currency') {
       componentProps.formatter = value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       componentProps.parser = value => value?.replace(/,/g, '');
     } else if (fieldConfig.type === 'percentage') {
-      componentProps.formatter = value => `${value}%`;
+      componentProps.addonAfter = '%';
+      componentProps.formatter = value => `${value}`;
       componentProps.parser = value => value?.replace('%', '');
     }
   }
-  
+
   const Component = getComponentByType(fieldConfig.type);
-  
+
   return (
     <div style={{ position: 'relative' }}>
       <Component {...componentProps} />

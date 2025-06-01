@@ -23,7 +23,11 @@ const CapexDrawdownCard = ({
     const costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], []);
     const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
 
-    // Calculate total CAPEX and summary metadata
+    // Get timeline data for markers
+    const developmentStartYear = getValueByPath(['settings', 'metrics', 'developmentStartYear'], -5);
+    const ntpYear = getValueByPath(['settings', 'metrics', 'ntpYear'], -3);
+
+    // Calculate total and summary metadata
     const summary = useMemo(() => {
         if (!costSources.length) {
             return {
@@ -94,6 +98,40 @@ const CapexDrawdownCard = ({
         return updatedDataArray;
     }, []);
 
+    // Custom year header format with timeline markers
+    const yearHeaderFormat = useCallback((year) => {
+        const baseFormat = year === 0 ? 'COD' : year > 0 ? `COD+${year}` : `COD${year}`;
+
+        if (year === developmentStartYear) {
+            return (
+                <div style={{ textAlign: 'center' }}>
+                    <div>{baseFormat}</div>
+                    <Tag color="blue" size="small" style={{ fontSize: '10px', margin: 0 }}>DEV</Tag>
+                </div>
+            );
+        }
+
+        if (year === ntpYear) {
+            return (
+                <div style={{ textAlign: 'center' }}>
+                    <div>{baseFormat}</div>
+                    <Tag color="orange" size="small" style={{ fontSize: '10px', margin: 0 }}>NTP</Tag>
+                </div>
+            );
+        }
+
+        if (year === 0) {
+            return (
+                <div style={{ textAlign: 'center' }}>
+                    <div>{baseFormat}</div>
+                    <Tag color="green" size="small" style={{ fontSize: '10px', margin: 0 }}>COD</Tag>
+                </div>
+            );
+        }
+
+        return baseFormat;
+    }, [developmentStartYear, ntpYear]);
+
     // Handle after save
     const handleAfterSave = useCallback((result) => {
         if (result.isValid) {
@@ -117,7 +155,7 @@ const CapexDrawdownCard = ({
     const validationStatus = (
         <Space>
             <Text type="secondary" style={{ fontSize: '12px' }}>
-                Total CAPEX: {currency} {summary.totalCapex.toLocaleString()}
+                Total Investment: {currency} {summary.totalCapex.toLocaleString()}
             </Text>
             {summary.allValid ? (
                 <Tag icon={<CheckCircleOutlined />} color="success" size="small">
@@ -133,13 +171,13 @@ const CapexDrawdownCard = ({
 
     return (
         <FieldCard
-            title={title || 'CAPEX Drawdown Schedule'}
+            title={title || 'Investment Drawdown Schedule'}
             extra={validationStatus}
             {...cardProps}
         >
             <div style={{ marginBottom: 16 }}>
                 <Text type="secondary">
-                    Configure when CAPEX is spent during construction for each cost category. Negative years are before COD.
+                    Configure when investment is spent across development and construction phases. Negative years are before COD.
                 </Text>
             </div>
 
@@ -182,12 +220,14 @@ const CapexDrawdownCard = ({
                 ]}
                 yearRange={{ min: -10, max: 5 }}
                 trimBlanks={true}
+                trimValue={0}
+                hideEmptyItems={true}
                 onBeforeSave={handleBeforeSave}
                 onAfterSave={handleAfterSave}
                 affectedMetrics={['constructionCosts', 'totalCapex']}
                 showMetadata={false}
-                orientation="horizontal"
-                hideEmptyItems={true}
+                orientation="vertical"
+                yearHeaderFormat={yearHeaderFormat}
                 {...tableProps}
             />
 
@@ -201,7 +241,7 @@ const CapexDrawdownCard = ({
                 color: '#666'
             }}>
                 <Space split={<span style={{ color: '#d9d9d9' }}>|</span>} wrap>
-                    <span><strong>Total CAPEX:</strong> {currency} {summary.totalCapex.toLocaleString()}</span>
+                    <span><strong>Total Investment:</strong> {currency} {summary.totalCapex.toLocaleString()}</span>
                     <span><strong>End Year:</strong> COD{summary.estimatedEndYear > 0 ? '+' : ''}{summary.estimatedEndYear}</span>
                     {summary.postCODSpend > 0 && (
                         <span><strong>Post-COD Amount:</strong> {currency} {Math.round(summary.postCODSpend).toLocaleString()}</span>
