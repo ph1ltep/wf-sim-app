@@ -200,24 +200,9 @@ const Sider = ({ collapsed }) => {
           label: 'Dashboard Overview'
         },
         {
-          key: '/results/cost',
-          icon: <BarChartOutlined />,
-          label: 'Cost Analysis'
-        },
-        {
-          key: '/results/revenue',
-          icon: <LineChartOutlined />,
-          label: 'Revenue Analysis'
-        },
-        {
           key: '/results/cashflow',
           icon: <BarChartOutlined />,
-          label: 'Cash Flow'
-        },
-        {
-          key: '/results/irr',
-          icon: <LineChartOutlined />,
-          label: 'IRR Distribution'
+          label: 'Cash Flows'
         },
         {
           key: '/results/scenarios',
