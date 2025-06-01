@@ -127,8 +127,6 @@ const SettingsSchema = Yup.object().shape({
     }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
-            capex: Yup.number().default(50000000),
-            devex: Yup.number().default(10000000),
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
             loanDuration: Yup.number().default(15),
             minimumDSCR: Yup.number().default(1.3),
@@ -164,6 +162,46 @@ const SettingsSchema = Yup.object().shape({
             contingencyCost: Yup.number().default(0),
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
             failureModels: Yup.array().of(FailureModelSchema).default([]),
+            developmentPhase: Yup.object().shape({
+                devex: Yup.number().default(10000000)
+            }),
+            constructionPhase: Yup.object().shape({
+                costSources: Yup.array().of(Yup.object().shape({
+                    id: Yup.string().required('ID is required'),
+                    name: Yup.string().required('Name is required'),
+                    totalAmount: Yup.number().default(0),
+                    drawdownSchedule: Yup.array().of(DataPointSchema).default([])
+                })).default([
+                    {
+                        id: 'wtg',
+                        name: 'Wind Turbine Generators',
+                        totalAmount: 35000000,
+                        drawdownSchedule: [
+                            { year: -3, value: 10 },
+                            { year: -2, value: 40 },
+                            { year: -1, value: 45 },
+                            { year: 0, value: 5 }
+                        ]
+                    },
+                    {
+                        id: 'bop',
+                        name: 'Balance of Plant',
+                        totalAmount: 12000000,
+                        drawdownSchedule: [
+                            { year: -3, value: 30 },
+                            { year: -2, value: 70 }
+                        ]
+                    },
+                    {
+                        id: 'other',
+                        name: 'Other Costs',
+                        totalAmount: 3000000,
+                        drawdownSchedule: [
+                            { year: 0, value: 100 }
+                        ]
+                    }
+                ])
+            }),
         }),
         revenue: Yup.object().shape({
             energyProduction: DistributionTypeSchema.default(() => ({

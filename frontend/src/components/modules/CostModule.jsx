@@ -1,14 +1,16 @@
 // src/components/modules/CostModule.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Typography, Alert, Tabs } from 'antd';
 import {
   DollarOutlined,
   ToolOutlined,
   WarningOutlined,
-  ScheduleOutlined
+  ScheduleOutlined,
+  BuildOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
+import CapexDrawdownCard from '../cards/CapexDrawdownCard';
 
 // Import context field components
 import {
@@ -28,7 +30,7 @@ const { Title } = Typography;
 
 const CostModule = () => {
   // Get scenario data directly from context
-  const { scenarioData } = useScenario();
+  const { scenarioData, getValueByPath } = useScenario();
 
   // Define base path for cost module
   const basePath = ['settings', 'modules', 'cost'];
@@ -36,9 +38,27 @@ const CostModule = () => {
   // Get values from context for conditional rendering
   const oemTerm = scenarioData?.settings?.modules?.cost?.oemTerm || 0;
   const projectLife = scenarioData?.settings?.general?.projectLife || 20;
+  const capex = getValueByPath(['settings', 'modules', 'financing', 'capex'], 0);
 
   // Get the currency from scenario
   const currency = scenarioData?.settings?.project?.currency?.local || 'USD';
+
+  // Calculate construction phase summary
+  const constructionSummary = useMemo(() => {
+    const drawdownSchedule = getValueByPath([...basePath, 'constructionPhase', 'capexDrawdownSchedule'], []);
+
+    if (!drawdownSchedule.length || !capex) {
+      return { totalPercentage: 0, estimatedEndYear: 0, postCODSpend: 0 };
+    }
+
+    const totalPercentage = drawdownSchedule.reduce((sum, item) => sum + (item.value || 0), 0);
+    const estimatedEndYear = Math.max(...drawdownSchedule.map(item => item.year));
+    const postCODSpend = drawdownSchedule
+      .filter(item => item.year > 0)
+      .reduce((sum, item) => sum + (item.value || 0), 0);
+
+    return { totalPercentage, estimatedEndYear, postCODSpend };
+  }, [getValueByPath, basePath, capex]);
 
   // Check if we have an active scenario
   if (!scenarioData) {
@@ -53,6 +73,52 @@ const CostModule = () => {
       </div>
     );
   }
+
+  // Construction drawdown schedule fields for EditableTable
+  const drawdownScheduleFields = [
+    <NumberField
+      key="year"
+      label="Year (relative to COD)"
+      path="year"
+      min={-10}
+      max={5}
+      required
+      tooltip="Negative years are before COD (Commercial Operation Date)"
+    />,
+    <PercentageField
+      key="value"
+      label="Percentage of CAPEX"
+      path="value"
+      min={0}
+      max={100}
+      step={0.1}
+      precision={1}
+      required
+    />
+  ];
+
+  // Construction drawdown schedule columns
+  const drawdownScheduleColumns = [
+    {
+      title: 'Year',
+      dataIndex: 'year',
+      key: 'year',
+      sorter: (a, b) => a.year - b.year,
+      render: (year) => year === 0 ? 'COD (Year 0)' : year > 0 ? `COD+${year}` : `COD${year}`
+    },
+    {
+      title: 'CAPEX %',
+      dataIndex: 'value',
+      key: 'value',
+      render: value => `${(value || 0).toFixed(1)}%`
+    },
+    {
+      title: 'Amount',
+      dataIndex: 'value',
+      key: 'amount',
+      render: value => capex ? `${currency} ${((capex * (value || 0)) / 100).toLocaleString()}` : '-'
+    }
+  ];
 
   // Annual adjustment form fields for EditableTable
   const annualAdjustmentFields = [
@@ -157,24 +223,50 @@ const CostModule = () => {
         </span>
       ),
       children: (
-        <FormSection title="Capital & Development Investment" style={{ marginBottom: 24 }}>
-          <ResponsiveFieldRow layout="twoColumn">
-            <CurrencyField
-              path={[...basePath, 'capex']}
-              label="CAPEX Investment"
-              tooltip="Total capital expenditure for plant construction"
-              min={0}
-              step={1000000}
-            />
-            <CurrencyField
-              path={[...basePath, 'devex']}
-              label="DEVEX Investment"
-              tooltip="Development expenditure incurred prior to construction"
-              min={0}
-              step={100000}
-            />
-          </ResponsiveFieldRow>
-        </FormSection>
+        <>
+          <FormSection title="Development Phase" style={{ marginBottom: 24 }}>
+            <ResponsiveFieldRow layout="oneColumn">
+              <CurrencyField
+                path={[...basePath, 'developmentPhase', 'devex']}
+                label="Development Investment (DEVEX)"
+                tooltip="Development expenditure incurred prior to construction (permits, studies, etc.)"
+                min={0}
+                step={100000}
+              />
+            </ResponsiveFieldRow>
+          </FormSection>
+
+          <FormSection title="Construction Phase" style={{ marginBottom: 24 }}>
+            <ResponsiveFieldRow layout="threeColumn">
+              <CurrencyField
+                path={[...basePath, 'constructionPhase', 'costSources', 0, 'totalAmount']}
+                label="WTG CAPEX"
+                tooltip="Total cost for Wind Turbine Generators"
+                min={0}
+                step={1000000}
+                currencyOverride={currency}
+              />
+              <CurrencyField
+                path={[...basePath, 'constructionPhase', 'costSources', 1, 'totalAmount']}
+                label="BoP CAPEX"
+                tooltip="Balance of Plant costs (foundations, electrical, roads, etc.)"
+                min={0}
+                step={1000000}
+                currencyOverride={currency}
+              />
+              <CurrencyField
+                path={[...basePath, 'constructionPhase', 'costSources', 2, 'totalAmount']}
+                label="Other CAPEX"
+                tooltip="Other construction costs (contingency, soft costs, etc.)"
+                min={0}
+                step={100000}
+                currencyOverride={currency}
+              />
+            </ResponsiveFieldRow>
+          </FormSection>
+
+          <CapexDrawdownCard style={{ marginBottom: 24 }} />
+        </>
       )
     },
     {
@@ -195,7 +287,6 @@ const CostModule = () => {
                 showInfoBox={true}
                 valueType="percent"
                 valueName="Index (starting value)"
-                //addonAfter="GWh/year"
                 step={0.1}
                 options={[
                   { value: 'fixed', label: 'Fixed Value' },
@@ -326,7 +417,7 @@ const CostModule = () => {
       <Title level={2}>Cost Module</Title>
       <p>Configure operation and maintenance costs for your wind farm project.</p>
 
-      <Tabs defaultActiveKey="baseOM" items={tabItems} type="card" />
+      <Tabs defaultActiveKey="investment" items={tabItems} type="card" />
     </div>
   );
 };

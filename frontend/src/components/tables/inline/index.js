@@ -3,3 +3,5 @@ export { default as EditableCell } from './EditableCell';
 export * from './EditableCell';
 export * from './TableMetadata';
 export * from './TableControls';
+export * from './TableConfiguration';
+export * from './DataOperations';
