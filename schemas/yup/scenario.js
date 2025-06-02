@@ -276,6 +276,9 @@ const SettingsSchema = Yup.object().shape({
         netAEP: Yup.number().default(214032), // Matches getDefaultSettings
         debtToEquityRatio: Yup.number().default(1.5), // Matches getDefaultSettings
         wacc: Yup.number().default(5), // Matches getDefaultSettings
+        totalCapex: Yup.number().default(0),
+        devYear: Yup.number().default(-4),
+        ntpYear: Yup.number().default(-2),
         componentQuantities: Yup.object().shape({
             blades: Yup.number().default(60), // Matches getDefaultSettings
             bladeBearings: Yup.number().default(60), // Matches getDefaultSettings

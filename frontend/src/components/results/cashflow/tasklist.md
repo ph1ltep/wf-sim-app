@@ -1,4 +1,4 @@
- # Cashflow Analysis Development Plan | v4.0 | 2025-06-01
+ # Cashflow Analysis Development Plan | v4.2 | 2025-06-02
  Legend: ☐ Not Started ◐ In-Progress ☑ Done 🔥 Cleanup
  ## 1. Core Framework & Data Architecture 🏗️ 🏷️High
  - ☑ CF-1 Create CashflowContext.jsx with source registry and caching logic
@@ -37,40 +37,65 @@
  - ☑ EH-2 Fix infinite render loops with proper useEffect dependencies
  - ☑ EH-3 Improve data validation and transformer error handling
  - ☑ EH-4 Reduce logging to essential development information with emojis
- ## 8. Advanced Cards Implementation 💰 🏷️Medium
- - ☐ AC-1 Create FinanceabilityCard.jsx with KPI dashboard layout
- - ☐ AC-2 Implement DSCR timeline visualization with covenant thresholds
- - ☐ AC-3 Add covenant breach detection and alerting
- - ☐ AC-4 Create confidence interval displays for financial metrics
- - ☐ AC-5 Add stress testing capabilities for financing scenarios
- ## 9. Enhanced Finance Calculations 📈 🏷️Medium
- - ☐ FC-1 Replace placeholder IRR calculation with proper financial formula
- - ☐ FC-2 Implement accurate NPV calculation with discount rates
- - ☐ FC-3 Create proper DSCR calculation using debt service schedules
- - ☐ FC-4 Add LLCR (Loan Life Coverage Ratio) calculation
- - ☐ FC-5 Implement covenant breach probability analysis across percentiles
- ## 10. Additional Data Sources 📋 🏷️Low
- - ☐ ADS-1 Complete major repairs integration from CostModule settings
- - ☐ ADS-2 Add insurance premium costs from RiskModule settings
- - ☐ ADS-3 Implement reserve funds provision scheduling
+ ## 8. Construction Phase Implementation 🏗️🏷️High
+ - ☑ CP-1 Extend Cost Module schema with constructionPhase section using DataPointSchema
+ - ☑ CP-2 Create CapexDrawdownCard component for Investment tab
+ - ☑ CP-3 Add capex drawdown schedule transformer to cashflow pipeline
+ - ☑ CP-4 Update CashflowTimelineCard to display negative years (construction phase)
+ - ☐ CP-5 Integrate construction costs with financing debt drawdown calculations
+ ## 9. FinanceabilityCard Implementation 💰 🏷️High
+ - ☐ FC-1 Create FinanceabilityCard.jsx with KPI dashboard layout
+ - ☐ FC-2 Implement basic DCF calculations with WACC discounting
+ - ☐ FC-3 Add debt service schedule calculations using financing parameters
+ - ☐ FC-4 Create DSCR timeline with covenant threshold visualization
+ - ☐ FC-5 Add confidence interval displays for key financial metrics (P10-P90)
+ - ☐ FC-6 Implement covenant breach probability analysis across percentiles
+ ## 10. Enhanced Finance Calculations 📈 🏷️Medium
+ - ☐ EFC-1 Replace placeholder IRR calculation with proper NPV iteration method
+ - ☐ EFC-2 Implement accurate NPV calculation with project-specific discount rates
+ - ☐ EFC-3 Create proper DSCR calculation using actual debt service schedules
+ - ☐ EFC-4 Add LLCR (Loan Life Coverage Ratio) calculation
+ - ☐ EFC-5 Integrate grace period effects on debt service calculations
+ ## 11. Schema and Context Updates 🗂️ 🏷️Medium
+ - ☑ SCU-1 Update scenario schema with constructionPhase and limits fields
+ - ☐ SCU-2 Add capex drawdown source to CASHFLOW_SOURCE_REGISTRY
+ - ☐ SCU-3 Update financing calculations to use construction timeline
+ - ☑ SCU-4 Add validation for drawdown schedule percentages (InlineEditTable handles this)
+ ## 12. Additional Data Sources 📋 🏷️Low
+ - ☑ ADS-1 Complete major repairs integration from CostModule settings
+ - ☑ ADS-2 Add insurance premium costs from RiskModule settings
+ - ☑ ADS-3 Implement reserve funds provision scheduling
  - ☐ ADS-4 Add degradation factors for revenue streams
  - ☐ ADS-5 Integrate financing costs and debt service schedules
- ## 11. Driver Analysis & Sensitivity 🔍 🏷️Low
+ ## 13. Driver Analysis & Sensitivity 🔍 🏷️Low
  - ☐ DA-1 Create DriverExplorerCard.jsx with tornado chart visualization
  - ☐ DA-2 Implement NPV sensitivity analysis for key input variables
  - ☐ DA-3 Add ranking of variables by impact magnitude
  - ☐ DA-4 Create cross-panel linking to highlight selected drivers
  - ☐ DA-5 Add scenario comparison capabilities
- ## 12. Detailed Breakdown & Export 📊 🏷️Low
+ ## 14. Detailed Breakdown & Export 📊 🏷️Low
  - ☐ DB-1 Create CashflowTableCard.jsx with detailed annual breakdowns
  - ☐ DB-2 Add expandable line item details with multiplier effects
  - ☐ DB-3 Implement CSV export functionality for analysis
  - ☐ DB-4 Add cumulative vs annual view toggle
  - ☐ DB-5 Create summary statistics and variance analysis
+ ## 15. UI Component Cleanup 🧹 🏷️Low
+ - 🔥 UCC-1 Remove unused CashflowSummaryCard and CashflowDetailCard base classes
+ - ☐ UCC-2 Update card registry to reflect direct React component pattern
+ - ☐ UCC-3 Standardize card prop interfaces across all components
+ ## 16. V2 Advanced Features 🚀 🏷️Future
+ - ☐ V2-1 Advanced terminal value calculations with multiple exit scenarios
+ - ☐ V2-2 Tax shield benefits modeling from debt financing structure
+ - ☐ V2-3 Monthly-level cash flow accuracy for construction phase
+ - ☐ V2-4 Advanced debt modeling with variable rate structures
+ - ☐ V2-5 Integration with external market data APIs for pricing
+ - ☐ V2-6 Multi-scenario Monte Carlo analysis with correlation modeling
+ - ☐ V2-7 Advanced sensitivity analysis with interaction effects
+ - ☐ V2-8 Real-time covenant monitoring and alerting system
  ---
  ## Files Completed/Modified:
  ✅ COMPLETED:
-
+```
  frontend/src/
  ├── contexts/CashflowContext.jsx                    # Context with percentile management
  ├── components/
@@ -80,10 +105,14 @@
  │   │   └── components/
  │   │       ├── PercentileSelector.jsx              # Unified/per-source selection
  │   │       └── AuditTrailViewer.jsx                # Calculation transparency
- │   └── cards/
- │       └── CashflowTimelineCard.jsx                # Timeline with audit trail
+ │   ├── cards/
+ │   │   ├── CashflowTimelineCard.jsx                # Timeline with audit trail
+ │   │   └── CapexDrawdownCard.jsx                   # Construction phase investment
+ │   └── tables/inline/                              # Enhanced table components
  ├── utils/
  │   ├── cashflowUtils.js                            # Core transformation utilities
+ │   ├── metricsUtils.js                             # Enhanced metric calculations
+ │   ├── drawdownUtils.js                            # Construction phase utilities
  │   └── cashflow/
  │       ├── transform.js                            # Main orchestrator with reduced logging
  │       ├── contractUtils.js                        # Centralized contract processing
@@ -97,17 +126,22 @@
  │           ├── index.js                            # Multiplier application logic
  │           └── operations.js                       # Operation functions
  └── schemas/yup/
-     └── cashflow.js                                  # Simplified validation schemas
-
  App.js                                               # Updated routing and providers
+```
 
  🎯 NEXT TO CREATE:
-
+```
  frontend/src/components/cards/
  ├── FinanceabilityCard.jsx                          # KPI dashboard with DSCR analysis
  ├── DriverExplorerCard.jsx                          # Sensitivity analysis (future)
  └── CashflowTableCard.jsx                           # Detailed breakdown table (future)
-
+```
+ 🔥 FILES TO REMOVE:
+```
+ frontend/src/components/results/cashflow/base/
+ ├── CashflowSummaryCard.jsx                         # Unused base class
+ └── CashflowDetailCard.jsx                          # Unused base class
+```
  ---
  ## Technical Considerations & Patterns:
  ### Established Code Patterns:
@@ -134,7 +168,7 @@
  ### Critical Dependencies & Next Session Focus:
  - FinanceabilityCard: Next priority to complete business question #2
  - Enhanced finance metrics: Replace IRR/NPV placeholders with proper calculations
- - Additional cost sources: Complete major repairs, insurance, reserves integration
+ - Construction cost integration: Add capex drawdown to cashflow transformation
  - Registry maintenance: Easy addition of new data sources via configuration
  ### Development Workflow:
  - Cards validate data and show helpful errors instead of crashing

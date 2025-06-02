@@ -1,10 +1,12 @@
 // src/components/cards/CapexDrawdownCard.jsx
-import React, { useMemo, useCallback } from 'react';
-import { Alert, Typography, Space, Tag, message, Progress, Statistic, Row, Col } from 'antd';
-import { BuildOutlined, WarningOutlined, CheckCircleOutlined, CalendarOutlined, DollarOutlined } from '@ant-design/icons';
+import React, { useMemo, useCallback, useEffect } from 'react';
+import { Alert, Typography, Space, Tag, message, Row, Col } from 'antd';
+import { WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { InlineEditTable } from '../tables';
+import { TableControls } from '../tables/inline/TableControls';
 import { FieldCard } from '../contextFields';
+import { generateConstructionCostSources } from '../../utils/drawdownUtils';
 
 const { Text } = Typography;
 
@@ -17,104 +19,78 @@ const CapexDrawdownCard = ({
     cardProps = {},
     tableProps = {}
 }) => {
-    const { getValueByPath, scenarioData } = useScenario();
+    const { getValueByPath, updateByPath, scenarioData } = useScenario();
 
     // Get data
-    const costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], []);
+    let costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources']);
     const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
 
-    // Get timeline data for markers
+    // Simple initialization check and fix
+    useEffect(() => {
+        if (scenarioData && (!costSources || !Array.isArray(costSources) || costSources.length === 0)) {
+            console.log('🏗️ Initializing construction cost sources');
+            const codDate = getValueByPath(['settings', 'project', 'windFarm', 'codDate']);
+            updateByPath({
+                'settings.modules.cost.constructionPhase.costSources': generateConstructionCostSources(codDate)
+            });
+        }
+    }, [scenarioData, costSources, updateByPath, getValueByPath]);
+
+    // Re-get the data after potential initialization
+    costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], []);
+
+    // Get timeline data for markers and year range
     const developmentStartYear = getValueByPath(['settings', 'metrics', 'developmentStartYear'], -5);
     const ntpYear = getValueByPath(['settings', 'metrics', 'ntpYear'], -3);
 
     // Dynamic year range based on development start
     const yearRange = useMemo(() => ({
-        min: Math.min(developmentStartYear - 1, -10), // At least 1 year before dev start, but no more than -10
+        min: Math.min(developmentStartYear - 1, -10),
         max: 5
     }), [developmentStartYear]);
 
-    // Enhanced summary metadata
+    // Summary calculation
     const summary = useMemo(() => {
-        if (!costSources.length) {
+        if (!costSources || !Array.isArray(costSources) || costSources.length === 0) {
             return {
                 totalCapex: 0,
                 validationResults: [],
                 allValid: true,
-                postCODSpend: 0,
-                estimatedEndYear: 0,
-                phaseBreakdown: [],
-                timelineAnalysis: {}
+                phaseBreakdown: []
             };
         }
 
         let totalCapex = 0;
-        let postCODSpend = 0;
-        let estimatedEndYear = 0;
-        let totalScheduledPercentage = 0;
-        let totalScheduledAmount = 0;
-
+        const validationResults = [];
         const phaseBreakdown = [];
-        const yearlyTotals = new Map();
 
-        const validationResults = costSources.map(source => {
-            totalCapex += source.totalAmount || 0;
+        costSources.forEach(source => {
+            const sourceAmount = source?.totalAmount || 0;
+            const sourceSchedule = source?.drawdownSchedule || [];
+            const sourceName = source?.name || 'Unknown Source';
+            const sourceId = source?.id || 'unknown';
 
-            const schedule = source.drawdownSchedule || [];
-            const totalPercentage = schedule.reduce((sum, item) => sum + (item.value || 0), 0);
+            totalCapex += sourceAmount;
+
+            const totalPercentage = sourceSchedule.reduce((sum, item) => sum + (item?.value || 0), 0);
             const isValid = Math.abs(totalPercentage - 100) < 0.1;
 
-            // Calculate amounts for this source
-            const scheduledAmount = (totalPercentage / 100) * (source.totalAmount || 0);
-            totalScheduledAmount += scheduledAmount;
-
-            // Track yearly totals
-            schedule.forEach(item => {
-                const yearAmount = (item.value / 100) * (source.totalAmount || 0);
-                yearlyTotals.set(item.year, (yearlyTotals.get(item.year) || 0) + yearAmount);
-            });
-
-            // Calculate post-COD spending for this source
-            const sourcePostCOD = schedule
-                .filter(item => item.year > 0)
-                .reduce((sum, item) => sum + (item.value || 0), 0);
-            postCODSpend += (sourcePostCOD / 100) * (source.totalAmount || 0);
-
-            // Update estimated end year
-            if (schedule.length > 0) {
-                const sourceEndYear = Math.max(...schedule.map(item => item.year));
-                estimatedEndYear = Math.max(estimatedEndYear, sourceEndYear);
-            }
-
-            // Phase breakdown
-            phaseBreakdown.push({
-                id: source.id,
-                name: source.name,
-                amount: source.totalAmount || 0,
-                scheduledPercentage: totalPercentage,
-                scheduledAmount,
-                isValid,
-                peakYear: schedule.length > 0 ? schedule.reduce((prev, curr) =>
-                    (curr.value > prev.value) ? curr : prev
-                ).year : null
-            });
-
-            return {
-                sourceId: source.id,
-                sourceName: source.name,
+            validationResults.push({
+                sourceId,
+                sourceName,
                 totalPercentage,
                 isValid,
-                amount: source.totalAmount || 0
-            };
-        });
+                amount: sourceAmount
+            });
 
-        // Timeline analysis
-        const timelineAnalysis = {
-            peakSpendingYear: Array.from(yearlyTotals.entries()).reduce((peak, [year, amount]) =>
-                amount > (yearlyTotals.get(peak.year) || 0) ? { year, amount } : peak
-                , { year: 0, amount: 0 }),
-            preCODSpending: totalScheduledAmount - postCODSpend,
-            spendingEfficiency: totalCapex > 0 ? (totalScheduledAmount / totalCapex) * 100 : 0
-        };
+            phaseBreakdown.push({
+                id: sourceId,
+                name: sourceName,
+                amount: sourceAmount,
+                scheduledPercentage: totalPercentage,
+                isValid
+            });
+        });
 
         const allValid = validationResults.every(result => result.isValid);
 
@@ -122,44 +98,29 @@ const CapexDrawdownCard = ({
             totalCapex,
             validationResults,
             allValid,
-            postCODSpend,
-            estimatedEndYear,
-            phaseBreakdown,
-            timelineAnalysis,
-            totalScheduledAmount
+            phaseBreakdown
         };
     }, [costSources]);
 
-    // Handle before save - validate percentages for each cost source
+    // Timeline markers using actual metrics
+    const timelineMarkers = useMemo(() => [
+        { year: developmentStartYear, tag: 'DEV', color: '#1677ff', label: 'Development Start' },
+        { year: ntpYear, tag: 'NTP', color: '#fa8c16', label: 'Notice to Proceed' },
+        { year: 0, tag: 'COD', color: '#52c41a', label: 'Commercial Operation' }
+    ], [developmentStartYear, ntpYear]);
+
+    // Handle before save
     const handleBeforeSave = useCallback((updatedDataArray) => {
-        console.log('Processing CAPEX drawdown schedules before save:', updatedDataArray.length, 'cost sources');
-
-        updatedDataArray.forEach(source => {
-            const schedule = source.drawdownSchedule || [];
-            const totalPercentage = schedule.reduce((sum, item) => sum + (item.value || 0), 0);
-
-            if (Math.abs(totalPercentage - 100) > 5) {
-                console.warn(`${source.name} drawdown schedule total is ${totalPercentage.toFixed(1)}%, should be ~100%`);
-            }
-        });
-
+        console.log('Processing CAPEX drawdown schedules before save:', updatedDataArray?.length || 0, 'cost sources');
         return updatedDataArray;
     }, []);
 
-    // Timeline markers with enhanced information
-    const timelineMarkers = useMemo(() => [
-        { year: developmentStartYear, tag: 'DEV', color: 'blue', label: 'Development Start' },
-        { year: ntpYear, tag: 'NTP', color: 'orange', label: 'Notice to Proceed' },
-        { year: 0, tag: 'COD', color: 'green', label: 'Commercial Operation' }
-    ], [developmentStartYear, ntpYear]);
-
     // Handle after save
     const handleAfterSave = useCallback((result) => {
-        if (result.isValid) {
+        if (result?.isValid) {
             message.success('CAPEX drawdown schedules updated successfully');
         } else {
             message.error('Failed to save CAPEX drawdown schedules');
-            console.error('Save errors:', result.errors);
         }
     }, []);
 
@@ -172,28 +133,48 @@ const CapexDrawdownCard = ({
         );
     }
 
-    // Render validation status
-    const validationStatus = (
-        <Space>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-                Total Investment: {currency} {summary.totalCapex.toLocaleString()}
-            </Text>
-            {summary.allValid ? (
-                <Tag icon={<CheckCircleOutlined />} color="success" size="small">
-                    All Valid
-                </Tag>
-            ) : (
-                <Tag icon={<WarningOutlined />} color="warning" size="small">
-                    {summary.validationResults.filter(r => !r.isValid).length} Issues
-                </Tag>
-            )}
-        </Space>
-    );
+    // Render validation status for content area
+    const validationAlert = !summary.allValid ? (
+        <Alert
+            message="Validation Issues"
+            description={
+                <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                    {(summary.validationResults || [])
+                        .filter(result => !result?.isValid)
+                        .map(result => (
+                            <li key={result?.sourceId || 'unknown'}>
+                                <strong>{result?.sourceName || 'Unknown'}:</strong> {(result?.totalPercentage || 0).toFixed(1)}%
+                                (should be ~100%)
+                            </li>
+                        ))
+                    }
+                </ul>
+            }
+            type="warning"
+            size="small"
+            style={{ marginBottom: 16 }}
+        />
+    ) : null;
 
     return (
         <FieldCard
             title={title || 'Investment Drawdown Schedule'}
-            extra={validationStatus}
+            extra={
+                <Space>
+                    {/* Validation status in header */}
+                    {summary.allValid ? (
+                        <Tag icon={<CheckCircleOutlined />} color="success" size="small">
+                            All Valid
+                        </Tag>
+                    ) : (
+                        <Tag icon={<WarningOutlined />} color="warning" size="small">
+                            {(summary.validationResults?.filter(r => !r?.isValid) || []).length} Issues
+                        </Tag>
+                    )}
+
+                    {/* Edit controls in header */}
+                </Space>
+            }
             {...cardProps}
         >
             <div style={{ marginBottom: 16 }}>
@@ -202,83 +183,48 @@ const CapexDrawdownCard = ({
                 </Text>
             </div>
 
-            {/* Enhanced metadata summary */}
+            {/* Enhanced phase summary with per-unit and per-MW data */}
             <div style={{ marginBottom: 16 }}>
-                <Row gutter={16}>
-                    <Col span={6}>
-                        <Statistic
-                            title="Spending Efficiency"
-                            value={summary.timelineAnalysis.spendingEfficiency}
-                            precision={1}
-                            suffix="%"
-                            prefix={<DollarOutlined />}
-                        />
-                        <Progress
-                            percent={summary.timelineAnalysis.spendingEfficiency}
-                            size="small"
-                            strokeColor={summary.timelineAnalysis.spendingEfficiency > 95 ? '#52c41a' : '#faad14'}
-                            showInfo={false}
-                        />
-                    </Col>
-                    <Col span={6}>
-                        <Statistic
-                            title="Peak Spending Year"
-                            value={summary.timelineAnalysis.peakSpendingYear.year === 0 ? 'COD' :
-                                summary.timelineAnalysis.peakSpendingYear.year > 0 ?
-                                    `COD+${summary.timelineAnalysis.peakSpendingYear.year}` :
-                                    `COD${summary.timelineAnalysis.peakSpendingYear.year}`}
-                            prefix={<CalendarOutlined />}
-                        />
-                        <div style={{ fontSize: '12px', color: '#666' }}>
-                            {currency} {Math.round(summary.timelineAnalysis.peakSpendingYear.amount).toLocaleString()}
-                        </div>
-                    </Col>
-                    <Col span={6}>
-                        <Statistic
-                            title="Pre-COD Investment"
-                            value={summary.timelineAnalysis.preCODSpending}
-                            precision={0}
-                            formatter={value => `${currency} ${(value / 1000000).toFixed(1)}M`}
-                        />
-                        <div style={{ fontSize: '12px', color: '#666' }}>
-                            {((summary.timelineAnalysis.preCODSpending / summary.totalCapex) * 100).toFixed(1)}% of total
-                        </div>
-                    </Col>
-                    <Col span={6}>
-                        <Statistic
-                            title="Timeline Span"
-                            value={`${Math.abs(developmentStartYear)} years`}
-                            prefix={<CalendarOutlined />}
-                        />
-                        <div style={{ fontSize: '12px', color: '#666' }}>
-                            Dev to COD+{summary.estimatedEndYear}
-                        </div>
-                    </Col>
+                <Row gutter={8}>
+                    {(summary.phaseBreakdown || []).map(phase => {
+                        const numWTGs = getValueByPath(['settings', 'project', 'windFarm', 'numWTGs'], 20);
+                        const mwPerWTG = getValueByPath(['settings', 'project', 'windFarm', 'mwPerWTG'], 3.5);
+                        const totalMW = numWTGs * mwPerWTG;
+
+                        const perUnit = phase?.amount ? (phase.amount / numWTGs) : 0;
+                        const perMW = phase?.amount && totalMW > 0 ? (phase.amount / totalMW) : 0;
+
+                        return (
+                            <Col key={phase?.id || 'unknown'} span={6}>
+                                <div style={{
+                                    padding: '8px',
+                                    backgroundColor: '#fafafa',
+                                    borderRadius: '4px',
+                                    border: (phase?.isValid) ? '1px solid #d9d9d9' : '1px solid #ff7875'
+                                }}>
+                                    <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px' }}>
+                                        {phase?.name || 'Unknown'}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '2px' }}>
+                                        {currency} {((phase?.amount || 0) / 1000000).toFixed(1)}M total
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '2px' }}>
+                                        {currency} {(perUnit / 1000).toFixed(0)}k/unit • {currency} {(perMW / 1000).toFixed(0)}k/MW
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: (phase?.isValid) ? '#52c41a' : '#ff4d4f' }}>
+                                        {(phase?.scheduledPercentage || 0).toFixed(1)}% scheduled
+                                    </div>
+                                </div>
+                            </Col>
+                        );
+                    })}
                 </Row>
             </div>
 
-            {!summary.allValid && (
-                <Alert
-                    message="Validation Issues"
-                    description={
-                        <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                            {summary.validationResults
-                                .filter(result => !result.isValid)
-                                .map(result => (
-                                    <li key={result.sourceId}>
-                                        <strong>{result.sourceName}:</strong> {result.totalPercentage.toFixed(1)}%
-                                        (should be ~100%)
-                                    </li>
-                                ))
-                            }
-                        </ul>
-                    }
-                    type="warning"
-                    size="small"
-                    style={{ marginBottom: 16 }}
-                />
-            )}
+            {/* Validation alert if needed */}
+            {validationAlert}
 
+            {/* Table without controls */}
             <InlineEditTable
                 path={['settings', 'modules', 'cost', 'constructionPhase', 'costSources']}
                 dataFieldOptions={[
@@ -302,43 +248,53 @@ const CapexDrawdownCard = ({
                 onAfterSave={handleAfterSave}
                 affectedMetrics={['totalCapex']}
                 showMetadata={false}
-                orientation="vertical"
+                orientation="horizontal"
                 timelineMarkers={timelineMarkers}
+                controlsPlacement="internal"
                 {...tableProps}
             />
 
-            {/* Enhanced summary footer */}
-            <div style={{
-                marginTop: 16,
-                padding: '12px 16px',
-                backgroundColor: '#fafafa',
-                borderRadius: 6,
-                fontSize: '12px',
-                color: '#666'
-            }}>
-                <Row gutter={16}>
-                    <Col span={8}>
-                        <Space direction="vertical" size={4}>
+            {/* Simple KPIs at bottom */}
+            <div style={{ marginTop: 16 }}>
+                <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#fafafa',
+                    borderRadius: 6,
+                    fontSize: '12px',
+                    color: '#666'
+                }}>
+                    <Row gutter={16}>
+                        <Col span={8}>
                             <Text strong style={{ fontSize: '13px' }}>Investment Summary</Text>
-                            <Text>Total: {currency} {summary.totalCapex.toLocaleString()}</Text>
-                            <Text>Scheduled: {currency} {Math.round(summary.totalScheduledAmount).toLocaleString()}</Text>
-                        </Space>
-                    </Col>
-                    <Col span={8}>
-                        <Space direction="vertical" size={4}>
-                            <Text strong style={{ fontSize: '13px' }}>Timeline</Text>
-                            <Text>Span: {Math.abs(developmentStartYear)} to COD+{summary.estimatedEndYear}</Text>
-                            <Text>Post-COD: {currency} {Math.round(summary.postCODSpend).toLocaleString()}</Text>
-                        </Space>
-                    </Col>
-                    <Col span={8}>
-                        <Space direction="vertical" size={4}>
-                            <Text strong style={{ fontSize: '13px' }}>Validation</Text>
-                            <Text>Valid Schedules: {summary.validationResults.filter(r => r.isValid).length}/{summary.validationResults.length}</Text>
-                            <Text>Efficiency: {summary.timelineAnalysis.spendingEfficiency.toFixed(1)}%</Text>
-                        </Space>
-                    </Col>
-                </Row>
+                            <br />
+                            <Text>Total: {currency} {(summary.totalCapex || 0).toLocaleString()}</Text>
+                        </Col>
+                        <Col span={8}>
+                            <Text strong style={{ fontSize: '13px' }}>Per Unit Analysis</Text>
+                            <br />
+                            {(() => {
+                                const numWTGs = getValueByPath(['settings', 'project', 'windFarm', 'numWTGs'], 20);
+                                const mwPerWTG = getValueByPath(['settings', 'project', 'windFarm', 'mwPerWTG'], 3.5);
+                                const totalMW = numWTGs * mwPerWTG;
+                                const perUnit = summary.totalCapex > 0 ? (summary.totalCapex / numWTGs) : 0;
+                                const perMW = summary.totalCapex > 0 && totalMW > 0 ? (summary.totalCapex / totalMW) : 0;
+
+                                return (
+                                    <Text>
+                                        {currency} {(perUnit / 1000000).toFixed(2)}M/unit • {currency} {(perMW / 1000000).toFixed(2)}M/MW
+                                    </Text>
+                                );
+                            })()}
+                        </Col>
+                        <Col span={8}>
+                            <Text strong style={{ fontSize: '13px' }}>Validation Status</Text>
+                            <br />
+                            <Text>
+                                Valid Schedules: {(summary.validationResults || []).filter(r => r?.isValid).length}/{(summary.validationResults || []).length}
+                            </Text>
+                        </Col>
+                    </Row>
+                </div>
             </div>
         </FieldCard>
     );

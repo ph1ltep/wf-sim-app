@@ -120,12 +120,12 @@ const EditableCell = ({
   };
 
   const handleKeyDown = (e) => {
-    // Keyboard navigation
+    // Keyboard navigation logic stays the same...
     const currentCell = e.target;
     const table = currentCell.closest('table');
     const currentRow = currentCell.closest('tr');
     const currentCellIndex = Array.from(currentRow.cells).indexOf(currentCell.closest('td'));
-    const currentRowIndex = Array.from(table.rows).indexOf(currentRow) - 1; // Subtract header row
+    const currentRowIndex = Array.from(table.rows).indexOf(currentRow) - 1;
 
     switch (e.key) {
       case 'ArrowUp':
@@ -167,36 +167,41 @@ const EditableCell = ({
     width: '100%'
   };
 
+  // Base component props
   const componentProps = {
     value,
     onChange: handleChange,
     onKeyDown: handleKeyDown,
     disabled,
     size: 'small',
-    style: {
-      ...cellStyle,
-      width: fieldConfig.type === 'percentage' ? '80px' : '100%' // Make percentage fields smaller
-    },
     placeholder: disabled ? '-' : '0'
   };
 
-  // Add field-specific props
-  if (fieldConfig.type === 'currency' || fieldConfig.type === 'number') {
+  // Add field-specific props BEFORE style to avoid overwriting
+  if (fieldConfig.type === 'currency' || fieldConfig.type === 'number' || fieldConfig.type === 'percentage') {
     componentProps.min = fieldConfig.validation?.min;
     componentProps.max = fieldConfig.validation?.max;
     componentProps.precision = fieldConfig.validation?.precision;
-    componentProps.step = fieldConfig.type === 'currency' ? 1000 :
-      fieldConfig.type === 'percentage' ? 0.1 : 1;
 
     if (fieldConfig.type === 'currency') {
+      componentProps.step = 1000;
       componentProps.formatter = value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
       componentProps.parser = value => value?.replace(/,/g, '');
     } else if (fieldConfig.type === 'percentage') {
+      componentProps.step = 0.1;
       componentProps.addonAfter = '%';
       componentProps.formatter = value => `${value}`;
       componentProps.parser = value => value?.replace('%', '');
+    } else {
+      componentProps.step = 1;
     }
   }
+
+  // Apply style AFTER field-specific props
+  componentProps.style = {
+    ...cellStyle,
+    width: fieldConfig.type === 'percentage' ? '100px' : '100%' // Slightly wider for percentage with addon
+  };
 
   const Component = getComponentByType(fieldConfig.type);
 

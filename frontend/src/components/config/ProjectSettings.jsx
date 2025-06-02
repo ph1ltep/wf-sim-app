@@ -245,13 +245,13 @@ const ProjectSettings = () => {
         {/* Project Timeline */}
         <FormSection title="Project Timeline">
           <ResponsiveFieldRow layout="twoColumn">
-            <FieldGroup direction="vertical" size="middle">
+            <CompactFieldGroup direction="vertical" size="middle">
               <DateField
                 path={[...windFarmPath, 'devDate']}
                 label="Development Start Date"
                 tooltip="When development activities begin"
                 required
-                affectedMetrics={['developmentStartYear']}
+                affectedMetrics={['devYear']}
               />
               <DateField
                 path={[...windFarmPath, 'ntpDate']}
@@ -267,7 +267,7 @@ const ProjectSettings = () => {
                 required
                 affectedMetrics={['developmentStartYear', 'ntpYear']}
               />
-            </FieldGroup>
+            </CompactFieldGroup>
             <NumberField
               path={[...generalPath, 'projectLife']}
               label="Project Life (Years)"

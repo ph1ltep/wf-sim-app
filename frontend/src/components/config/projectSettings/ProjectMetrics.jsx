@@ -144,9 +144,9 @@ const ProjectMetrics = ({ calculatedValues }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Tag color="blue" size="small">DEV</Tag>
                 <span>
-                  {formatTimelineYear(calculatedValues.developmentStartYear || -5)}
+                  {formatTimelineYear(calculatedValues.devYear || -5)}
                   <span style={{ color: '#999', marginLeft: '4px' }}>
-                    ({getYearFromCOD(calculatedValues.developmentStartYear || -5)})
+                    ({getYearFromCOD(calculatedValues.devYear || -5)})
                   </span>
                 </span>
               </div>

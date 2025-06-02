@@ -88,3 +88,43 @@ export const reserveFundsToProvision = (reserveFunds, sourceConfig, context = {}
 
     return timeSeries;
 };
+
+/**
+ * Transform CAPEX drawdown schedule to annual costs
+ * @param {Array} costSources - Array of cost source objects with drawdown schedules
+ * @param {Object} sourceConfig - Source configuration
+ * @param {Object} context - Transformation context
+ * @returns {Array} Array of DataPointSchema objects
+ */
+export const capexDrawdownToAnnualCosts = (costSources, sourceConfig, context = {}) => {
+    if (!Array.isArray(costSources)) {
+        console.warn('capexDrawdownToAnnualCosts: Expected array of cost sources');
+        return [];
+    }
+
+    const annualCosts = [];
+    const yearlyTotals = new Map();
+
+    costSources.forEach(source => {
+        const schedule = source.drawdownSchedule || [];
+        const totalAmount = source.totalAmount || 0;
+
+        schedule.forEach(item => {
+            if (typeof item.year === 'number' && typeof item.value === 'number') {
+                const yearAmount = (item.value / 100) * totalAmount;
+                const currentTotal = yearlyTotals.get(item.year) || 0;
+                yearlyTotals.set(item.year, currentTotal + yearAmount);
+            }
+        });
+    });
+
+    // Convert to DataPointSchema array
+    Array.from(yearlyTotals.entries()).forEach(([year, amount]) => {
+        annualCosts.push({
+            year: parseInt(year),
+            value: amount
+        });
+    });
+
+    return annualCosts.sort((a, b) => a.year - b.year);
+};

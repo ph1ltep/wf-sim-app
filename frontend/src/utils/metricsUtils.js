@@ -46,7 +46,7 @@ export const calculateWACC = (financingParams, currencyParams = null) => {
  * @param {Object} windFarmParams - Wind farm parameters
  * @returns {number} Development start year relative to COD
  */
-export const calculateDevelopmentStartYear = (windFarmParams) => {
+export const calculateDevYear = (windFarmParams) => {
     if (!windFarmParams) return -5;
 
     const { devDate, codDate } = windFarmParams;
@@ -198,10 +198,10 @@ const METRIC_CALCULATORS = {
         dependencies: ['settings.modules.financing'],
         storePath: ['settings', 'metrics', 'debtToEquityRatio']
     },
-    developmentStartYear: {
-        calculator: calculateDevelopmentStartYear,
+    devYear: {
+        calculator: calculateDevYear,
         dependencies: ['settings.project.windFarm'],
-        storePath: ['settings', 'metrics', 'developmentStartYear']
+        storePath: ['settings', 'metrics', 'devYear']
     },
     ntpYear: {
         calculator: calculateNtpYear,

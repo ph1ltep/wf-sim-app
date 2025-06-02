@@ -5,7 +5,7 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { calculateAffectedMetrics } from '../../utils/metricsUtils';
 import { validateCellValue } from './inline/EditableCell';
 import { ValidationErrorSummary } from './inline/TableMetadata';
-import { DataFieldSelector, EditModeControls, ViewModeControls } from './inline/TableControls';
+import { DataFieldSelector, EditModeControls, ViewModeControls, TableControls } from './inline/TableControls';
 import {
     getTableConfiguration,
     generateTableColumns
@@ -50,6 +50,11 @@ const InlineEditTable = ({
     onAfterSave,
     onCancel,
     orientation = 'horizontal',
+    // New render props options
+    renderControls, // Function to render controls externally
+    controlsPlacement = 'internal', // 'internal', 'external', or 'none'
+    showDataFieldSelector = true,
+
     ...tableProps
 }) => {
     // Validation
@@ -177,6 +182,7 @@ const InlineEditTable = ({
                 okType: 'danger',
                 cancelText: 'Keep Editing',
                 onOk: () => {
+                    // Reset all state
                     setIsEditing(false);
                     setFormData(null);
                     setOriginalData(null);
@@ -187,6 +193,7 @@ const InlineEditTable = ({
                 }
             });
         } else {
+            // No changes, cancel immediately
             setIsEditing(false);
             setFormData(null);
             setOriginalData(null);
@@ -306,6 +313,28 @@ const InlineEditTable = ({
         }
     }, [isEditing, hasUnsavedChanges, modifiedCells.size, dataFieldOptions, originalData, yearColumns]);
 
+    // Create controls props object
+    const controlsProps = {
+        isEditing,
+        dataFieldOptions,
+        selectedDataField,
+        onDataFieldChange: handleDataFieldChangeWithConfirmation,
+        onEdit: handleEdit,
+        onSave: handleSaveAttempt,
+        onCancel: handleCancelWithConfirmation,
+        canSave: canSaveComputed,
+        saveLoading,
+        hasValidationErrors,
+        saveAttempted,
+        modifiedCellsCount: modifiedCells.size,
+        validationErrorsCount: validationErrors.size,
+        totalCells: (formData?.length || 0) * yearColumns.length,
+        hasUnsavedChanges,
+        fieldLabel: currentFieldConfig?.label || 'Data',
+        showDataFieldSelector,
+        showMetadata
+    };
+
     // Effects
     useEffect(() => {
         if (saveAttempted && isEditing) {
@@ -316,8 +345,16 @@ const InlineEditTable = ({
     // Table configuration and columns
     const tableConfig = useMemo(() => {
         const baseData = isEditing ? formData : contextData;
-        return getTableConfiguration(orientation, yearColumns, baseData, selectedDataField, hideEmptyItems, isEditing);
-    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems]);
+        return getTableConfiguration(
+            orientation,
+            yearColumns,
+            baseData,
+            selectedDataField,
+            hideEmptyItems,
+            isEditing,
+            tableProps.timelineMarkers || [] // Pass timelineMarkers from props
+        );
+    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, tableProps.timelineMarkers]);
 
     const columns = useMemo(() => {
         return generateTableColumns(
@@ -383,19 +420,66 @@ const InlineEditTable = ({
         );
     };
 
-    // Main render
+    // Render controls based on placement
+    const renderTableControls = () => {
+        if (controlsPlacement === 'none') return null;
+
+        if (controlsPlacement === 'external' && renderControls) {
+            // External rendering - return the controls for parent to use
+            return null; // Controls are rendered by parent
+        }
+
+        // Internal rendering (default)
+        return <TableControls {...controlsProps} />;
+    };
+
+    // For external rendering, make controls available to parent
+    if (controlsPlacement === 'external' && renderControls) {
+        return (
+            <>
+                {renderControls(controlsProps)}
+                <div className="inline-edit-table">
+                    {/* Validation summary */}
+                    <ValidationErrorSummary
+                        validationErrors={validationErrors}
+                        saveAttempted={saveAttempted}
+                        onClose={() => setSaveAttempted(false)}
+                    />
+
+                    {/* Main table */}
+                    <Table
+                        columns={columns}
+                        dataSource={tableConfig.rows}
+                        rowKey={(record) =>
+                            orientation === 'vertical'
+                                ? `year-${record.year}`
+                                : `contract-${record.index}`
+                        }
+                        pagination={false}
+                        size="small"
+                        scroll={{ x: 'max-content' }}
+                        onRow={orientation === 'vertical' ? (record) => {
+                            const marker = record.timelineMarker;
+                            return {
+                                style: marker ? {
+                                    backgroundColor: `${marker.color}08`,
+                                    borderTop: `2px solid ${marker.color}30`,
+                                    borderBottom: `1px solid ${marker.color}20`
+                                } : {}
+                            };
+                        } : undefined}
+                        {...tableProps}
+                    />
+                </div>
+            </>
+        );
+    }
+
+    // Main render for internal controls
     if (!contextData || contextData.length === 0) {
         return (
             <div>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 16
-                }}>
-                    {renderDataFieldSelector()}
-                    {renderEditControls()}
-                </div>
+                {controlsPlacement === 'internal' && renderTableControls()}
                 <Alert message="No data available" type="info" />
             </div>
         );
@@ -403,16 +487,12 @@ const InlineEditTable = ({
 
     return (
         <div className="inline-edit-table">
-            {/* Header with controls */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 16
-            }}>
-                {renderDataFieldSelector()}
-                {renderEditControls()}
-            </div>
+            {/* Header with controls - only if internal */}
+            {controlsPlacement === 'internal' && (
+                <div style={{ marginBottom: 16 }}>
+                    {renderTableControls()}
+                </div>
+            )}
 
             {/* Validation summary */}
             <ValidationErrorSummary
@@ -433,6 +513,16 @@ const InlineEditTable = ({
                 pagination={false}
                 size="small"
                 scroll={{ x: 'max-content' }}
+                onRow={orientation === 'vertical' ? (record) => {
+                    const marker = record.timelineMarker;
+                    return {
+                        style: marker ? {
+                            backgroundColor: `${marker.color}08`,
+                            borderTop: `2px solid ${marker.color}30`,
+                            borderBottom: `1px solid ${marker.color}20`
+                        } : {}
+                    };
+                } : undefined}
                 {...tableProps}
             />
         </div>

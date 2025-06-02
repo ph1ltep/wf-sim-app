@@ -16,6 +16,15 @@ export const CONSTRUCTION_PHASE_DEFAULTS = {
             ]
         },
         {
+            id: 'bop',
+            name: 'Balance of Plant',
+            totalAmount: 12000000,
+            defaultSchedule: [
+                { yearOffset: -3, value: 30 },
+                { yearOffset: -2, value: 70 }
+            ]
+        },
+        {
             id: 'wtg',
             name: 'Wind Turbine Generators',
             totalAmount: 35000000,
@@ -24,15 +33,6 @@ export const CONSTRUCTION_PHASE_DEFAULTS = {
                 { yearOffset: -2, value: 40 },
                 { yearOffset: -1, value: 45 },
                 { yearOffset: 0, value: 5 }
-            ]
-        },
-        {
-            id: 'bop',
-            name: 'Balance of Plant',
-            totalAmount: 12000000,
-            defaultSchedule: [
-                { yearOffset: -3, value: 30 },
-                { yearOffset: -2, value: 70 }
             ]
         },
         {

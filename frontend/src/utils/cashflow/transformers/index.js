@@ -5,7 +5,8 @@ import { extractPercentileData, extractFixedData } from './simulationTransformer
 import {
     majorRepairsToAnnualCosts,
     fixedCostToTimeSeries,
-    reserveFundsToProvision
+    reserveFundsToProvision,
+    capexDrawdownToAnnualCosts
 } from './costTransformer';
 
 /**
@@ -19,7 +20,8 @@ export const TRANSFORMER_REGISTRY = {
     'extractFixedData': extractFixedData,
     'majorRepairsToAnnualCosts': majorRepairsToAnnualCosts,
     'fixedCostToTimeSeries': fixedCostToTimeSeries,
-    'reserveFundsToProvision': reserveFundsToProvision
+    'reserveFundsToProvision': reserveFundsToProvision,
+    'capexDrawdownToAnnualCosts': capexDrawdownToAnnualCosts
 };
 
 /**
@@ -48,5 +50,6 @@ export {
     extractFixedData,
     majorRepairsToAnnualCosts,
     fixedCostToTimeSeries,
-    reserveFundsToProvision
+    reserveFundsToProvision,
+    capexDrawdownToAnnualCosts
 };

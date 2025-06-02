@@ -237,16 +237,7 @@ const CostModule = () => {
               />
               <CurrencyField
                 path={[...basePath, 'constructionPhase', 'costSources', 1, 'totalAmount']}
-                label="WTG CAPEX"
-                tooltip="Total cost for Wind Turbine Generators"
-                min={0}
-                step={1000000}
-                currencyOverride={currency}
-                affectedMetrics={['totalCapex']}
-              />
-              <CurrencyField
-                path={[...basePath, 'constructionPhase', 'costSources', 2, 'totalAmount']}
-                label="BoP CAPEX"
+                label="Balance of Plant"
                 tooltip="Balance of Plant costs (foundations, electrical, roads, etc.)"
                 min={0}
                 step={1000000}
@@ -254,8 +245,17 @@ const CostModule = () => {
                 affectedMetrics={['totalCapex']}
               />
               <CurrencyField
+                path={[...basePath, 'constructionPhase', 'costSources', 2, 'totalAmount']}
+                label="Wind Turbine Generators"
+                tooltip="Total cost for Wind Turbine Generators"
+                min={0}
+                step={1000000}
+                currencyOverride={currency}
+                affectedMetrics={['totalCapex']}
+              />
+              <CurrencyField
                 path={[...basePath, 'constructionPhase', 'costSources', 3, 'totalAmount']}
-                label="Other CAPEX"
+                label="Other Costs"
                 tooltip="Other construction costs (contingency, soft costs, etc.)"
                 min={0}
                 step={100000}

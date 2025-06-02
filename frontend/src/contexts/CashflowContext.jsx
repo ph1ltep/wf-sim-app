@@ -30,6 +30,16 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     ],
     costs: [
         {
+            id: 'capexDrawdown',
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            category: 'construction',
+            hasPercentiles: false,
+            transformer: 'capexDrawdownToAnnualCosts',
+            multipliers: [], // No escalation on CAPEX - it's historical cost
+            description: 'Construction phase CAPEX drawdown schedule',
+            displayNote: 'Construction investments occur in negative years (before COD)'
+        },
+        {
             id: 'contractFees',
             path: ['settings', 'modules', 'contracts', 'oemContracts'],
             category: 'contracts',
