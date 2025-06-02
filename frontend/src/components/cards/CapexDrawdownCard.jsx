@@ -1,7 +1,7 @@
 // src/components/cards/CapexDrawdownCard.jsx
 import React, { useMemo, useCallback } from 'react';
-import { Alert, Typography, Space, Tag, message } from 'antd';
-import { BuildOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Alert, Typography, Space, Tag, message, Progress, Statistic, Row, Col } from 'antd';
+import { BuildOutlined, WarningOutlined, CheckCircleOutlined, CalendarOutlined, DollarOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { InlineEditTable } from '../tables';
 import { FieldCard } from '../contextFields';
@@ -27,7 +27,13 @@ const CapexDrawdownCard = ({
     const developmentStartYear = getValueByPath(['settings', 'metrics', 'developmentStartYear'], -5);
     const ntpYear = getValueByPath(['settings', 'metrics', 'ntpYear'], -3);
 
-    // Calculate total and summary metadata
+    // Dynamic year range based on development start
+    const yearRange = useMemo(() => ({
+        min: Math.min(developmentStartYear - 1, -10), // At least 1 year before dev start, but no more than -10
+        max: 5
+    }), [developmentStartYear]);
+
+    // Enhanced summary metadata
     const summary = useMemo(() => {
         if (!costSources.length) {
             return {
@@ -35,13 +41,20 @@ const CapexDrawdownCard = ({
                 validationResults: [],
                 allValid: true,
                 postCODSpend: 0,
-                estimatedEndYear: 0
+                estimatedEndYear: 0,
+                phaseBreakdown: [],
+                timelineAnalysis: {}
             };
         }
 
         let totalCapex = 0;
         let postCODSpend = 0;
         let estimatedEndYear = 0;
+        let totalScheduledPercentage = 0;
+        let totalScheduledAmount = 0;
+
+        const phaseBreakdown = [];
+        const yearlyTotals = new Map();
 
         const validationResults = costSources.map(source => {
             totalCapex += source.totalAmount || 0;
@@ -49,6 +62,16 @@ const CapexDrawdownCard = ({
             const schedule = source.drawdownSchedule || [];
             const totalPercentage = schedule.reduce((sum, item) => sum + (item.value || 0), 0);
             const isValid = Math.abs(totalPercentage - 100) < 0.1;
+
+            // Calculate amounts for this source
+            const scheduledAmount = (totalPercentage / 100) * (source.totalAmount || 0);
+            totalScheduledAmount += scheduledAmount;
+
+            // Track yearly totals
+            schedule.forEach(item => {
+                const yearAmount = (item.value / 100) * (source.totalAmount || 0);
+                yearlyTotals.set(item.year, (yearlyTotals.get(item.year) || 0) + yearAmount);
+            });
 
             // Calculate post-COD spending for this source
             const sourcePostCOD = schedule
@@ -62,6 +85,19 @@ const CapexDrawdownCard = ({
                 estimatedEndYear = Math.max(estimatedEndYear, sourceEndYear);
             }
 
+            // Phase breakdown
+            phaseBreakdown.push({
+                id: source.id,
+                name: source.name,
+                amount: source.totalAmount || 0,
+                scheduledPercentage: totalPercentage,
+                scheduledAmount,
+                isValid,
+                peakYear: schedule.length > 0 ? schedule.reduce((prev, curr) =>
+                    (curr.value > prev.value) ? curr : prev
+                ).year : null
+            });
+
             return {
                 sourceId: source.id,
                 sourceName: source.name,
@@ -71,6 +107,15 @@ const CapexDrawdownCard = ({
             };
         });
 
+        // Timeline analysis
+        const timelineAnalysis = {
+            peakSpendingYear: Array.from(yearlyTotals.entries()).reduce((peak, [year, amount]) =>
+                amount > (yearlyTotals.get(peak.year) || 0) ? { year, amount } : peak
+                , { year: 0, amount: 0 }),
+            preCODSpending: totalScheduledAmount - postCODSpend,
+            spendingEfficiency: totalCapex > 0 ? (totalScheduledAmount / totalCapex) * 100 : 0
+        };
+
         const allValid = validationResults.every(result => result.isValid);
 
         return {
@@ -78,7 +123,10 @@ const CapexDrawdownCard = ({
             validationResults,
             allValid,
             postCODSpend,
-            estimatedEndYear
+            estimatedEndYear,
+            phaseBreakdown,
+            timelineAnalysis,
+            totalScheduledAmount
         };
     }, [costSources]);
 
@@ -98,39 +146,12 @@ const CapexDrawdownCard = ({
         return updatedDataArray;
     }, []);
 
-    // Custom year header format with timeline markers
-    const yearHeaderFormat = useCallback((year) => {
-        const baseFormat = year === 0 ? 'COD' : year > 0 ? `COD+${year}` : `COD${year}`;
-
-        if (year === developmentStartYear) {
-            return (
-                <div style={{ textAlign: 'center' }}>
-                    <div>{baseFormat}</div>
-                    <Tag color="blue" size="small" style={{ fontSize: '10px', margin: 0 }}>DEV</Tag>
-                </div>
-            );
-        }
-
-        if (year === ntpYear) {
-            return (
-                <div style={{ textAlign: 'center' }}>
-                    <div>{baseFormat}</div>
-                    <Tag color="orange" size="small" style={{ fontSize: '10px', margin: 0 }}>NTP</Tag>
-                </div>
-            );
-        }
-
-        if (year === 0) {
-            return (
-                <div style={{ textAlign: 'center' }}>
-                    <div>{baseFormat}</div>
-                    <Tag color="green" size="small" style={{ fontSize: '10px', margin: 0 }}>COD</Tag>
-                </div>
-            );
-        }
-
-        return baseFormat;
-    }, [developmentStartYear, ntpYear]);
+    // Timeline markers with enhanced information
+    const timelineMarkers = useMemo(() => [
+        { year: developmentStartYear, tag: 'DEV', color: 'blue', label: 'Development Start' },
+        { year: ntpYear, tag: 'NTP', color: 'orange', label: 'Notice to Proceed' },
+        { year: 0, tag: 'COD', color: 'green', label: 'Commercial Operation' }
+    ], [developmentStartYear, ntpYear]);
 
     // Handle after save
     const handleAfterSave = useCallback((result) => {
@@ -177,8 +198,63 @@ const CapexDrawdownCard = ({
         >
             <div style={{ marginBottom: 16 }}>
                 <Text type="secondary">
-                    Configure when investment is spent across development and construction phases. Negative years are before COD.
+                    Configure when investment is spent across development and construction phases. Timeline markers show key project milestones.
                 </Text>
+            </div>
+
+            {/* Enhanced metadata summary */}
+            <div style={{ marginBottom: 16 }}>
+                <Row gutter={16}>
+                    <Col span={6}>
+                        <Statistic
+                            title="Spending Efficiency"
+                            value={summary.timelineAnalysis.spendingEfficiency}
+                            precision={1}
+                            suffix="%"
+                            prefix={<DollarOutlined />}
+                        />
+                        <Progress
+                            percent={summary.timelineAnalysis.spendingEfficiency}
+                            size="small"
+                            strokeColor={summary.timelineAnalysis.spendingEfficiency > 95 ? '#52c41a' : '#faad14'}
+                            showInfo={false}
+                        />
+                    </Col>
+                    <Col span={6}>
+                        <Statistic
+                            title="Peak Spending Year"
+                            value={summary.timelineAnalysis.peakSpendingYear.year === 0 ? 'COD' :
+                                summary.timelineAnalysis.peakSpendingYear.year > 0 ?
+                                    `COD+${summary.timelineAnalysis.peakSpendingYear.year}` :
+                                    `COD${summary.timelineAnalysis.peakSpendingYear.year}`}
+                            prefix={<CalendarOutlined />}
+                        />
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                            {currency} {Math.round(summary.timelineAnalysis.peakSpendingYear.amount).toLocaleString()}
+                        </div>
+                    </Col>
+                    <Col span={6}>
+                        <Statistic
+                            title="Pre-COD Investment"
+                            value={summary.timelineAnalysis.preCODSpending}
+                            precision={0}
+                            formatter={value => `${currency} ${(value / 1000000).toFixed(1)}M`}
+                        />
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                            {((summary.timelineAnalysis.preCODSpending / summary.totalCapex) * 100).toFixed(1)}% of total
+                        </div>
+                    </Col>
+                    <Col span={6}>
+                        <Statistic
+                            title="Timeline Span"
+                            value={`${Math.abs(developmentStartYear)} years`}
+                            prefix={<CalendarOutlined />}
+                        />
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                            Dev to COD+{summary.estimatedEndYear}
+                        </div>
+                    </Col>
+                </Row>
             </div>
 
             {!summary.allValid && (
@@ -218,36 +294,51 @@ const CapexDrawdownCard = ({
                         defaultValueField: null
                     }
                 ]}
-                yearRange={{ min: -10, max: 5 }}
+                yearRange={yearRange}
                 trimBlanks={true}
                 trimValue={0}
                 hideEmptyItems={true}
                 onBeforeSave={handleBeforeSave}
                 onAfterSave={handleAfterSave}
-                affectedMetrics={['constructionCosts', 'totalCapex']}
+                affectedMetrics={['totalCapex']}
                 showMetadata={false}
                 orientation="vertical"
-                yearHeaderFormat={yearHeaderFormat}
+                timelineMarkers={timelineMarkers}
                 {...tableProps}
             />
 
-            {/* Summary footer */}
+            {/* Enhanced summary footer */}
             <div style={{
                 marginTop: 16,
-                padding: '8px 12px',
+                padding: '12px 16px',
                 backgroundColor: '#fafafa',
-                borderRadius: 4,
+                borderRadius: 6,
                 fontSize: '12px',
                 color: '#666'
             }}>
-                <Space split={<span style={{ color: '#d9d9d9' }}>|</span>} wrap>
-                    <span><strong>Total Investment:</strong> {currency} {summary.totalCapex.toLocaleString()}</span>
-                    <span><strong>End Year:</strong> COD{summary.estimatedEndYear > 0 ? '+' : ''}{summary.estimatedEndYear}</span>
-                    {summary.postCODSpend > 0 && (
-                        <span><strong>Post-COD Amount:</strong> {currency} {Math.round(summary.postCODSpend).toLocaleString()}</span>
-                    )}
-                    <span><strong>Valid Schedules:</strong> {summary.validationResults.filter(r => r.isValid).length}/{summary.validationResults.length}</span>
-                </Space>
+                <Row gutter={16}>
+                    <Col span={8}>
+                        <Space direction="vertical" size={4}>
+                            <Text strong style={{ fontSize: '13px' }}>Investment Summary</Text>
+                            <Text>Total: {currency} {summary.totalCapex.toLocaleString()}</Text>
+                            <Text>Scheduled: {currency} {Math.round(summary.totalScheduledAmount).toLocaleString()}</Text>
+                        </Space>
+                    </Col>
+                    <Col span={8}>
+                        <Space direction="vertical" size={4}>
+                            <Text strong style={{ fontSize: '13px' }}>Timeline</Text>
+                            <Text>Span: {Math.abs(developmentStartYear)} to COD+{summary.estimatedEndYear}</Text>
+                            <Text>Post-COD: {currency} {Math.round(summary.postCODSpend).toLocaleString()}</Text>
+                        </Space>
+                    </Col>
+                    <Col span={8}>
+                        <Space direction="vertical" size={4}>
+                            <Text strong style={{ fontSize: '13px' }}>Validation</Text>
+                            <Text>Valid Schedules: {summary.validationResults.filter(r => r.isValid).length}/{summary.validationResults.length}</Text>
+                            <Text>Efficiency: {summary.timelineAnalysis.spendingEfficiency.toFixed(1)}%</Text>
+                        </Space>
+                    </Col>
+                </Row>
             </div>
         </FieldCard>
     );

@@ -1,6 +1,6 @@
 // src/components/config/projectSettings/ProjectMetrics.jsx
 import React from 'react';
-import { Card, Row, Col, Statistic, Divider, Table } from 'antd';
+import { Card, Row, Col, Statistic, Divider, Table, Tag } from 'antd';
 
 /**
  * Component for displaying calculated project metrics
@@ -78,10 +78,22 @@ const ProjectMetrics = ({ calculatedValues }) => {
     },
   ];
 
+  // Format timeline display
+  const formatTimelineYear = (year) => {
+    if (year === 0) return 'COD';
+    return year > 0 ? `COD+${year}` : `COD${year}`;
+  };
+
+  const getYearFromCOD = (year) => {
+    const currentYear = new Date().getFullYear();
+    const codYear = currentYear + 2; // Assuming COD is 2 years from now (adjust as needed)
+    return codYear + year;
+  };
+
   return (
     <Card title="Calculated Project Metrics" style={{ marginBottom: 24 }}>
       <Row gutter={24}>
-        <Col span={8}>
+        <Col span={5}>
           <Statistic
             title="Total Project Capacity"
             value={calculatedValues.totalMW}
@@ -89,7 +101,7 @@ const ProjectMetrics = ({ calculatedValues }) => {
             suffix="MW"
           />
         </Col>
-        <Col span={8}>
+        <Col span={5}>
           <Statistic
             title="Estimated AEP (Gross)"
             value={calculatedValues.grossAEP}
@@ -100,7 +112,7 @@ const ProjectMetrics = ({ calculatedValues }) => {
             ({calculatedValues.grossAEP.toLocaleString()} MWh)
           </div>
         </Col>
-        <Col span={8}>
+        <Col span={5}>
           <Statistic
             title="Estimated AEP (Net)"
             value={calculatedValues.netAEP}
@@ -112,10 +124,57 @@ const ProjectMetrics = ({ calculatedValues }) => {
             ({calculatedValues.netAEP.toLocaleString()} MWh)
           </div>
         </Col>
+        <Col span={5}>
+          <Statistic
+            title="Total Investment"
+            value={calculatedValues.totalCapex}
+            precision={0}
+            formatter={value => `$${(value / 1000000).toFixed(1)}M`}
+          />
+          <div style={{ fontSize: '12px', color: 'rgba(0, 0, 0, 0.45)' }}>
+            (${calculatedValues.totalCapex.toLocaleString()})
+          </div>
+        </Col>
+        <Col span={4}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>
+              Project Timeline
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Tag color="blue" size="small">DEV</Tag>
+                <span>
+                  {formatTimelineYear(calculatedValues.developmentStartYear || -5)}
+                  <span style={{ color: '#999', marginLeft: '4px' }}>
+                    ({getYearFromCOD(calculatedValues.developmentStartYear || -5)})
+                  </span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Tag color="orange" size="small">NTP</Tag>
+                <span>
+                  {formatTimelineYear(calculatedValues.ntpYear || -3)}
+                  <span style={{ color: '#999', marginLeft: '4px' }}>
+                    ({getYearFromCOD(calculatedValues.ntpYear || -3)})
+                  </span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Tag color="green" size="small">COD</Tag>
+                <span>
+                  Year 0
+                  <span style={{ color: '#999', marginLeft: '4px' }}>
+                    ({getYearFromCOD(0)})
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </Col>
       </Row>
-      
+
       <Divider orientation="left">Major Component Quantities</Divider>
-      
+
       <Table
         columns={columns}
         dataSource={dataSource}

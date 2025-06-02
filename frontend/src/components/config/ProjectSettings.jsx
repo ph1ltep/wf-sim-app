@@ -245,24 +245,29 @@ const ProjectSettings = () => {
         {/* Project Timeline */}
         <FormSection title="Project Timeline">
           <ResponsiveFieldRow layout="twoColumn">
-            <DateField
-              path={[...windFarmPath, 'devDate']}
-              label="Development Start Date"
-              tooltip="When development activities begin"
-            />
-            <DateField
-              path={[...windFarmPath, 'ntpDate']}
-              label="Notice to Proceed (NTP)"
-              tooltip="When construction can begin"
-            />
-          </ResponsiveFieldRow>
-          <ResponsiveFieldRow layout="twoColumn">
-            <DateField
-              path={[...windFarmPath, 'codDate']}
-              label="Commercial Operation Date (COD)"
-              tooltip="When the project begins commercial operation"
-              required
-            />
+            <FieldGroup direction="vertical" size="middle">
+              <DateField
+                path={[...windFarmPath, 'devDate']}
+                label="Development Start Date"
+                tooltip="When development activities begin"
+                required
+                affectedMetrics={['developmentStartYear']}
+              />
+              <DateField
+                path={[...windFarmPath, 'ntpDate']}
+                label="Notice to Proceed (NTP)"
+                tooltip="When construction can begin"
+                required
+                affectedMetrics={['ntpYear']}
+              />
+              <DateField
+                path={[...windFarmPath, 'codDate']}
+                label="Commercial Operation Date (COD)"
+                tooltip="When the project begins commercial operation"
+                required
+                affectedMetrics={['developmentStartYear', 'ntpYear']}
+              />
+            </FieldGroup>
             <NumberField
               path={[...generalPath, 'projectLife']}
               label="Project Life (Years)"

@@ -224,43 +224,43 @@ const CostModule = () => {
       ),
       children: (
         <>
-          <FormSection title="Development Phase" style={{ marginBottom: 24 }}>
-            <ResponsiveFieldRow layout="oneColumn">
-              <CurrencyField
-                path={[...basePath, 'developmentPhase', 'devex']}
-                label="Development Investment (DEVEX)"
-                tooltip="Development expenditure incurred prior to construction (permits, studies, etc.)"
-                min={0}
-                step={100000}
-              />
-            </ResponsiveFieldRow>
-          </FormSection>
-
-          <FormSection title="Construction Phase" style={{ marginBottom: 24 }}>
-            <ResponsiveFieldRow layout="threeColumn">
+          <FormSection title="Construction Phase Investment" style={{ marginBottom: 24 }}>
+            <ResponsiveFieldRow layout="fourColumn">
               <CurrencyField
                 path={[...basePath, 'constructionPhase', 'costSources', 0, 'totalAmount']}
+                label="Development (DEVEX)"
+                tooltip="Development expenditure (permits, studies, etc.)"
+                min={0}
+                step={100000}
+                currencyOverride={currency}
+                affectedMetrics={['totalCapex']}
+              />
+              <CurrencyField
+                path={[...basePath, 'constructionPhase', 'costSources', 1, 'totalAmount']}
                 label="WTG CAPEX"
                 tooltip="Total cost for Wind Turbine Generators"
                 min={0}
                 step={1000000}
                 currencyOverride={currency}
+                affectedMetrics={['totalCapex']}
               />
               <CurrencyField
-                path={[...basePath, 'constructionPhase', 'costSources', 1, 'totalAmount']}
+                path={[...basePath, 'constructionPhase', 'costSources', 2, 'totalAmount']}
                 label="BoP CAPEX"
                 tooltip="Balance of Plant costs (foundations, electrical, roads, etc.)"
                 min={0}
                 step={1000000}
                 currencyOverride={currency}
+                affectedMetrics={['totalCapex']}
               />
               <CurrencyField
-                path={[...basePath, 'constructionPhase', 'costSources', 2, 'totalAmount']}
+                path={[...basePath, 'constructionPhase', 'costSources', 3, 'totalAmount']}
                 label="Other CAPEX"
                 tooltip="Other construction costs (contingency, soft costs, etc.)"
                 min={0}
                 step={100000}
                 currencyOverride={currency}
+                affectedMetrics={['totalCapex']}
               />
             </ResponsiveFieldRow>
           </FormSection>
