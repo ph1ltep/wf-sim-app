@@ -131,6 +131,11 @@ const SettingsSchema = Yup.object().shape({
                 date.setFullYear(date.getFullYear() + 2); // 2 years from now
                 return date;
             }),
+            baseDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear()); // 2 years from now
+                return date;
+            }),
         }),
         currency: Yup.object().shape({
             local: Yup.string().default('USD'),

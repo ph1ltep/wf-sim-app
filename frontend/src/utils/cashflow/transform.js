@@ -1,4 +1,4 @@
-// src/utils/cashflow/transform.js - Updated transformation orchestrator with new data structure
+// src/utils/cashflow/transform.js - Enhanced with multi-percentile support
 import { applyTransformer } from './transformers';
 import { applyMultipliers } from './multipliers';
 import { calculateFinanceMetrics } from '../cashflowUtils';
@@ -19,7 +19,6 @@ const getSelectedPercentileForSource = (sourceId, selectedPercentiles, available
  */
 const extractDataForPercentile = (dataSource, dataReferences, sourceConfig, percentile) => {
     if (sourceConfig.hasPercentiles) {
-        // Add percentile to context for simulation data extraction
         const contextWithPercentile = {
             ...dataReferences.context,
             percentile
@@ -37,7 +36,30 @@ const extractDataForPercentile = (dataSource, dataReferences, sourceConfig, perc
 };
 
 /**
- * Build dataReferences object with proper structure
+ * NEW: Extract data for all available percentiles (for summary cards)
+ */
+const extractDataForAllPercentiles = (dataSource, dataReferences, sourceConfig, availablePercentiles) => {
+    const allPercentileData = new Map();
+
+    if (sourceConfig.hasPercentiles) {
+        // For sources with percentiles, extract each one
+        availablePercentiles.forEach(percentile => {
+            const data = extractDataForPercentile(dataSource, dataReferences, sourceConfig, percentile);
+            allPercentileData.set(percentile, data);
+        });
+    } else {
+        // For fixed sources, same data for all percentiles
+        const fixedData = extractDataForPercentile(dataSource, dataReferences, sourceConfig, null);
+        availablePercentiles.forEach(percentile => {
+            allPercentileData.set(percentile, fixedData);
+        });
+    }
+
+    return allPercentileData;
+};
+
+/**
+ * Build dataReferences object with proper structure (unchanged)
  */
 const buildDataReferences = (sourceConfig, registry, getValueByPath, selectedPercentiles, availablePercentiles, context) => {
     const dataReferences = {
@@ -59,7 +81,6 @@ const buildDataReferences = (sourceConfig, registry, getValueByPath, selectedPer
     if (sourceConfig.references && Array.isArray(sourceConfig.references)) {
         sourceConfig.references.forEach((referencePath, index) => {
             const data = getValueByPath(referencePath);
-            // Use the last segment of the path as the key, or fall back to index
             const key = referencePath[referencePath.length - 1] || `ref_${index}`;
             dataReferences.reference[key] = data;
         });
@@ -79,7 +100,7 @@ const buildDataReferences = (sourceConfig, registry, getValueByPath, selectedPer
 };
 
 /**
- * Validate that primary data source exists before calling transformer
+ * Validate that primary data source exists before calling transformer (unchanged)
  */
 const validateDataSource = (dataSource, sourceConfig) => {
     if (!dataSource) {
@@ -100,7 +121,6 @@ const testUnifiedPercentileMode = (selectedPercentiles, registry, getValueByPath
 
     console.log(`📊 Testing unified percentile: P${unified}`);
 
-    // Test that all percentile sources will use the same percentile
     const percentileSources = [...(registry.multipliers || []), ...(registry.revenues || [])]
         .filter(source => source.hasPercentiles);
 
@@ -124,7 +144,7 @@ const testUnifiedPercentileMode = (selectedPercentiles, registry, getValueByPath
 };
 
 /**
- * Updated transformation function with new data structure and signatures
+ * Enhanced transformation function with multi-percentile support
  */
 export const transformScenarioToCashflow = async (
     scenarioData,
@@ -132,18 +152,21 @@ export const transformScenarioToCashflow = async (
     selectedPercentiles,
     getValueByPath
 ) => {
-    console.log('🔄 Starting cashflow transformation with new data structure...');
+    console.log('🔄 Starting enhanced cashflow transformation with multi-percentile support...');
 
     // Test percentile mode
     testUnifiedPercentileMode(selectedPercentiles, registry, getValueByPath);
 
-    // Extract metadata
+    // Extract metadata (enhanced)
     const availablePercentiles = getValueByPath(['settings', 'simulation', 'percentiles'], []).map(p => p.value);
+    const primaryPercentile = selectedPercentiles?.unified || getValueByPath(['settings', 'simulation', 'primaryPercentile'], 50);
+
     const metadata = {
         projectLife: getValueByPath(['settings', 'general', 'projectLife'], 20),
         currency: getValueByPath(['settings', 'project', 'currency', 'local'], 'USD'),
         numWTGs: getValueByPath(['settings', 'project', 'windFarm', 'numWTGs'], 20),
         availablePercentiles,
+        primaryPercentile, // NEW: Store primary percentile
         lastUpdated: new Date(),
         percentileStrategy: {
             strategy: selectedPercentiles.strategy,
@@ -159,18 +182,16 @@ export const transformScenarioToCashflow = async (
         getValueByPath
     };
 
-    // Extract multiplier data with new structure
-    console.log('📊 Processing multipliers...');
+    // Extract multiplier data (unchanged logic, but enhanced storage)
+    console.log('📊 Processing multipliers with multi-percentile support...');
     const multiplierData = {};
     let multiplierErrors = 0;
 
     registry.multipliers?.forEach(multiplierConfig => {
         try {
-            // Get primary data source
             const dataSource = getValueByPath(multiplierConfig.path);
             validateDataSource(dataSource, multiplierConfig);
 
-            // Build data references
             const dataReferences = buildDataReferences(
                 multiplierConfig,
                 registry,
@@ -186,6 +207,7 @@ export const transformScenarioToCashflow = async (
                 availablePercentiles
             );
 
+            // Get primary data (existing logic)
             const data = extractDataForPercentile(dataSource, dataReferences, multiplierConfig, selectedPercentile);
             multiplierData[multiplierConfig.id] = data;
 
@@ -198,19 +220,17 @@ export const transformScenarioToCashflow = async (
 
     console.log(`✅ Processed ${Object.keys(multiplierData).length} multipliers (${multiplierErrors} errors)`);
 
-    // Process line items with new structure
-    console.log('📈 Processing line items...');
+    // Process line items with enhanced storage (CORE ENHANCEMENT)
+    console.log('📈 Processing line items with multi-percentile support...');
     const lineItems = [];
     let lineItemErrors = 0;
 
     ['costs', 'revenues'].forEach(sourceType => {
         registry[sourceType]?.forEach(sourceConfig => {
             try {
-                // Get primary data source
                 const dataSource = getValueByPath(sourceConfig.path);
                 validateDataSource(dataSource, sourceConfig);
 
-                // Build data references
                 const dataReferences = buildDataReferences(
                     sourceConfig,
                     registry,
@@ -226,11 +246,12 @@ export const transformScenarioToCashflow = async (
                     availablePercentiles
                 );
 
+                // Get primary data (existing logic)
                 const baseData = extractDataForPercentile(dataSource, dataReferences, sourceConfig, selectedPercentile);
                 let finalData = baseData;
                 let appliedMultipliers = [];
 
-                // Apply multipliers if configured
+                // Apply multipliers if configured (existing logic)
                 if (sourceConfig.multipliers && sourceConfig.multipliers.length > 0) {
                     const multiplierResult = applyMultipliers(
                         baseData,
@@ -241,15 +262,39 @@ export const transformScenarioToCashflow = async (
                     appliedMultipliers = multiplierResult.appliedMultipliers;
                 }
 
+                // NEW: Get all percentile data for summary cards
+                let allPercentileData = null;
+                if (sourceConfig.hasPercentiles || availablePercentiles.length > 1) {
+                    allPercentileData = new Map();
+
+                    availablePercentiles.forEach(percentile => {
+                        let percentileBaseData = extractDataForPercentile(dataSource, dataReferences, sourceConfig, percentile);
+
+                        // Apply same multipliers to each percentile
+                        if (sourceConfig.multipliers && sourceConfig.multipliers.length > 0) {
+                            const percentileMultiplierResult = applyMultipliers(
+                                percentileBaseData,
+                                sourceConfig.multipliers,
+                                multiplierData
+                            );
+                            percentileBaseData = percentileMultiplierResult.data;
+                        }
+
+                        allPercentileData.set(percentile, percentileBaseData);
+                    });
+                }
+
                 const lineItem = {
                     id: sourceConfig.id,
                     category: sourceType === 'costs' ? 'cost' : 'revenue',
                     subcategory: sourceConfig.category,
                     name: sourceConfig.description || sourceConfig.id,
-                    data: finalData || [],
+                    data: finalData || [], // Primary percentile (existing)
+                    percentileData: allPercentileData, // NEW: All percentiles
                     metadata: {
                         selectedPercentile,
                         hasPercentileVariation: sourceConfig.hasPercentiles,
+                        hasAllPercentiles: allPercentileData !== null, // NEW: Flag
                         appliedMultipliers,
                         description: sourceConfig.description
                     }
@@ -268,24 +313,27 @@ export const transformScenarioToCashflow = async (
         });
     });
 
-    console.log(`✅ Processed ${lineItems.length} line items (${lineItemErrors} errors)`);
+    console.log(`✅ Processed ${lineItems.length} line items with multi-percentile support (${lineItemErrors} errors)`);
 
-    // Calculate aggregations (unchanged logic)
-    console.log('🧮 Calculating aggregations...');
-    const aggregateByCategorySimplified = (category) => {
+    // Enhanced aggregations with multi-percentile support
+    console.log('🧮 Calculating enhanced aggregations...');
+    const aggregateByCategoryEnhanced = (category) => {
         const categoryItems = lineItems.filter(item => item.category === category);
 
         if (categoryItems.length === 0) {
             return {
                 data: [],
+                percentileData: new Map(),
                 metadata: {
-                    selectedPercentile: selectedPercentiles.unified || 50,
+                    selectedPercentile: primaryPercentile,
                     sourceCount: 0,
-                    hasPercentileVariation: false
+                    hasPercentileVariation: false,
+                    hasAllPercentiles: false
                 }
             };
         }
 
+        // Calculate primary percentile aggregation (existing logic)
         const allYears = new Set();
         categoryItems.forEach(item => {
             if (!item.data || !Array.isArray(item.data)) {
@@ -305,16 +353,48 @@ export const transformScenarioToCashflow = async (
             });
         });
 
-        const aggregatedData = Array.from(allYears).map(year => {
+        const primaryData = Array.from(allYears).map(year => {
             const total = categoryItems.reduce((sum, item) => {
-                if (!Array.isArray(item.data)) {
-                    return sum;
-                }
+                if (!Array.isArray(item.data)) return sum;
                 const dataPoint = item.data.find(d => d && d.year === year);
                 return sum + (dataPoint ? (dataPoint.value || 0) : 0);
             }, 0);
             return { year, value: total };
         }).sort((a, b) => a.year - b.year);
+
+        // NEW: Calculate all percentile aggregations
+        const allPercentileAggregation = new Map();
+        availablePercentiles.forEach(percentile => {
+            const percentileYears = new Set();
+
+            // Collect all years across all items for this percentile
+            categoryItems.forEach(item => {
+                if (item.percentileData && item.percentileData.has(percentile)) {
+                    const percentileData = item.percentileData.get(percentile);
+                    if (Array.isArray(percentileData)) {
+                        percentileData.forEach(point => {
+                            if (point && typeof point.year === 'number') {
+                                percentileYears.add(point.year);
+                            }
+                        });
+                    }
+                }
+            });
+
+            // Aggregate for this percentile
+            const percentileAggregated = Array.from(percentileYears).map(year => {
+                const total = categoryItems.reduce((sum, item) => {
+                    if (!item.percentileData || !item.percentileData.has(percentile)) return sum;
+                    const percentileData = item.percentileData.get(percentile);
+                    if (!Array.isArray(percentileData)) return sum;
+                    const dataPoint = percentileData.find(d => d && d.year === year);
+                    return sum + (dataPoint ? (dataPoint.value || 0) : 0);
+                }, 0);
+                return { year, value: total };
+            }).sort((a, b) => a.year - b.year);
+
+            allPercentileAggregation.set(percentile, percentileAggregated);
+        });
 
         const hasPercentileVariation = categoryItems.some(item => item.metadata?.hasPercentileVariation);
         const representativePercentile = selectedPercentiles.strategy === 'unified'
@@ -322,45 +402,70 @@ export const transformScenarioToCashflow = async (
             : Math.round(Object.values(selectedPercentiles.perSource).reduce((sum, p) => sum + p, 0) / categoryItems.length);
 
         return {
-            data: aggregatedData,
+            data: primaryData, // Primary percentile (existing)
+            percentileData: allPercentileAggregation, // NEW: All percentiles
             metadata: {
                 selectedPercentile: representativePercentile,
                 sourceCount: categoryItems.length,
-                hasPercentileVariation
+                hasPercentileVariation,
+                hasAllPercentiles: allPercentileAggregation.size > 0 // NEW: Flag
             }
         };
     };
 
     const aggregations = {
-        totalCosts: aggregateByCategorySimplified('cost'),
-        totalRevenue: aggregateByCategorySimplified('revenue'),
-        netCashflow: { data: [], metadata: { selectedPercentile: 50, sourceCount: 0, hasPercentileVariation: false } }
+        totalCosts: aggregateByCategoryEnhanced('cost'),
+        totalRevenue: aggregateByCategoryEnhanced('revenue'),
+        netCashflow: { data: [], percentileData: new Map(), metadata: { selectedPercentile: primaryPercentile, sourceCount: 0, hasPercentileVariation: false, hasAllPercentiles: false } }
     };
 
-    // Calculate net cashflow
-    const allYears = new Set([
+    // Calculate net cashflow for all percentiles
+    const allNetCashflowYears = new Set([
         ...aggregations.totalCosts.data.map(d => d.year),
         ...aggregations.totalRevenue.data.map(d => d.year)
     ]);
 
-    aggregations.netCashflow.data = Array.from(allYears).map(year => {
+    // Primary percentile net cashflow (existing logic)
+    aggregations.netCashflow.data = Array.from(allNetCashflowYears).map(year => {
         const revenue = aggregations.totalRevenue.data.find(d => d.year === year)?.value || 0;
         const cost = aggregations.totalCosts.data.find(d => d.year === year)?.value || 0;
         return { year, value: revenue - cost };
     }).sort((a, b) => a.year - b.year);
 
+    // NEW: All percentile net cashflow
+    const netCashflowAllPercentiles = new Map();
+    availablePercentiles.forEach(percentile => {
+        const revenueData = aggregations.totalRevenue.percentileData.get(percentile) || [];
+        const costData = aggregations.totalCosts.percentileData.get(percentile) || [];
+
+        const allYears = new Set([
+            ...revenueData.map(d => d.year),
+            ...costData.map(d => d.year)
+        ]);
+
+        const netData = Array.from(allYears).map(year => {
+            const revenue = revenueData.find(d => d.year === year)?.value || 0;
+            const cost = costData.find(d => d.year === year)?.value || 0;
+            return { year, value: revenue - cost };
+        }).sort((a, b) => a.year - b.year);
+
+        netCashflowAllPercentiles.set(percentile, netData);
+    });
+
+    aggregations.netCashflow.percentileData = netCashflowAllPercentiles;
     aggregations.netCashflow.metadata = {
         selectedPercentile: aggregations.totalRevenue.metadata.selectedPercentile,
         sourceCount: aggregations.totalCosts.metadata.sourceCount + aggregations.totalRevenue.metadata.sourceCount,
-        hasPercentileVariation: aggregations.totalCosts.metadata.hasPercentileVariation || aggregations.totalRevenue.metadata.hasPercentileVariation
+        hasPercentileVariation: aggregations.totalCosts.metadata.hasPercentileVariation || aggregations.totalRevenue.metadata.hasPercentileVariation,
+        hasAllPercentiles: netCashflowAllPercentiles.size > 0
     };
 
-    // Calculate finance metrics
+    // Calculate enhanced finance metrics (already supports all percentiles)
     const financeMetrics = calculateFinanceMetrics(aggregations, availablePercentiles, scenarioData, lineItems);
 
     const result = { metadata, lineItems, aggregations, financeMetrics };
 
-    console.log(`✅ New transformation complete: ${lineItems.length} items, ${aggregations.totalCosts.data.length} cost points, ${aggregations.totalRevenue.data.length} revenue points`);
+    console.log(`✅ Enhanced transformation complete: ${lineItems.length} items, multi-percentile support enabled`);
 
     return result;
 };

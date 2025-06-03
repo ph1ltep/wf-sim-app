@@ -14,7 +14,7 @@ import PercentileSelector from './components/PercentileSelector';
 
 // Import card components (will be created in next tasks)
 import CashflowTimelineCard from '../../cards/CashflowTimelineCard';
-// import FinanceabilityCard from '../../cards/FinanceabilityCard';
+import FinanceabilityCard from '../../cards/FinanceabilityCard';
 // import DriverExplorerCard from '../../cards/DriverExplorerCard';
 // import CashflowTableCard from '../../cards/CashflowTableCard';
 
@@ -25,7 +25,22 @@ export const CASHFLOW_CARD_REGISTRY = {
     timeline: {
         component: CashflowTimelineCard,
         enabled: true,
-        gridProps: { span: 24 }
+        gridProps: { span: 24 },
+        order: 1,
+        type: 'detail',
+        name: 'Timeline Analysis',
+        category: 'Analysis',
+        description: 'Cash flow timeline with revenue, costs, and net cashflow over project life'
+    },
+    financeability: {
+        component: FinanceabilityCard,
+        enabled: true,
+        gridProps: { span: 24 },
+        order: 2,
+        type: 'summary',
+        name: 'Financeability Analysis',
+        category: 'Investment',
+        description: 'Bankability metrics, DSCR analysis, and covenant compliance assessment'
     }
 };
 
@@ -198,8 +213,8 @@ const CashflowAnalysis = () => {
 
     // Get enabled cards sorted by order
     const enabledCards = Object.entries(CASHFLOW_CARD_REGISTRY)
-        .filter(([cardId, config]) => cardVisibility[cardId])
-        .sort(([, a], [, b]) => a.order - b.order);
+        .filter(([cardId, config]) => cardVisibility[cardId] && config.enabled) // Check both visibility and enabled
+        .sort(([, a], [, b]) => (a.order || 999) - (b.order || 999)); // Handle missing order gracefully
 
     return (
         <div className="cashflow-analysis" style={{ padding: '20px' }}>
