@@ -4,11 +4,23 @@ import { message } from 'antd';
 import { useScenario } from './ScenarioContext';
 import { getPercentileSourcesFromRegistry, createPerSourceDefaults } from '../utils/cashflowUtils';
 import { transformScenarioToCashflow } from '../utils/cashflow/transform';
+import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
+import { validate } from '../utils/validate';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
 
-// Updated source registry with proper data sources
+/**
+ * CASHFLOW_SOURCE_REGISTRY Structure Rules:
+ * 
+ * 1. All sources must have .path (primary data source) as array of strings
+ * 2. Optional .references as array of path arrays for additional data
+ * 3. Cannot have .references without .path
+ * 4. Required fields: id, path, category, hasPercentiles, description
+ * 5. Global data paths defined in .data section
+ */
+
+// Updated source registry with new structure: .path + .references array
 export const CASHFLOW_SOURCE_REGISTRY = {
     // Global data available to all transformers
     data: {
@@ -48,10 +60,10 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'debtDrawdown',
-            paths: {
-                financing: ['settings', 'modules', 'financing'],
-                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
-            },
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            references: [
+                ['settings', 'modules', 'financing']
+            ],
             category: 'financing',
             hasPercentiles: false,
             transformer: 'debtDrawdownToAnnualCosts',
@@ -61,10 +73,10 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'interestDuringConstruction',
-            paths: {
-                financing: ['settings', 'modules', 'financing'],
-                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
-            },
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            references: [
+                ['settings', 'modules', 'financing']
+            ],
             category: 'financing',
             hasPercentiles: false,
             transformer: 'interestDuringConstruction',
@@ -74,10 +86,10 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'operationalDebtService',
-            paths: {
-                financing: ['settings', 'modules', 'financing'],
-                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
-            },
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            references: [
+                ['settings', 'modules', 'financing']
+            ],
             category: 'financing',
             hasPercentiles: false,
             transformer: 'operationalDebtService',
@@ -145,6 +157,29 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     ]
 };
 
+// Simple registry validation using existing schema validation
+const validateRegistry = async () => {
+    try {
+        const result = await validate(CashflowSourceRegistrySchema, CASHFLOW_SOURCE_REGISTRY);
+        if (!result.isValid) {
+            console.error('🚨 CASHFLOW_SOURCE_REGISTRY validation errors:', result.errors);
+            if (process.env.NODE_ENV === 'development') {
+                throw new Error(`Registry validation failed: ${result.errors.join(', ')}`);
+            }
+        }
+        return result.isValid;
+    } catch (error) {
+        console.error('🚨 Registry validation error:', error);
+        if (process.env.NODE_ENV === 'development') {
+            throw error;
+        }
+        return false;
+    }
+};
+
+// Validate on module load
+validateRegistry();
+
 export const CashflowProvider = ({ children }) => {
     const { getValueByPath, scenarioData } = useScenario();
 
@@ -198,6 +233,27 @@ export const CashflowProvider = ({ children }) => {
         unified: 50,
         perSource: {}
     }));
+
+    // Test percentile mode when it changes
+    React.useEffect(() => {
+        if (selectedPercentiles && scenarioData) {
+            console.log('🔄 Percentile selection changed:', {
+                strategy: selectedPercentiles.strategy,
+                unified: selectedPercentiles.unified,
+                perSourceCount: Object.keys(selectedPercentiles.perSource).length
+            });
+
+            // Validate unified mode
+            if (selectedPercentiles.strategy === 'unified') {
+                const isValidPercentile = availablePercentiles.includes(selectedPercentiles.unified);
+                if (!isValidPercentile) {
+                    console.warn('⚠️ Invalid unified percentile:', selectedPercentiles.unified, 'Available:', availablePercentiles);
+                } else {
+                    console.log('✅ Valid unified percentile:', selectedPercentiles.unified);
+                }
+            }
+        }
+    }, [selectedPercentiles, availablePercentiles, scenarioData]);
 
     // Update defaults when scenario loads - prevent infinite loop
     React.useEffect(() => {

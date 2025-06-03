@@ -98,11 +98,46 @@ const SimplifiedCashflowDataSourceSchema = Yup.object().shape({
     financeMetrics: SimplifiedFinanceMetricsSchema.required('Finance metrics are required')
 });
 
+// Registry validation schemas
+const RegistryDataSchema = Yup.object().shape({
+    projectLife: Yup.array().of(Yup.string()).required('Project life path is required'),
+    numWTGs: Yup.array().of(Yup.string()).required('Number of WTGs path is required'),
+    currency: Yup.array().of(Yup.string()).required('Currency path is required')
+});
+
+const RegistrySourceSchema = Yup.object().shape({
+    id: Yup.string().required('Source ID is required'),
+    path: Yup.array().of(Yup.string()).required('Primary path is required'),
+    references: Yup.array().of(
+        Yup.array().of(Yup.string())
+    ).optional(),
+    category: Yup.string().required('Category is required'),
+    hasPercentiles: Yup.boolean().required('Has percentiles flag is required'),
+    transformer: Yup.string().nullable().optional(),
+    multipliers: Yup.array().of(Yup.object().shape({
+        id: Yup.string().required('Multiplier ID is required'),
+        operation: Yup.string().oneOf(['multiply', 'compound', 'simple']).required('Operation is required'),
+        baseYear: Yup.number().default(1)
+    })).default([]),
+    description: Yup.string().required('Description is required'),
+    displayNote: Yup.string().optional()
+});
+
+const CashflowSourceRegistrySchema = Yup.object().shape({
+    data: RegistryDataSchema.required('Global data paths are required'),
+    multipliers: Yup.array().of(RegistrySourceSchema).default([]),
+    costs: Yup.array().of(RegistrySourceSchema).default([]),
+    revenues: Yup.array().of(RegistrySourceSchema).default([])
+});
+
 module.exports = {
     SimplifiedCashflowDataSourceSchema,
     SimplifiedLineItemSchema,
     SimplifiedAggregationSchema,
     SimplifiedFinanceMetricsSchema,
     SimplifiedCashflowMetadataSchema,
-    AppliedMultiplierSchema
+    AppliedMultiplierSchema,
+    CashflowSourceRegistrySchema,
+    RegistrySourceSchema,
+    RegistryDataSchema
 };

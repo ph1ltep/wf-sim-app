@@ -1,21 +1,24 @@
-// src/utils/cashflow/transformers/financingTransformer.js - All transformers updated to new methodology
+// src/utils/cashflow/transformers/financingTransformer.js - Updated to new signature
 
 /**
  * Transform construction schedule to debt drawdown schedule
- * @param {Object} data - Object with financing, costSources, and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: costSources array
+ * @param {Object} dataReferences - Reference data: {reference: {financing}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects for debt drawdown
  */
-export const debtDrawdownToAnnualCosts = (data, sourceConfig) => {
-    const { financing, costSources, projectLife, numWTGs } = data;
+export const debtDrawdownToAnnualCosts = (dataSource, dataReferences, sourceConfig) => {
+    const costSources = dataSource;
+    const financing = dataReferences.reference.financing;
+    const { projectLife, numWTGs } = dataReferences.global;
 
     if (!financing) {
-        console.warn('debtDrawdownToAnnualCosts: No financing data available');
+        console.warn('debtDrawdownToAnnualCosts: No financing data available in references');
         return [];
     }
 
-    if (!costSources || !Array.isArray(costSources) || costSources.length === 0) {
-        console.warn('debtDrawdownToAnnualCosts: No construction cost sources found');
+    if (!Array.isArray(costSources) || costSources.length === 0) {
+        console.warn('debtDrawdownToAnnualCosts: No construction cost sources found in dataSource');
         return [];
     }
 
@@ -70,15 +73,18 @@ export const debtDrawdownToAnnualCosts = (data, sourceConfig) => {
 
 /**
  * Calculate Interest During Construction (IDC)
- * @param {Object} data - Object with financing, costSources, and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: costSources array
+ * @param {Object} dataReferences - Reference data: {reference: {financing}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects for IDC
  */
-export const interestDuringConstruction = (data, sourceConfig) => {
-    const { financing, costSources, projectLife } = data;
+export const interestDuringConstruction = (dataSource, dataReferences, sourceConfig) => {
+    const costSources = dataSource;
+    const financing = dataReferences.reference.financing;
+    const { projectLife } = dataReferences.global;
 
     if (!financing) {
-        console.warn('interestDuringConstruction: No financing data available');
+        console.warn('interestDuringConstruction: No financing data available in references');
         return [];
     }
 
@@ -92,7 +98,7 @@ export const interestDuringConstruction = (data, sourceConfig) => {
         }
 
         // Get debt drawdown schedule using the same transformer
-        const debtDrawdown = debtDrawdownToAnnualCosts(data, sourceConfig);
+        const debtDrawdown = debtDrawdownToAnnualCosts(dataSource, dataReferences, sourceConfig);
         const constructionDebtRate = (financing.costOfConstructionDebt || 4) / 100; // Convert % to decimal
 
         if (debtDrawdown.length === 0) {
@@ -141,22 +147,25 @@ export const interestDuringConstruction = (data, sourceConfig) => {
 
 /**
  * Calculate operational debt service schedule
- * @param {Object} data - Object with financing, costSources, and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: costSources array
+ * @param {Object} dataReferences - Reference data: {reference: {financing}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects for debt service
  */
-export const operationalDebtService = (data, sourceConfig) => {
-    const { financing, projectLife } = data;
+export const operationalDebtService = (dataSource, dataReferences, sourceConfig) => {
+    const costSources = dataSource;
+    const financing = dataReferences.reference.financing;
+    const { projectLife } = dataReferences.global;
 
     if (!financing) {
-        console.warn('operationalDebtService: No financing data available');
+        console.warn('operationalDebtService: No financing data available in references');
         return [];
     }
 
     try {
         // Get total debt amount (construction drawdown + IDC if capitalized)
-        const debtDrawdown = debtDrawdownToAnnualCosts(data, sourceConfig);
-        const idc = interestDuringConstruction(data, sourceConfig);
+        const debtDrawdown = debtDrawdownToAnnualCosts(dataSource, dataReferences, sourceConfig);
+        const idc = interestDuringConstruction(dataSource, dataReferences, sourceConfig);
 
         const totalDebtDrawn = debtDrawdown.reduce((sum, item) => sum + item.value, 0);
         const totalIDC = idc.reduce((sum, item) => sum + item.value, 0);

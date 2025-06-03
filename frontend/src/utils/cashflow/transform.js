@@ -1,4 +1,4 @@
-// src/utils/cashflow/transform.js - Complete transformation orchestrator with debugging
+// src/utils/cashflow/transform.js - Updated transformation orchestrator with new data structure
 import { applyTransformer } from './transformers';
 import { applyMultipliers } from './multipliers';
 import { calculateFinanceMetrics } from '../cashflowUtils';
@@ -17,18 +17,114 @@ const getSelectedPercentileForSource = (sourceId, selectedPercentiles, available
 /**
  * Extract data for a specific percentile from simulation results
  */
-const extractDataForPercentile = (rawData, sourceConfig, percentile) => {
+const extractDataForPercentile = (dataSource, dataReferences, sourceConfig, percentile) => {
     if (sourceConfig.hasPercentiles) {
-        return applyTransformer('extractPercentileData', rawData, sourceConfig, { percentile });
+        // Add percentile to context for simulation data extraction
+        const contextWithPercentile = {
+            ...dataReferences.context,
+            percentile
+        };
+        const referencesWithContext = {
+            ...dataReferences,
+            context: contextWithPercentile
+        };
+        return applyTransformer('extractPercentileData', dataSource, referencesWithContext, sourceConfig);
     } else {
         return sourceConfig.transformer
-            ? applyTransformer(sourceConfig.transformer, rawData, sourceConfig)
-            : applyTransformer('extractFixedData', rawData, sourceConfig);
+            ? applyTransformer(sourceConfig.transformer, dataSource, dataReferences, sourceConfig)
+            : applyTransformer('extractFixedData', dataSource, dataReferences, sourceConfig);
     }
 };
 
 /**
- * Simplified transformation function with enhanced debugging
+ * Build dataReferences object with proper structure
+ */
+const buildDataReferences = (sourceConfig, registry, getValueByPath, selectedPercentiles, availablePercentiles, context) => {
+    const dataReferences = {
+        reference: {},
+        global: {},
+        context: {
+            projectLife: context.projectLife,
+            numWTGs: context.numWTGs,
+            getValueByPath
+        }
+    };
+
+    // Add global data from registry.data
+    Object.entries(registry.data || {}).forEach(([key, path]) => {
+        dataReferences.global[key] = getValueByPath(path);
+    });
+
+    // Add reference data from sourceConfig.references
+    if (sourceConfig.references && Array.isArray(sourceConfig.references)) {
+        sourceConfig.references.forEach((referencePath, index) => {
+            const data = getValueByPath(referencePath);
+            // Use the last segment of the path as the key, or fall back to index
+            const key = referencePath[referencePath.length - 1] || `ref_${index}`;
+            dataReferences.reference[key] = data;
+        });
+    }
+
+    // Add percentile to context if source has percentiles
+    if (sourceConfig.hasPercentiles) {
+        const selectedPercentile = getSelectedPercentileForSource(
+            sourceConfig.id,
+            selectedPercentiles,
+            availablePercentiles
+        );
+        dataReferences.context.percentile = selectedPercentile;
+    }
+
+    return dataReferences;
+};
+
+/**
+ * Validate that primary data source exists before calling transformer
+ */
+const validateDataSource = (dataSource, sourceConfig) => {
+    if (!dataSource) {
+        throw new Error(`Missing primary data source for '${sourceConfig.id}' at path: ${sourceConfig.path.join('.')}`);
+    }
+    return true;
+};
+
+const testUnifiedPercentileMode = (selectedPercentiles, registry, getValueByPath) => {
+    console.log('🧪 Testing unified percentile mode...');
+
+    const { strategy, unified } = selectedPercentiles;
+
+    if (strategy !== 'unified') {
+        console.log('⏭️ Skipping unified test - strategy is:', strategy);
+        return true;
+    }
+
+    console.log(`📊 Testing unified percentile: P${unified}`);
+
+    // Test that all percentile sources will use the same percentile
+    const percentileSources = [...(registry.multipliers || []), ...(registry.revenues || [])]
+        .filter(source => source.hasPercentiles);
+
+    percentileSources.forEach(source => {
+        const testPercentile = getSelectedPercentileForSource(
+            source.id,
+            selectedPercentiles,
+            [10, 25, 50, 75, 90]
+        );
+
+        if (testPercentile === unified) {
+            console.log(`✅ ${source.id}: P${testPercentile} (correct)`);
+        } else {
+            console.warn(`❌ ${source.id}: P${testPercentile} (expected P${unified})`);
+            return false;
+        }
+    });
+
+    console.log('✅ Unified percentile mode test passed');
+    return true;
+};
+
+/**
+ * Updated transformation function with new data structure and signatures
  */
 export const transformScenarioToCashflow = async (
     scenarioData,
@@ -36,7 +132,10 @@ export const transformScenarioToCashflow = async (
     selectedPercentiles,
     getValueByPath
 ) => {
-    console.log('🔄 Starting cashflow transformation...');
+    console.log('🔄 Starting cashflow transformation with new data structure...');
+
+    // Test percentile mode
+    testUnifiedPercentileMode(selectedPercentiles, registry, getValueByPath);
 
     // Extract metadata
     const availablePercentiles = getValueByPath(['settings', 'simulation', 'percentiles'], []).map(p => p.value);
@@ -60,28 +159,36 @@ export const transformScenarioToCashflow = async (
         getValueByPath
     };
 
-    // Extract multiplier data
+    // Extract multiplier data with new structure
     console.log('📊 Processing multipliers...');
     const multiplierData = {};
     let multiplierErrors = 0;
 
     registry.multipliers?.forEach(multiplierConfig => {
-        const rawData = getValueByPath(multiplierConfig.path);
-        if (!rawData) {
-            console.warn(`⚠️ No data for multiplier '${multiplierConfig.id}'`);
-            multiplierErrors++;
-            return;
-        }
-
-        const selectedPercentile = getSelectedPercentileForSource(
-            multiplierConfig.id,
-            selectedPercentiles,
-            availablePercentiles
-        );
-
         try {
-            const data = extractDataForPercentile(rawData, multiplierConfig, selectedPercentile, context);
+            // Get primary data source
+            const dataSource = getValueByPath(multiplierConfig.path);
+            validateDataSource(dataSource, multiplierConfig);
+
+            // Build data references
+            const dataReferences = buildDataReferences(
+                multiplierConfig,
+                registry,
+                getValueByPath,
+                selectedPercentiles,
+                availablePercentiles,
+                context
+            );
+
+            const selectedPercentile = getSelectedPercentileForSource(
+                multiplierConfig.id,
+                selectedPercentiles,
+                availablePercentiles
+            );
+
+            const data = extractDataForPercentile(dataSource, dataReferences, multiplierConfig, selectedPercentile);
             multiplierData[multiplierConfig.id] = data;
+
         } catch (error) {
             console.error(`❌ Error processing multiplier '${multiplierConfig.id}':`, error.message);
             multiplierErrors++;
@@ -91,58 +198,39 @@ export const transformScenarioToCashflow = async (
 
     console.log(`✅ Processed ${Object.keys(multiplierData).length} multipliers (${multiplierErrors} errors)`);
 
-    // Process line items
+    // Process line items with new structure
     console.log('📈 Processing line items...');
     const lineItems = [];
     let lineItemErrors = 0;
 
     ['costs', 'revenues'].forEach(sourceType => {
         registry[sourceType]?.forEach(sourceConfig => {
-            let rawData = {};
-
-            // Add global data first
-            Object.entries(registry.data || {}).forEach(([key, path]) => {
-                const lastSegment = path[path.length - 1];
-                rawData[lastSegment] = getValueByPath(path);
-            });
-
-            // Add source-specific data
-            if (sourceConfig.paths) {
-                Object.entries(sourceConfig.paths).forEach(([key, path]) => {
-                    const lastSegment = path[path.length - 1];
-                    rawData[lastSegment] = getValueByPath(path);
-                });
-            }
-            else if (sourceConfig.path) {
-                const lastSegment = sourceConfig.path[sourceConfig.path.length - 1];
-                rawData[lastSegment] = getValueByPath(sourceConfig.path);
-            }
-
-            if (!rawData || Object.keys(rawData).length === 0) {
-                console.warn(`⚠️ No data for ${sourceType} '${sourceConfig.id}'`);
-                lineItemErrors++;
-                return;
-            }
-
-            const selectedPercentile = getSelectedPercentileForSource(
-                sourceConfig.id,
-                selectedPercentiles,
-                availablePercentiles
-            );
-
             try {
-                const baseData = extractDataForPercentile(rawData, sourceConfig, selectedPercentile);
+                // Get primary data source
+                const dataSource = getValueByPath(sourceConfig.path);
+                validateDataSource(dataSource, sourceConfig);
+
+                // Build data references
+                const dataReferences = buildDataReferences(
+                    sourceConfig,
+                    registry,
+                    getValueByPath,
+                    selectedPercentiles,
+                    availablePercentiles,
+                    context
+                );
+
+                const selectedPercentile = getSelectedPercentileForSource(
+                    sourceConfig.id,
+                    selectedPercentiles,
+                    availablePercentiles
+                );
+
+                const baseData = extractDataForPercentile(dataSource, dataReferences, sourceConfig, selectedPercentile);
                 let finalData = baseData;
                 let appliedMultipliers = [];
 
-                console.log(`Debug - Processing ${sourceConfig.id}:`, {
-                    baseDataType: typeof baseData,
-                    baseDataIsArray: Array.isArray(baseData),
-                    finalDataType: typeof finalData,
-                    finalDataIsArray: Array.isArray(finalData),
-                    finalDataLength: finalData?.length
-                });
-
+                // Apply multipliers if configured
                 if (sourceConfig.multipliers && sourceConfig.multipliers.length > 0) {
                     const multiplierResult = applyMultipliers(
                         baseData,
@@ -182,7 +270,7 @@ export const transformScenarioToCashflow = async (
 
     console.log(`✅ Processed ${lineItems.length} line items (${lineItemErrors} errors)`);
 
-    // Calculate aggregations
+    // Calculate aggregations (unchanged logic)
     console.log('🧮 Calculating aggregations...');
     const aggregateByCategorySimplified = (category) => {
         const categoryItems = lineItems.filter(item => item.category === category);
@@ -200,14 +288,12 @@ export const transformScenarioToCashflow = async (
 
         const allYears = new Set();
         categoryItems.forEach(item => {
-            // Add validation to prevent the error
             if (!item.data || !Array.isArray(item.data)) {
                 console.warn(`⚠️ Line item '${item.id}' has invalid data:`, {
                     dataType: typeof item.data,
                     isArray: Array.isArray(item.data),
                     value: item.data
                 });
-                // Set empty array as fallback
                 item.data = [];
                 return;
             }
@@ -221,7 +307,6 @@ export const transformScenarioToCashflow = async (
 
         const aggregatedData = Array.from(allYears).map(year => {
             const total = categoryItems.reduce((sum, item) => {
-                // Additional safety check here too
                 if (!Array.isArray(item.data)) {
                     return sum;
                 }
@@ -270,24 +355,12 @@ export const transformScenarioToCashflow = async (
         hasPercentileVariation: aggregations.totalCosts.metadata.hasPercentileVariation || aggregations.totalRevenue.metadata.hasPercentileVariation
     };
 
-    // Calculate finance metrics (simplified placeholders)
-    const netCashflowData = aggregations.netCashflow.data;
-    const representativePercentile = aggregations.netCashflow.metadata.selectedPercentile;
-
+    // Calculate finance metrics
     const financeMetrics = calculateFinanceMetrics(aggregations, availablePercentiles, scenarioData, lineItems);
-
-    financeMetrics.covenantBreaches.data = financeMetrics.dscr.data
-        .filter(d => d.value < financeMetrics.dscr.metadata.covenantThreshold)
-        .map(d => ({
-            year: d.year,
-            dscr: d.value,
-            threshold: financeMetrics.dscr.metadata.covenantThreshold,
-            margin: financeMetrics.dscr.metadata.covenantThreshold - d.value
-        }));
 
     const result = { metadata, lineItems, aggregations, financeMetrics };
 
-    console.log(`✅ Transformation complete: ${lineItems.length} items, ${aggregations.totalCosts.data.length} cost points, ${aggregations.totalRevenue.data.length} revenue points`);
+    console.log(`✅ New transformation complete: ${lineItems.length} items, ${aggregations.totalCosts.data.length} cost points, ${aggregations.totalRevenue.data.length} revenue points`);
 
     return result;
 };

@@ -1,16 +1,18 @@
-// src/utils/cashflow/transformers/costTransformer.js - Updated to new methodology
+// src/utils/cashflow/transformers/costTransformer.js - Updated to new signature
 
 /**
  * Transform major repair events to annual costs
- * @param {Object} data - Object with majorRepairEvents and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: majorRepairEvents array
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const majorRepairsToAnnualCosts = (data, sourceConfig) => {
-    const { majorRepairEvents, projectLife, numWTGs } = data;
+export const majorRepairsToAnnualCosts = (dataSource, dataReferences, sourceConfig) => {
+    const majorRepairEvents = dataSource;
+    const { projectLife, numWTGs } = dataReferences.global;
 
     if (!Array.isArray(majorRepairEvents)) {
-        console.warn('majorRepairsToAnnualCosts: Expected array of repair events');
+        console.warn('majorRepairsToAnnualCosts: Expected array of repair events, got:', typeof majorRepairEvents);
         return [];
     }
 
@@ -37,12 +39,14 @@ export const majorRepairsToAnnualCosts = (data, sourceConfig) => {
 
 /**
  * Transform fixed cost value to time series
- * @param {Object} data - Object with insurancePremium and global data (projectLife, numWTGs, currency)
+ * @param {number} dataSource - Primary data: insurancePremium value
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const fixedCostToTimeSeries = (data, sourceConfig) => {
-    const { insurancePremium, projectLife } = data;
+export const fixedCostToTimeSeries = (dataSource, dataReferences, sourceConfig) => {
+    const insurancePremium = dataSource;
+    const { projectLife } = dataReferences.global;
 
     if (typeof insurancePremium !== 'number') {
         console.warn('fixedCostToTimeSeries: Expected number, got:', typeof insurancePremium);
@@ -62,15 +66,17 @@ export const fixedCostToTimeSeries = (data, sourceConfig) => {
 
 /**
  * Transform reserve funds to provision schedule
- * @param {Object} data - Object with reserveFunds and global data (projectLife, numWTGs, currency)
+ * @param {number} dataSource - Primary data: reserveFunds value
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const reserveFundsToProvision = (data, sourceConfig) => {
-    const { reserveFunds, projectLife } = data;
+export const reserveFundsToProvision = (dataSource, dataReferences, sourceConfig) => {
+    const reserveFunds = dataSource;
+    const { projectLife } = dataReferences.global;
 
     if (typeof reserveFunds !== 'number' || reserveFunds <= 0) {
-        console.warn('reserveFundsToProvision: Invalid reserve funds amount');
+        console.warn('reserveFundsToProvision: Invalid reserve funds amount:', reserveFunds);
         return [];
     }
 
@@ -97,15 +103,17 @@ export const reserveFundsToProvision = (data, sourceConfig) => {
 
 /**
  * Transform CAPEX drawdown schedule to annual costs
- * @param {Object} data - Object with costSources and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: costSources array
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const capexDrawdownToAnnualCosts = (data, sourceConfig) => {
-    const { costSources, projectLife, numWTGs } = data;
+export const capexDrawdownToAnnualCosts = (dataSource, dataReferences, sourceConfig) => {
+    const costSources = dataSource;
+    const { projectLife, numWTGs } = dataReferences.global;
 
     if (!Array.isArray(costSources)) {
-        console.warn('capexDrawdownToAnnualCosts: Expected array of cost sources');
+        console.warn('capexDrawdownToAnnualCosts: Expected array of cost sources, got:', typeof costSources);
         return [];
     }
 

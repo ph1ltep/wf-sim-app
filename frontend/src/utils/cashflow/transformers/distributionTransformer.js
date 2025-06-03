@@ -1,19 +1,16 @@
 /**
  * Transform distribution parameters to time series data
- * @param {Object} data - Object with distribution data and global data (projectLife, numWTGs, currency)
+ * @param {Object} dataSource - Primary data: distribution object with parameters/timeSeriesParameters
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const distributionToTimeSeries = (data, sourceConfig) => {
-    // Extract the distribution data (could be under various keys)
-    const distributionData = Object.values(data).find(item =>
-        item && typeof item === 'object' && (item.parameters || item.timeSeriesParameters)
-    );
-
-    const { projectLife } = data;
+export const distributionToTimeSeries = (dataSource, dataReferences, sourceConfig) => {
+    const distributionData = dataSource;
+    const { projectLife } = dataReferences.global;
 
     if (!distributionData || typeof distributionData !== 'object') {
-        console.warn('distributionToTimeSeries: Invalid distribution data');
+        console.warn('distributionToTimeSeries: Invalid distribution data, got:', typeof distributionData);
         return [];
     }
 

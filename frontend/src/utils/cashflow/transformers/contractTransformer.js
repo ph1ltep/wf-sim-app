@@ -1,17 +1,19 @@
-// src/utils/cashflow/transformers/contractTransformer.js - Updated to new methodology
+// src/utils/cashflow/transformers/contractTransformer.js - Updated to new signature
 import { contractsToAnnualCostsTotal } from '../contractUtils';
 
 /**
  * Transform OEM contracts to annual cost data (uses centralized logic)
- * @param {Object} data - Object with oemContracts and global data (projectLife, numWTGs, currency)
+ * @param {Array} dataSource - Primary data: oemContracts array
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration from registry
  * @returns {Array} Array of DataPointSchema objects
  */
-export const contractsToAnnualCosts = (data, sourceConfig) => {
-    const { oemContracts, projectLife, numWTGs } = data;
+export const contractsToAnnualCosts = (dataSource, dataReferences, sourceConfig) => {
+    const oemContracts = dataSource;
+    const { projectLife, numWTGs } = dataReferences.global;
 
     if (!Array.isArray(oemContracts)) {
-        console.warn('contractsToAnnualCosts: Expected array of contracts');
+        console.warn('contractsToAnnualCosts: Expected array of contracts, got:', typeof oemContracts);
         return [];
     }
 
@@ -30,11 +32,12 @@ export const contractsToAnnualCosts = (data, sourceConfig) => {
 };
 
 // Keep legacy function for reference but update its signature
-export const contractsToAnnualCostsLegacy = (data, sourceConfig) => {
-    const { oemContracts, numWTGs } = data;
+export const contractsToAnnualCostsLegacy = (dataSource, dataReferences, sourceConfig) => {
+    const oemContracts = dataSource;
+    const { numWTGs } = dataReferences.global;
 
     if (!Array.isArray(oemContracts)) {
-        console.warn('contractsToAnnualCostsLegacy: Expected array of contracts');
+        console.warn('contractsToAnnualCostsLegacy: Expected array of contracts, got:', typeof oemContracts);
         return [];
     }
 

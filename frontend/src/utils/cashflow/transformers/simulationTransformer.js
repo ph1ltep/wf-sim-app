@@ -1,45 +1,37 @@
-// src/utils/cashflow/transformers/simulationTransformer.js - Updated to new methodology
+// src/utils/cashflow/transformers/simulationTransformer.js - Updated to new signature
 
 /**
  * Extract percentile data from simulation results
- * @param {Object} data - Object containing simulation data and global data (projectLife, numWTGs, currency)
+ * @param {Object} dataSource - Primary data: simulation results object
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {percentile, ...}}
  * @param {Object} sourceConfig - Source configuration
- * @param {Object} context - Context object containing percentile information
  * @returns {Array} Array of DataPointSchema objects
  */
-export const extractPercentileData = (data, sourceConfig, context) => {
-    const { projectLife, numWTGs, currency } = data;
+export const extractPercentileData = (dataSource, dataReferences, sourceConfig) => {
+    const simulationData = dataSource;
+    const { projectLife, numWTGs, currency } = dataReferences.global;
+    const { percentile } = dataReferences.context;
 
     // More robust validation
-    if (!data) {
+    if (!simulationData) {
         console.warn('extractPercentileData: No simulation data provided');
         return [];
     }
 
-    if (!context || !context.percentile) {
+    if (!percentile) {
         console.warn('extractPercentileData: No percentile specified in context');
         return [];
     }
 
-    // Find simulation results in the data object
-    let simulationData = null;
-
-    // Look for simulation data in the values
-    Object.values(data).forEach(value => {
-        if (value && value.results && Array.isArray(value.results)) {
-            simulationData = value;
-        }
-    });
-
     // Handle different possible simulation data structures
     let results = null;
 
-    if (simulationData && simulationData.results) {
+    if (simulationData.results && Array.isArray(simulationData.results)) {
         results = simulationData.results;
     } else if (Array.isArray(simulationData)) {
         results = simulationData;
     } else {
-        console.warn('extractPercentileData: Simulation data has no recognizable results structure:', Object.keys(data));
+        console.warn('extractPercentileData: Simulation data has no recognizable results structure:', Object.keys(simulationData));
         return [];
     }
 
@@ -53,21 +45,21 @@ export const extractPercentileData = (data, sourceConfig, context) => {
         // Handle different possible percentile structures
         if (result.percentile) {
             if (typeof result.percentile === 'number') {
-                return result.percentile === context.percentile;
+                return result.percentile === percentile;
             }
             if (result.percentile.value) {
-                return result.percentile.value === context.percentile;
+                return result.percentile.value === percentile;
             }
         }
         // Also check if result itself has a value property that matches
-        if (result.value === context.percentile) {
+        if (result.value === percentile) {
             return true;
         }
         return false;
     });
 
     if (!percentileResult) {
-        console.warn(`extractPercentileData: Percentile ${context.percentile} not found in results. Available:`,
+        console.warn(`extractPercentileData: Percentile ${percentile} not found in results. Available:`,
             results.map(r => r.percentile?.value || r.percentile || 'unknown')
         );
         return [];
@@ -75,36 +67,26 @@ export const extractPercentileData = (data, sourceConfig, context) => {
 
     const extractedData = percentileResult.data || [];
 
-    console.log(`📊 Extracted P${context.percentile} data: ${extractedData.length} points for ${sourceConfig.id}`);
+    console.log(`📊 Extracted P${percentile} data: ${extractedData.length} points for ${sourceConfig.id}`);
 
     return extractedData;
 };
 
 /**
  * Extract fixed data from configuration sources
- * @param {Object} data - Object containing source data and global data (projectLife, numWTGs, currency)
+ * @param {any} dataSource - Primary data: source data (array, object, or primitive)
+ * @param {Object} dataReferences - Reference data: {reference: {}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
  * @returns {Array} Array of DataPointSchema objects
  */
-export const extractFixedData = (data, sourceConfig) => {
-    const { projectLife, numWTGs, currency } = data;
+export const extractFixedData = (dataSource, dataReferences, sourceConfig) => {
+    const sourceData = dataSource;
+    const { projectLife, numWTGs, currency } = dataReferences.global;
 
-    if (!data) {
+    if (!sourceData) {
         console.warn('extractFixedData: No source data provided');
         return [];
     }
-
-    // Find the actual source data (exclude global data)
-    const globalKeys = ['projectLife', 'numWTGs', 'currency'];
-    const sourceDataEntries = Object.entries(data).filter(([key]) => !globalKeys.includes(key));
-
-    if (sourceDataEntries.length === 0) {
-        console.warn('extractFixedData: No source data found after filtering global data');
-        return [];
-    }
-
-    // Get the first non-global data entry
-    const [dataKey, sourceData] = sourceDataEntries[0];
 
     // If data is already in correct format (array of {year, value})
     if (Array.isArray(sourceData)) {
