@@ -1,13 +1,14 @@
-// src/utils/cashflow/transformers/costTransformer.js - Cost-specific transformations
+// src/utils/cashflow/transformers/costTransformer.js - Updated to new methodology
 
 /**
  * Transform major repair events to annual costs
- * @param {Array} majorRepairEvents - Array of repair event objects
+ * @param {Object} data - Object with majorRepairEvents and global data (projectLife, numWTGs, currency)
  * @param {Object} sourceConfig - Source configuration
- * @param {Object} context - Transformation context
  * @returns {Array} Array of DataPointSchema objects
  */
-export const majorRepairsToAnnualCosts = (majorRepairEvents, sourceConfig, context = {}) => {
+export const majorRepairsToAnnualCosts = (data, sourceConfig) => {
+    const { majorRepairEvents, projectLife, numWTGs } = data;
+
     if (!Array.isArray(majorRepairEvents)) {
         console.warn('majorRepairsToAnnualCosts: Expected array of repair events');
         return [];
@@ -29,46 +30,49 @@ export const majorRepairsToAnnualCosts = (majorRepairEvents, sourceConfig, conte
         }
     });
 
+    console.log(`🔧 Major repairs: ${annualCosts.length} events, total ${annualCosts.reduce((sum, item) => sum + item.value, 0).toLocaleString()}`);
+
     return annualCosts.sort((a, b) => a.year - b.year);
 };
 
 /**
  * Transform fixed cost value to time series
- * @param {number} fixedCost - Fixed annual cost
+ * @param {Object} data - Object with insurancePremium and global data (projectLife, numWTGs, currency)
  * @param {Object} sourceConfig - Source configuration
- * @param {Object} context - Transformation context
  * @returns {Array} Array of DataPointSchema objects
  */
-export const fixedCostToTimeSeries = (fixedCost, sourceConfig, context = {}) => {
-    if (typeof fixedCost !== 'number') {
-        console.warn('fixedCostToTimeSeries: Expected number, got:', typeof fixedCost);
+export const fixedCostToTimeSeries = (data, sourceConfig) => {
+    const { insurancePremium, projectLife } = data;
+
+    if (typeof insurancePremium !== 'number') {
+        console.warn('fixedCostToTimeSeries: Expected number, got:', typeof insurancePremium);
         return [];
     }
 
-    const { projectLife = 20 } = context;
     const timeSeries = [];
 
     for (let year = 1; year <= projectLife; year++) {
-        timeSeries.push({ year, value: fixedCost });
+        timeSeries.push({ year, value: insurancePremium });
     }
+
+    console.log(`🛡️ Insurance: ${timeSeries.length} years, annual ${insurancePremium.toLocaleString()}`);
 
     return timeSeries;
 };
 
 /**
  * Transform reserve funds to provision schedule
- * @param {number} reserveFunds - Total reserve fund amount
+ * @param {Object} data - Object with reserveFunds and global data (projectLife, numWTGs, currency)
  * @param {Object} sourceConfig - Source configuration
- * @param {Object} context - Transformation context
  * @returns {Array} Array of DataPointSchema objects
  */
-export const reserveFundsToProvision = (reserveFunds, sourceConfig, context = {}) => {
+export const reserveFundsToProvision = (data, sourceConfig) => {
+    const { reserveFunds, projectLife } = data;
+
     if (typeof reserveFunds !== 'number' || reserveFunds <= 0) {
         console.warn('reserveFundsToProvision: Invalid reserve funds amount');
         return [];
     }
-
-    const { projectLife = 20 } = context;
 
     // Option 1: Spread provision over first 5 years
     const provisionYears = Math.min(5, projectLife);
@@ -86,17 +90,20 @@ export const reserveFundsToProvision = (reserveFunds, sourceConfig, context = {}
         });
     }
 
+    console.log(`💰 Reserve funds: ${timeSeries.length} years, total ${reserveFunds.toLocaleString()}`);
+
     return timeSeries;
 };
 
 /**
  * Transform CAPEX drawdown schedule to annual costs
- * @param {Array} costSources - Array of cost source objects with drawdown schedules
+ * @param {Object} data - Object with costSources and global data (projectLife, numWTGs, currency)
  * @param {Object} sourceConfig - Source configuration
- * @param {Object} context - Transformation context
  * @returns {Array} Array of DataPointSchema objects
  */
-export const capexDrawdownToAnnualCosts = (costSources, sourceConfig, context = {}) => {
+export const capexDrawdownToAnnualCosts = (data, sourceConfig) => {
+    const { costSources, projectLife, numWTGs } = data;
+
     if (!Array.isArray(costSources)) {
         console.warn('capexDrawdownToAnnualCosts: Expected array of cost sources');
         return [];
@@ -108,6 +115,12 @@ export const capexDrawdownToAnnualCosts = (costSources, sourceConfig, context = 
     costSources.forEach(source => {
         const schedule = source.drawdownSchedule || [];
         const totalAmount = source.totalAmount || 0;
+        const sourceName = source.name || 'Unknown Source';
+
+        if (totalAmount === 0) {
+            console.warn(`🏗️ Source '${sourceName}' has zero amount`);
+            return;
+        }
 
         schedule.forEach(item => {
             if (typeof item.year === 'number' && typeof item.value === 'number') {
@@ -125,6 +138,9 @@ export const capexDrawdownToAnnualCosts = (costSources, sourceConfig, context = 
             value: amount
         });
     });
+
+    const totalCapex = annualCosts.reduce((sum, item) => sum + item.value, 0);
+    console.log(`🏗️ CAPEX drawdown: ${annualCosts.length} years, total ${totalCapex.toLocaleString()}`);
 
     return annualCosts.sort((a, b) => a.year - b.year);
 };

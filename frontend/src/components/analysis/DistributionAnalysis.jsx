@@ -8,7 +8,8 @@ import {
   DollarOutlined,
   FieldTimeOutlined,
   ThunderboltOutlined,
-  LineChartOutlined
+  LineChartOutlined,
+  RiseOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import useInputSim from '../../hooks/useInputSim';
@@ -35,6 +36,16 @@ const distributionFields = [
     icon: <DollarOutlined style={{ color: '#52c41a' }} />,
     units: '$/MWh',
     color: '#52c41a',
+    precision: 2
+  },
+  {
+    name: 'Escalation Rate',
+    path: ['settings', 'modules', 'cost', 'escalationRate'],
+    contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate'],
+    key: 'escalationRate',
+    icon: <RiseOutlined style={{ color: '#f5222d' }} />,
+    units: '%',
+    color: '#f5222d',
     precision: 2
   },
   {

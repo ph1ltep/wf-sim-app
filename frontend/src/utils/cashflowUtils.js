@@ -137,13 +137,14 @@ export const aggregateLineItems = (lineItems, category, availablePercentiles) =>
 };
 
 /**
- * Calculate basic finance metrics
+ * Calculate enhanced finance metrics with real debt service
  * @param {Object} aggregations - Cashflow aggregations
  * @param {Array} availablePercentiles - Available percentile values
  * @param {Object} scenarioData - Full scenario data for parameters
+ * @param {Array} lineItems - All line items for debt service lookup
  * @returns {Object} Finance metrics with percentile data
  */
-export const calculateFinanceMetrics = (aggregations, availablePercentiles, scenarioData) => {
+export const calculateFinanceMetrics = (aggregations, availablePercentiles, scenarioData, lineItems = []) => {
     const financeMetrics = {
         dscr: new Map(),
         llcr: new Map(),
@@ -152,31 +153,64 @@ export const calculateFinanceMetrics = (aggregations, availablePercentiles, scen
         covenantBreaches: new Map()
     };
 
-    // Placeholder calculations - will be expanded with actual financial formulas
-    availablePercentiles.forEach(percentile => {
-        const netCashflowData = aggregations.netCashflow.percentileData.get(percentile) || [];
+    // Get financing parameters
+    const financingParams = scenarioData?.settings?.modules?.financing || {};
+    const minimumDSCR = financingParams.minimumDSCR || 1.3;
 
-        // Simple DSCR calculation (placeholder)
-        const dscrData = netCashflowData.map(dataPoint => ({
-            year: dataPoint.year,
-            value: Math.max(0.5, 1.0 + (dataPoint.value / 10000000)) // Placeholder formula
-        }));
+    availablePercentiles.forEach(percentile => {
+        const netCashflowData = aggregations.netCashflow.data || [];
+
+        // Find operational debt service line item
+        const debtServiceLineItem = lineItems.find(item => item.id === 'operationalDebtService');
+        const debtServiceData = debtServiceLineItem?.data || [];
+
+        // Calculate DSCR using real debt service
+        const dscrData = [];
+
+        if (debtServiceData.length > 0) {
+            // Create map for efficient lookup
+            const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
+
+            netCashflowData.forEach(cashflowPoint => {
+                const debtService = debtServiceMap.get(cashflowPoint.year);
+
+                if (debtService && debtService > 0) {
+                    // DSCR = Net Operating Cash Flow / Debt Service
+                    const dscr = Math.max(0, cashflowPoint.value / debtService);
+                    dscrData.push({
+                        year: cashflowPoint.year,
+                        value: dscr
+                    });
+                }
+            });
+        }
+
+        // If no debt service data, fall back to placeholder calculation
+        if (dscrData.length === 0) {
+            console.warn('No debt service data found, using placeholder DSCR calculation');
+            netCashflowData.forEach(dataPoint => {
+                dscrData.push({
+                    year: dataPoint.year,
+                    value: Math.max(0.5, 1.0 + (dataPoint.value / 10000000)) // Placeholder formula
+                });
+            });
+        }
 
         financeMetrics.dscr.set(percentile, dscrData);
 
-        // Placeholder values for other metrics
+        // Placeholder values for other metrics (to be enhanced later)
         financeMetrics.irr.set(percentile, 8.5 + (percentile - 50) * 0.1);
         financeMetrics.npv.set(percentile, 50000000 + (percentile - 50) * 1000000);
         financeMetrics.llcr.set(percentile, 1.2 + (percentile - 50) * 0.01);
 
-        // Covenant breach detection
+        // Covenant breach detection using real DSCR data
         const breaches = dscrData
-            .filter(d => d.value < 1.3) // Assume 1.3 covenant threshold
+            .filter(d => d.value < minimumDSCR)
             .map(d => ({
                 year: d.year,
                 dscr: d.value,
-                threshold: 1.3,
-                margin: 1.3 - d.value,
+                threshold: minimumDSCR,
+                margin: minimumDSCR - d.value,
                 severity: d.value < 1.0 ? 'severe' : d.value < 1.2 ? 'moderate' : 'minor'
             }));
 

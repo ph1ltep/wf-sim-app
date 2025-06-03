@@ -8,6 +8,11 @@ import {
     reserveFundsToProvision,
     capexDrawdownToAnnualCosts
 } from './costTransformer';
+import {
+    debtDrawdownToAnnualCosts,
+    interestDuringConstruction,
+    operationalDebtService
+} from './financingTransformer';
 
 /**
  * Registry of available transformers
@@ -21,7 +26,10 @@ export const TRANSFORMER_REGISTRY = {
     'majorRepairsToAnnualCosts': majorRepairsToAnnualCosts,
     'fixedCostToTimeSeries': fixedCostToTimeSeries,
     'reserveFundsToProvision': reserveFundsToProvision,
-    'capexDrawdownToAnnualCosts': capexDrawdownToAnnualCosts
+    'capexDrawdownToAnnualCosts': capexDrawdownToAnnualCosts,
+    'debtDrawdownToAnnualCosts': debtDrawdownToAnnualCosts,
+    'interestDuringConstruction': interestDuringConstruction,
+    'operationalDebtService': operationalDebtService
 };
 
 /**
@@ -51,5 +59,8 @@ export {
     majorRepairsToAnnualCosts,
     fixedCostToTimeSeries,
     reserveFundsToProvision,
-    capexDrawdownToAnnualCosts
+    capexDrawdownToAnnualCosts,
+    debtDrawdownToAnnualCosts,
+    interestDuringConstruction,
+    operationalDebtService
 };

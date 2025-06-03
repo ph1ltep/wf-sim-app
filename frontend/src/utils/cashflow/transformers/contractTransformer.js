@@ -1,27 +1,44 @@
-// src/utils/cashflow/transformers/contractTransformer.js - Updated with centralized logic
+// src/utils/cashflow/transformers/contractTransformer.js - Updated to new methodology
 import { contractsToAnnualCostsTotal } from '../contractUtils';
 
 /**
  * Transform OEM contracts to annual cost data (uses centralized logic)
- * @param {Array} oemContracts - Array of contract objects
+ * @param {Object} data - Object with oemContracts and global data (projectLife, numWTGs, currency)
  * @param {Object} sourceConfig - Source configuration from registry
- * @param {Object} context - Transformation context {projectLife, numWTGs, etc.}
  * @returns {Array} Array of DataPointSchema objects
  */
-export const contractsToAnnualCosts = (oemContracts, sourceConfig, context = {}) => {
-    // Use the centralized logic that matches ContractScopeChart's fee-total calculation
-    return contractsToAnnualCostsTotal(oemContracts, sourceConfig, context);
-};
+export const contractsToAnnualCosts = (data, sourceConfig) => {
+    const { oemContracts, projectLife, numWTGs } = data;
 
-// Legacy function kept for backward compatibility (if needed)
-export const contractsToAnnualCostsLegacy = (oemContracts, sourceConfig, context = {}) => {
     if (!Array.isArray(oemContracts)) {
         console.warn('contractsToAnnualCosts: Expected array of contracts');
         return [];
     }
 
+    // Create context object for the utility function
+    const context = { projectLife, numWTGs };
+
+    // Use the centralized logic that matches ContractScopeChart's fee-total calculation
+    const result = contractsToAnnualCostsTotal(oemContracts, sourceConfig, context);
+
+    if (result.length > 0) {
+        const totalFees = result.reduce((sum, item) => sum + item.value, 0);
+        console.log(`📋 Contract fees: ${result.length} years, total ${totalFees.toLocaleString()}`);
+    }
+
+    return result;
+};
+
+// Keep legacy function for reference but update its signature
+export const contractsToAnnualCostsLegacy = (data, sourceConfig) => {
+    const { oemContracts, numWTGs } = data;
+
+    if (!Array.isArray(oemContracts)) {
+        console.warn('contractsToAnnualCostsLegacy: Expected array of contracts');
+        return [];
+    }
+
     const annualCosts = new Map();
-    const { numWTGs = 1 } = context;
 
     oemContracts.forEach(contract => {
         // Handle time-series contracts (fixedFeeTimeSeries)

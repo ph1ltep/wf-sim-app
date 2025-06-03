@@ -146,10 +146,18 @@ const SettingsSchema = Yup.object().shape({
             minimumDSCR: Yup.number().default(1.3),
             costOfConstructionDebt: Yup.number().default(4),
             costOfOperationalDebt: Yup.number().default(5),
-            debtRatio: Yup.number().default(70),
+            debtFinancingRatio: Yup.number().min(0).max(100).default(70),
             effectiveTaxRate: Yup.number().default(25),
             costOfEquity: Yup.number().default(5),
             gracePeriod: Yup.number().default(1),
+
+            idcCapitalization: Yup.boolean().default(true),
+            equityTiming: Yup.string().oneOf(['upfront', 'progressive', 'atCOD']).default('progressive'),
+            amortizationType: Yup.string().oneOf(['bullet', 'amortizing']).default('amortizing'),
+
+            equityIRRTarget: Yup.number().default(12),
+            projectIRRTarget: Yup.number().default(10),
+            targetPaybackPeriod: Yup.number().default(8),
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),
@@ -298,7 +306,8 @@ const InputSimSchema = Yup.object().shape({
         energyProduction: SimulationInfoSchema.nullable().default(null),
         electricityPrice: SimulationInfoSchema.nullable().default(null),
         windVariability: SimulationInfoSchema.nullable().default(null),
-        downtimePerEvent: SimulationInfoSchema.nullable().default(null)
+        downtimePerEvent: SimulationInfoSchema.nullable().default(null),
+        escalationRate: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
         annualCosts: Yup.object().shape({

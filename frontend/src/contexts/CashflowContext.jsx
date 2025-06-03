@@ -10,13 +10,20 @@ export const useCashflow = () => useContext(CashflowContext);
 
 // Updated source registry with proper data sources
 export const CASHFLOW_SOURCE_REGISTRY = {
+    // Global data available to all transformers
+    data: {
+        projectLife: ['settings', 'general', 'projectLife'],
+        numWTGs: ['settings', 'project', 'windFarm', 'numWTGs'],
+        currency: ['settings', 'project', 'currency', 'local']
+    },
+
     multipliers: [
         {
             id: 'escalationRate',
-            path: ['settings', 'modules', 'cost', 'escalationRate'],
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate'],
             category: 'escalation',
             hasPercentiles: true,
-            transformer: 'distributionToTimeSeries',
+            transformer: null,
             description: 'Annual cost escalation rate applied to all cost items'
         },
         {
@@ -24,7 +31,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice'],
             category: 'pricing',
             hasPercentiles: true,
-            transformer: null, // Already in simulation results format
+            transformer: null,
             description: 'Electricity price per MWh used to calculate revenue'
         }
     ],
@@ -35,9 +42,48 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             category: 'construction',
             hasPercentiles: false,
             transformer: 'capexDrawdownToAnnualCosts',
-            multipliers: [], // No escalation on CAPEX - it's historical cost
+            multipliers: [],
             description: 'Construction phase CAPEX drawdown schedule',
             displayNote: 'Construction investments occur in negative years (before COD)'
+        },
+        {
+            id: 'debtDrawdown',
+            paths: {
+                financing: ['settings', 'modules', 'financing'],
+                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
+            },
+            category: 'financing',
+            hasPercentiles: false,
+            transformer: 'debtDrawdownToAnnualCosts',
+            multipliers: [],
+            description: 'Debt drawdown during construction phase (% of CAPEX)',
+            displayNote: 'Debt is drawn to fund construction spending'
+        },
+        {
+            id: 'interestDuringConstruction',
+            paths: {
+                financing: ['settings', 'modules', 'financing'],
+                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
+            },
+            category: 'financing',
+            hasPercentiles: false,
+            transformer: 'interestDuringConstruction',
+            multipliers: [],
+            description: 'Interest During Construction (IDC) - capitalized interest costs',
+            displayNote: 'Only included if IDC capitalization is enabled'
+        },
+        {
+            id: 'operationalDebtService',
+            paths: {
+                financing: ['settings', 'modules', 'financing'],
+                costSources: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources']
+            },
+            category: 'financing',
+            hasPercentiles: false,
+            transformer: 'operationalDebtService',
+            multipliers: [],
+            description: 'Annual debt service payments during operational period',
+            displayNote: 'Includes principal and interest, starts after grace period'
         },
         {
             id: 'contractFees',
@@ -46,7 +92,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             hasPercentiles: false,
             transformer: 'contractsToAnnualCosts',
             multipliers: [
-                { id: 'escalationRate', operation: 'compound', baseYear: 1 }
+                { id: 'escalationRate', operation: 'multiply', baseYear: 1 }
             ],
             description: 'OEM service contract fees (fixed or time-series based)'
         },
@@ -57,7 +103,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             hasPercentiles: false,
             transformer: 'majorRepairsToAnnualCosts',
             multipliers: [
-                { id: 'escalationRate', operation: 'compound', baseYear: 1 }
+                { id: 'escalationRate', operation: 'multiply', baseYear: 1 }
             ],
             description: 'Major repair events and associated costs'
         },
@@ -68,7 +114,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             hasPercentiles: false,
             transformer: 'fixedCostToTimeSeries',
             multipliers: [
-                { id: 'escalationRate', operation: 'compound', baseYear: 1 }
+                { id: 'escalationRate', operation: 'multiply', baseYear: 1 }
             ],
             description: 'Annual insurance premium payments'
         },
@@ -78,7 +124,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             category: 'reserves',
             hasPercentiles: false,
             transformer: 'reserveFundsToProvision',
-            multipliers: [], // No escalation on reserve provisions
+            multipliers: [],
             description: 'Reserve fund provisions (allocated but not spent)',
             displayNote: 'Shown as provision allocation, not immediate cash outflow'
         }
@@ -89,10 +135,10 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'],
             category: 'energy',
             hasPercentiles: true,
-            transformer: null, // Already in simulation results format
+            transformer: null,
             multipliers: [
                 { id: 'electricityPrice', operation: 'multiply', baseYear: 1 },
-                { id: 'escalationRate', operation: 'compound', baseYear: 1 }
+                { id: 'escalationRate', operation: 'multiply', baseYear: 1 }
             ],
             description: 'Energy production revenue (MWh × Price × Escalation)'
         }
