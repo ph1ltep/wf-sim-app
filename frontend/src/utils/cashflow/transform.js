@@ -1,7 +1,7 @@
 // src/utils/cashflow/transform.js - Enhanced with multi-percentile support
 import { applyTransformer } from './transformers';
 import { applyMultipliers } from './multipliers';
-import { calculateFinanceMetrics } from '../cashflowUtils';
+import { enhancedFinanceMetrics } from '../financingMetrics';
 
 /**
  * Get the selected percentile for a source based on strategy
@@ -460,12 +460,14 @@ export const transformScenarioToCashflow = async (
         hasAllPercentiles: netCashflowAllPercentiles.size > 0
     };
 
-    // Calculate enhanced finance metrics (already supports all percentiles)
-    const financeMetrics = calculateFinanceMetrics(aggregations, availablePercentiles, scenarioData, lineItems);
+    // Calculate enhanced finance metrics (REPLACED SECTION)
+    console.log('🧮 Calculating enhanced finance metrics...');
+    const financeMetrics = enhancedFinanceMetrics(aggregations, availablePercentiles, scenarioData, lineItems);
 
     const result = { metadata, lineItems, aggregations, financeMetrics };
 
     console.log(`✅ Enhanced transformation complete: ${lineItems.length} items, multi-percentile support enabled`);
+
 
     return result;
 };
