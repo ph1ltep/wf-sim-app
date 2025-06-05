@@ -52,7 +52,9 @@ export const MetricsCell = ({
     // Combine base styles with threshold styles
     const cellStyle = useMemo(() => {
         const baseStyle = {
-            fontWeight: isPrimary ? 600 : 400,
+            fontSize: '14px', // Ant Design standard - align with InlineEditTable
+            lineHeight: '22px', // Ant Design standard - align with InlineEditTable
+            fontWeight: isPrimary ? 500 : 400, // Align with InlineEditTable weight scale
             transition: 'all 0.2s ease'
         };
 

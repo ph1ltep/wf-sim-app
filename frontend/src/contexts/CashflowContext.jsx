@@ -85,17 +85,30 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             displayNote: 'Only included if IDC capitalization is enabled'
         },
         {
-            id: 'operationalDebtService',
+            id: 'operationalInterest',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
             ],
             category: 'financing',
             hasPercentiles: false,
-            transformer: 'operationalDebtService',
+            transformer: 'operationalInterestPayments',
             multipliers: [],
-            description: 'Annual debt service payments during operational period',
-            displayNote: 'Includes principal and interest, starts after grace period'
+            description: 'Annual interest payments during operational period',
+            displayNote: 'Interest portion of debt service - used for ICR calculation'
+        },
+        {
+            id: 'operationalPrincipal',
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            references: [
+                ['settings', 'modules', 'financing']
+            ],
+            category: 'financing',
+            hasPercentiles: false,
+            transformer: 'operationalPrincipalPayments',
+            multipliers: [],
+            description: 'Annual principal repayments during operational period',
+            displayNote: 'Principal portion of debt service'
         },
         {
             id: 'contractFees',

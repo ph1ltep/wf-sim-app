@@ -67,18 +67,10 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
             const opacity = shouldEmphasize ? 1.0 : 0.3 + (index % 3) * 0.2;
             const lineWidth = shouldEmphasize ? 4 : 2;
             const markerSize = shouldEmphasize ? 8 : 5;
+            const markerSymbol = isPrimary ? 'circle' : markerSymbols[index % markerSymbols.length];
 
-            // Special handling for LLCR - it's typically a single value per percentile, not time series
-            let plotData;
-            if (metricType === 'llcr' && data.length === 1) {
-                // LLCR is typically a single value - plot as horizontal line
-                plotData = allYears.map(year => ({
-                    year,
-                    value: data[0].value || data[0] // Handle both {year, value} and raw value
-                }));
-            } else {
-                plotData = completeData;
-            }
+            // REMOVED: Special LLCR handling - now treats all metrics the same
+            const plotData = completeData;
 
             traces.push({
                 x: plotData.map(d => d.year),
@@ -89,7 +81,7 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
                 line: {
                     color: baseColor,
                     width: lineWidth,
-                    dash: metricType === 'llcr' ? 'dot' : 'solid' // Distinguish LLCR with dotted line
+                    dash: metricType === 'llcr' ? 'dot' : 'solid'
                 },
                 marker: {
                     size: markerSize,
@@ -98,7 +90,7 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
                     line: { width: 1, color: 'white' }
                 },
                 opacity: opacity,
-                connectgaps: metricType === 'llcr', // Connect LLCR gaps since it's a flat line
+                yaxis: metricType === 'icr' ? 'y2' : 'y', // ADDED: Assign ICR to secondary axis
                 hovertemplate: `Year: %{x}<br>${metricType.toUpperCase()}: %{y:.2f}<br>Percentile: P${percentile}<extra></extra>`
             });
         });
@@ -300,17 +292,25 @@ const createFinancialTimelineLayout = (covenantThreshold, years) => {
             dtick: 1
         },
         yaxis: {
-            title: 'Coverage Ratio',
+            title: 'Coverage Ratio (DSCR, LLCR)',
             showgrid: true,
             gridcolor: '#f0f0f0',
-            tickformat: '.2f'
+            tickformat: '.2f',
+            side: 'left'
+        },
+        yaxis2: {
+            title: 'Interest Coverage Ratio (ICR)',
+            showgrid: false,
+            tickformat: '.1f',
+            side: 'right',
+            overlaying: 'y'
         },
         legend: {
             orientation: 'h',
             y: -0.3,
             font: { size: 10 }
         },
-        margin: { t: 20, b: 100, l: 80, r: 20 },
+        margin: { t: 20, b: 100, l: 80, r: 80 },
         height: 350,
         plot_bgcolor: '#fafafa'
     };

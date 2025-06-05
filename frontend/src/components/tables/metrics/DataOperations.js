@@ -78,7 +78,58 @@ export const validateTableData = (data, config) => {
 };
 
 /**
- * Transform raw data into table format
+ * Extract single value from financial data based on metric type
+ * @param {string} metricKey - The metric key (irr, npv, minDSCR, etc.)
+ * @param {any} rawData - The raw data for this metric
+ * @param {number} percentile - The percentile to extract
+ * @returns {number|null} Extracted value
+ */
+const extractMetricValue = (metricKey, rawData, percentile) => {
+    // Handle null/undefined data
+    if (!rawData) return null;
+
+    // Handle Map objects (most financial metrics)
+    if (rawData && typeof rawData.get === 'function') {
+        const percentileData = rawData.get(percentile);
+
+        if (percentileData === null || percentileData === undefined) {
+            return null;
+        }
+
+        // Handle time series data (arrays)
+        if (Array.isArray(percentileData)) {
+            switch (metricKey) {
+                case 'minDSCR':
+                    // Find minimum from operational years (year > 0)
+                    const operationalDSCR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
+                    return operationalDSCR.length > 0 ? Math.min(...operationalDSCR.map(d => d.value)) : null;
+
+                case 'icr':
+                    // Find minimum from operational years (year > 0)
+                    const operationalICR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
+                    return operationalICR.length > 0 ? Math.min(...operationalICR.map(d => d.value)) : null;
+
+                case 'llcr':
+                    // LLCR is constant across years, take first valid value
+                    const firstValid = percentileData.find(d => d && typeof d.value === 'number');
+                    return firstValid ? firstValid.value : null;
+
+                default:
+                    // For other time series, return first value or handle differently
+                    return percentileData[0]?.value || null;
+            }
+        }
+
+        // Handle scalar values
+        return typeof percentileData === 'number' ? percentileData : null;
+    }
+
+    // Handle direct values
+    return typeof rawData === 'number' ? rawData : null;
+};
+
+/**
+ * Transform raw data into table format - simplified and optimized
  * @param {Object} rawData - Raw data object (e.g., financial metrics)
  * @param {Array} rowDefinitions - Row configuration definitions
  * @param {Array} columns - Column definitions
@@ -98,20 +149,11 @@ export const transformToTableData = (rawData, rowDefinitions, columns) => {
             thresholds: rowDef.thresholds || []
         };
 
-        // Add data for each column
+        // Extract data for each column (percentile)
         columns.forEach(column => {
-            const dataSource = rawData[rowDef.key];
-
-            if (dataSource && typeof dataSource === 'object' && dataSource.get) {
-                // Handle Map objects (e.g., financingData.irr)
-                row[column.key] = dataSource.get(column.value);
-            } else if (dataSource && typeof dataSource === 'object') {
-                // Handle regular objects
-                row[column.key] = dataSource[column.key];
-            } else {
-                // Handle primitive values
-                row[column.key] = dataSource;
-            }
+            const rawMetricData = rawData[rowDef.key];
+            const extractedValue = extractMetricValue(rowDef.key, rawMetricData, column.value);
+            row[column.key] = extractedValue;
         });
 
         return row;
@@ -141,6 +183,14 @@ export const detectColumns = (data, excludeFields = ['key', 'label', 'tooltip', 
     return Array.from(allKeys).sort();
 };
 
+/**
+ * Create financial metrics table data from cashflow data
+ * @param {Object} financingData - Financial metrics data (Maps)
+ * @param {Array} availablePercentiles - Available percentile values
+ * @param {number} primaryPercentile - Primary percentile
+ * @param {string} currency - Currency code
+ * @returns {Object} { data, config } for MetricsDataTable
+ */
 /**
  * Create financial metrics table data from cashflow data
  * @param {Object} financingData - Financial metrics data (Maps)
@@ -207,7 +257,7 @@ export const createFinancialMetricsTableData = (financingData, availablePercenti
             ]
         },
         {
-            key: 'minDSCR',
+            key: 'dscr',
             label: 'Min DSCR',
             tooltip: {
                 title: 'Minimum Debt Service Coverage Ratio',
@@ -220,9 +270,9 @@ export const createFinancialMetricsTableData = (financingData, availablePercenti
             ],
             thresholds: [
                 {
-                    field: 'dscr_covenant',
+                    field: 'covenantThreshold',
                     comparison: 'below',
-                    colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 'bold' } : null,
+                    colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
                     priority: 10
                 }
             ]
@@ -238,11 +288,26 @@ export const createFinancialMetricsTableData = (financingData, availablePercenti
             tags: [
                 { text: 'Coverage', color: 'blue' }
             ]
+        },
+        {
+            key: 'icr',
+            label: 'Min ICR',
+            tooltip: {
+                title: 'Minimum Interest Coverage Ratio',
+                content: 'Lowest ICR during operational period. Measures ability to pay interest obligations from operating cash flow.',
+                icon: 'SafetyOutlined'
+            },
+            tags: [
+                { text: 'Coverage', color: 'orange' },
+                { text: 'Interest', color: 'blue' }
+            ]
         }
     ];
 
-    // Column definitions for percentiles
-    const columns = availablePercentiles.map(p => ({
+    // FIXED: Sort percentiles in ascending order, then create columns
+    const sortedPercentiles = [...availablePercentiles].sort((a, b) => a - b);
+
+    const columns = sortedPercentiles.map(p => ({
         key: `P${p}`,
         label: `P${p}`,
         valueField: 'percentile',
@@ -265,31 +330,21 @@ export const createFinancialMetricsTableData = (financingData, availablePercenti
         width: 80
     }));
 
-    // Transform data
+    // Transform data using the cleaner logic
     const data = transformToTableData(financingData, rowDefinitions, columns);
 
-    // FIXED: Calculate Min DSCR properly for each row
+    // Add threshold reference values (separate step, no overwrites)
     data.forEach(row => {
-        if (row.key === 'minDSCR') {
-            // Calculate Min DSCR for each percentile
-            columns.forEach(column => {
-                const dscrData = financingData.dscr?.get(column.value);
-                if (Array.isArray(dscrData) && dscrData.length > 0) {
-                    // Filter to operational years only and find minimum
-                    const operationalDSCR = dscrData.filter(d => d.year > 0);
-                    if (operationalDSCR.length > 0) {
-                        const minValue = Math.min(...operationalDSCR.map(d => d.value));
-                        row[column.key] = minValue;
-                    }
-                }
-            });
-            row.dscr_covenant = 1.3; // Standard covenant threshold
-        }
-        if (row.key === 'irr') {
-            row.target_irr = 10.0; // Example target IRR
-        }
-        if (row.key === 'npv') {
-            row.npv_positive = 0; // NPV positive threshold
+        switch (row.key) {
+            case 'dscr':
+                row.covenantThreshold = financingData.covenantThreshold || 1.3;
+                break;
+            case 'irr':
+                row.target_irr = 10.0;
+                break;
+            case 'npv':
+                row.npv_positive = 0;
+                break;
         }
     });
 

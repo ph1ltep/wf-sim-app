@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
-import { MetricsDataTable } from '../tables/metrics';
+import { MetricsTable } from '../tables';
 import { createFinancialMetricsTableData } from '../tables/metrics/DataOperations';
 import { prepareFinancialTimelineData } from '../../utils/financialChartsUtils';
 import {
@@ -162,7 +162,7 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
                     </Space>
                 }
             >
-                {/* MetricsDataTable replacing inline table */}
+                {/* MetricsTable replacing inline table */}
                 <div style={{ marginBottom: 24 }}>
                     <Title level={5} style={{ marginBottom: 12 }}>
                         Financial Summary - All Percentiles
@@ -171,7 +171,7 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
                         </span>
                     </Title>
 
-                    <MetricsDataTable
+                    <MetricsTable
                         data={tableData}
                         config={tableConfig}
                         loading={false}

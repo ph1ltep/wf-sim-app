@@ -1,42 +1,176 @@
-// src/components/tables/metrics/TableConfiguration.js - Configuration utilities for MetricsDataTable
+// src/components/tables/metrics/TableConfiguration.js - Configuration utilities for MetricsTable
 import React from 'react';
+import { Typography, Tag, Tooltip } from 'antd';
+import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
+import { MetricsCell } from './MetricsCell';
+
+const { Text } = Typography;
 
 /**
- * Generate table columns configuration from data and config
+ * Render header cell with tags and tooltips (aligned with InlineEditTable pattern)
+ */
+const renderHeaderCell = (rowData) => {
+    const { label = '', tooltip, tags = [] } = rowData;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* Main label with tooltip and inline tags */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <Text strong style={{ fontSize: '13px' }}>
+                    {label}
+                </Text>
+                {tooltip && (
+                    <Tooltip
+                        title={tooltip.title}
+                        overlay={tooltip.content && (
+                            <div>
+                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                                    {tooltip.title}
+                                </div>
+                                <div style={{ fontSize: '12px' }}>
+                                    {tooltip.content}
+                                </div>
+                            </div>
+                        )}
+                    >
+                        {tooltip.icon === 'DollarOutlined' ? <DollarOutlined style={{ fontSize: '12px', color: '#999' }} /> :
+                            tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined style={{ fontSize: '12px', color: '#999' }} /> :
+                                <InfoCircleOutlined style={{ fontSize: '12px', color: '#999' }} />}
+                    </Tooltip>
+                )}
+
+                {/* Inline tags that wrap as needed */}
+                {tags.length > 0 && tags.map((tag, index) => (
+                    <Tag
+                        key={index}
+                        color={tag.color}
+                        size="small"
+                        style={{ fontSize: '9px', lineHeight: '14px', margin: '0 2px' }}
+                    >
+                        {tag.text}
+                    </Tag>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+/**
+ * Generate table columns configuration for MetricsTable (aligned with InlineEditTable pattern)
  * @param {Array} data - Table row data
  * @param {Object} config - Table configuration
+ * @param {Function} handleColumnSelect - Column selection handler
  * @returns {Array} Generated column configurations
  */
-export const generateTableColumns = (data, config) => {
+export const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
     if (!config.columns || !Array.isArray(config.columns)) {
-        console.warn('generateTableColumns: No columns configuration provided');
+        console.warn('generateMetricsTableColumns: No columns configuration provided');
         return [];
     }
 
-    // Validate that all column keys exist in data
-    const availableKeys = new Set();
-    data.forEach(row => {
-        Object.keys(row).forEach(key => availableKeys.add(key));
+    // Header column (fixed left) - similar to InlineEditTable pattern
+    const headerColumn = {
+        title: 'Metric',
+        dataIndex: 'header',
+        key: 'header',
+        fixed: 'left',
+        width: 200,
+        render: (_, record) => renderHeaderCell(record)
+    };
+
+    // Data columns with InlineEditTable styling pattern
+    const dataColumns = config.columns.map((columnConfig) => {
+        const isSelected = config.selectedColumn === columnConfig.key;
+        const isPrimary = columnConfig.primary;
+
+        // Use primary blue color for consistency with InlineEditTable marker pattern
+        const primaryColor = '#1677ff';
+
+        return {
+            title: (
+                <div
+                    style={{
+                        textAlign: 'center',
+                        fontWeight: isPrimary ? 600 : 500,
+                        color: isPrimary ? primaryColor : '#262626',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        padding: '6px 5px', // Align with InlineEditTable padding
+                        borderRadius: '4px'
+                    }}
+                    onClick={() => handleColumnSelect(columnConfig.key)}
+                    onMouseEnter={(e) => {
+                        if (!isPrimary && !isSelected) {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!isPrimary && !isSelected) {
+                            e.target.style.backgroundColor = 'transparent';
+                        }
+                    }}
+                >
+                    <div style={{ fontSize: '13px' }}>
+                        {columnConfig.label}
+                        {isPrimary && (
+                            <span style={{
+                                fontSize: '9px',
+                                color: primaryColor,
+                                marginLeft: '4px',
+                                fontWeight: 600
+                            }}>
+                                (Primary)
+                            </span>
+                        )}
+                    </div>
+                </div>
+            ),
+            dataIndex: columnConfig.key,
+            key: columnConfig.key,
+            width: columnConfig.width || 120, // Align with InlineEditTable width
+            align: columnConfig.align || 'center',
+            // ALIGNED: Use exact InlineEditTable onHeaderCell pattern
+            onHeaderCell: () => ({
+                style: (isPrimary || isSelected) ? {
+                    backgroundColor: `${primaryColor}15`, // Same as InlineEditTable marker pattern
+                    borderColor: `${primaryColor}40`,
+                    borderWidth: '2px'
+                } : {},
+                onClick: () => handleColumnSelect(columnConfig.key)
+            }),
+            // ALIGNED: Use exact InlineEditTable onCell pattern
+            onCell: (record) => ({
+                style: (isPrimary || isSelected) ? {
+                    backgroundColor: `${primaryColor}08`, // Same as InlineEditTable marker pattern
+                    borderLeft: '0px',
+                    borderRight: '0px'
+                } : {},
+                onClick: columnConfig.selectable && config.onColumnSelect ?
+                    () => handleColumnSelect(columnConfig.key, record) : undefined
+            }),
+            render: (value, record) => (
+                <MetricsCell
+                    value={value}
+                    rowData={record}
+                    columnConfig={columnConfig}
+                    isSelected={isSelected}
+                    isPrimary={isPrimary}
+                />
+            )
+        };
     });
 
-    const validColumns = config.columns.filter(column => {
-        if (!availableKeys.has(column.key)) {
-            console.warn(`generateTableColumns: Column key '${column.key}' not found in data`);
-            return false;
-        }
-        return true;
-    });
-
-    return validColumns;
+    return [headerColumn, ...dataColumns];
 };
 
 /**
  * Evaluate thresholds for a row and return styling information
  * @param {Object} rowData - Row data object
  * @param {Array} thresholds - Array of threshold configurations
+ * @param {any} cellValue - Current cell value being evaluated (optional, for cell-specific evaluation)
  * @returns {Object} Style object with color, backgroundColor, etc.
  */
-export const evaluateThresholds = (rowData, thresholds = []) => {
+export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) => {
     if (!thresholds || thresholds.length === 0) {
         return {};
     }
@@ -55,8 +189,9 @@ export const evaluateThresholds = (rowData, thresholds = []) => {
             return;
         }
 
-        const value = rowData[field];
-        const thresholdValue = rowData[field]; // For self-comparison scenarios
+        // FIXED: Use cellValue for comparison, not rowData[field]
+        const value = cellValue !== null ? cellValue : rowData[field];
+        const thresholdValue = rowData[field]; // This is the threshold to compare against
         let shouldApply = false;
 
         // Evaluate threshold condition
@@ -137,13 +272,8 @@ export const evaluateCellThresholds = (value, rowData, thresholds = []) => {
         return {};
     }
 
-    // Filter thresholds that apply to this specific value
-    const relevantThresholds = thresholds.filter(threshold => {
-        // For cell-specific evaluation, we compare the current value against threshold fields
-        return rowData.hasOwnProperty(threshold.field);
-    });
-
-    return evaluateThresholds({ ...rowData, currentValue: value }, relevantThresholds);
+    // FIXED: Pass the cell value to evaluateThresholds
+    return evaluateThresholds(rowData, thresholds, value);
 };
 
 /**
@@ -200,7 +330,7 @@ export const createFinancialThresholds = (thresholdValues = {}) => {
             field: 'dscrMin',
             comparison: 'below',
             priority: 10,
-            colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 'bold' } : null,
+            colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
             description: 'DSCR below minimum covenant'
         });
     }

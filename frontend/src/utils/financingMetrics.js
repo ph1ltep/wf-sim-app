@@ -260,10 +260,8 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
     const minimumDSCR = financingParams.minimumDSCR || 1.3;
     const costOfEquity = (financingParams.costOfEquity || 8) / 100; // Convert % to decimal
 
-    // Find relevant line items
-    const debtServiceLineItem = lineItems.find(item => item.id === 'operationalDebtService');
-    const interestLineItem = lineItems.find(item => item.id === 'interestDuringConstruction') ||
-        lineItems.find(item => item.id === 'interestPayments');
+    const interestLineItem = lineItems.find(item => item.id === 'operationalInterest');
+    const principalLineItem = lineItems.find(item => item.id === 'operationalPrincipal');
 
     availablePercentiles.forEach(percentile => {
         // Get net cashflow for this percentile
@@ -274,12 +272,27 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
             netCashflowData = aggregations.netCashflow?.data || [];
         }
 
-        // Get debt service data for this percentile
+        // Calculate combined debt service for DSCR (interest + principal)
         let debtServiceData = [];
-        if (debtServiceLineItem?.percentileData?.has(percentile)) {
-            debtServiceData = debtServiceLineItem.percentileData.get(percentile);
-        } else if (debtServiceLineItem?.data) {
-            debtServiceData = debtServiceLineItem.data;
+        if (interestLineItem && principalLineItem) {
+            const interestData = interestLineItem.percentileData?.has(percentile)
+                ? interestLineItem.percentileData.get(percentile)
+                : interestLineItem.data || [];
+
+            const principalData = principalLineItem.percentileData?.has(percentile)
+                ? principalLineItem.percentileData.get(percentile)
+                : principalLineItem.data || [];
+
+            // Combine interest + principal by year
+            const debtServiceMap = new Map();
+            [...interestData, ...principalData].forEach(item => {
+                const currentTotal = debtServiceMap.get(item.year) || 0;
+                debtServiceMap.set(item.year, currentTotal + item.value);
+            });
+
+            debtServiceData = Array.from(debtServiceMap.entries())
+                .map(([year, value]) => ({ year: parseInt(year), value }))
+                .sort((a, b) => a.year - b.year);
         }
 
         // Get interest payment data for ICR calculation
@@ -344,7 +357,16 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
 
         // Calculate real LLCR
         const llcr = calculateRealLLCR(netCashflowData, debtServiceData, costOfEquity);
-        financeMetrics.llcr.set(percentile, llcr);
+        // FIXED: Store as time series array like DSCR (repeat the scalar value for each operational year)
+        const llcrTimeSeries = [];
+        const projectLife = scenarioData?.settings?.general?.projectLife || 20;
+        for (let year = 1; year <= projectLife; year++) {
+            llcrTimeSeries.push({
+                year: year,
+                value: llcr // Same LLCR value for all operational years
+            });
+        }
+        financeMetrics.llcr.set(percentile, llcrTimeSeries);
 
         // Covenant breach detection using real DSCR data - EXCLUDE construction years
         const breaches = dscrData

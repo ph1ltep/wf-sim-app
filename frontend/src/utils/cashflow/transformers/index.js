@@ -11,7 +11,8 @@ import {
 import {
     debtDrawdownToAnnualCosts,
     interestDuringConstruction,
-    operationalDebtService
+    operationalPrincipalPayments,
+    operationalInterestPayments
 } from './financingTransformer';
 
 /**
@@ -35,7 +36,8 @@ export const TRANSFORMER_REGISTRY = {
     'capexDrawdownToAnnualCosts': capexDrawdownToAnnualCosts,
     'debtDrawdownToAnnualCosts': debtDrawdownToAnnualCosts,
     'interestDuringConstruction': interestDuringConstruction,
-    'operationalDebtService': operationalDebtService
+    'operationalPrincipalPayments': operationalPrincipalPayments,
+    'operationalInterestPayments': operationalInterestPayments,
 };
 
 /**
@@ -74,5 +76,6 @@ export {
     capexDrawdownToAnnualCosts,
     debtDrawdownToAnnualCosts,
     interestDuringConstruction,
-    operationalDebtService
+    operationalPrincipalPayments,
+    operationalInterestPayments
 };

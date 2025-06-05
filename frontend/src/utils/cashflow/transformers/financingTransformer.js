@@ -146,19 +146,18 @@ export const interestDuringConstruction = (dataSource, dataReferences, sourceCon
 };
 
 /**
- * Calculate operational debt service schedule
+ * Calculate operational interest payments (interest portion of debt service)
  * @param {Array} dataSource - Primary data: costSources array
  * @param {Object} dataReferences - Reference data: {reference: {financing}, global: {projectLife, numWTGs, currency}, context: {}}
  * @param {Object} sourceConfig - Source configuration
- * @returns {Array} Array of DataPointSchema objects for debt service
+ * @returns {Array} Array of DataPointSchema objects for interest payments
  */
-export const operationalDebtService = (dataSource, dataReferences, sourceConfig) => {
-    const costSources = dataSource;
+export const operationalInterestPayments = (dataSource, dataReferences, sourceConfig) => {
     const financing = dataReferences.reference.financing;
     const { projectLife } = dataReferences.global;
 
     if (!financing) {
-        console.warn('operationalDebtService: No financing data available in references');
+        console.warn('operationalInterestPayments: No financing data available in references');
         return [];
     }
 
@@ -172,7 +171,7 @@ export const operationalDebtService = (dataSource, dataReferences, sourceConfig)
         const totalDebtPrincipal = totalDebtDrawn + totalIDC;
 
         if (totalDebtPrincipal <= 0) {
-            console.warn('operationalDebtService: No debt principal to service');
+            console.warn('operationalInterestPayments: No debt principal to calculate interest on');
             return [];
         }
 
@@ -182,44 +181,112 @@ export const operationalDebtService = (dataSource, dataReferences, sourceConfig)
         const gracePeriod = financing.gracePeriod || 1;
         const amortizationType = financing.amortizationType || 'amortizing';
 
-        // Calculate debt service schedule
-        const debtService = [];
-        const debtServiceStartYear = 1 + gracePeriod; // After COD + grace period
+        // Calculate interest payments schedule
+        const interestPayments = [];
+        const interestStartYear = 1 + gracePeriod;
 
         if (amortizationType === 'bullet') {
-            // Bullet loan: interest only, then principal at maturity
-            for (let year = debtServiceStartYear; year <= projectLife && year <= loanDuration; year++) {
-                const isMaturityYear = year === loanDuration;
+            // Bullet loan: interest only payments
+            for (let year = interestStartYear; year <= projectLife && year <= loanDuration; year++) {
                 const interestPayment = totalDebtPrincipal * operationalRate;
-                const principalPayment = isMaturityYear ? totalDebtPrincipal : 0;
-                const totalPayment = interestPayment + principalPayment;
-
-                debtService.push({
-                    year,
-                    value: totalPayment
-                });
+                interestPayments.push({ year, value: interestPayment });
             }
         } else {
-            // Amortizing loan: equal annual payments
+            // Amortizing loan: calculate interest portion
+            let remainingPrincipal = totalDebtPrincipal;
             const annualPayment = totalDebtPrincipal *
                 (operationalRate * Math.pow(1 + operationalRate, loanDuration)) /
                 (Math.pow(1 + operationalRate, loanDuration) - 1);
 
-            for (let year = debtServiceStartYear; year <= projectLife && year <= (debtServiceStartYear + loanDuration - 1); year++) {
-                debtService.push({
-                    year,
-                    value: annualPayment
-                });
+            for (let year = interestStartYear; year <= projectLife && year <= (interestStartYear + loanDuration - 1); year++) {
+                const interestPayment = remainingPrincipal * operationalRate;
+                const principalPayment = annualPayment - interestPayment;
+
+                interestPayments.push({ year, value: interestPayment });
+                remainingPrincipal = Math.max(0, remainingPrincipal - principalPayment);
             }
         }
 
-        const totalDebtService = debtService.reduce((sum, item) => sum + item.value, 0);
-        console.log(`💳 Debt service: ${debtService.length} years, total ${totalDebtService.toLocaleString()}, principal ${totalDebtPrincipal.toLocaleString()}`);
+        const totalInterest = interestPayments.reduce((sum, item) => sum + item.value, 0);
+        console.log(`💰 Interest payments: ${interestPayments.length} years, total ${totalInterest.toLocaleString()}`);
 
-        return debtService;
+        return interestPayments;
 
     } catch (error) {
-        console.error('operationalDebtService: Error calculating debt service:', error);
+        console.error('operationalInterestPayments: Error calculating interest payments:', error);
+        return [];
+    }
+};
+
+/**
+ * Calculate operational principal payments (principal portion of debt service)
+ * @param {Array} dataSource - Primary data: costSources array
+ * @param {Object} dataReferences - Reference data: {reference: {financing}, global: {projectLife, numWTGs, currency}, context: {}}
+ * @param {Object} sourceConfig - Source configuration
+ * @returns {Array} Array of DataPointSchema objects for principal payments
+ */
+export const operationalPrincipalPayments = (dataSource, dataReferences, sourceConfig) => {
+    const financing = dataReferences.reference.financing;
+    const { projectLife } = dataReferences.global;
+
+    if (!financing) {
+        console.warn('operationalPrincipalPayments: No financing data available in references');
+        return [];
+    }
+
+    try {
+        // Get total debt amount (same calculation as interest)
+        const debtDrawdown = debtDrawdownToAnnualCosts(dataSource, dataReferences, sourceConfig);
+        const idc = interestDuringConstruction(dataSource, dataReferences, sourceConfig);
+
+        const totalDebtDrawn = debtDrawdown.reduce((sum, item) => sum + item.value, 0);
+        const totalIDC = idc.reduce((sum, item) => sum + item.value, 0);
+        const totalDebtPrincipal = totalDebtDrawn + totalIDC;
+
+        if (totalDebtPrincipal <= 0) {
+            console.warn('operationalPrincipalPayments: No debt principal to repay');
+            return [];
+        }
+
+        // Get financing parameters
+        const operationalRate = (financing.costOfOperationalDebt || 5) / 100;
+        const loanDuration = financing.loanDuration || 15;
+        const gracePeriod = financing.gracePeriod || 1;
+        const amortizationType = financing.amortizationType || 'amortizing';
+
+        // Calculate principal payments schedule
+        const principalPayments = [];
+        const paymentStartYear = 1 + gracePeriod;
+
+        if (amortizationType === 'bullet') {
+            // Bullet loan: principal at maturity
+            principalPayments.push({
+                year: Math.min(loanDuration, projectLife),
+                value: totalDebtPrincipal
+            });
+        } else {
+            // Amortizing loan: calculate principal portion
+            let remainingPrincipal = totalDebtPrincipal;
+            const annualPayment = totalDebtPrincipal *
+                (operationalRate * Math.pow(1 + operationalRate, loanDuration)) /
+                (Math.pow(1 + operationalRate, loanDuration) - 1);
+
+            for (let year = paymentStartYear; year <= projectLife && year <= (paymentStartYear + loanDuration - 1); year++) {
+                const interestPayment = remainingPrincipal * operationalRate;
+                const principalPayment = annualPayment - interestPayment;
+
+                principalPayments.push({ year, value: principalPayment });
+                remainingPrincipal = Math.max(0, remainingPrincipal - principalPayment);
+            }
+        }
+
+        const totalPrincipal = principalPayments.reduce((sum, item) => sum + item.value, 0);
+        console.log(`💰 Principal payments: ${principalPayments.length} years, total ${totalPrincipal.toLocaleString()}`);
+
+        return principalPayments;
+
+    } catch (error) {
+        console.error('operationalPrincipalPayments: Error calculating principal payments:', error);
         return [];
     }
 };
