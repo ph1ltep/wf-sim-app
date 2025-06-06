@@ -1,5 +1,5 @@
-// src/utils/financialChartsUtils.js - Finance-specific chart utilities
-import { hexToRgb } from './plotUtils';
+// src/utils/financialChartsUtils.js - Finance-specific chart utilities only
+import { addRefinancingAnnotations, addCovenantAnnotations, hexToRgb } from './charts';
 
 /**
  * Prepare financial timeline chart data with multiple metrics on same axis
@@ -67,14 +67,10 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
             const opacity = shouldEmphasize ? 1.0 : 0.3 + (index % 3) * 0.2;
             const lineWidth = shouldEmphasize ? 4 : 2;
             const markerSize = shouldEmphasize ? 8 : 5;
-            const markerSymbol = isPrimary ? 'circle' : markerSymbols[index % markerSymbols.length];
-
-            // REMOVED: Special LLCR handling - now treats all metrics the same
-            const plotData = completeData;
 
             traces.push({
-                x: plotData.map(d => d.year),
-                y: plotData.map(d => d.value),
+                x: completeData.map(d => d.year),
+                y: completeData.map(d => d.value),
                 type: 'scatter',
                 mode: 'lines+markers',
                 name: `${metricType.toUpperCase()} P${percentile}${shouldEmphasize ? ' (Primary)' : ''}`,
@@ -90,7 +86,7 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
                     line: { width: 1, color: 'white' }
                 },
                 opacity: opacity,
-                yaxis: metricType === 'icr' ? 'y2' : 'y', // ADDED: Assign ICR to secondary axis
+                yaxis: metricType === 'icr' ? 'y2' : 'y', // ICR on secondary axis
                 hovertemplate: `Year: %{x}<br>${metricType.toUpperCase()}: %{y:.2f}<br>Percentile: P${percentile}<extra></extra>`
             });
         });
@@ -184,95 +180,6 @@ export const prepareDualAxisChartData = (cashflowData, ratioData, options = {}) 
 
     const layout = createDualAxisLayout(primaryAxis);
     return { data: traces, layout };
-};
-
-/**
- * Add covenant annotations to chart layout
- * @param {Object} layout - Existing Plotly layout object
- * @param {Array} covenantThresholds - Array of covenant threshold objects
- * @param {Array} years - Array of years for the chart
- * @returns {Object} Updated layout with covenant annotations
- */
-export const addCovenantAnnotations = (layout, covenantThresholds = [], years = []) => {
-    if (!layout.shapes) layout.shapes = [];
-    if (!layout.annotations) layout.annotations = [];
-
-    covenantThresholds.forEach(covenant => {
-        const { value, label, color = '#ff4d4f', startYear, endYear } = covenant;
-
-        const xStart = startYear || Math.min(...years);
-        const xEnd = endYear || Math.max(...years);
-
-        // Add horizontal line for covenant threshold
-        layout.shapes.push({
-            type: 'line',
-            x0: xStart,
-            x1: xEnd,
-            y0: value,
-            y1: value,
-            line: {
-                color: color,
-                width: 3,
-                dash: 'dash'
-            }
-        });
-
-        // Add label annotation
-        layout.annotations.push({
-            x: xEnd * 0.9,
-            y: value,
-            text: label || `Covenant: ${value}`,
-            showarrow: false,
-            font: { size: 10, color: color },
-            bgcolor: 'rgba(255,255,255,0.8)',
-            bordercolor: color,
-            borderwidth: 1
-        });
-    });
-
-    return layout;
-};
-
-/**
- * Add refinancing window annotations
- * @param {Object} layout - Existing Plotly layout object
- * @param {Array} refinancingWindows - Array of refinancing window objects
- * @returns {Object} Updated layout with refinancing annotations
- */
-export const addRefinancingAnnotations = (layout, refinancingWindows = []) => {
-    if (!layout.shapes) layout.shapes = [];
-    if (!layout.annotations) layout.annotations = [];
-
-    refinancingWindows.forEach(window => {
-        const { startYear, endYear, label, color = '#faad14' } = window;
-
-        // Add vertical shaded region for refinancing window
-        layout.shapes.push({
-            type: 'rect',
-            x0: startYear,
-            x1: endYear,
-            y0: 0,
-            y1: 1,
-            yref: 'paper',
-            fillcolor: `rgba(${hexToRgb(color)}, 0.1)`,
-            line: { width: 0 }
-        });
-
-        // Add label
-        layout.annotations.push({
-            x: (startYear + endYear) / 2,
-            y: 0.95,
-            yref: 'paper',
-            text: label || 'Refinancing Window',
-            showarrow: false,
-            font: { size: 10, color: color },
-            bgcolor: 'rgba(255,255,255,0.8)',
-            bordercolor: color,
-            borderwidth: 1
-        });
-    });
-
-    return layout;
 };
 
 /**
@@ -387,4 +294,82 @@ export const getFinancialColorScheme = (metricType) => {
     };
 
     return colors[metricType] || '#666666';
+};
+
+/**
+ * Create financial performance benchmark data
+ * @param {Object} metrics - Financial metrics
+ * @param {Object} industry - Industry benchmarks
+ * @returns {Object} Benchmark comparison data
+ */
+export const createFinancialBenchmarks = (metrics, industry = {}) => {
+    const benchmarks = {
+        dscr: {
+            value: metrics.minDSCR,
+            industry: industry.minDSCR || 1.3,
+            rating: metrics.minDSCR >= 1.5 ? 'excellent' : metrics.minDSCR >= 1.3 ? 'good' : 'poor'
+        },
+        irr: {
+            value: metrics.projectIRR,
+            industry: industry.projectIRR || 10,
+            rating: metrics.projectIRR >= 12 ? 'excellent' : metrics.projectIRR >= 8 ? 'good' : 'poor'
+        },
+        llcr: {
+            value: metrics.llcr,
+            industry: industry.llcr || 1.4,
+            rating: metrics.llcr >= 1.6 ? 'excellent' : metrics.llcr >= 1.4 ? 'good' : 'poor'
+        }
+    };
+
+    return benchmarks;
+};
+
+/**
+ * Prepare finance-specific chart annotations
+ * @param {Object} layout - Chart layout
+ * @param {Object} annotations - Finance-specific annotations
+ * @returns {Object} Updated layout with finance annotations
+ */
+export const addFinanceAnnotations = (layout, annotations = {}) => {
+    const {
+        covenantThresholds = [],
+        refinancingWindows = [],
+        milestones = []
+    } = annotations;
+
+    // Add covenant thresholds
+    if (covenantThresholds.length > 0) {
+        addCovenantAnnotations(layout, covenantThresholds);
+    }
+
+    // Add refinancing windows
+    if (refinancingWindows.length > 0) {
+        addRefinancingAnnotations(layout, refinancingWindows);
+    }
+
+    // Add financial milestones (break-even, payback, etc.)
+    if (milestones.length > 0) {
+        milestones.forEach(milestone => {
+            const { year, type, label } = milestone;
+            const color = getFinancialColorScheme(type);
+
+            if (!layout.annotations) layout.annotations = [];
+
+            layout.annotations.push({
+                x: year,
+                y: 1.05,
+                yref: 'paper',
+                text: label,
+                showarrow: true,
+                arrowhead: 2,
+                arrowcolor: color,
+                font: { size: 9, color: color },
+                bgcolor: 'rgba(255,255,255,0.9)',
+                bordercolor: color,
+                borderwidth: 1
+            });
+        });
+    }
+
+    return layout;
 };

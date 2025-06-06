@@ -1,0 +1,363 @@
+// src/utils/finance/calculations.js - Finance-specific calculation utilities
+
+/**
+ * Calculate Net Present Value using discount rate
+ * @param {Array} cashflowData - Array of {year, value} objects
+ * @param {number} discountRate - Discount rate as decimal (e.g., 0.08 for 8%)
+ * @returns {number} NPV value
+ */
+export const calculateNPV = (cashflowData, discountRate) => {
+    if (!Array.isArray(cashflowData) || cashflowData.length === 0) return 0;
+
+    return cashflowData.reduce((npv, dataPoint) => {
+        const { year, value } = dataPoint;
+        const presentValue = value / Math.pow(1 + discountRate, year);
+        return npv + presentValue;
+    }, 0);
+};
+
+/**
+ * Calculate Internal Rate of Return using Newton-Raphson method
+ * @param {Array} cashflowData - Array of {year, value} objects
+ * @returns {number} IRR as percentage (e.g., 8.5 for 8.5%)
+ */
+export const calculateIRR = (cashflowData) => {
+    if (!Array.isArray(cashflowData) || cashflowData.length === 0) return 0;
+
+    // Initial guess - use average return
+    let irr = 0.1; // 10%
+    const tolerance = 0.0001;
+    const maxIterations = 100;
+
+    for (let i = 0; i < maxIterations; i++) {
+        // Calculate NPV and its derivative at current IRR
+        let npv = 0;
+        let dnpv = 0;
+
+        cashflowData.forEach(({ year, value }) => {
+            const factor = Math.pow(1 + irr, year);
+            npv += value / factor;
+            dnpv -= (year * value) / (factor * (1 + irr));
+        });
+
+        // Newton-Raphson iteration
+        if (Math.abs(dnpv) < tolerance) break;
+
+        const newIrr = irr - npv / dnpv;
+
+        if (Math.abs(newIrr - irr) < tolerance) {
+            irr = newIrr;
+            break;
+        }
+
+        irr = newIrr;
+
+        // Bound IRR to reasonable range
+        if (irr < -0.99) irr = -0.99;
+        if (irr > 10) irr = 10;
+    }
+
+    return irr * 100; // Return as percentage
+};
+
+/**
+ * Calculate Interest Coverage Ratio (ICR)
+ * @param {Array} netCashflowData - Net operating cash flow data
+ * @param {Array} interestPaymentData - Interest payment data
+ * @returns {Array} Array of {year, value} ICR data points
+ */
+export const calculateICR = (netCashflowData, interestPaymentData) => {
+    if (!Array.isArray(netCashflowData) || !Array.isArray(interestPaymentData)) {
+        return [];
+    }
+
+    const interestMap = new Map(interestPaymentData.map(d => [d.year, d.value]));
+    const icrData = [];
+
+    netCashflowData.forEach(cashflowPoint => {
+        const interestPayment = interestMap.get(cashflowPoint.year);
+
+        if (interestPayment && interestPayment > 0) {
+            // ICR = EBITDA (approximated by net cash flow) / Interest Payments
+            const icr = Math.max(0, cashflowPoint.value / interestPayment);
+            icrData.push({
+                year: cashflowPoint.year,
+                value: icr
+            });
+        }
+    });
+
+    return icrData.sort((a, b) => a.year - b.year);
+};
+
+/**
+ * Calculate Average DSCR across operational years only
+ * @param {Array} dscrData - DSCR data points
+ * @param {boolean} operationalYearsOnly - Whether to exclude construction/grace period years
+ * @returns {number} Average DSCR value
+ */
+export const calculateAverageDSCR = (dscrData, operationalYearsOnly = true) => {
+    if (!Array.isArray(dscrData) || dscrData.length === 0) return 0;
+
+    let filteredData = dscrData;
+
+    if (operationalYearsOnly) {
+        // Filter to operational years only (year > 0 and has actual DSCR values)
+        filteredData = dscrData.filter(d => d.year > 0 && d.value !== null && d.value !== undefined);
+    }
+
+    if (filteredData.length === 0) return 0;
+
+    const sum = filteredData.reduce((total, d) => total + d.value, 0);
+    return sum / filteredData.length;
+};
+
+/**
+ * Calculate real Loan Life Coverage Ratio
+ * LLCR = NPV of cash flows available for debt service / Outstanding debt
+ * @param {Array} netCashflowData - Net cashflow data for the percentile
+ * @param {Array} debtServiceData - Debt service schedule
+ * @param {number} discountRate - Discount rate for NPV calculation
+ * @returns {number} LLCR value
+ */
+export const calculateLLCR = (netCashflowData, debtServiceData, discountRate = 0.05) => {
+    if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) return 0;
+
+    // Calculate total outstanding debt (sum of all debt service payments)
+    const totalDebtService = debtServiceData.reduce((sum, ds) => sum + ds.value, 0);
+
+    if (totalDebtService <= 0) return 0;
+
+    // Calculate NPV of cash flows available for debt service
+    // Using operational years only (year > 0)
+    const operationalCashflows = netCashflowData.filter(cf => cf.year > 0);
+    const npvCashflows = operationalCashflows.reduce((npv, cf) => {
+        const presentValue = cf.value / Math.pow(1 + discountRate, cf.year);
+        return npv + presentValue;
+    }, 0);
+
+    // LLCR = NPV of available cash flows / Total debt service
+    return Math.max(0, npvCashflows / totalDebtService);
+};
+
+/**
+ * Calculate Equity IRR - return to equity investors after debt service
+ * @param {Array} netCashflowData - Net project cash flows
+ * @param {Array} debtServiceData - Debt service payments
+ * @param {number} equityInvestment - Initial equity investment
+ * @returns {number} Equity IRR as percentage
+ */
+export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInvestment) => {
+    if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) return 0;
+
+    // Create equity cash flows = net project cash flows - debt service
+    const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
+
+    const equityCashflows = [];
+
+    // Add initial equity investment as negative cash flow in year 0
+    if (equityInvestment > 0) {
+        equityCashflows.push({ year: 0, value: -equityInvestment });
+    }
+
+    // Calculate equity cash flows for operational years
+    netCashflowData.forEach(cf => {
+        if (cf.year > 0) { // Only operational years
+            const debtService = debtServiceMap.get(cf.year) || 0;
+            const equityCashflow = cf.value - debtService;
+            equityCashflows.push({ year: cf.year, value: equityCashflow });
+        }
+    });
+
+    return calculateIRR(equityCashflows);
+};
+
+/**
+ * Calculate total equity investment based on CAPEX and debt ratio
+ * @param {Object} scenarioData - Scenario data
+ * @returns {number} Total equity investment
+ */
+export const calculateEquityInvestment = (scenarioData) => {
+    const financing = scenarioData?.settings?.modules?.financing || {};
+    const debtRatio = (financing.debtFinancingRatio || 70) / 100;
+    const equityRatio = 1 - debtRatio;
+
+    // Get total CAPEX from metrics or calculate from cost sources
+    const totalCapex = scenarioData?.settings?.metrics?.totalCapex || 0;
+
+    return totalCapex * equityRatio;
+};
+
+/**
+ * Calculate Weighted Average Cost of Capital (WACC)
+ * WACC = (E/V * Re) + ((D/V * Rd) * (1 - Tc))
+ * @param {Object} financingParams - Financing parameters from scenario
+ * @param {Object} options - Additional options
+ * @returns {number} WACC as percentage
+ */
+export const calculateWACC = (financingParams, options = {}) => {
+    if (!financingParams) return 0;
+
+    const {
+        debtRatio = 70,
+        costOfEquity = 8,
+        costOfOperationalDebt = 5,
+        effectiveTaxRate = 25
+    } = financingParams;
+
+    // Convert percentages to decimals
+    const debtWeight = debtRatio / 100;
+    const equityWeight = 1 - debtWeight;
+    const costOfDebt = costOfOperationalDebt / 100;
+    const costOfEquityDecimal = costOfEquity / 100;
+    const taxRate = effectiveTaxRate / 100;
+
+    // WACC formula
+    const equityComponent = equityWeight * costOfEquityDecimal;
+    const debtComponent = debtWeight * costOfDebt * (1 - taxRate);
+    const wacc = (equityComponent + debtComponent) * 100;
+
+    return Math.round(wacc * 100) / 100; // Round to 2 decimal places
+};
+
+/**
+ * Calculate debt-to-equity ratio from debt ratio
+ * @param {Object} financingParams - Financing parameters
+ * @returns {number} Debt-to-equity ratio
+ */
+export const calculateDebtToEquityRatio = (financingParams) => {
+    if (!financingParams) return 0;
+
+    const { debtRatio = 70 } = financingParams;
+    const debtWeight = debtRatio / 100;
+    const equityWeight = 1 - debtWeight;
+
+    if (equityWeight === 0) return 0;
+
+    return Math.round((debtWeight / equityWeight) * 100) / 100;
+};
+
+/**
+ * Calculate break-even analysis metrics
+ * @param {Array} cashflowData - Cashflow data points
+ * @param {Object} options - Analysis options
+ * @returns {Object} Break-even analysis results
+ */
+export const calculateBreakEvenAnalysis = (cashflowData, options = {}) => {
+    const { includeNegativeYears = false } = options;
+
+    if (!Array.isArray(cashflowData) || cashflowData.length === 0) {
+        return { breakEvenYear: null, cumulativeBreakEven: null, paybackPeriod: null };
+    }
+
+    let cumulativeCashflow = 0;
+    let breakEvenYear = null;
+    let paybackPeriod = null;
+
+    const sortedData = cashflowData
+        .filter(d => includeNegativeYears || d.year >= 0)
+        .sort((a, b) => a.year - b.year);
+
+    for (let i = 0; i < sortedData.length; i++) {
+        const dataPoint = sortedData[i];
+        cumulativeCashflow += dataPoint.value;
+
+        // First year where cumulative becomes positive
+        if (cumulativeCashflow >= 0 && breakEvenYear === null) {
+            breakEvenYear = dataPoint.year;
+
+            // Calculate more precise payback period with interpolation
+            if (i > 0) {
+                const prevCumulative = cumulativeCashflow - dataPoint.value;
+                const interpolation = Math.abs(prevCumulative) / dataPoint.value;
+                paybackPeriod = sortedData[i - 1].year + interpolation;
+            } else {
+                paybackPeriod = dataPoint.year;
+            }
+            break;
+        }
+    }
+
+    return {
+        breakEvenYear,
+        cumulativeBreakEven: cumulativeCashflow,
+        paybackPeriod,
+        finalCumulativeCashflow: cumulativeCashflow
+    };
+};
+
+/**
+ * Calculate financial ratios and metrics summary
+ * @param {Object} financialData - Financial data including cash flows, debt service, etc.
+ * @param {Object} scenarioData - Scenario data for parameters
+ * @returns {Object} Comprehensive financial metrics
+ */
+export const calculateFinancialMetrics = (financialData, scenarioData) => {
+    const {
+        netCashflow = [],
+        debtService = [],
+        interestPayments = [],
+        equityInvestment
+    } = financialData;
+
+    const financing = scenarioData?.settings?.modules?.financing || {};
+    const costOfEquity = (financing.costOfEquity || 8) / 100;
+
+    // Core metrics
+    const projectIRR = calculateIRR(netCashflow);
+    const npv = calculateNPV(netCashflow, costOfEquity);
+    const equityIRR = calculateEquityIRR(netCashflow, debtService, equityInvestment);
+    const wacc = calculateWACC(financing);
+
+    // Coverage ratios
+    const llcr = calculateLLCR(netCashflow, debtService, costOfEquity);
+    const icr = calculateICR(netCashflow, interestPayments);
+
+    // DSCR calculation
+    const dscrData = [];
+    if (debtService.length > 0) {
+        const debtServiceMap = new Map(debtService.map(d => [d.year, d.value]));
+        netCashflow.forEach(cf => {
+            const ds = debtServiceMap.get(cf.year);
+            if (ds && ds > 0) {
+                dscrData.push({
+                    year: cf.year,
+                    value: Math.max(0, cf.value / ds)
+                });
+            }
+        });
+    }
+
+    const avgDSCR = calculateAverageDSCR(dscrData);
+    const minDSCR = dscrData.length > 0 ? Math.min(...dscrData.map(d => d.value)) : 0;
+
+    // Break-even analysis
+    const breakEvenAnalysis = calculateBreakEvenAnalysis(netCashflow);
+
+    // Risk metrics
+    const debtToEquityRatio = calculateDebtToEquityRatio(financing);
+
+    return {
+        // Return metrics
+        projectIRR,
+        equityIRR,
+        npv,
+        wacc,
+
+        // Coverage metrics
+        llcr,
+        avgDSCR,
+        minDSCR,
+        icr,
+
+        // Risk metrics
+        debtToEquityRatio,
+
+        // Analysis
+        breakEvenAnalysis,
+
+        // Raw data for charts
+        dscrData,
+        icrData: icr
+    };
+};

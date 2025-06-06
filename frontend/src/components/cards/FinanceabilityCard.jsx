@@ -10,12 +10,13 @@ import {
 import Plot from 'react-plotly.js';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import { MetricsTable } from '../tables';
-import { createFinancialMetricsTableData } from '../tables/metrics/DataOperations';
+import { createFinancialMetricsConfig, createDSCRChartConfig, createCovenantAnalysisConfig } from './configs'; // UPDATED
 import { prepareFinancialTimelineData } from '../../utils/financialChartsUtils';
 import {
     calculateCovenantAnalysis,
     getBankabilityRiskLevel
 } from '../../utils/cashflowUtils';
+
 
 const { Text, Title } = Typography;
 
@@ -52,34 +53,40 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
             return { tableData: [], tableConfig: { columns: [] } };
         }
 
-        const { data, config } = createFinancialMetricsTableData(
+        const { data, config } = createFinancialMetricsConfig({
             financingData,
-            cashflowData.metadata.availablePercentiles,
-            selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
-            cashflowData.metadata.currency
-        );
-
-        // Add column selection handler
-        const enhancedConfig = {
-            ...config,
+            availablePercentiles: cashflowData.metadata.availablePercentiles,
+            primaryPercentile: selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
+            currency: cashflowData.metadata.currency,
             onColumnSelect: (percentile, columnKey, rowData) => {
                 setSelectedChartPercentile(percentile);
-            },
+            }
+        });
+
+        // Add selected column to config
+        const enhancedConfig = {
+            ...config,
             selectedColumn: selectedChartPercentile ? `P${selectedChartPercentile}` : `P${selectedPercentiles?.unified || 50}`
         };
 
         return { tableData: data, tableConfig: enhancedConfig };
     }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile]);
 
+
     // Calculate covenant breach analysis
     const covenantAnalysis = useMemo(() => {
         if (!financingData?.covenantBreaches || !financingData?.covenantThreshold ||
             !cashflowData?.metadata?.availablePercentiles) return null;
 
-        return calculateCovenantAnalysis(
+        const analysisConfig = createCovenantAnalysisConfig({
             financingData,
-            { minDSCR: financingData.avgDSCR }, // Use avgDSCR for analysis
-            cashflowData.metadata.availablePercentiles
+            availablePercentiles: cashflowData.metadata.availablePercentiles
+        });
+
+        return calculateCovenantAnalysis(
+            analysisConfig.financingData,
+            analysisConfig.confidenceIntervals,
+            analysisConfig.availablePercentiles
         );
     }, [financingData, cashflowData?.metadata?.availablePercentiles]);
 
@@ -89,20 +96,21 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
             return { data: [], layout: {} };
         }
 
-        return prepareFinancialTimelineData(
+        const chartConfig = createDSCRChartConfig({
             financingData,
-            cashflowData.metadata.availablePercentiles,
-            selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
-            {
-                metrics: ['dscr', 'llcr', 'icr'], // LLCR now included
-                selectedPercentile: selectedChartPercentile,
-                showAllPercentiles: !selectedChartPercentile,
-                covenantThreshold: financingData.covenantThreshold,
-                projectLife: cashflowData.metadata.projectLife
-            }
+            availablePercentiles: cashflowData.metadata.availablePercentiles,
+            primaryPercentile: selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
+            selectedPercentile: selectedChartPercentile,
+            projectLife: cashflowData.metadata.projectLife
+        });
+
+        return prepareFinancialTimelineData(
+            chartConfig.financingData,
+            chartConfig.availablePercentiles,
+            chartConfig.primaryPercentile,
+            chartConfig.options
         );
     }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile]);
-
 
     // Error states
     if (!cashflowData) {

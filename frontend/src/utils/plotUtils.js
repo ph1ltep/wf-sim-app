@@ -1,5 +1,6 @@
 // src/utils/plotUtils.js - Updated to use distributionBase helpers
 import { DistributionBase } from './distributions/distributionBase';
+import { hexToRgb } from './charts';
 
 /**
  * Generate evenly spaced X values
@@ -269,24 +270,6 @@ export function createPercentileBand(
         hoverinfo,
         showlegend: showLegend
     };
-}
-
-/**
- * Convert hex color to rgb
- * @param {string} hex - Hex color code
- * @returns {Object} RGB color object
- */
-export function hexToRgb(hex) {
-    // Remove hash if it exists
-    hex = hex.replace(/^#/, '');
-
-    // Parse hex values
-    const bigint = parseInt(hex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-
-    return { r, g, b };
 }
 
 /**

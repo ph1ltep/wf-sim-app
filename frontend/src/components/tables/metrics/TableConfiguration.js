@@ -134,7 +134,9 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                 style: (isPrimary || isSelected) ? {
                     backgroundColor: `${primaryColor}15`, // Same as InlineEditTable marker pattern
                     borderColor: `${primaryColor}40`,
-                    borderWidth: '2px'
+                    borderWidth: '4px',
+                    borderLeft: '0px',
+                    borderRight: '0px'
                 } : {},
                 onClick: () => handleColumnSelect(columnConfig.key)
             }),

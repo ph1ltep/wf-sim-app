@@ -1,6 +1,7 @@
 // src/utils/chartUtils.js
 
-import { organizePercentiles, hexToRgb } from './plotUtils';
+import { organizePercentiles } from './plotUtils';
+import { hexToRgb } from './charts';
 import { formatNumber } from './formatUtils';
 import { DistributionUtils } from './distributions';
 
