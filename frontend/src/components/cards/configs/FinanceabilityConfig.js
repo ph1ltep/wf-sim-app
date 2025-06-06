@@ -1,6 +1,5 @@
-// src/components/cards/configs/FinanceabilityConfig.js - FinanceabilityCard configuration factory
+// frontend/src/components/cards/configs/FinanceabilityConfig.js - Fixed column labels and chart filtering
 
-import { createPercentileColumns } from '../../tables/shared/ColumnGenerators';
 import { addCovenantAnnotations } from '../../../utils/charts/annotations';
 
 /**
@@ -18,7 +17,7 @@ export const createFinancialMetricsConfig = (context) => {
         scenarioData = null
     } = context;
 
-    // Get finance-specific thresholds
+    // Get finance-specific thresholds with proper financing settings integration
     const financialThresholds = createFinancialThresholds(financingData, scenarioData);
 
     // Row definitions for financial metrics with thresholds
@@ -107,12 +106,13 @@ export const createFinancialMetricsConfig = (context) => {
         }
     ];
 
-    // Create columns manually instead of using createPercentileColumns
+    // FIXED: Create columns with proper labels (P50, not PP50)
     const sortedPercentiles = [...availablePercentiles].sort((a, b) => a - b);
     const columns = sortedPercentiles.map(percentile => ({
         key: `P${percentile}`, // Use consistent P{number} format
-        label: `P${percentile}`,
-        value: percentile,
+        label: `P${percentile}`, // FIXED: Simple label without double P
+        value: percentile, // This is the actual percentile number for onColumnSelect
+        valueField: 'value',
         primary: percentile === primaryPercentile,
         selectable: true,
         align: 'center',
@@ -120,7 +120,7 @@ export const createFinancialMetricsConfig = (context) => {
         formatter: (value, rowData) => {
             if (value === null || value === undefined || isNaN(value)) return '-';
 
-            // Format based on metric type
+            // FIXED: Proper formatting based on metric type
             if (rowData.key === 'npv') {
                 return (value / 1000000).toFixed(1); // Convert to millions
             } else if (rowData.key === 'irr' || rowData.key === 'equityIRR') {
@@ -134,7 +134,7 @@ export const createFinancialMetricsConfig = (context) => {
     // Transform data using the fixed utility
     const data = transformFinancialData(financingData, rowDefinitions, columns);
 
-    // Add threshold reference values (finance-specific business logic)
+    // FIXED: Add threshold reference values with proper financing integration
     data.forEach(row => {
         const financingSettings = scenarioData?.settings?.modules?.financing || {};
         const targetProjectIRR = financingSettings.targetProjectIRR || financingSettings.costOfEquity || 8;
@@ -152,7 +152,9 @@ export const createFinancialMetricsConfig = (context) => {
                 row.target_equity_irr = targetEquityIRR;
                 row.target_equity_irr_high = targetEquityIRR * 1.1; // 10% higher
                 break;
-            // Remove NPV, LLCR, ICR threshold values
+            case 'npv':
+                row.npv_positive = 0; // Positive NPV threshold
+                break;
         }
     });
 
@@ -198,7 +200,7 @@ const transformFinancialData = (financingData, rowDefinitions, columns) => {
 };
 
 /**
- * Extract single value from financial data (moved from DataOperations)
+ * FIXED: Extract single value from financial data (handles Maps and arrays correctly)
  * @param {string} metricKey - The metric key (irr, npv, minDSCR, etc.)
  * @param {any} rawData - The raw data for this metric
  * @param {number} percentile - The percentile to extract
@@ -300,7 +302,7 @@ export const createCovenantAnalysisConfig = (context) => {
 };
 
 /**
- * Prepare financial timeline chart data with multiple metrics on same axis
+ * FIXED: Prepare financial timeline chart data with proper percentile filtering
  * @param {Object} financingData - Financial metrics data with Maps
  * @param {Array} availablePercentiles - Available percentile values
  * @param {number} primaryPercentile - Primary percentile to emphasize
@@ -315,6 +317,13 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
         covenantThreshold = null,
         projectLife = 20
     } = options;
+
+    console.log('prepareFinancialTimelineData called with:', {
+        metrics,
+        selectedPercentile,
+        showAllPercentiles,
+        availablePercentiles
+    });
 
     const traces = [];
     const colors = {
@@ -342,7 +351,19 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
 
         const baseColor = colors[metricType] || '#666666';
         const markerSymbol = markerSymbols[metricType] || 'circle';
-        const percentilesToShow = showAllPercentiles ? availablePercentiles : [selectedPercentile || primaryPercentile];
+
+        // FIXED: Determine which percentiles to show based on selection
+        let percentilesToShow;
+        if (selectedPercentile !== null) {
+            percentilesToShow = [selectedPercentile];
+            console.log(`Showing only selected percentile: P${selectedPercentile}`);
+        } else if (showAllPercentiles) {
+            percentilesToShow = availablePercentiles;
+            console.log(`Showing all percentiles:`, percentilesToShow);
+        } else {
+            percentilesToShow = [primaryPercentile];
+            console.log(`Showing only primary percentile: P${primaryPercentile}`);
+        }
 
         percentilesToShow.forEach((percentile, index) => {
             const data = metricData.get(percentile);
@@ -353,7 +374,7 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
 
             const isPrimary = percentile === primaryPercentile;
             const isSelected = percentile === selectedPercentile;
-            const shouldEmphasize = isSelected || (isPrimary && !selectedPercentile);
+            const shouldEmphasize = isSelected || (isPrimary && selectedPercentile === null);
 
             // Create complete dataset with nulls for missing years
             const dataMap = new Map(data.map(d => [d.year, d.value]));
@@ -390,9 +411,9 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
         });
     });
 
+    console.log(`Generated ${traces.length} chart traces`);
     return { data: traces, layout: createFinancialTimelineLayout(covenantThreshold, allYears) };
 };
-
 
 /**
  * Create layout for financial timeline charts
@@ -447,7 +468,7 @@ const createFinancialTimelineLayout = (covenantThreshold, years) => {
 };
 
 /**
- * Create finance-specific threshold configurations
+ * FIXED: Create finance-specific threshold configurations with proper integration
  * @param {Object} financingData - Financial data including covenant threshold
  * @param {Object} scenarioData - Full scenario data for financing settings
  * @returns {Object} Threshold configurations by metric
@@ -458,12 +479,18 @@ const createFinancialThresholds = (financingData, scenarioData) => {
     const targetProjectIRR = financingSettings.targetProjectIRR || financingSettings.costOfEquity || 8;
     const targetEquityIRR = financingSettings.targetEquityIRR || financingSettings.costOfEquity || 12;
 
+    console.log('Creating thresholds with financing settings:', {
+        targetProjectIRR,
+        targetEquityIRR,
+        covenantThreshold: financingData?.covenantThreshold
+    });
+
     return {
         dscr: [
             {
                 field: 'covenantThreshold',
                 comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
+                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 600 } : null,
                 priority: 10,
                 description: 'DSCR below covenant threshold'
             }
@@ -479,7 +506,7 @@ const createFinancialThresholds = (financingData, scenarioData) => {
             {
                 field: 'target_irr_high',
                 comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
+                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a', fontWeight: 600 } : null,
                 priority: 5,
                 description: 'Project IRR >10% above target'
             }
@@ -495,14 +522,21 @@ const createFinancialThresholds = (financingData, scenarioData) => {
             {
                 field: 'target_equity_irr_high',
                 comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
+                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a', fontWeight: 600 } : null,
                 priority: 5,
                 description: 'Equity IRR >10% above target'
             }
         ],
-        // Remove thresholds for NPV, LLCR, ICR
-        npv: [],
-        llcr: [],
-        icr: []
+        npv: [
+            {
+                field: 'npv_positive',
+                comparison: 'above',
+                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : { color: '#ff4d4f' },
+                priority: 10,
+                description: 'NPV positive/negative indicator'
+            }
+        ],
+        llcr: [], // No specific thresholds for LLCR
+        icr: []  // No specific thresholds for ICR
     };
 };

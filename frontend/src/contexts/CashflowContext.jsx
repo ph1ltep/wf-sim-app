@@ -6,6 +6,7 @@ import { getPercentileSourcesFromRegistry, createPerSourceDefaults } from '../ut
 import { transformScenarioToCashflow } from '../utils/cashflow/transform';
 import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
 import { validate } from '../utils/validate';
+import { refreshAllMetrics } from '../utils/metricsUtils';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
@@ -194,7 +195,7 @@ const validateRegistry = async () => {
 validateRegistry();
 
 export const CashflowProvider = ({ children }) => {
-    const { getValueByPath, scenarioData } = useScenario();
+    const { getValueByPath, scenarioData, updateByPath } = useScenario();
 
     const [loading, setLoading] = useState(false);
     const [cashflowData, setCashflowData] = useState(null);
@@ -331,6 +332,12 @@ export const CashflowProvider = ({ children }) => {
                 availablePercentiles
             });
 
+            // ADDED: Refresh metrics before cashflow transformation
+            if (updateByPath) {
+                console.log('🔄 Refreshing metrics before cashflow transformation...');
+                await refreshAllMetrics(scenarioData, updateByPath);
+            }
+
             const transformedData = await transformScenarioToCashflow(
                 scenarioData,
                 CASHFLOW_SOURCE_REGISTRY,
@@ -356,7 +363,7 @@ export const CashflowProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [scenarioData, selectedPercentiles, getValueByPath, loading]);
+    }, [scenarioData, selectedPercentiles, getValueByPath, loading, updateByPath]);
 
     // Auto-refresh when scenario changes - prevent infinite loop
     React.useEffect(() => {

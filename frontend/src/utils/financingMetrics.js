@@ -1,4 +1,5 @@
-// src/utils/financingMetrics.js - Enhanced financing calculations extracted and extended
+// frontend/src/utils/financingMetrics.js - FIXED Equity IRR calculation and enhanced finance metrics
+
 import { get } from 'lodash';
 
 /**
@@ -24,6 +25,15 @@ export const calculateNPV = (cashflowData, discountRate) => {
  */
 export const calculateIRR = (cashflowData) => {
     if (!Array.isArray(cashflowData) || cashflowData.length === 0) return 0;
+
+    // Check if we have at least one negative and one positive cash flow
+    const hasNegative = cashflowData.some(cf => cf.value < 0);
+    const hasPositive = cashflowData.some(cf => cf.value > 0);
+
+    if (!hasNegative || !hasPositive) {
+        console.warn('calculateIRR: Need both positive and negative cash flows for IRR calculation');
+        return 0;
+    }
 
     // Initial guess - use average return
     let irr = 0.1; // 10%
@@ -188,14 +198,28 @@ export const calculateRealLLCR = (netCashflowData, debtServiceData, discountRate
 };
 
 /**
- * Calculate Equity IRR - return to equity investors after debt service
+ * FIXED: Calculate Equity IRR - return to equity investors after debt service
  * @param {Array} netCashflowData - Net project cash flows
- * @param {Array} debtServiceData - Debt service payments
+ * @param {Array} debtServiceData - Debt service payments (combined interest + principal)
  * @param {number} equityInvestment - Initial equity investment
  * @returns {number} Equity IRR as percentage
  */
 export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInvestment) => {
-    if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) return 0;
+    console.log('calculateEquityIRR called with:', {
+        netCashflowCount: netCashflowData?.length || 0,
+        debtServiceCount: debtServiceData?.length || 0,
+        equityInvestment
+    });
+
+    if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) {
+        console.warn('calculateEquityIRR: Invalid input arrays');
+        return 0;
+    }
+
+    if (!equityInvestment || equityInvestment <= 0) {
+        console.warn('calculateEquityIRR: Invalid equity investment amount');
+        return 0;
+    }
 
     // Create equity cash flows = net project cash flows - debt service
     const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
@@ -203,9 +227,7 @@ export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInves
     const equityCashflows = [];
 
     // Add initial equity investment as negative cash flow in year 0
-    if (equityInvestment > 0) {
-        equityCashflows.push({ year: 0, value: -equityInvestment });
-    }
+    equityCashflows.push({ year: 0, value: -equityInvestment });
 
     // Calculate equity cash flows for operational years
     netCashflowData.forEach(cf => {
@@ -216,15 +238,33 @@ export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInves
         }
     });
 
-    return calculateIRR(equityCashflows);
+    console.log('Generated equity cashflows:', {
+        count: equityCashflows.length,
+        sample: equityCashflows.slice(0, 3),
+        totalEquityInflows: equityCashflows.filter(cf => cf.value > 0).reduce((sum, cf) => sum + cf.value, 0),
+        initialInvestment: equityInvestment
+    });
+
+    // FIXED: Calculate IRR and ensure it's in correct units
+    const equityIRR = calculateIRR(equityCashflows);
+
+    console.log('Calculated Equity IRR:', equityIRR);
+
+    // The calculateIRR function already returns a percentage, so no additional multiplication needed
+    return equityIRR;
 };
 
 /**
- * Calculate total equity investment based on CAPEX and debt ratio
+ * FIXED: Calculate total equity investment based on CAPEX and debt ratio
  * @param {Object} scenarioData - Scenario data
  * @returns {number} Total equity investment
  */
 export const calculateEquityInvestment = (scenarioData) => {
+    if (!scenarioData) {
+        console.warn('calculateEquityInvestment: No scenario data provided');
+        return 0;
+    }
+
     const financing = scenarioData?.settings?.modules?.financing || {};
     const debtRatio = (financing.debtFinancingRatio || 70) / 100;
     const equityRatio = 1 - debtRatio;
@@ -232,11 +272,20 @@ export const calculateEquityInvestment = (scenarioData) => {
     // Get total CAPEX from metrics or calculate from cost sources
     const totalCapex = scenarioData?.settings?.metrics?.totalCapex || 0;
 
-    return totalCapex * equityRatio;
+    const equityInvestment = totalCapex * equityRatio;
+
+    console.log('calculateEquityInvestment:', {
+        totalCapex,
+        debtRatio: debtRatio * 100 + '%',
+        equityRatio: equityRatio * 100 + '%',
+        equityInvestment
+    });
+
+    return equityInvestment;
 };
 
 /**
- * Enhanced finance metrics calculation with new metrics (ICR, Average DSCR)
+ * FIXED: Enhanced finance metrics calculation with proper data handling
  * @param {Object} aggregations - Cashflow aggregations (with percentileData)
  * @param {Array} availablePercentiles - Available percentile values
  * @param {Object} scenarioData - Full scenario data for parameters
@@ -244,6 +293,12 @@ export const calculateEquityInvestment = (scenarioData) => {
  * @returns {Object} Enhanced finance metrics with percentile data
  */
 export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scenarioData, lineItems = []) => {
+    console.log('enhancedFinanceMetrics called with:', {
+        availablePercentiles,
+        lineItemsCount: lineItems.length,
+        hasNetCashflow: !!aggregations?.netCashflow
+    });
+
     const financeMetrics = {
         dscr: new Map(),
         llcr: new Map(),
@@ -260,10 +315,18 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
     const minimumDSCR = financingParams.minimumDSCR || 1.3;
     const costOfEquity = (financingParams.costOfEquity || 8) / 100; // Convert % to decimal
 
+    // FIXED: Find debt service line items correctly
     const interestLineItem = lineItems.find(item => item.id === 'operationalInterest');
     const principalLineItem = lineItems.find(item => item.id === 'operationalPrincipal');
 
+    console.log('Found debt service line items:', {
+        hasInterest: !!interestLineItem,
+        hasPrincipal: !!principalLineItem
+    });
+
     availablePercentiles.forEach(percentile => {
+        console.log(`\nProcessing percentile P${percentile}:`);
+
         // Get net cashflow for this percentile
         let netCashflowData = [];
         if (aggregations.netCashflow?.percentileData?.has(percentile)) {
@@ -272,7 +335,9 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
             netCashflowData = aggregations.netCashflow?.data || [];
         }
 
-        // Calculate combined debt service for DSCR (interest + principal)
+        console.log(`Net cashflow data points: ${netCashflowData.length}`);
+
+        // FIXED: Calculate combined debt service for DSCR (interest + principal)
         let debtServiceData = [];
         if (interestLineItem && principalLineItem) {
             const interestData = interestLineItem.percentileData?.has(percentile)
@@ -282,6 +347,8 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
             const principalData = principalLineItem.percentileData?.has(percentile)
                 ? principalLineItem.percentileData.get(percentile)
                 : principalLineItem.data || [];
+
+            console.log(`Debt service components: ${interestData.length} interest, ${principalData.length} principal`);
 
             // Combine interest + principal by year
             const debtServiceMap = new Map();
@@ -293,6 +360,10 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
             debtServiceData = Array.from(debtServiceMap.entries())
                 .map(([year, value]) => ({ year: parseInt(year), value }))
                 .sort((a, b) => a.year - b.year);
+
+            console.log(`Combined debt service data points: ${debtServiceData.length}`);
+        } else {
+            console.warn('Missing debt service line items for DSCR calculation');
         }
 
         // Get interest payment data for ICR calculation
@@ -350,10 +421,18 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
         const projectIRR = calculateIRR(netCashflowData);
         financeMetrics.irr.set(percentile, projectIRR);
 
-        // Calculate Equity IRR using equity cash flows
+        // FIXED: Calculate Equity IRR using equity cash flows
         const equityInvestment = calculateEquityInvestment(scenarioData);
-        const equityIRR = calculateEquityIRR(netCashflowData, debtServiceData, equityInvestment);
+        let equityIRR = 0;
+
+        if (equityInvestment > 0 && debtServiceData.length > 0) {
+            equityIRR = calculateEquityIRR(netCashflowData, debtServiceData, equityInvestment);
+        } else {
+            console.warn(`Cannot calculate Equity IRR for P${percentile}: equityInvestment=${equityInvestment}, debtServiceData=${debtServiceData.length}`);
+        }
+
         financeMetrics.equityIRR.set(percentile, equityIRR);
+        console.log(`Equity IRR for P${percentile}: ${equityIRR}`);
 
         // Calculate real LLCR
         const llcr = calculateRealLLCR(netCashflowData, debtServiceData, costOfEquity);
@@ -385,6 +464,12 @@ export const enhancedFinanceMetrics = (aggregations, availablePercentiles, scena
 
     // Add covenant threshold for reference
     financeMetrics.covenantThreshold = minimumDSCR;
+
+    console.log('Enhanced finance metrics completed:', {
+        dscrPercentiles: financeMetrics.dscr.size,
+        equityIRRPercentiles: financeMetrics.equityIRR.size,
+        sampleEquityIRR: financeMetrics.equityIRR.get(availablePercentiles[0])
+    });
 
     return financeMetrics;
 };

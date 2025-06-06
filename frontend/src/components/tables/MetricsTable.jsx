@@ -175,6 +175,7 @@ const MetricsTable = ({
                 align: columnConfig.align || 'center',
                 // Use shared theme utilities for header styling
                 onHeaderCell: () => ({
+                    className: isSelected ? 'selected-column-header' : '',
                     style: finalTheme.getHeaderStyle(isSelected, isPrimary),
                     onClick: () => handleColumnSelect(columnConfig.key)
                 }),

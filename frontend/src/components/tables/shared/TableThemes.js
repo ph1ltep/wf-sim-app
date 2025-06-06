@@ -84,6 +84,9 @@ export const BASE_TABLE_THEMES = {
             .table-theme-metrics .ant-table-thead {
                 background-color: #fafafa;
             }
+            .table-theme-metrics .selected-column-cell {
+                border-left: 4px solid var(--primary-color);
+                border-right: 4px solid var(--primary-color);
         `
     },
 

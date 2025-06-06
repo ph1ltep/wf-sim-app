@@ -126,8 +126,9 @@ const buildTimelineTraces = (traceData) => {
         hovertemplate: 'Year: %{x}<br>Net Cash Flow: $%{y:,.0f}<extra></extra>'
     });
 
-    // Add debt service on secondary axis
+    // FIXED: Add debt service on secondary axis when enabled and data exists
     if (debtServiceData?.data && showDebtService) {
+        console.log('Adding debt service trace with', debtServiceData.data.length, 'points');
         traces.push({
             x: debtServiceData.data.map(d => d.year),
             y: debtServiceData.data.map(d => d.value),
@@ -140,6 +141,23 @@ const buildTimelineTraces = (traceData) => {
             hovertemplate: 'Year: %{x}<br>Debt Service: $%{y:,.0f}<extra></extra>'
         });
     }
+
+    // FIXED: Add equity cash flow on primary axis when enabled and data exists
+    if (equityCashflowData?.data && showEquityCashflow) {
+        console.log('Adding equity cash flow trace with', equityCashflowData.data.length, 'points');
+        traces.push({
+            x: equityCashflowData.data.map(d => d.year),
+            y: equityCashflowData.data.map(d => d.value),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Free Cash Flow to Equity',
+            line: { color: '#13c2c2', width: 2 },
+            marker: { size: 5 },
+            yaxis: 'y',
+            hovertemplate: 'Year: %{x}<br>Equity Cash Flow: $%{y:,.0f}<extra></extra>'
+        });
+    }
+
 
     // Add equity cash flow on primary axis
     if (equityCashflowData?.data && showEquityCashflow) {

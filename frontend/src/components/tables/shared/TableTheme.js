@@ -50,7 +50,7 @@ export const useTableTheme = (themeSource = 'standard') => {
                 ...(isSelected && {
                     backgroundColor: `rgba(${hexToRgb(primaryColor)}, 0.15)`,
                     borderColor: `rgba(${hexToRgb(primaryColor)}, 0.4)`,
-                    borderWidth: '2px'
+                    borderBottom: `2px solid rgba(${hexToRgb(primaryColor)}, 0.4)`
                 }),
                 ...(isPrimary && { fontWeight: 700 })
             };
