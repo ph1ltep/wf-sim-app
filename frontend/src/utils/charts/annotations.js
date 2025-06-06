@@ -1,6 +1,6 @@
 // src/utils/charts/annotations.js - Generic chart annotation utilities
 
-import { hexToRgb } from './colors';
+import { hexToRgb, getFinancialColorScheme } from './colors';
 
 /**
  * Add refinancing window annotations to chart layout
@@ -40,6 +40,56 @@ export const addRefinancingAnnotations = (layout, refinancingWindows = []) => {
             borderwidth: 1
         });
     });
+
+    return layout;
+};
+
+/**
+ * Prepare finance-specific chart annotations
+ * @param {Object} layout - Chart layout
+ * @param {Object} annotations - Finance-specific annotations
+ * @returns {Object} Updated layout with finance annotations
+ */
+export const addFinanceAnnotations = (layout, annotations = {}) => {
+    const {
+        covenantThresholds = [],
+        refinancingWindows = [],
+        milestones = []
+    } = annotations;
+
+    // Add covenant thresholds
+    if (covenantThresholds.length > 0) {
+        addCovenantAnnotations(layout, covenantThresholds);
+    }
+
+    // Add refinancing windows
+    if (refinancingWindows.length > 0) {
+        addRefinancingAnnotations(layout, refinancingWindows);
+    }
+
+    // Add financial milestones (break-even, payback, etc.)
+    if (milestones.length > 0) {
+        milestones.forEach(milestone => {
+            const { year, type, label } = milestone;
+            const color = getFinancialColorScheme(type);
+
+            if (!layout.annotations) layout.annotations = [];
+
+            layout.annotations.push({
+                x: year,
+                y: 1.05,
+                yref: 'paper',
+                text: label,
+                showarrow: true,
+                arrowhead: 2,
+                arrowcolor: color,
+                font: { size: 9, color: color },
+                bgcolor: 'rgba(255,255,255,0.9)',
+                bordercolor: color,
+                borderwidth: 1
+            });
+        });
+    }
 
     return layout;
 };
@@ -350,4 +400,32 @@ export const addFinancialMilestones = (layout, milestones = []) => {
     });
 
     return layout;
+};
+
+/**
+ * Create financial performance benchmark data
+ * @param {Object} metrics - Financial metrics
+ * @param {Object} industry - Industry benchmarks
+ * @returns {Object} Benchmark comparison data
+ */
+export const createFinancialBenchmarks = (metrics, industry = {}) => {
+    const benchmarks = {
+        dscr: {
+            value: metrics.minDSCR,
+            industry: industry.minDSCR || 1.3,
+            rating: metrics.minDSCR >= 1.5 ? 'excellent' : metrics.minDSCR >= 1.3 ? 'good' : 'poor'
+        },
+        irr: {
+            value: metrics.projectIRR,
+            industry: industry.projectIRR || 10,
+            rating: metrics.projectIRR >= 12 ? 'excellent' : metrics.projectIRR >= 8 ? 'good' : 'poor'
+        },
+        llcr: {
+            value: metrics.llcr,
+            industry: industry.llcr || 1.4,
+            rating: metrics.llcr >= 1.6 ? 'excellent' : metrics.llcr >= 1.4 ? 'good' : 'poor'
+        }
+    };
+
+    return benchmarks;
 };

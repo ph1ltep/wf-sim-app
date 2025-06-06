@@ -135,18 +135,3 @@ export const aggregateLineItems = (lineItems, category, availablePercentiles) =>
     return aggregation;
 };
 
-// Existing functions that should remain...
-export const prepareDSCRChartData = (financingData, availablePercentiles, selectedPercentiles) => {
-    // ... existing implementation
-};
-
-// Re-export functions that were moved to other utils
-export {
-    calculateCovenantAnalysis,
-    getBankabilityRiskLevel,
-    calculateConfidenceIntervals
-} from './finance';
-
-export {
-    createConfidenceStatistic
-} from './tables';

@@ -309,3 +309,130 @@ export const validateChartData = (cashflowData) => {
 
     return { isValid: true };
 };
+
+/**
+ * Prepare dual-axis chart data for cash flows and ratios
+ * @param {Object} cashflowData - Cash flow data (revenue, costs, net)
+ * @param {Object} ratioData - Ratio data (DSCR, coverage ratios)
+ * @param {Object} options - Chart configuration options
+ * @returns {Object} Plotly chart data and layout with dual y-axes
+ */
+export const prepareDualAxisChartData = (cashflowData, ratioData, options = {}) => {
+    const {
+        primaryAxis = 'cashflow', // 'cashflow' or 'ratios'
+        selectedPercentile = 50,
+        showDebtService = true,
+        showEquityCashflow = true
+    } = options;
+
+    const traces = [];
+
+    // Primary axis traces (cash flows)
+    if (cashflowData) {
+        // Net operating cash flow
+        if (cashflowData.netCashflow?.data) {
+            traces.push({
+                x: cashflowData.netCashflow.data.map(d => d.year),
+                y: cashflowData.netCashflow.data.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Net Cash Flow',
+                line: { color: '#1890ff', width: 3 },
+                marker: { size: 6 },
+                yaxis: 'y',
+                hovertemplate: 'Year: %{x}<br>Net Cash Flow: $%{y:,.0f}<extra></extra>'
+            });
+        }
+
+        // Debt service payments (if available and requested)
+        if (showDebtService && cashflowData.debtService?.data) {
+            traces.push({
+                x: cashflowData.debtService.data.map(d => d.year),
+                y: cashflowData.debtService.data.map(d => -d.value), // Negative for cash outflow
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Debt Service',
+                line: { color: '#ff4d4f', width: 2 },
+                marker: { size: 5 },
+                yaxis: 'y',
+                hovertemplate: 'Year: %{x}<br>Debt Service: $%{y:,.0f}<extra></extra>'
+            });
+        }
+
+        // Free cash flow to equity (if available and requested)
+        if (showEquityCashflow && cashflowData.equityCashflow?.data) {
+            traces.push({
+                x: cashflowData.equityCashflow.data.map(d => d.year),
+                y: cashflowData.equityCashflow.data.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Free Cash Flow to Equity',
+                line: { color: '#52c41a', width: 2 },
+                marker: { size: 5 },
+                yaxis: 'y',
+                hovertemplate: 'Year: %{x}<br>Equity Cash Flow: $%{y:,.0f}<extra></extra>'
+            });
+        }
+    }
+
+    // Secondary axis traces (ratios)
+    if (ratioData?.dscr) {
+        const dscrData = ratioData.dscr.get(selectedPercentile);
+        if (Array.isArray(dscrData)) {
+            traces.push({
+                x: dscrData.map(d => d.year),
+                y: dscrData.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `DSCR P${selectedPercentile}`,
+                line: { color: '#722ed1', width: 2 },
+                marker: { size: 5 },
+                yaxis: 'y2',
+                hovertemplate: `Year: %{x}<br>DSCR: %{y:.2f}<extra></extra>`
+            });
+        }
+    }
+
+    const layout = createDualAxisLayout(primaryAxis);
+    return { data: traces, layout };
+};
+
+/**
+ * Create layout for dual-axis charts
+ * @param {string} primaryAxis - Which axis is primary ('cashflow' or 'ratios')
+ * @returns {Object} Plotly layout object
+ */
+const createDualAxisLayout = (primaryAxis = 'cashflow') => {
+    return {
+        title: '',
+        xaxis: {
+            title: 'Project Year',
+            showgrid: true,
+            gridcolor: '#f0f0f0',
+            tick0: 0,
+            dtick: 1
+        },
+        yaxis: {
+            title: primaryAxis === 'cashflow' ? 'Cash Flow ($)' : 'Coverage Ratio',
+            showgrid: true,
+            gridcolor: '#f0f0f0',
+            tickformat: primaryAxis === 'cashflow' ? '$,.0s' : '.2f',
+            side: 'left'
+        },
+        yaxis2: {
+            title: primaryAxis === 'cashflow' ? 'Coverage Ratio' : 'Cash Flow ($)',
+            showgrid: false,
+            tickformat: primaryAxis === 'cashflow' ? '.2f' : '$,.0s',
+            side: 'right',
+            overlaying: 'y'
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.2,
+            font: { size: 10 }
+        },
+        margin: { t: 20, b: 80, l: 80, r: 80 },
+        height: 400,
+        plot_bgcolor: '#fafafa'
+    };
+};

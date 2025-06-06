@@ -127,6 +127,28 @@ export const getSemanticColor = (type) => {
 };
 
 /**
+ * Get financial color scheme for different metric types
+ * @param {string} metricType - Type of financial metric
+ * @returns {string} Hex color code
+ */
+export const getFinancialColorScheme = (metricType) => {
+    const colors = {
+        dscr: '#1890ff',      // Blue - primary coverage ratio
+        llcr: '#52c41a',      // Green - loan life coverage
+        icr: '#faad14',       // Orange - interest coverage
+        irr: '#722ed1',       // Purple - returns
+        npv: '#eb2f96',       // Pink - valuation
+        cashflow: '#13c2c2',  // Cyan - cash flows
+        debt: '#ff4d4f',      // Red - debt service
+        equity: '#52c41a',    // Green - equity returns
+        revenue: '#52c41a',   // Green - positive cash
+        costs: '#ff4d4f'      // Red - negative cash
+    };
+
+    return colors[metricType] || '#666666';
+};
+
+/**
  * Create color with opacity
  * @param {string} color - Base color (hex)
  * @param {number} opacity - Opacity value (0-1)

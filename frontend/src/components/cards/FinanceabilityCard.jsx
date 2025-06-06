@@ -11,11 +11,12 @@ import Plot from 'react-plotly.js';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import { MetricsTable } from '../tables';
 import { createFinancialMetricsConfig, createDSCRChartConfig, createCovenantAnalysisConfig } from './configs'; // UPDATED
-import { prepareFinancialTimelineData } from '../../utils/financialChartsUtils';
+import { prepareFinancialTimelineData } from './configs/FinanceabilityConfig';
 import {
     calculateCovenantAnalysis,
     getBankabilityRiskLevel
-} from '../../utils/cashflowUtils';
+} from '../../utils/finance';
+import { useScenario } from '../../contexts/ScenarioContext';
 
 
 const { Text, Title } = Typography;
@@ -25,6 +26,7 @@ const { Text, Title } = Typography;
  * Enhanced with LLCR, ICR metrics and column selection for chart filtering
  */
 const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
+    const { scenarioData } = useScenario();
     const [auditTrailVisible, setAuditTrailVisible] = useState(false);
     const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
 
@@ -58,6 +60,7 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
             availablePercentiles: cashflowData.metadata.availablePercentiles,
             primaryPercentile: selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
             currency: cashflowData.metadata.currency,
+            scenarioData, // Add scenarioData to context
             onColumnSelect: (percentile, columnKey, rowData) => {
                 setSelectedChartPercentile(percentile);
             }
@@ -70,8 +73,7 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
         };
 
         return { tableData: data, tableConfig: enhancedConfig };
-    }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile]);
-
+    }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile, scenarioData]); // Add scenarioData dependency
 
     // Calculate covenant breach analysis
     const covenantAnalysis = useMemo(() => {

@@ -318,49 +318,7 @@ export const getDefaultFormatter = (dataType, options = {}) => {
     }
 };
 
-/**
- * Create common threshold configurations for financial metrics
- * @param {Object} thresholdValues - Object with threshold values
- * @returns {Array} Array of threshold configurations
- */
-export const createFinancialThresholds = (thresholdValues = {}) => {
-    const thresholds = [];
 
-    // DSCR thresholds
-    if (thresholdValues.dscrMin !== undefined) {
-        thresholds.push({
-            field: 'dscrMin',
-            comparison: 'below',
-            priority: 10,
-            colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
-            description: 'DSCR below minimum covenant'
-        });
-    }
-
-    // IRR thresholds
-    if (thresholdValues.irrTarget !== undefined) {
-        thresholds.push({
-            field: 'irrTarget',
-            comparison: 'above',
-            priority: 5,
-            colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
-            description: 'IRR above target'
-        });
-    }
-
-    // NPV thresholds
-    if (thresholdValues.npvPositive !== undefined) {
-        thresholds.push({
-            field: 'npvPositive',
-            comparison: 'above',
-            priority: 5,
-            colorRule: (value) => value > 0 ? { color: '#52c41a' } : { color: '#ff4d4f' },
-            description: 'NPV positive/negative'
-        });
-    }
-
-    return thresholds;
-};
 
 /**
  * Create column configuration for percentile data
