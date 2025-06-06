@@ -206,3 +206,26 @@ export const createConfidenceStatistic = (title, intervals, percentileInfo, form
         }
     };
 };
+
+/**
+ * Convert CSS-in-JS object to CSS string for style injection
+ * @param {Object} styleObj - CSS-in-JS style object
+ * @param {string} containerClass - Container class for scoping
+ * @returns {string} CSS string
+ */
+export const objectToCss = (styleObj, containerClass) => {
+    return Object.entries(styleObj).map(([selector, styles]) => {
+        if (!styles || typeof styles !== 'object') return '';
+
+        const cssProps = Object.entries(styles)
+            .map(([prop, value]) => {
+                if (value === undefined || value === null) return '';
+                const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+                return `    ${cssProp}: ${value};`;
+            })
+            .filter(Boolean)
+            .join('\n');
+
+        return cssProps ? `.${containerClass} ${selector} {\n${cssProps}\n}` : '';
+    }).filter(Boolean).join('\n\n');
+};

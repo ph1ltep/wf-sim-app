@@ -1,4 +1,4 @@
-// src/components/tables/InlineEditTable.jsx - Refactored and simplified with shared theme integration
+// src/components/tables/InlineEditTable.jsx - Updated to use CSS-in-JS theme system
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Alert, message, Modal } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
@@ -16,7 +16,7 @@ import {
     trimTimeSeriesData,
     buildBatchUpdates
 } from './inline/DataOperations';
-// Updated shared table infrastructure imports
+// Updated theme imports
 import {
     useTableTheme,
     composeTheme,
@@ -27,7 +27,7 @@ import {
 const { confirm } = Modal;
 
 /**
- * InlineEditTable - Simplified table component with form isolation and shared theme integration
+ * InlineEditTable - Updated with CSS-in-JS theme integration
  */
 const InlineEditTable = ({
     path,
@@ -46,9 +46,12 @@ const InlineEditTable = ({
     // Theme integration options
     theme = 'compact', // Use compact theme by default for inline editing
     customTheme = null,
-    additionalCSS = '', // Allow cards to add custom CSS
+    additionalCSS = '', // Legacy CSS string support
+    additionalStyles = {}, // NEW: CSS-in-JS object overrides
     containerClassName = '', // Allow cards to add container classes
     tableClassName = '', // Allow cards to add table classes
+    // Timeline marker support
+    timelineMarkers = [],
     // Existing render props options
     renderControls,
     controlsPlacement = 'internal',
@@ -66,16 +69,17 @@ const InlineEditTable = ({
     // Theme composition: base theme + card overrides
     const baseTableTheme = useTableTheme(customTheme || theme);
     const finalTheme = useMemo(() => {
-        if (!additionalCSS && !containerClassName && !tableClassName) {
+        if (!additionalCSS && !additionalStyles && !containerClassName && !tableClassName) {
             return baseTableTheme;
         }
 
         return composeTheme(baseTableTheme, {
             containerClass: containerClassName,
             tableClass: tableClassName,
-            additionalCSS
+            additionalCSS,
+            additionalStyles // NEW: CSS-in-JS object support
         });
-    }, [baseTableTheme, additionalCSS, containerClassName, tableClassName]);
+    }, [baseTableTheme, additionalCSS, additionalStyles, containerClassName, tableClassName]);
 
     // Context and state
     const { getValueByPath, updateByPath } = useScenario();
@@ -93,7 +97,7 @@ const InlineEditTable = ({
     const isSingleMode = isSingleObjectMode(rawContextData);
     const contextData = isSingleMode ? [rawContextData] : (Array.isArray(rawContextData) ? rawContextData : []);
 
-    // NEW: Validate data structure using shared utilities
+    // Validate data structure using shared utilities
     const dataValidation = useMemo(() => {
         const errors = validateTableStructure(contextData, 'InlineEditTable');
         return { isValid: errors.length === 0, errors };
@@ -200,7 +204,6 @@ const InlineEditTable = ({
                 okType: 'danger',
                 cancelText: 'Keep Editing',
                 onOk: () => {
-                    // Reset all state
                     setIsEditing(false);
                     setFormData(null);
                     setOriginalData(null);
@@ -211,7 +214,6 @@ const InlineEditTable = ({
                 }
             });
         } else {
-            // No changes, cancel immediately
             setIsEditing(false);
             setFormData(null);
             setOriginalData(null);
@@ -232,13 +234,11 @@ const InlineEditTable = ({
         try {
             setSaveLoading(true);
 
-            // Process data
             let processedData = trimTimeSeriesData(formData, selectedDataField, trimBlanks, trimValue);
             if (onBeforeSave) {
                 processedData = await onBeforeSave(processedData);
             }
 
-            // Build updates
             const updates = buildBatchUpdates(
                 processedData,
                 originalData,
@@ -248,13 +248,11 @@ const InlineEditTable = ({
                 selectedDataField
             );
 
-            // Add metrics
             if (affectedMetrics?.length > 0) {
                 const metricUpdates = calculateAffectedMetrics(affectedMetrics, null, updates);
                 Object.assign(updates, metricUpdates);
             }
 
-            // Save
             const result = await updateByPath(updates);
 
             if (result.isValid) {
@@ -280,7 +278,7 @@ const InlineEditTable = ({
         } finally {
             setSaveLoading(false);
         }
-    }, [canSaveComputed, formData, selectedDataField, trimBlanks, onBeforeSave, originalData, rawContextData, isSingleMode, path, affectedMetrics, updateByPath, modifiedCells.size, onAfterSave]);
+    }, [canSaveComputed, formData, selectedDataField, trimBlanks, trimValue, onBeforeSave, originalData, rawContextData, isSingleMode, path, affectedMetrics, updateByPath, modifiedCells.size, onAfterSave]);
 
     const handleSaveAttempt = useCallback(() => {
         setSaveAttempted(true);
@@ -360,7 +358,7 @@ const InlineEditTable = ({
         }
     }, [saveAttempted, isEditing, validateAllCells]);
 
-    // Table configuration and columns (existing logic)
+    // Table configuration and columns
     const tableConfig = useMemo(() => {
         const baseData = isEditing ? formData : contextData;
         return getTableConfiguration(
@@ -370,9 +368,9 @@ const InlineEditTable = ({
             selectedDataField,
             hideEmptyItems,
             isEditing,
-            tableProps.timelineMarkers || []
+            timelineMarkers || []
         );
-    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, tableProps.timelineMarkers]);
+    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, timelineMarkers]);
 
     const columns = useMemo(() => {
         return generateTableColumns(
@@ -400,48 +398,22 @@ const InlineEditTable = ({
         handleCellModification
     ]);
 
-    // NEW: Ensure data has unique keys using shared utility
+    // Ensure data has unique keys using shared utility
     const tableDataWithKeys = useMemo(() => {
         return ensureUniqueKeys(tableConfig.rows, 'key');
     }, [tableConfig.rows]);
 
-    // Render helpers (existing logic)
-    const renderDataFieldSelector = () => (
-        <DataFieldSelector
-            dataFieldOptions={dataFieldOptions}
-            selectedDataField={selectedDataField}
-            onChange={handleDataFieldChangeWithConfirmation}
-            disabled={isEditing && saveLoading}
-            hasUnsavedChanges={isEditing && hasUnsavedChanges}
-        />
-    );
+    // Generate CSS classes for timeline marker rows (vertical orientation)
+    const getTimelineRowClasses = useCallback((record) => {
+        if (orientation !== 'vertical' || !record.timelineMarker) return undefined;
 
-    const renderEditControls = () => {
-        if (!isEditing) {
-            return (
-                <ViewModeControls
-                    onEdit={handleEdit}
-                    disabled={!contextData || contextData.length === 0}
-                    fieldLabel={currentFieldConfig?.label || 'Data'}
-                />
-            );
+        const classes = ['timeline-marker-row'];
+        if (record.timelineMarker.tag) {
+            classes.push(`timeline-marker-${record.timelineMarker.tag.toLowerCase().replace(/\s+/g, '-')}`);
         }
 
-        return (
-            <EditModeControls
-                onSave={handleSaveAttempt}
-                onCancel={handleCancelWithConfirmation}
-                canSave={canSaveComputed}
-                saveLoading={saveLoading}
-                hasValidationErrors={hasValidationErrors}
-                saveAttempted={saveAttempted}
-                modifiedCellsCount={modifiedCells.size}
-                validationErrorsCount={validationErrors.size}
-                totalCells={(formData?.length || 0) * yearColumns.length}
-                isEditing={isEditing}
-            />
-        );
-    };
+        return classes.join(' ');
+    }, [orientation]);
 
     // Render controls based on placement
     const renderTableControls = () => {
@@ -459,7 +431,7 @@ const InlineEditTable = ({
         return (
             <>
                 {renderControls(controlsProps)}
-                <div className={finalTheme.containerClass}>
+                <div className={`table-container ${finalTheme.containerClass}`.trim()}>
                     {/* Apply theme CSS globally */}
                     <style jsx global>{finalTheme.cssRules}</style>
 
@@ -470,9 +442,9 @@ const InlineEditTable = ({
                         onClose={() => setSaveAttempted(false)}
                     />
 
-                    {/* Main table with CSS classes - preserves all dynamic styling */}
+                    {/* Main table with CSS classes and timeline marker support */}
                     <Table
-                        className={finalTheme.tableClass}
+                        className={`table-base ${finalTheme.tableClass}`.trim()}
                         columns={columns}
                         dataSource={tableDataWithKeys}
                         rowKey="key"
@@ -480,9 +452,11 @@ const InlineEditTable = ({
                         size={finalTheme.tableProps.size}
                         bordered={finalTheme.tableProps.bordered}
                         scroll={{ x: 'max-content' }}
+                        rowClassName={getTimelineRowClasses}
                         onRow={orientation === 'vertical' ? (record) => {
                             const marker = record.timelineMarker;
                             return {
+                                className: getTimelineRowClasses(record),
                                 style: marker ? {
                                     backgroundColor: `${marker.color}08`,
                                     borderTop: `2px solid ${marker.color}30`,
@@ -500,7 +474,7 @@ const InlineEditTable = ({
     // Main render for internal controls
     if (!contextData || contextData.length === 0) {
         return (
-            <div className={finalTheme.containerClass}>
+            <div className={`table-container ${finalTheme.containerClass}`.trim()}>
                 <style jsx global>{finalTheme.cssRules}</style>
                 {controlsPlacement === 'internal' && renderTableControls()}
                 <Alert message="No data available" type="info" />
@@ -511,7 +485,7 @@ const InlineEditTable = ({
     // Show data validation errors if any
     if (!dataValidation.isValid) {
         return (
-            <div className={finalTheme.containerClass}>
+            <div className={`table-container ${finalTheme.containerClass}`.trim()}>
                 <style jsx global>{finalTheme.cssRules}</style>
                 {controlsPlacement === 'internal' && renderTableControls()}
                 <Alert
@@ -524,8 +498,8 @@ const InlineEditTable = ({
     }
 
     return (
-        <div className={finalTheme.containerClass}>
-            {/* Apply theme CSS globally - no !important conflicts */}
+        <div className={`table-container ${finalTheme.containerClass}`.trim()}>
+            {/* Apply theme CSS globally */}
             <style jsx global>{finalTheme.cssRules}</style>
 
             {/* Header with controls - only if internal */}
@@ -542,9 +516,9 @@ const InlineEditTable = ({
                 onClose={() => setSaveAttempted(false)}
             />
 
-            {/* Main table with CSS classes - preserves ALL dynamic styling */}
+            {/* Main table with CSS classes and timeline marker support */}
             <Table
-                className={finalTheme.tableClass}
+                className={`table-base ${finalTheme.tableClass}`.trim()}
                 columns={columns}
                 dataSource={tableDataWithKeys}
                 rowKey="key"
@@ -552,9 +526,11 @@ const InlineEditTable = ({
                 size={finalTheme.tableProps.size}
                 bordered={finalTheme.tableProps.bordered}
                 scroll={{ x: 'max-content' }}
+                rowClassName={getTimelineRowClasses}
                 onRow={orientation === 'vertical' ? (record) => {
                     const marker = record.timelineMarker;
                     return {
+                        className: getTimelineRowClasses(record),
                         style: marker ? {
                             backgroundColor: `${marker.color}08`,
                             borderTop: `2px solid ${marker.color}30`,

@@ -1,6 +1,8 @@
-// src/components/tables/shared/TableThemes.js - CSS Classes + Theme Provider approach
+// src/components/tables/shared/TableThemes.js - Theme definitions and CSS-in-JS styles
+import { hexToRgb } from '../../../utils/charts/colors';
+
 /**
- * Base table theme definitions with CSS classes and rules
+ * Base table theme definitions
  */
 export const BASE_TABLE_THEMES = {
     // Standard Ant Design theme with minimal customization
@@ -13,13 +15,7 @@ export const BASE_TABLE_THEMES = {
             size: 'middle',
             bordered: false,
             pagination: false
-        },
-        cssRules: `
-            /* Minimal custom styles, rely on Ant Design defaults */
-            .table-theme-standard {
-                /* Container-level styles */
-            }
-        `
+        }
     },
 
     // Compact theme matching InlineEditTable/CapexDrawdownCard style
@@ -32,29 +28,7 @@ export const BASE_TABLE_THEMES = {
             size: 'small',
             bordered: true,
             pagination: false
-        },
-        cssRules: `
-            .table-theme-compact .ant-table-thead > tr > th {
-                padding: 4px 8px;
-                border-bottom: 1px solid #f0f0f0;
-                background-color: #fafafa;
-                font-size: 12px;
-                font-weight: 600;
-            }
-            .table-theme-compact .ant-table-tbody > tr > td {
-                padding: 6px 8px;
-                font-size: 13px;
-            }
-            .table-theme-compact .ant-table-thead > tr > th::before {
-                display: none;
-            }
-            .table-theme-compact .ant-table-container {
-                border-top: none;
-            }
-            .table-theme-compact .ant-table-thead {
-                background: #fafafa;
-            }
-        `
+        }
     },
 
     // Dense theme for metrics and financial data
@@ -67,27 +41,7 @@ export const BASE_TABLE_THEMES = {
             size: 'small',
             bordered: true,
             pagination: false
-        },
-        cssRules: `
-            .table-theme-metrics .ant-table-thead > tr > th {
-                padding: 8px 12px;
-                background-color: #fafafa;
-                font-size: 13px;
-                font-weight: 600;
-                text-align: center;
-            }
-            .table-theme-metrics .ant-table-tbody > tr > td {
-                padding: 8px 12px;
-                font-size: 14px;
-                text-align: center;
-            }
-            .table-theme-metrics .ant-table-thead {
-                background-color: #fafafa;
-            }
-            .table-theme-metrics .selected-column-cell {
-                border-left: 4px solid var(--primary-color);
-                border-right: 4px solid var(--primary-color);
-        `
+        }
     },
 
     // Timeline-specific theme for timeline markers and year displays
@@ -100,34 +54,168 @@ export const BASE_TABLE_THEMES = {
             size: 'small',
             bordered: true,
             pagination: false
-        },
-        cssRules: `
-            .table-theme-timeline .ant-table-thead > tr > th {
-                padding: 6px 8px;
-                background-color: #fafafa;
-                font-size: 12px;
-                font-weight: 600;
-                text-align: center;
-            }
-            .table-theme-timeline .ant-table-tbody > tr > td {
-                padding: 8px 10px;
-                font-size: 13px;
-            }
-            /* Timeline marker column styling - lower specificity allows onHeaderCell to override */
-            .table-theme-timeline .timeline-marker-column {
-                background-color: rgba(250, 173, 20, 0.08);
-                border-color: rgba(250, 173, 20, 0.4);
-            }
-        `
+        }
     }
 };
 
 /**
+ * Create CSS-in-JS styles based on theme name and tokens
+ */
+export const createThemeStyles = (themeName, token) => {
+    console.log('🎨 Creating theme styles for:', themeName, 'with token:', token);
+
+    const primaryColor = token.colorPrimary || '#1677ff';
+    const primaryRgb = hexToRgb(primaryColor);
+
+    console.log('🎨 Primary color:', primaryColor, 'RGB:', primaryRgb);
+
+    const baseStyles = {
+        // Standard theme - minimal overrides
+        standard: {},
+
+        // Compact theme - dense data entry
+        compact: {
+            '.ant-table-thead > tr > th': {
+                padding: '4px 8px',
+                borderBottom: '1px solid #f0f0f0',
+                backgroundColor: '#fafafa',
+                fontSize: '12px',
+                fontWeight: 600
+            },
+            '.ant-table-tbody > tr > td': {
+                padding: '6px 8px',
+                fontSize: '13px'
+            },
+            '.ant-table-thead > tr > th::before': {
+                display: 'none'
+            },
+            '.ant-table-container': {
+                borderTop: 'none'
+            },
+            '.ant-table-thead': {
+                background: '#fafafa'
+            },
+            '.cell-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
+                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
+            },
+            '.header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                borderColor: `rgba(${primaryRgb}, 0.4)`,
+                borderWidth: '2px'
+            }
+        },
+
+        // Metrics theme - financial data display
+        metrics: {
+            '.ant-table-thead > tr > th': {
+                padding: '8px 12px',
+                backgroundColor: '#fafafa',
+                fontSize: '13px',
+                fontWeight: 600,
+                textAlign: 'center'
+            },
+            '.ant-table-tbody > tr > td': {
+                padding: '8px 12px',
+                fontSize: '14px',
+                textAlign: 'center'
+            },
+            '.ant-table-thead': {
+                backgroundColor: '#fafafa'
+            },
+            '.cell-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
+                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
+            },
+            '.header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                border: `2px solid rgba(${primaryRgb}, 0.6)`,
+                borderRadius: '4px 4px 0 0',
+                boxShadow: `0 2px 4px rgba(${primaryRgb}, 0.2)`
+            },
+            '.cell-primary': {
+                fontWeight: 600
+            },
+            '.header-primary': {
+                fontWeight: 700,
+                color: primaryColor
+            },
+            '.cell-primary-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.12)`,
+                fontWeight: 600
+            },
+            '.header-primary-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.2)`,
+                border: `2px solid ${primaryColor}`,
+                fontWeight: 700,
+                color: primaryColor
+            }
+        },
+
+        // Timeline theme - timeline data with markers  
+        timeline: {
+            '.ant-table-thead > tr > th': {
+                padding: '6px 8px',
+                backgroundColor: '#fafafa',
+                fontSize: '12px',
+                fontWeight: 600,
+                textAlign: 'center'
+            },
+            '.ant-table-tbody > tr > td': {
+                padding: '8px 10px',
+                fontSize: '13px'
+            },
+            '.timeline-marker-column': {
+                backgroundColor: 'rgba(250, 173, 20, 0.08)',
+                borderColor: 'rgba(250, 173, 20, 0.4)'
+            },
+            '.timeline-marker-row': {
+                position: 'relative',
+                transition: 'all 0.2s ease'
+            },
+            '.timeline-marker-cod': {
+                backgroundColor: 'rgba(52, 199, 89, 0.05)',
+                borderLeft: '3px solid #34c759'
+            },
+            '.timeline-marker-ntp': {
+                backgroundColor: 'rgba(255, 149, 0, 0.05)',
+                borderLeft: '3px solid #ff9500'
+            },
+            '.timeline-marker-dev': {
+                backgroundColor: 'rgba(0, 122, 255, 0.05)',
+                borderLeft: '3px solid #007aff'
+            },
+            '.timeline-marker-construction': {
+                backgroundColor: 'rgba(255, 59, 48, 0.05)',
+                borderLeft: '3px solid #ff3b30'
+            },
+            '.cell-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
+                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
+            },
+            '.header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                borderColor: `rgba(${primaryRgb}, 0.4)`,
+                borderWidth: '2px'
+            }
+        }
+    };
+
+    // FIX: Normalize theme name to lowercase for lookup
+    const normalizedThemeName = themeName.toLowerCase();
+    const styles = baseStyles[normalizedThemeName] || baseStyles.standard;
+
+    console.log('🎨 Normalized theme name:', normalizedThemeName);
+    console.log('🎨 Generated styles:', styles);
+
+    return styles;
+};
+
+/**
  * Create a custom theme by extending a base theme
- * @param {string} baseThemeName - Name of base theme to extend
- * @param {Object} overrides - Object with overrides for theme properties
- * @param {string} customName - Name for the custom theme
- * @returns {Object} New theme object
  */
 export const createCustomTheme = (baseThemeName, overrides = {}, customName = 'Custom') => {
     const baseTheme = BASE_TABLE_THEMES[baseThemeName];
@@ -136,20 +224,8 @@ export const createCustomTheme = (baseThemeName, overrides = {}, customName = 'C
         return createCustomTheme('standard', overrides, customName);
     }
 
-    // Generate unique class names for custom theme
     const customContainerClass = `table-theme-${customName.toLowerCase().replace(/\s+/g, '-')}`;
     const customTableClass = `table-${customName.toLowerCase().replace(/\s+/g, '-')}`;
-
-    // Merge CSS rules
-    let customCssRules = baseTheme.cssRules;
-    if (overrides.additionalCSS) {
-        // Replace base class names with custom ones in additional CSS
-        const additionalCSS = overrides.additionalCSS
-            .replace(new RegExp(baseTheme.containerClass, 'g'), customContainerClass)
-            .replace(new RegExp(baseTheme.tableClass, 'g'), customTableClass);
-
-        customCssRules = `${baseTheme.cssRules}\n${additionalCSS}`;
-    }
 
     return {
         name: customName,
@@ -159,21 +235,18 @@ export const createCustomTheme = (baseThemeName, overrides = {}, customName = 'C
         table: {
             ...baseTheme.table,
             ...overrides.table
-        },
-        cssRules: customCssRules
+        }
     };
+};
+
+/**
+ * Get base theme by name with fallback
+ */
+export const getBaseTheme = (themeName) => {
+    return BASE_TABLE_THEMES[themeName] || BASE_TABLE_THEMES.standard;
 };
 
 /**
  * Available base theme names for easy reference
  */
 export const THEME_NAMES = Object.keys(BASE_TABLE_THEMES);
-
-/**
- * Get base theme by name with fallback
- * @param {string} themeName - Theme name
- * @returns {Object} Theme configuration
- */
-export const getBaseTheme = (themeName) => {
-    return BASE_TABLE_THEMES[themeName] || BASE_TABLE_THEMES.standard;
-};

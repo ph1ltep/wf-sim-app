@@ -1,12 +1,13 @@
-// src/components/tables/shared/index.js - Refactored exports with focused modules
+// src/components/tables/shared/index.js - Updated exports with split theme system
 
-// Theme system
+// Theme engine
 export {
     useTableTheme,
     generateTableStyles,
     composeTheme
-} from './TableTheme';
+} from './TableThemeEngine';
 
+// Theme definitions
 export {
     BASE_TABLE_THEMES,
     createCustomTheme,
@@ -66,7 +67,7 @@ export {
 } from './TableValidation';
 
 // Re-export everything for convenience
-export * from './TableTheme';
+export * from './TableThemeEngine';
 export * from './TableThemes';
 export * from './TableDataOps';
 export * from './TimeSeriesOps';
