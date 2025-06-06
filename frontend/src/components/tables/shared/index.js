@@ -1,7 +1,12 @@
-// src/components/tables/shared/index.js - Shared table utilities exports
+// src/components/tables/shared/index.js - Refactored exports with focused modules
 
 // Theme system
-export { useTableTheme, generateTableStyles, applyThemeStyles } from './TableTheme';
+export {
+    useTableTheme,
+    generateTableStyles,
+    composeTheme
+} from './TableTheme';
+
 export {
     BASE_TABLE_THEMES,
     createCustomTheme,
@@ -9,31 +14,64 @@ export {
     THEME_NAMES
 } from './TableThemes';
 
-// Data operations
+// Core data operations
 export {
     validateTableData,
     ensureUniqueKeys,
-    transformTimeSeriesForTable,
-    transformPercentileMapForTable,
-    createYearColumn,
-    createValueColumn,
-    createPercentileColumns,
-    formatValue,
-    detectValueType,
     filterTableData,
     sortTableData
 } from './TableDataOps';
+
+// Time series operations
+export {
+    transformTimeSeriesForTable,
+    transformPercentileMapForTable
+} from './TimeSeriesOps';
+
+// Column generators
+export {
+    createYearColumn,
+    createValueColumn,
+    createPercentileColumns
+} from './ColumnGenerators';
+
+// Formatting utilities
+export {
+    formatValue,
+    detectValueType,
+    formatProjectYear
+} from './FormatUtils';
+
+// Timeline utilities
+export {
+    getTimelineMarker,
+    createTimelineYearColumn,
+    applyTimelineMarkersToColumns
+} from './TimelineUtils';
+
+// Table configuration
+export {
+    generateTableConfiguration
+} from './TableConfiguration';
 
 // Validation utilities
 export {
     validateCellValue,
     validateTableStructure,
     validatePercentageSum,
-    validateUniqueYears
+    validateUniqueYears,
+    validateTimeSeriesStructure,
+    validateYearRange,
+    validateDataFieldOptions
 } from './TableValidation';
 
 // Re-export everything for convenience
 export * from './TableTheme';
 export * from './TableThemes';
 export * from './TableDataOps';
+export * from './TimeSeriesOps';
+export * from './ColumnGenerators';
+export * from './FormatUtils';
+export * from './TimelineUtils';
+export * from './TableConfiguration';
 export * from './TableValidation';

@@ -1,13 +1,13 @@
-// src/components/tables/shared/TableTheme.js - Theming utilities and hooks
+// src/components/tables/shared/TableTheme.js - Simplified CSS classes approach
 import { theme } from 'antd';
 import { BASE_TABLE_THEMES, getBaseTheme } from './TableThemes';
 
 const { useToken } = theme;
 
 /**
- * Hook to get table theme configuration and styling utilities
+ * Hook to get table theme configuration with CSS classes
  * @param {string|Object} themeSource - Theme name from BASE_TABLE_THEMES or custom theme object
- * @returns {Object} Theme configuration and styling utilities
+ * @returns {Object} Theme configuration with CSS classes and utilities
  */
 export const useTableTheme = (themeSource = 'standard') => {
     const { token } = useToken();
@@ -17,46 +17,44 @@ export const useTableTheme = (themeSource = 'standard') => {
         ? getBaseTheme(themeSource)
         : themeSource;
 
-    // Build dynamic styles with Ant Design tokens
-    const getDynamicStyles = () => {
-        const baseStyles = themeConfig.styles.container || {};
-
-        // Inject Ant Design token values into styles
-        const processedStyles = { ...baseStyles };
-
-        // Add primary color variations for selection states
-        const primaryColor = token.colorPrimary || '#1677ff';
-        const primaryColorRgb = hexToRgb(primaryColor);
-
-        return {
-            ...processedStyles,
-            // Override with token-based colors if needed
-            '.selected-column-header': {
-                backgroundColor: `rgba(${primaryColorRgb}, 0.15)`,
-                borderColor: `rgba(${primaryColorRgb}, 0.4)`,
-                ...themeConfig.styles.selectedColumnHeader
-            },
-            '.selected-column-cell': {
-                backgroundColor: `rgba(${primaryColorRgb}, 0.08)`,
-                ...themeConfig.styles.selectedColumn
-            }
-        };
-    };
+    // Inject Ant Design token values into CSS rules if needed
+    const processedCssRules = themeConfig.cssRules.replace(
+        /var\(--primary-color\)/g,
+        token.colorPrimary || '#1677ff'
+    );
 
     return {
         theme: themeConfig,
+        containerClass: themeConfig.containerClass,
+        tableClass: themeConfig.tableClass,
         tableProps: themeConfig.table,
-        styles: getDynamicStyles(),
+        cssRules: processedCssRules,
         token,
-        // Utility functions
-        getSelectionStyle: (isSelected, isPrimary = false) => ({
-            ...(isSelected && themeConfig.styles.selectedColumn),
-            ...(isPrimary && { fontWeight: 600 })
-        }),
-        getHeaderStyle: (isSelected, isPrimary = false) => ({
-            ...(isSelected && themeConfig.styles.selectedColumnHeader),
-            ...(isPrimary && { fontWeight: 700 })
-        })
+
+        // Utility functions for dynamic styling
+        getSelectionStyle: (isSelected, isPrimary = false) => {
+            const primaryColor = token.colorPrimary || '#1677ff';
+            return {
+                ...(isSelected && {
+                    backgroundColor: `rgba(${hexToRgb(primaryColor)}, 0.08)`,
+                    borderLeft: '0px',
+                    borderRight: '0px'
+                }),
+                ...(isPrimary && { fontWeight: 600 })
+            };
+        },
+
+        getHeaderStyle: (isSelected, isPrimary = false) => {
+            const primaryColor = token.colorPrimary || '#1677ff';
+            return {
+                ...(isSelected && {
+                    backgroundColor: `rgba(${hexToRgb(primaryColor)}, 0.15)`,
+                    borderColor: `rgba(${hexToRgb(primaryColor)}, 0.4)`,
+                    borderWidth: '2px'
+                }),
+                ...(isPrimary && { fontWeight: 700 })
+            };
+        }
     };
 };
 
@@ -77,44 +75,37 @@ const hexToRgb = (hex) => {
 };
 
 /**
- * Generate CSS-in-JS styles for table container
- * @param {Object} styles - Style object from theme
- * @returns {Object} CSS-in-JS object
+ * Compose multiple themes together (for card-level overrides)
+ * @param {Object} baseTheme - Base theme object
+ * @param {Object} overrides - Override styles and classes
+ * @returns {Object} Composed theme
  */
-export const generateTableStyles = (styles) => {
-    const cssInJs = {};
-
-    Object.entries(styles).forEach(([selector, rules]) => {
-        if (selector.startsWith('.')) {
-            // Convert CSS selector to CSS-in-JS format
-            cssInJs[selector] = rules;
-        } else {
-            // Direct style properties
-            Object.assign(cssInJs, { [selector]: rules });
+export const composeTheme = (baseTheme, overrides = {}) => {
+    return {
+        ...baseTheme,
+        containerClass: `${baseTheme.containerClass} ${overrides.containerClass || ''}`.trim(),
+        tableClass: `${baseTheme.tableClass} ${overrides.tableClass || ''}`.trim(),
+        cssRules: `${baseTheme.cssRules}\n${overrides.additionalCSS || ''}`,
+        table: {
+            ...baseTheme.table,
+            ...overrides.table
         }
-    });
-
-    return cssInJs;
+    };
 };
 
 /**
- * Apply theme styles to a component using CSS-in-JS
+ * Generate theme-aware styles for external use
  * @param {Object} themeConfig - Theme configuration object
- * @param {Object} token - Ant Design token object
- * @returns {Object} Styled JSX styles
+ * @returns {Object} Style utilities
  */
-export const applyThemeStyles = (themeConfig, token) => {
-    const containerStyles = themeConfig.styles.container || {};
-
-    // Convert styles to CSS string for styled-jsx
-    const cssRules = Object.entries(containerStyles)
-        .map(([selector, rules]) => {
-            const ruleString = Object.entries(rules)
-                .map(([prop, value]) => `${prop}: ${value}`)
-                .join('; ');
-            return `${selector} { ${ruleString} }`;
-        })
-        .join('\n');
-
-    return cssRules;
+export const generateTableStyles = (themeConfig) => {
+    return {
+        container: {
+            className: themeConfig.containerClass
+        },
+        table: {
+            className: themeConfig.tableClass,
+            ...themeConfig.table
+        }
+    };
 };

@@ -122,3 +122,107 @@ export const validateUniqueYears = (data) => {
 
     return null;
 };
+
+/**
+ * Validate time series data structure
+ * @param {Array} timeSeries - Time series data array
+ * @param {string} context - Context for error messages
+ * @returns {Array} Array of error messages
+ */
+export const validateTimeSeriesStructure = (timeSeries, context = 'time series') => {
+    const errors = [];
+
+    if (!Array.isArray(timeSeries)) {
+        errors.push(`${context} must be an array`);
+        return errors;
+    }
+
+    timeSeries.forEach((dataPoint, index) => {
+        if (!dataPoint || typeof dataPoint !== 'object') {
+            errors.push(`${context} item ${index} must be an object`);
+            return;
+        }
+
+        if (typeof dataPoint.year !== 'number') {
+            errors.push(`${context} item ${index} must have a numeric 'year' field`);
+        }
+
+        if (dataPoint.value !== null && dataPoint.value !== undefined && isNaN(Number(dataPoint.value))) {
+            errors.push(`${context} item ${index} value must be numeric or null`);
+        }
+    });
+
+    return errors;
+};
+
+/**
+ * Validate year range configuration
+ * @param {Object} yearRange - Year range object with min/max
+ * @returns {string|null} Error message or null
+ */
+export const validateYearRange = (yearRange) => {
+    if (!yearRange || typeof yearRange !== 'object') {
+        return 'Year range must be an object with min and max properties';
+    }
+
+    if (typeof yearRange.min !== 'number' || typeof yearRange.max !== 'number') {
+        return 'Year range min and max must be numbers';
+    }
+
+    if (yearRange.min >= yearRange.max) {
+        return 'Year range min must be less than max';
+    }
+
+    if (yearRange.max - yearRange.min > 50) {
+        return 'Year range cannot exceed 50 years (performance limitation)';
+    }
+
+    return null;
+};
+
+/**
+ * Validate data field options for inline tables
+ * @param {Array} dataFieldOptions - Array of field option objects
+ * @returns {Array} Array of error messages
+ */
+export const validateDataFieldOptions = (dataFieldOptions) => {
+    const errors = [];
+
+    if (!Array.isArray(dataFieldOptions)) {
+        errors.push('Data field options must be an array');
+        return errors;
+    }
+
+    if (dataFieldOptions.length === 0) {
+        errors.push('At least one data field option is required');
+        return errors;
+    }
+
+    dataFieldOptions.forEach((option, index) => {
+        if (!option || typeof option !== 'object') {
+            errors.push(`Data field option ${index} must be an object`);
+            return;
+        }
+
+        if (!option.value) {
+            errors.push(`Data field option ${index} must have a 'value' property`);
+        }
+
+        if (!option.label) {
+            errors.push(`Data field option ${index} must have a 'label' property`);
+        }
+
+        if (option.type && !['currency', 'number', 'percentage', 'string'].includes(option.type)) {
+            errors.push(`Data field option ${index} has invalid type: ${option.type}`);
+        }
+    });
+
+    // Check for duplicate values
+    const values = dataFieldOptions.map(opt => opt.value).filter(Boolean);
+    const uniqueValues = new Set(values);
+    if (values.length !== uniqueValues.size) {
+        errors.push('Data field options must have unique values');
+    }
+
+    return errors;
+};

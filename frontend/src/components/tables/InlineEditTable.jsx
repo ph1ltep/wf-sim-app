@@ -1,4 +1,4 @@
-// src/components/tables/InlineEditTable.jsx - Refactored and simplified
+// src/components/tables/InlineEditTable.jsx - Refactored and simplified with shared theme integration
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Alert, message, Modal } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
@@ -16,25 +16,18 @@ import {
     trimTimeSeriesData,
     buildBatchUpdates
 } from './inline/DataOperations';
+// Updated shared table infrastructure imports
+import {
+    useTableTheme,
+    composeTheme,
+    validateTableStructure,
+    ensureUniqueKeys
+} from './shared';
 
 const { confirm } = Modal;
 
 /**
- * InlineEditTable - Simplified table component with form isolation for editing time series data
- * 
- * @param {Array} path - Path to the parent array/object in context
- * @param {Array} dataFieldOptions - Array of field configuration objects for editing
- * @param {Object} yearRange - Year range configuration { min: number, max: number }
- * @param {boolean} trimBlanks - Whether to remove entries with null/empty values on save (default: true)
- * @param {any} trimValue - Specific value to remove on save (e.g., 0 for default percentages)
- * @param {boolean} showMetadata - Whether to show expandable row metadata with statistics (default: true)
- * @param {boolean} hideEmptyItems - Whether to hide empty rows/columns in read mode (default: false)
- * @param {Function} metadataRenderer - Custom metadata renderer function
- * @param {Array} affectedMetrics - Array of metric names to recalculate on save
- * @param {Function} onBeforeSave - Intercept and transform data before updateByPath call
- * @param {Function} onAfterSave - Handle save result after updateByPath completes
- * @param {Function} onCancel - Handle cancel action when user exits edit mode
- * @param {string} orientation - Table orientation ('horizontal' or 'vertical', default: 'horizontal')
+ * InlineEditTable - Simplified table component with form isolation and shared theme integration
  */
 const InlineEditTable = ({
     path,
@@ -50,11 +43,16 @@ const InlineEditTable = ({
     onAfterSave,
     onCancel,
     orientation = 'horizontal',
-    // New render props options
-    renderControls, // Function to render controls externally
-    controlsPlacement = 'internal', // 'internal', 'external', or 'none'
+    // Theme integration options
+    theme = 'compact', // Use compact theme by default for inline editing
+    customTheme = null,
+    additionalCSS = '', // Allow cards to add custom CSS
+    containerClassName = '', // Allow cards to add container classes
+    tableClassName = '', // Allow cards to add table classes
+    // Existing render props options
+    renderControls,
+    controlsPlacement = 'internal',
     showDataFieldSelector = true,
-
     ...tableProps
 }) => {
     // Validation
@@ -64,6 +62,20 @@ const InlineEditTable = ({
     if (!dataFieldOptions || dataFieldOptions.length === 0) {
         throw new Error('InlineEditTable: dataFieldOptions prop is required and must not be empty');
     }
+
+    // Theme composition: base theme + card overrides
+    const baseTableTheme = useTableTheme(customTheme || theme);
+    const finalTheme = useMemo(() => {
+        if (!additionalCSS && !containerClassName && !tableClassName) {
+            return baseTableTheme;
+        }
+
+        return composeTheme(baseTableTheme, {
+            containerClass: containerClassName,
+            tableClass: tableClassName,
+            additionalCSS
+        });
+    }, [baseTableTheme, additionalCSS, containerClassName, tableClassName]);
 
     // Context and state
     const { getValueByPath, updateByPath } = useScenario();
@@ -76,10 +88,16 @@ const InlineEditTable = ({
     const [saveLoading, setSaveLoading] = useState(false);
     const [saveAttempted, setSaveAttempted] = useState(false);
 
-    // Data preparation
+    // Data preparation with shared validation
     const rawContextData = getValueByPath(path, []);
     const isSingleMode = isSingleObjectMode(rawContextData);
     const contextData = isSingleMode ? [rawContextData] : (Array.isArray(rawContextData) ? rawContextData : []);
+
+    // NEW: Validate data structure using shared utilities
+    const dataValidation = useMemo(() => {
+        const errors = validateTableStructure(contextData, 'InlineEditTable');
+        return { isValid: errors.length === 0, errors };
+    }, [contextData]);
 
     // Computed states
     const hasUnsavedChanges = modifiedCells.size > 0;
@@ -118,7 +136,7 @@ const InlineEditTable = ({
         });
     }, []);
 
-    // Validate all cells
+    // Validate all cells using shared validation
     const validateAllCells = useCallback(() => {
         if (!formData || !isEditing) return;
 
@@ -342,7 +360,7 @@ const InlineEditTable = ({
         }
     }, [saveAttempted, isEditing, validateAllCells]);
 
-    // Table configuration and columns
+    // Table configuration and columns (existing logic)
     const tableConfig = useMemo(() => {
         const baseData = isEditing ? formData : contextData;
         return getTableConfiguration(
@@ -352,7 +370,7 @@ const InlineEditTable = ({
             selectedDataField,
             hideEmptyItems,
             isEditing,
-            tableProps.timelineMarkers || [] // Pass timelineMarkers from props
+            tableProps.timelineMarkers || []
         );
     }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, tableProps.timelineMarkers]);
 
@@ -382,7 +400,12 @@ const InlineEditTable = ({
         handleCellModification
     ]);
 
-    // Render helpers
+    // NEW: Ensure data has unique keys using shared utility
+    const tableDataWithKeys = useMemo(() => {
+        return ensureUniqueKeys(tableConfig.rows, 'key');
+    }, [tableConfig.rows]);
+
+    // Render helpers (existing logic)
     const renderDataFieldSelector = () => (
         <DataFieldSelector
             dataFieldOptions={dataFieldOptions}
@@ -425,11 +448,9 @@ const InlineEditTable = ({
         if (controlsPlacement === 'none') return null;
 
         if (controlsPlacement === 'external' && renderControls) {
-            // External rendering - return the controls for parent to use
             return null; // Controls are rendered by parent
         }
 
-        // Internal rendering (default)
         return <TableControls {...controlsProps} />;
     };
 
@@ -438,7 +459,10 @@ const InlineEditTable = ({
         return (
             <>
                 {renderControls(controlsProps)}
-                <div className="inline-edit-table">
+                <div className={finalTheme.containerClass}>
+                    {/* Apply theme CSS globally */}
+                    <style jsx global>{finalTheme.cssRules}</style>
+
                     {/* Validation summary */}
                     <ValidationErrorSummary
                         validationErrors={validationErrors}
@@ -446,17 +470,15 @@ const InlineEditTable = ({
                         onClose={() => setSaveAttempted(false)}
                     />
 
-                    {/* Main table */}
+                    {/* Main table with CSS classes - preserves all dynamic styling */}
                     <Table
+                        className={finalTheme.tableClass}
                         columns={columns}
-                        dataSource={tableConfig.rows}
-                        rowKey={(record) =>
-                            orientation === 'vertical'
-                                ? `year-${record.year}`
-                                : `contract-${record.index}`
-                        }
+                        dataSource={tableDataWithKeys}
+                        rowKey="key"
                         pagination={false}
-                        size="small"
+                        size={finalTheme.tableProps.size}
+                        bordered={finalTheme.tableProps.bordered}
                         scroll={{ x: 'max-content' }}
                         onRow={orientation === 'vertical' ? (record) => {
                             const marker = record.timelineMarker;
@@ -478,15 +500,34 @@ const InlineEditTable = ({
     // Main render for internal controls
     if (!contextData || contextData.length === 0) {
         return (
-            <div>
+            <div className={finalTheme.containerClass}>
+                <style jsx global>{finalTheme.cssRules}</style>
                 {controlsPlacement === 'internal' && renderTableControls()}
                 <Alert message="No data available" type="info" />
             </div>
         );
     }
 
+    // Show data validation errors if any
+    if (!dataValidation.isValid) {
+        return (
+            <div className={finalTheme.containerClass}>
+                <style jsx global>{finalTheme.cssRules}</style>
+                {controlsPlacement === 'internal' && renderTableControls()}
+                <Alert
+                    message="Data Structure Error"
+                    description={`Table data validation failed: ${dataValidation.errors.join(', ')}`}
+                    type="error"
+                />
+            </div>
+        );
+    }
+
     return (
-        <div className="inline-edit-table">
+        <div className={finalTheme.containerClass}>
+            {/* Apply theme CSS globally - no !important conflicts */}
+            <style jsx global>{finalTheme.cssRules}</style>
+
             {/* Header with controls - only if internal */}
             {controlsPlacement === 'internal' && (
                 <div style={{ marginBottom: 16 }}>
@@ -501,17 +542,15 @@ const InlineEditTable = ({
                 onClose={() => setSaveAttempted(false)}
             />
 
-            {/* Main table */}
+            {/* Main table with CSS classes - preserves ALL dynamic styling */}
             <Table
+                className={finalTheme.tableClass}
                 columns={columns}
-                dataSource={tableConfig.rows}
-                rowKey={(record) =>
-                    orientation === 'vertical'
-                        ? `year-${record.year}`
-                        : `contract-${record.index}`
-                }
+                dataSource={tableDataWithKeys}
+                rowKey="key"
                 pagination={false}
-                size="small"
+                size={finalTheme.tableProps.size}
+                bordered={finalTheme.tableProps.bordered}
                 scroll={{ x: 'max-content' }}
                 onRow={orientation === 'vertical' ? (record) => {
                     const marker = record.timelineMarker;

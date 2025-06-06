@@ -19,11 +19,11 @@
  - ☑ UR-1 Create utils/tables/ for reusable table utilities
  - ☑ UR-2 Create utils/finance/ for finance-specific calculations
  - ☑ UR-3 Move generic functions from cashflowUtils.js to appropriate locations
- - ☐ UR-4 Split financialChartsUtils.js into generic vs finance-specific parts
+ - ☑ UR-4 Split financialChartsUtils.js into generic vs finance-specific parts
 
  ## 4. InlineEditTable Updates 📝 🏷️Medium
- - ☐ IET-1 Update InlineEditTable to use shared styling system
- - ☐ IET-2 Extract inline table configurations to shared utilities
+ - ☑ IET-1 Update InlineEditTable to use shared styling system
+ - ☑ IET-2 Extract inline table configurations to shared utilities
  - ☐ IET-3 Standardize data processing patterns with shared utilities
 
  ## 5. MetricsTable Updates 📊 🏷️Medium
@@ -67,7 +67,16 @@
 
  #### Table Infrastructure
  - Shared Styling System: TableThemes.js (definitions) + TableTheme.js (hooks/utilities)
- - Theme Structure: BASE_TABLE_THEMES with createCustomTheme() for card-specific extensions
+ - Theme Structure: CSS Classes + Theme Provider 
+
+##### Theme Hierarchy Should be:
+```
+Base Theme (lowest specificity)
+  ↓
+Card-Level Overrides (medium specificity)  
+  ↓
+Dynamic/State Overrides (highest specificity)
+```
  - Common Data Operations: Shared utilities for time series transformation, percentile handling, column generation
  - Simplified Validation: Essential validation only (cell values, unique keys, structure) - removed over-complex business rules
 
@@ -92,7 +101,12 @@
  │   │       ├── TableTheme.js    # Theme hooks & utilities  
  │   │       ├── TableDataOps.js  # Data transformation utilities
  │   │       ├── TableValidation.js # Essential validation only
- │   │       └── index.js         # Barrel exports
+ │   │       ├── index.js         # Barrel exports
+ │   │       ├── ColumnGenerators.js
+ │   │       ├── FormatUtils.js
+ │   │       ├── TableConfiguration.js
+ │   │       ├── TimelineUtils.js
+ │   │       └── TimeSeriesOps.js
  │   └── cards/
  │       └── configs/             # ✅ COMPLETED  
  │           ├── FinanceabilityConfig.js  # Financial metrics table config

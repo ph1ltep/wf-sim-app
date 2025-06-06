@@ -1,6 +1,6 @@
 // src/components/cards/configs/FinanceabilityConfig.js - FinanceabilityCard configuration factory
 
-import { createPercentileColumns } from '../../tables/shared';
+import { createPercentileColumns } from '../../tables/shared/ColumnGenerators';
 
 /**
  * Create financial metrics table configuration for FinanceabilityCard
@@ -120,7 +120,7 @@ export const createFinancialMetricsConfig = (context) => {
         }
     ];
 
-    // Create columns using shared utility
+    // Create columns using shared utility - NOW WORKS
     const sortedPercentiles = [...availablePercentiles].sort((a, b) => a - b);
     const columns = createPercentileColumns(sortedPercentiles, {
         primaryPercentile,
