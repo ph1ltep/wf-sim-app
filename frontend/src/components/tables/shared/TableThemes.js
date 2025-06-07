@@ -110,14 +110,14 @@ export const createThemeStyles = (themeName, token) => {
         // Metrics theme - financial data display
         metrics: {
             '.ant-table-thead > tr > th': {
-                padding: '8px 12px',
+                padding: '0px 0px',
                 backgroundColor: '#fafafa',
                 fontSize: '13px',
                 fontWeight: 600,
                 textAlign: 'center'
             },
             '.ant-table-tbody > tr > td': {
-                padding: '8px 12px',
+                padding: '0px 0px',
                 fontSize: '14px',
                 textAlign: 'center'
             },
@@ -126,14 +126,14 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.cell-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.08)`,
-                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
-                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
+                borderLeft: `0px solid rgba(${primaryRgb}, 0.6)`,
+                borderRight: `0px solid rgba(${primaryRgb}, 0.6)`
             },
             '.header-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.15)`,
-                border: `2px solid rgba(${primaryRgb}, 0.6)`,
+                border: `0px solid rgba(${primaryRgb}, 0.6)`,
                 borderRadius: '4px 4px 0 0',
-                boxShadow: `0 2px 4px rgba(${primaryRgb}, 0.2)`
+                boxShadow: `0 2px 0px rgba(${primaryRgb}, 0.2)`
             },
             '.cell-primary': {
                 fontWeight: 600
@@ -148,7 +148,7 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.header-primary-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.2)`,
-                border: `2px solid ${primaryColor}`,
+                border: `0px solid ${primaryColor}`,
                 fontWeight: 700,
                 color: primaryColor
             }
