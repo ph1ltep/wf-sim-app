@@ -1,99 +1,99 @@
-// src/components/tables/metrics/MetricsCell.jsx - Updated to use CSS classes
+// src/components/tables/metrics/MetricsCell.jsx - v3.0 CORRECTED: Class concatenation system
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
-import { evaluateCellThresholds } from './TableConfiguration';
+import { evaluateThresholds } from './TableConfiguration';
 
 const { Text } = Typography;
 
 /**
- * MetricsCell - Renders individual table cells with CSS class-based formatting
+ * Format value based on column configuration
+ */
+const formatValue = (value, columnConfig) => {
+    if (value === null || value === undefined || value === '') return null;
+
+    const { format, precision = 2, prefix = '', suffix = '' } = columnConfig;
+
+    let formattedValue = value;
+
+    switch (format) {
+        case 'currency':
+            formattedValue = parseFloat(value).toLocaleString(undefined, {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            break;
+        case 'percentage':
+            formattedValue = `${parseFloat(value).toFixed(precision)}%`;
+            break;
+        case 'number':
+            formattedValue = parseFloat(value).toLocaleString(undefined, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            break;
+        default:
+            formattedValue = value.toString();
+    }
+
+    return `${prefix}${formattedValue}${suffix}`;
+};
+
+/**
+ * MetricsCell component - CORRECTED: semantic classes applied by parent (onCell)
  */
 export const MetricsCell = ({
     value,
-    rowData,
-    columnConfig,
+    rowData = {},
+    columnConfig = {},
     isSelected = false,
-    isPrimary = false
+    isPrimary = false,
+    position = {}, // Position data (not used since classes applied by parent)
+    states = {}, // State data (not used since classes applied by parent)
+    className = '', // Additional classes from parent (not needed)
+    style = {} // Additional styles from parent (not needed)
 }) => {
-    // Apply formatting if formatter is provided
+    // Format the display value
     const formattedValue = useMemo(() => {
-        if (columnConfig.formatter && typeof columnConfig.formatter === 'function') {
-            try {
-                return columnConfig.formatter(value, rowData);
-            } catch (error) {
-                console.error('MetricsCell: Error applying formatter:', error);
-                return value;
-            }
-        }
+        return formatValue(value, columnConfig);
+    }, [value, columnConfig]);
 
-        // Default formatting for null/undefined values
-        if (value === null || value === undefined) {
-            return '-';
-        }
-
-        return value;
-    }, [value, rowData, columnConfig.formatter]);
-
-    // Evaluate thresholds for conditional styling (still use inline for dynamic colors)
+    // Evaluate thresholds for styling (PRESERVED: highest precedence)
     const thresholdStyles = useMemo(() => {
-        if (!rowData.thresholds || !Array.isArray(rowData.thresholds)) {
+        if (!columnConfig.thresholds || !Array.isArray(columnConfig.thresholds)) {
             return {};
         }
+        return evaluateThresholds(rowData, columnConfig.thresholds, value);
+    }, [rowData, columnConfig.thresholds, value]);
 
-        return evaluateCellThresholds(value, rowData, rowData.thresholds);
-    }, [value, rowData]);
+    // CORRECTED: Don't generate semantic classes here - they're applied by parent onCell
+    // MetricsCell focuses on content rendering and threshold styling only
 
-    // Generate CSS classes based on state and thresholds
-    const cellClasses = useMemo(() => {
-        const classes = ['metric-value'];
+    // Base cell styling with threshold overrides (threshold = highest precedence)
+    const cellStyle = useMemo(() => {
+        const baseStyle = {
+            fontWeight: isPrimary ? 600 : 400,
+            transition: 'all 0.2s ease'
+        };
 
-        // Add state classes
-        if (isPrimary) classes.push('cell-primary');
-        if (isSelected) classes.push('cell-selected');
-        if (isPrimary && isSelected) classes.push('cell-primary-selected');
+        // Apply threshold styles (remove internal properties for DOM)
+        const { _appliedRules, _priority, ...domThresholdStyles } = thresholdStyles;
 
-        // Add threshold-based classes
-        if (thresholdStyles._appliedRules) {
-            thresholdStyles._appliedRules.forEach(rule => {
-                if (rule.description.includes('below')) classes.push('threshold-critical');
-                if (rule.description.includes('covenant')) classes.push('covenant-breach');
-                if (rule.description.includes('above') && rule.description.includes('target')) classes.push('threshold-good');
-            });
-        }
-
-        // Add data type classes
-        if (columnConfig.formatter) {
-            if (rowData.key === 'npv') classes.push('value-currency');
-            else if (rowData.key === 'irr' || rowData.key === 'equityIRR') classes.push('value-percentage');
-            else classes.push('value-number');
-        }
-
-        // Add null value class
-        if (formattedValue === '-' || formattedValue === null || formattedValue === undefined) {
-            classes.push('value-null');
-        }
-
-        return classes.join(' ');
-    }, [thresholdStyles, columnConfig, rowData, formattedValue, isPrimary, isSelected]);
-
-    // Only use inline styles for threshold colors (data-driven overrides)
-    const inlineStyle = useMemo(() => {
-        // Remove internal properties and only keep actual CSS properties
-        const { _appliedRules, ...domStyle } = thresholdStyles;
-        return domStyle;
-    }, [thresholdStyles]);
+        return { ...baseStyle, ...domThresholdStyles };
+    }, [isPrimary, thresholdStyles]);
 
     // Handle empty or invalid values
     if (formattedValue === null || formattedValue === undefined || formattedValue === '') {
         return (
-            <Text type="secondary" className={`${cellClasses} value-null`.trim()}>
+            <Text type="secondary" style={cellStyle}>
                 -
             </Text>
         );
     }
 
     return (
-        <Text className={cellClasses} style={inlineStyle}>
+        <Text style={cellStyle}>
             {formattedValue}
         </Text>
     );

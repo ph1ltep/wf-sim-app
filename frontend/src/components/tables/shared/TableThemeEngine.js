@@ -1,4 +1,4 @@
-// src/components/tables/shared/TableThemeEngine.js - Enhanced theme composition
+// src/components/tables/shared/TableThemeEngine.js - v3.0 FIXED: Remove circular import
 import { theme } from 'antd';
 import { objectToCss } from '../../../utils/tables/formatting';
 import { BASE_TABLE_THEMES, createThemeStyles, getBaseTheme } from './TableThemes';
@@ -6,7 +6,160 @@ import { BASE_TABLE_THEMES, createThemeStyles, getBaseTheme } from './TableTheme
 const { useToken } = theme;
 
 /**
- * Hook to get table theme configuration with CSS-in-JS objects
+ * Detect cell position based on indices and totals
+ * PROPERLY CORRECTED: Real header vs subheader based on orientation
+ */
+export const detectCellPosition = (position = {}) => {
+    const {
+        rowIndex = 0,
+        colIndex = 0,
+        totalRows = 1,
+        totalCols = 1,
+        isHeaderRow = false,
+        isHeaderCol = false,
+        orientation = 'horizontal'
+    } = position;
+
+    // CORRECTED: Real header detection based on orientation
+    const isHeader = (orientation === 'horizontal' && isHeaderRow) ||
+        (orientation === 'vertical' && isHeaderCol);
+
+    // CORRECTED: Subheader detection based on orientation (mutually exclusive with header)
+    const isSubheader = (orientation === 'horizontal' && colIndex === 0 && !isHeaderRow) ||
+        (orientation === 'vertical' && rowIndex === 0 && !isHeaderCol);
+
+    // Regular position detection (excluding headers and subheaders)
+    const isSummary = !isHeader && !isSubheader && rowIndex === totalRows - 1 && totalRows > 1;
+    const isTotals = !isHeader && !isSubheader && colIndex === totalCols - 1 && totalCols > 1;
+    const isCell = !isHeader && !isSubheader && !isSummary && !isTotals;
+
+    return {
+        isHeader,        // Real headers: top row (horizontal) or first column (vertical)
+        isSubheader,     // Subheaders: first column (horizontal) or top row (vertical)
+        isSummary,       // Bottom row (excluding headers/subheaders)
+        isTotals,        // Right column (excluding headers/subheaders)
+        isCell           // Regular data cells
+    };
+};
+
+/**
+ * Generate content type classes with CORRECTED hierarchy
+ * CORRECTED: subheader and header are mutually exclusive
+ */
+export const getContentClasses = (position, orientation = 'horizontal') => {
+    const classes = ['table-base', 'content'];
+
+    // Add cell/row/col classes
+    classes.push('content-cell');
+    if (orientation === 'horizontal') {
+        classes.push('content-row');
+    } else {
+        classes.push('content-col');
+    }
+
+    // CORRECTED: Add position-specific classes (mutually exclusive)
+    if (position.isHeader) {
+        classes.push('content-header');
+    } else if (position.isSubheader) {
+        classes.push('content-subheader');  // ONLY if not header
+    } else if (position.isSummary) {
+        classes.push('content-summary');
+    } else if (position.isTotals) {
+        classes.push('content-totals');
+    }
+    // Note: regular cells just get content-cell, content-row/col
+
+    return classes;
+};
+
+
+/**
+ * Generate marker classes - separate class names to be concatenated
+ */
+export const getMarkerClasses = (marker) => {
+    if (!marker || !marker.type) return [];
+
+    const classes = [`marker-${marker.type}`];
+
+    if (marker.key) {
+        classes.push(`marker-${marker.type}-${marker.key}`);
+    }
+
+    return classes;
+};
+
+/**
+ * Generate state classes with CORRECTED position detection
+ */
+export const getStateClasses = (states = {}, position = {}) => {
+    const classes = [];
+
+    if (states.selected) {
+        classes.push('state-selected');
+        if (position.isHeader) classes.push('state-header-selected');
+        if (position.isSubheader) classes.push('state-subheader-selected');
+        if (position.isSummary) classes.push('state-summary-selected');
+        if (position.isTotals) classes.push('state-totals-selected');
+    }
+
+    if (states.primary) {
+        classes.push('state-primary');
+        if (position.isHeader) classes.push('state-header-primary');
+        if (position.isSubheader) classes.push('state-subheader-primary');
+        if (position.isSummary) classes.push('state-summary-primary');
+        if (position.isTotals) classes.push('state-totals-primary');
+    }
+
+    return classes;
+};
+/**
+ * Master function: Generate complete cell classes as concatenated string
+ */
+export const getCellClasses = (config = {}) => {
+    const {
+        position = {},
+        states = {},
+        marker = null
+    } = config;
+
+    const allClasses = [];
+
+    // 1. Content type classes (includes table-base)
+    const positionDetected = detectCellPosition(position);
+    const contentClasses = getContentClasses(positionDetected);
+    allClasses.push(...contentClasses);
+
+    // 2. Marker classes (before states in hierarchy)
+    if (marker) {
+        const markerClasses = getMarkerClasses(marker);
+        allClasses.push(...markerClasses);
+    }
+
+    // 3. State classes (supersede markers via CSS specificity/source order)
+    const stateClasses = getStateClasses(states, positionDetected);
+    allClasses.push(...stateClasses);
+
+    // Return space-separated string for HTML className
+    return allClasses.join(' ');
+};
+
+/**
+ * Generate marker styles for CSS custom properties
+ */
+export const getMarkerStyles = (marker) => {
+    if (!marker) return {};
+
+    const styles = {};
+
+    if (marker.color) {
+        styles['--marker-color'] = marker.color;
+    }
+
+    return styles;
+};
+
+/**
+ * Hook for table theme configuration with v3.0 class concatenation system
  */
 export const useTableTheme = (themeSource = 'standard') => {
     const { token } = useToken();
@@ -31,50 +184,36 @@ export const useTableTheme = (themeSource = 'standard') => {
         cssRules,
         token,
 
-        // Marker utilities - ADDED
+        // v3.0 Class concatenation utilities
+        getCellClasses,
+        getStateClasses,
         getMarkerClasses,
         getMarkerStyles,
-
-        // Utility functions for dynamic styling
-        getSelectionStyle: (isSelected, isPrimary = false) => {
-            const style = {};
-
-            if (isSelected && styles['.cell-selected']) {
-                Object.assign(style, styles['.cell-selected']);
-            }
-            if (isPrimary && styles['.cell-primary']) {
-                Object.assign(style, styles['.cell-primary']);
-            }
-            if (isPrimary && isSelected && styles['.cell-primary-selected']) {
-                Object.assign(style, styles['.cell-primary-selected']);
-            }
-
-            return style;
-        },
-
-        getHeaderStyle: (isSelected, isPrimary = false) => {
-            const style = {};
-
-            if (isSelected && styles['.header-selected']) {
-                Object.assign(style, styles['.header-selected']);
-            }
-            if (isPrimary && styles['.header-primary']) {
-                Object.assign(style, styles['.header-primary']);
-            }
-            if (isPrimary && isSelected && styles['.header-primary-selected']) {
-                Object.assign(style, styles['.header-primary-selected']);
-            }
-
-            return style;
-        }
+        detectCellPosition,
+        getContentClasses
     };
 };
 
 /**
+ * Merge CSS-in-JS style objects with deep merging for nested selectors
+ */
+const mergeStyleObjects = (base, override) => {
+    const merged = { ...base };
+
+    Object.keys(override).forEach(selector => {
+        if (merged[selector] && typeof merged[selector] === 'object' && typeof override[selector] === 'object') {
+            merged[selector] = { ...merged[selector], ...override[selector] };
+        } else {
+            merged[selector] = override[selector];
+        }
+    });
+
+    return merged;
+};
+
+/**
  * Enhanced theme composition with CSS-in-JS object support
- * @param {Object} baseTheme - Base theme object with styles
- * @param {Object} overrides - Override configuration
- * @returns {Object} Composed theme with merged styles
+ * FIXED: Implement here instead of circular import
  */
 export const composeTheme = (baseTheme, overrides = {}) => {
     try {
@@ -138,81 +277,25 @@ export const composeTheme = (baseTheme, overrides = {}) => {
 };
 
 /**
- * Merge multiple CSS-in-JS style objects
- * @param {...Object} styleObjects - Style objects to merge
- * @returns {Object} Merged style object
- */
-export const mergeStyleObjects = (...styleObjects) => {
-    const merged = {};
-
-    styleObjects.forEach(styleObj => {
-        if (!styleObj || typeof styleObj !== 'object') return;
-
-        Object.keys(styleObj).forEach(selector => {
-            if (merged[selector]) {
-                // Merge properties for existing selectors
-                merged[selector] = {
-                    ...merged[selector],
-                    ...styleObj[selector]
-                };
-            } else {
-                // Add new selectors
-                merged[selector] = { ...styleObj[selector] };
-            }
-        });
-    });
-
-    return merged;
-};
-
-/**
- * Validate theme configuration structure
- * @param {Object} themeConfig - Theme configuration to validate
- * @returns {Object} { isValid, errors, warnings }
+ * Validate theme configuration
  */
 export const validateThemeConfig = (themeConfig) => {
     const errors = [];
     const warnings = [];
 
-    if (!themeConfig || typeof themeConfig !== 'object') {
-        errors.push('Theme configuration must be an object');
+    if (!themeConfig) {
+        errors.push('Theme configuration is required');
         return { isValid: false, errors, warnings };
     }
 
     // Required properties
-    const requiredProps = ['name', 'containerClass', 'tableClass'];
-    requiredProps.forEach(prop => {
-        if (!themeConfig[prop]) {
-            errors.push(`Missing required property: ${prop}`);
-        }
-    });
+    if (!themeConfig.name) errors.push('Theme name is required');
+    if (!themeConfig.containerClass) errors.push('Container class is required');
+    if (!themeConfig.tableClass) errors.push('Table class is required');
 
-    // Validate table configuration
+    // Type validation
     if (themeConfig.table && typeof themeConfig.table !== 'object') {
         errors.push('Table configuration must be an object');
-    }
-
-    // Validate styles if present
-    if (themeConfig.styles) {
-        if (typeof themeConfig.styles !== 'object') {
-            errors.push('Styles must be an object');
-        } else {
-            // Check for valid CSS selectors
-            Object.keys(themeConfig.styles).forEach(selector => {
-                if (!selector.startsWith('.') && !selector.startsWith('#') && !selector.includes(' ')) {
-                    warnings.push(`Selector '${selector}' may not be a valid CSS selector`);
-                }
-            });
-        }
-    }
-
-    // Validate class names
-    if (themeConfig.containerClass && !/^[a-zA-Z][a-zA-Z0-9-_]*$/.test(themeConfig.containerClass)) {
-        warnings.push('Container class name should follow CSS class naming conventions');
-    }
-
-    if (themeConfig.tableClass && !/^[a-zA-Z][a-zA-Z0-9-_]*$/.test(themeConfig.tableClass)) {
-        warnings.push('Table class name should follow CSS class naming conventions');
     }
 
     return {
@@ -224,8 +307,6 @@ export const validateThemeConfig = (themeConfig) => {
 
 /**
  * Create theme debugging information
- * @param {Object} theme - Theme object to debug
- * @returns {Object} Debug information
  */
 export const createThemeDebugInfo = (theme) => {
     if (!theme) return { error: 'No theme provided' };
@@ -267,40 +348,51 @@ export const generateTableStyles = (themeConfig) => {
 };
 
 /**
- * Generate dynamic marker classes from marker object
- * @param {Object} marker - Marker object with type, key, tag properties
- * @param {string} context - Context ('cell', 'row', 'column', 'header')
- * @returns {string} Space-separated CSS class names
+ * Utility for migrating from old class patterns to new concatenation system
  */
-export const getMarkerClasses = (marker, context = 'cell') => {
-    if (!marker) return '';
+export const migrateToSemanticClasses = (oldConfig = {}) => {
+    const {
+        isSelected = false,
+        isPrimary = false,
+        marker = null,
+        rowIndex = 0,
+        colIndex = 0,
+        totalRows = 1,
+        totalCols = 1,
+        isHeader = false
+    } = oldConfig;
 
-    const classes = [`marker-${context}`];
-
-    if (marker.type) {
-        classes.push(`marker-type-${marker.type.toLowerCase().replace(/\s+/g, '-')}`);
-    }
-    if (marker.key) {
-        classes.push(`marker-key-${marker.key.toLowerCase().replace(/\s+/g, '-')}`);
-    }
-    if (marker.tag) {
-        classes.push(`marker-tag-${marker.tag.toLowerCase().replace(/\s+/g, '-')}`);
-    }
-
-    return classes.join(' ');
+    return {
+        position: {
+            rowIndex,
+            colIndex,
+            totalRows,
+            totalCols,
+            isHeaderRow: isHeader,
+            isHeaderCol: isHeader
+        },
+        states: {
+            selected: isSelected,
+            primary: isPrimary
+        },
+        marker
+    };
 };
 
 /**
- * Generate dynamic marker inline styles (highest priority overrides)
- * @param {Object} marker - Marker object with optional color property
- * @returns {Object} Inline style object or empty object
+ * Debug function to verify position detection
+ * Add this temporarily to debug subheader detection
  */
-export const getMarkerStyles = (marker) => {
-    if (!marker || !marker.color) return {};
+export const debugCellPosition = (position, orientation = 'horizontal') => {
+    const detected = detectCellPosition({ ...position, orientation });
+    const classes = getCellClasses({ position, orientation });
 
-    return {
-        '--marker-color': marker.color,
-        backgroundColor: `color-mix(in srgb, ${marker.color} 8%, transparent)`,
-        borderColor: `color-mix(in srgb, ${marker.color} 40%, transparent)`
-    };
+    console.log('=== CELL POSITION DEBUG ===');
+    console.log('Input position:', position);
+    console.log('Orientation:', orientation);
+    console.log('Detected:', detected);
+    console.log('Generated classes:', classes);
+    console.log('==========================');
+
+    return { detected, classes };
 };

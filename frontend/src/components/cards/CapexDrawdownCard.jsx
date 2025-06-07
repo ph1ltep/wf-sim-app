@@ -104,9 +104,9 @@ const CapexDrawdownCard = ({
 
     // Timeline markers using actual metrics
     const timelineMarkers = useMemo(() => [
-        { year: developmentStartYear, tag: 'DEV', color: '#1677ff', label: 'Development Start' },
-        { year: ntpYear, tag: 'NTP', color: '#fa8c16', label: 'Notice to Proceed' },
-        { year: 0, tag: 'COD', color: '#52c41a', label: 'Commercial Operation' }
+        { year: developmentStartYear, tag: 'DEV', type: 'milestone', color: '#1677ff', label: 'Development Start' },
+        { year: ntpYear, tag: 'NTP', type: 'milestone', color: '#fa8c16', label: 'Notice to Proceed' },
+        { year: 0, tag: 'COD', type: 'milestone', color: '#52c41a', label: 'Commercial Operation' }
     ], [developmentStartYear, ntpYear]);
 
     // Handle before save

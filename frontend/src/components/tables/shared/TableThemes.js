@@ -1,73 +1,54 @@
-// src/components/tables/shared/TableThemes.js - Enhanced with consolidated classes
-import { hexToRgb } from '../../../utils/charts/colors';
+// src/components/tables/shared/TableThemes.js - v3.0 FINAL: Separate Class Definitions
 
-/**
- * Base table theme definitions
- */
+// Keep existing BASE_TABLE_THEMES configuration
 export const BASE_TABLE_THEMES = {
-    // Standard Ant Design theme with minimal customization
     standard: {
         name: 'Standard',
-        description: 'Default Ant Design table styling',
+        description: 'Clean styling close to Ant Design defaults',
         containerClass: 'table-theme-container',
         tableClass: 'table-base',
-        table: {
-            size: 'middle',
-            bordered: false,
-            pagination: false
-        }
+        table: { size: 'middle', bordered: false }
     },
-
-    // Compact theme for data entry and editing
     compact: {
         name: 'Compact',
-        description: 'Dense, space-efficient table for data entry',
+        description: 'Dense data entry and editing with clear boundaries',
         containerClass: 'table-theme-container',
         tableClass: 'table-base',
-        table: {
-            size: 'small',
-            bordered: true,
-            pagination: false
-        }
+        table: { size: 'small', bordered: true }
     },
-
-    // Metrics theme for financial data
     metrics: {
         name: 'Metrics',
-        description: 'Optimized for numerical data and metrics display',
+        description: 'Financial and numerical data display with emphasis on hierarchy',
         containerClass: 'table-theme-container',
         tableClass: 'table-base',
-        table: {
-            size: 'small',
-            bordered: true,
-            pagination: false
-        }
+        table: { size: 'small', bordered: true }
     },
-
-    // Timeline theme for project phases and milestones
     timeline: {
         name: 'Timeline',
-        description: 'Optimized for timeline data with year markers and construction phases',
+        description: 'Timeline data with construction phases and enhanced markers',
         containerClass: 'table-theme-container',
         tableClass: 'table-base',
-        table: {
-            size: 'small',
-            bordered: true,
-            pagination: false
-        }
+        table: { size: 'small', bordered: true }
     }
 };
 
 /**
- * Create theme-specific CSS styles - consolidated and enhanced
+ * Create separate class definitions that get concatenated in HTML
+ * Each class is defined independently - NO nested selectors
+ * Hierarchy achieved through CSS specificity and source order
+ * @param {string} themeName - Theme name
+ * @param {Object} token - Ant Design token
+ * @returns {Object} CSS-in-JS styles object with separate class definitions
  */
+// src/components/tables/shared/TableThemes.js - v3.0 UPDATED: New content hierarchy + timeline column sizing
+
 export const createThemeStyles = (themeName, token) => {
-    const primaryColor = token.colorPrimary || '#1677ff';
-    const primaryRgb = hexToRgb(primaryColor);
+    const primaryColor = token?.colorPrimary || '#1677ff';
+    const primaryRgb = primaryColor.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
 
     const themeStyles = {
-        // Standard theme - minimal overrides, mostly Ant Design defaults
         standard: {
+            // Container classes
             '.table-theme-container': {
                 position: 'relative',
                 width: '100%'
@@ -75,172 +56,75 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-            // Basic cell and header states
-            '.cell-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
-                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
-                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
-            },
-            '.cell-primary': {
-                fontWeight: 600
-            },
-            '.header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
-                borderColor: `rgba(${primaryRgb}, 0.4)`,
-                borderWidth: '2px'
-            },
-            '.header-primary': {
-                fontWeight: 700,
-                color: primaryColor
-            },
-            '.header-clickable': {
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-            },
-            // Timeline classes - basic implementation
-            '.timeline-cell': {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px 10px',
-                textAlign: 'center',
+
+            // Content hierarchy - minimal overrides
+            '.content': {},
+            '.content-cell': {},
+            '.content-row': {},
+            '.content-col': {},
+            '.content-subheader': {
                 fontWeight: 500,
-                fontSize: '13px'
+                backgroundColor: '#f9f9f9'
             },
-            '.timeline-header': {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '8px',
-                textAlign: 'center',
+            '.content-header': {
                 fontWeight: 600,
-                fontSize: '13px'
+                backgroundColor: '#fafafa'
             },
-            '.timeline-text': {
-                fontWeight: 600,
-                fontSize: '13px'
+            '.content-summary': {
+                borderTop: '1px solid #d9d9d9',
+                backgroundColor: '#fafafa'
             },
-            // Generic layout classes
-            '.cell-icon': {
-                fontSize: '12px',
-                color: '#999'
+            '.content-totals': {
+                borderLeft: '1px solid #d9d9d9',
+                backgroundColor: '#fafafa'
             },
-            '.cell-tag': {
-                fontSize: '10px',
-                lineHeight: '16px',
-                margin: '0 2px'
-            },
-            '.cell-numerical': {
-                fontSize: '14px',
-                lineHeight: '22px',
-                fontWeight: 400,
-                textAlign: 'right'
-            }
-        },
 
-        // Compact theme - tight spacing for data entry
-        compact: {
-            '.table-theme-container': {
-                position: 'relative',
-                width: '100%'
+            // Marker classes
+            '.marker-milestone': {
+                borderLeft: '3px solid var(--marker-color, #52c41a)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 5%, transparent)'
             },
-            '.table-base': {
-                width: '100%'
+
+            // State classes
+            '.state-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.06)`
             },
-            '.ant-table-thead > tr > th': {
-                padding: '4px 8px',
-                backgroundColor: '#fafafa',
-                fontSize: '12px',
-                fontWeight: 600,
-                textAlign: 'center'
-            },
-            '.ant-table-tbody > tr > td': {
-                padding: '6px 8px',
-                fontSize: '12px'
-            },
-            // Selection states for compact
-            '.cell-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
-                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
-                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
-            },
-            '.cell-primary': {
+            '.state-primary': {
+                color: primaryColor,
                 fontWeight: 600
             },
-            '.header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
-                borderColor: `rgba(${primaryRgb}, 0.4)`,
-                borderWidth: '2px'
+
+            // State-position combinations
+            '.state-header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.1)`,
+                borderBottom: `2px solid rgba(${primaryRgb}, 0.3)`
             },
-            '.header-primary': {
-                fontWeight: 700,
-                color: primaryColor
+            '.state-header-primary': {
+                color: primaryColor,
+                fontWeight: 700
             },
-            '.header-clickable': {
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
+            '.state-subheader-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`
             },
-            // Timeline classes optimized for compact editing
-            '.timeline-cell': {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '6px 5px',
-                borderRadius: '4px',
-                margin: '2px 0',
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '13px'
+            '.state-summary-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`
             },
-            '.timeline-header': {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px',
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '12px'
+            '.state-totals-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`
             },
-            '.timeline-text': {
-                fontWeight: 600,
-                fontSize: '13px'
-            },
-            // Generic layout classes - compact sizing
-            '.cell-icon': {
-                fontSize: '12px',
-                color: '#999'
-            },
-            '.cell-tag': {
-                fontSize: '9px',
+
+            // Content tag classes
+            '.content-tag': {
+                fontSize: '10px',
                 lineHeight: '14px',
-                margin: '0 2px'
-            },
-            '.cell-numerical': {
-                fontSize: '13px',
-                lineHeight: '20px',
-                fontWeight: 400,
-                textAlign: 'center'
-            },
-            // Marker support for compact
-            '.marker-cell': {
-                '--marker-color': primaryColor
-            },
-            '.marker-type-milestone': {
-                borderLeft: '3px solid var(--marker-color)',
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 5%, transparent)'
-            },
-            '.marker-type-phase': {
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 8%, transparent)',
-                borderTop: '2px solid color-mix(in srgb, var(--marker-color) 30%, transparent)'
+                margin: '0 2px',
+                padding: '0 4px',
+                borderRadius: '2px'
             }
         },
 
-        // Metrics theme - center-aligned numerical display
-        metrics: {
+        compact: {
+            // Container classes
             '.table-theme-container': {
                 position: 'relative',
                 width: '100%'
@@ -248,97 +132,170 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-            '.ant-table-thead > tr > th': {
-                padding: '8px 10px',
-                backgroundColor: '#fafafa',
+
+            // Content hierarchy - compact theme
+            '.content': {
                 fontSize: '13px',
+                lineHeight: '18px'
+            },
+            '.content-cell': {
+                padding: '4px 8px'
+            },
+            '.content-row': {},
+            '.content-col': {},
+            '.content-subheader': {
+                padding: '6px 8px',
+                fontSize: '12px',
+                fontWeight: 500,
+                backgroundColor: '#f5f5f5'
+            },
+            '.content-header': {
+                padding: '6px 8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                backgroundColor: '#fafafa'
+            },
+            '.content-summary': {
+                padding: '4px 8px',
+                borderTop: '1px solid #d9d9d9',
+                backgroundColor: '#f0f0f0'
+            },
+            '.content-totals': {
+                padding: '4px 8px',
+                borderLeft: '1px solid #d9d9d9',
+                backgroundColor: '#f0f0f0'
+            },
+
+            // Marker classes
+            '.marker-milestone': {
+                borderLeft: '3px solid var(--marker-color, #52c41a)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 8%, transparent)'
+            },
+
+            // State classes
+            '.state-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                border: `1px solid rgba(${primaryRgb}, 0.25)`
+            },
+            '.state-primary': {
+                color: primaryColor,
+                fontWeight: 600
+            },
+
+            // State-position combinations
+            '.state-header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                borderBottom: `2px solid ${primaryColor}`
+            },
+            '.state-header-primary': {
+                color: primaryColor,
+                fontWeight: 700
+            },
+            '.state-subheader-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.12)`
+            },
+
+            // Content tag classes
+            '.content-tag': {
+                fontSize: '9px',
+                lineHeight: '12px',
+                margin: '0 1px',
+                padding: '0 3px',
+                borderRadius: '2px'
+            }
+        },
+
+        metrics: {
+            // Container classes
+            '.table-theme-container': {
+                position: 'relative',
+                width: '100%'
+            },
+            '.table-base': {
+                width: '100%'
+            },
+
+            // Content hierarchy - metrics theme
+            '.content': {
+                textAlign: 'center'
+            },
+            '.content-cell': {
+                padding: '8px 10px'
+            },
+            '.content-row': {},
+            '.content-col': {},
+            '.content-subheader': {
+                padding: '8px 10px',
+                textAlign: 'left',
+                fontWeight: 500,
+                backgroundColor: '#f5f5f5'
+            },
+            '.content-header': {
+                padding: '8px 10px',
+                textAlign: 'center',
+                fontWeight: 600,
+                backgroundColor: '#fafafa'
+            },
+            '.content-summary': {
+                padding: '8px 10px',
+                borderTop: '2px solid #d9d9d9',
+                backgroundColor: '#f0f0f0',
                 fontWeight: 600,
                 textAlign: 'center'
             },
-            '.ant-table-tbody > tr > td': {
-                padding: '10px 12px',
-                fontSize: '13px',
+            '.content-totals': {
+                padding: '8px 10px',
+                borderLeft: '2px solid #d9d9d9',
+                backgroundColor: '#f0f0f0',
+                fontWeight: 600,
                 textAlign: 'center'
             },
-            // Selection states for metrics - rounded styling
-            '.cell-selected': {
+
+            // Marker classes
+            '.marker-milestone': {
+                borderLeft: '3px solid var(--marker-color, #52c41a)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 5%, transparent)',
+                borderRadius: '0 4px 4px 0'
+            },
+
+            // State classes
+            '.state-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.08)`,
                 borderRadius: '4px'
             },
-            '.cell-primary': {
-                fontWeight: 600
+            '.state-primary': {
+                color: primaryColor,
+                fontWeight: 700
             },
-            '.header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+
+            // State-position combinations
+            '.state-header-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.12)`,
                 borderRadius: '4px 4px 0 0',
                 boxShadow: `0 2px 0px rgba(${primaryRgb}, 0.2)`
             },
-            '.header-primary': {
-                fontWeight: 700,
-                color: primaryColor
+            '.state-header-primary': {
+                color: primaryColor,
+                fontWeight: 700
             },
-            '.header-clickable': {
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                padding: '6px 5px',
-                borderRadius: '4px'
+            '.state-subheader-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.1)`,
+                borderRadius: '4px 0 0 4px'
             },
-            // Timeline classes for metrics - center-aligned
-            '.timeline-cell': {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px 10px',
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '13px',
-                borderRadius: '4px'
-            },
-            '.timeline-header': {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px',
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '13px',
-                borderRadius: '4px'
-            },
-            '.timeline-text': {
-                fontWeight: 600,
-                fontSize: '13px'
-            },
-            // Generic layout classes - metrics optimized
-            '.cell-icon': {
-                fontSize: '12px',
-                color: '#999'
-            },
-            '.cell-tag': {
-                fontSize: '10px',
-                lineHeight: '16px',
-                margin: '0 2px'
-            },
-            '.cell-numerical': {
-                fontSize: '14px',
-                lineHeight: '22px',
-                fontWeight: 400,
-                textAlign: 'center',
-                transition: 'all 0.2s ease'
-            },
-            // Enhanced marker support for metrics
-            '.marker-cell': {
-                '--marker-color': primaryColor
-            },
-            '.marker-type-milestone': {
-                borderLeft: '3px solid var(--marker-color)',
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 5%, transparent)'
+
+            // Content tag classes
+            '.content-tag': {
+                fontSize: '9px',
+                lineHeight: '14px',
+                margin: '0 2px',
+                padding: '1px 4px',
+                borderRadius: '6px',
+                display: 'inline-block'
             }
         },
 
-        // Timeline theme - enhanced timeline marker support
         timeline: {
+            // Container classes
             '.table-theme-container': {
                 position: 'relative',
                 width: '100%'
@@ -346,100 +303,53 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-            '.ant-table-thead > tr > th': {
-                padding: '6px 8px',
-                backgroundColor: '#fafafa',
-                fontSize: '12px',
-                fontWeight: 600,
-                textAlign: 'center'
+
+            // Content hierarchy - timeline theme with column spreading
+            '.content': {},
+            '.content-cell': {
+                padding: '6px 8px'
             },
-            '.ant-table-tbody > tr > td': {
+            '.content-row': {},
+            '.content-col': {
+            },
+            '.content-subheader': {
+                padding: '8px 12px',
+                fontWeight: 500,
+                borderRight: '2px solid #e0e0e0'
+            },
+            '.content-header': {
                 padding: '8px 10px',
-                fontSize: '13px'
-            },
-            // Selection states for timeline
-            '.cell-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
-                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
-                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
-            },
-            '.cell-primary': {
-                fontWeight: 600
-            },
-            '.header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
-                borderColor: `rgba(${primaryRgb}, 0.4)`,
-                borderWidth: '2px'
-            },
-            '.header-primary': {
-                fontWeight: 700,
-                color: primaryColor
-            },
-            '.header-clickable': {
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-            },
-            // Enhanced timeline classes
-            '.timeline-cell': {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '6px 5px',
-                borderRadius: '4px',
-                margin: '2px 0',
-                textAlign: 'center',
                 fontWeight: 600,
-                fontSize: '13px'
+                backgroundColor: '#fafafa'
             },
-            '.timeline-header': {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px',
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '12px'
+
+            // Enhanced marker classes
+            '.marker-milestone': {
+                borderLeft: '0px solid var(--marker-color, #52c41a)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 10%, transparent)',
+                position: 'relative'
             },
-            '.timeline-text': {
-                fontWeight: 600,
-                fontSize: '13px'
+            '.marker-milestone::before': {
+                content: '""',
+                position: 'absolute',
+                left: '-2px',
+                top: '50%',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--marker-color, #52c41a)',
+                transform: 'translateY(-50%)'
             },
-            // Generic layout classes
-            '.cell-icon': {
-                fontSize: '12px',
-                color: '#999'
-            },
-            '.cell-tag': {
-                fontSize: '9px',
+
+            // Content tag classes
+            '.content-tag': {
+                fontSize: '10px',
                 lineHeight: '14px',
-                margin: '0 2px'
-            },
-            '.cell-numerical': {
-                fontSize: '13px',
-                lineHeight: '20px',
-                fontWeight: 400,
-                textAlign: 'center'
-            },
-            // Enhanced marker support for timeline
-            '.marker-cell': {
-                '--marker-color': primaryColor
-            },
-            '.marker-type-milestone': {
-                borderLeft: '3px solid var(--marker-color)',
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 5%, transparent)'
-            },
-            '.marker-type-phase': {
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 8%, transparent)',
-                borderTop: '2px solid color-mix(in srgb, var(--marker-color) 30%, transparent)'
-            },
-            '.marker-type-construction': {
-                backgroundColor: 'rgba(255, 59, 48, 0.05)',
-                borderLeft: '3px solid #ff3b30'
-            },
-            '.timeline-marker-row': {
-                backgroundColor: `rgba(${primaryRgb}, 0.02)`
+                margin: '0 2px',
+                padding: '1px 5px',
+                borderRadius: '5px',
+                fontWeight: 600,
+                textShadow: 'none'
             }
         }
     };
@@ -448,9 +358,7 @@ export const createThemeStyles = (themeName, token) => {
     return themeStyles[normalizedThemeName] || themeStyles.standard;
 };
 
-/**
- * Create a custom theme by extending a base theme
- */
+// Keep existing utility functions unchanged
 export const createCustomTheme = (baseThemeName, overrides = {}, customName = 'Custom') => {
     const baseTheme = BASE_TABLE_THEMES[baseThemeName];
     if (!baseTheme) {
@@ -470,14 +378,8 @@ export const createCustomTheme = (baseThemeName, overrides = {}, customName = 'C
     };
 };
 
-/**
- * Get base theme by name with fallback
- */
 export const getBaseTheme = (themeName) => {
     return BASE_TABLE_THEMES[themeName] || BASE_TABLE_THEMES.standard;
 };
 
-/**
- * Available base theme names for easy reference
- */
 export const THEME_NAMES = Object.keys(BASE_TABLE_THEMES);

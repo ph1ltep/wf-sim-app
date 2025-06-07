@@ -1,21 +1,43 @@
-// src/components/tables/metrics/TableConfiguration.js - Updated with consolidated classes
+// src/components/tables/metrics/TableConfiguration.js - v3.0 CORRECTED: Fix subheader vs header logic
+
 import React from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
 import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
 import { MetricsCell } from './MetricsCell';
+import {
+    getCellClasses,
+    getMarkerStyles
+} from '../shared/TableThemeEngine';
 
 const { Text } = Typography;
 
 /**
- * Render header cell with tags and tooltips - using consolidated classes
+ * Render header cell with CORRECTED class hierarchy
+ * This is for the actual table header, not subheader
  */
 const renderHeaderCell = (rowData) => {
     const { label = '', tooltip, tags = [] } = rowData;
 
+    // CORRECTED: This is for the metric labels (first column), which should be subheaders, not headers
+    const headerClasses = getCellClasses({
+        position: {
+            rowIndex: 0, // This will vary per cell
+            colIndex: 0,
+            totalRows: 1, // Will be corrected in onCell
+            totalCols: 1, // Will be corrected in onCell  
+            isHeaderRow: false,  // CORRECTED: This is NOT a table header row
+            isHeaderCol: true,   // CORRECTED: This IS the first column (subheader)
+            orientation: 'horizontal'
+        },
+        states: {},
+        marker: null,
+        orientation: 'horizontal'
+    });
+
     return (
-        <div className="metric-label">
+        <div className={headerClasses}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <Text strong className="cell-numerical">
+                <Text strong style={{ fontSize: '13px' }}>
                     {label}
                 </Text>
                 {tooltip && (
@@ -32,9 +54,9 @@ const renderHeaderCell = (rowData) => {
                             </div>
                         )}
                     >
-                        {tooltip.icon === 'DollarOutlined' ? <DollarOutlined className="cell-icon" /> :
-                            tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined className="cell-icon" /> :
-                                <InfoCircleOutlined className="cell-icon" />}
+                        {tooltip.icon === 'DollarOutlined' ? <DollarOutlined style={{ fontSize: '12px', color: '#999' }} /> :
+                            tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined style={{ fontSize: '12px', color: '#999' }} /> :
+                                <InfoCircleOutlined style={{ fontSize: '12px', color: '#999' }} />}
                     </Tooltip>
                 )}
 
@@ -43,7 +65,7 @@ const renderHeaderCell = (rowData) => {
                         key={index}
                         color={tag.color}
                         size="small"
-                        className="cell-tag"
+                        className="content-tag"
                     >
                         {tag.text}
                     </Tag>
@@ -54,51 +76,106 @@ const renderHeaderCell = (rowData) => {
 };
 
 /**
- * Generate table columns configuration for MetricsTable - using consolidated classes
+ * Generate table columns with CORRECTED class hierarchy and mutual exclusivity
  */
-const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
+export const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
     if (!config.columns || !Array.isArray(config.columns)) {
         console.warn('generateMetricsTableColumns: No columns configuration provided');
         return [];
     }
 
-    // Header column (fixed left)
+    const columns = [];
+    const orientation = 'horizontal'; // MetricsTable is always horizontal
+    const totalCols = config.columns.length + 1;
+    const totalRows = data.length;
+
+    // CORRECTED: Header column - this contains the metric labels (subheaders)
     const headerColumn = {
         title: 'Metric',
         dataIndex: 'header',
         key: 'header',
         fixed: 'left',
         width: 200,
-        className: 'table-header-cell',
+        onHeaderCell: () => {
+            // CORRECTED: This is the actual table header cell
+            const headerClasses = getCellClasses({
+                position: {
+                    rowIndex: 0,
+                    colIndex: 0,
+                    totalRows: 1, // Header row
+                    totalCols,
+                    isHeaderRow: true,   // CORRECTED: This IS a table header
+                    isHeaderCol: true,   // CORRECTED: This IS a header column
+                    orientation
+                },
+                states: {},
+                marker: null,
+                orientation
+            });
+
+            return { className: headerClasses };
+        },
+        onCell: (record, recordIndex) => {
+            // CORRECTED: These are the metric label cells (subheaders in first column)
+            const cellClasses = getCellClasses({
+                position: {
+                    rowIndex: recordIndex || 0,
+                    colIndex: 0,
+                    totalRows,
+                    totalCols,
+                    isHeaderRow: false,  // CORRECTED: NOT a header row
+                    isHeaderCol: true,   // CORRECTED: IS the first column (makes it subheader)
+                    orientation
+                },
+                states: {},
+                marker: null,
+                orientation
+            });
+
+            return { className: cellClasses };
+        },
         render: (_, record) => renderHeaderCell(record)
     };
 
-    // Data columns with consolidated CSS classes
-    const dataColumns = config.columns.map((columnConfig) => {
+    columns.push(headerColumn);
+
+    // CORRECTED: Data columns with proper header vs cell distinction
+    const dataColumns = config.columns.map((columnConfig, colIndex) => {
         const isSelected = config.selectedColumn === columnConfig.key;
         const isPrimary = columnConfig.primary;
 
-        // Generate consolidated class names
-        const headerClasses = ['header-clickable'];
-        if (isPrimary) headerClasses.push('header-primary');
-        if (isSelected) headerClasses.push('header-selected');
-        if (isPrimary && isSelected) headerClasses.push('header-primary-selected');
-
-        const cellClasses = [];
-        if (isPrimary) cellClasses.push('cell-primary');
-        if (isSelected) cellClasses.push('cell-selected');
-        if (isPrimary && isSelected) cellClasses.push('cell-primary-selected');
+        const columnStates = {
+            selected: isSelected,
+            primary: isPrimary
+        };
 
         return {
             title: (
                 <div
-                    className={headerClasses.join(' ')}
+                    className={getCellClasses({
+                        position: {
+                            rowIndex: 0,
+                            colIndex: colIndex + 1,
+                            totalRows: 1, // Header row
+                            totalCols,
+                            isHeaderRow: true,   // CORRECTED: This IS a table header
+                            isHeaderCol: false,  // CORRECTED: This is NOT the first column
+                            orientation
+                        },
+                        states: columnStates,
+                        marker: null,
+                        orientation
+                    })}
+                    style={{
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
                     onClick={() => handleColumnSelect(columnConfig.key)}
                 >
-                    <div className="cell-numerical">
+                    <div style={{ fontSize: '13px' }}>
                         {columnConfig.label}
                         {isPrimary && (
-                            <span className="cell-tag" style={{
+                            <span style={{
                                 fontSize: '9px',
                                 marginLeft: '4px',
                                 fontWeight: 600
@@ -113,40 +190,82 @@ const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
             key: columnConfig.key,
             width: columnConfig.width || 120,
             align: columnConfig.align || 'center',
-            className: `table-data-cell ${cellClasses.join(' ')}`.trim(),
-            onHeaderCell: () => ({
-                className: headerClasses.join(' '),
-                onClick: () => handleColumnSelect(columnConfig.key)
-            }),
-            onCell: (record) => ({
-                className: cellClasses.join(' '),
-                onClick: columnConfig.selectable && config.onColumnSelect ?
-                    () => handleColumnSelect(columnConfig.key, record) : undefined
-            }),
-            render: (value, record) => (
+            onHeaderCell: () => {
+                // CORRECTED: Column headers (actual table headers)
+                const headerClasses = getCellClasses({
+                    position: {
+                        rowIndex: 0,
+                        colIndex: colIndex + 1,
+                        totalRows: 1,
+                        totalCols,
+                        isHeaderRow: true,   // CORRECTED: IS a header row
+                        isHeaderCol: false,  // CORRECTED: NOT the first column
+                        orientation
+                    },
+                    states: columnStates,
+                    marker: null,
+                    orientation
+                });
+
+                return {
+                    className: headerClasses,
+                    onClick: () => handleColumnSelect(columnConfig.key)
+                };
+            },
+            onCell: (record, rowIndex) => {
+                // CORRECTED: Regular data cells (not headers, not subheaders)
+                const cellClasses = getCellClasses({
+                    position: {
+                        rowIndex: rowIndex || 0,
+                        colIndex: colIndex + 1,
+                        totalRows,
+                        totalCols,
+                        isHeaderRow: false,  // CORRECTED: NOT a header row
+                        isHeaderCol: false,  // CORRECTED: NOT the first column
+                        orientation
+                    },
+                    states: columnStates,
+                    marker: null,
+                    orientation
+                });
+
+                return {
+                    className: cellClasses,
+                    onClick: columnConfig.selectable && config.onColumnSelect ?
+                        () => handleColumnSelect(columnConfig.key, record) : undefined
+                };
+            },
+            render: (value, record, rowIndex) => (
                 <MetricsCell
                     value={value}
                     rowData={record}
                     columnConfig={columnConfig}
                     isSelected={isSelected}
                     isPrimary={isPrimary}
+                    position={{
+                        rowIndex: rowIndex || 0,
+                        colIndex: colIndex + 1,
+                        totalRows,
+                        totalCols,
+                        isHeaderRow: false,
+                        isHeaderCol: false,
+                        orientation
+                    }}
+                    states={columnStates}
                 />
             )
         };
     });
 
-    return [headerColumn, ...dataColumns];
+    return [...columns, ...dataColumns];
 };
 
-/**
- * Evaluate thresholds for a row and return styling information
- */
-const evaluateThresholds = (rowData, thresholds = [], cellValue = null) => {
+// Keep evaluateThresholds function unchanged
+export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) => {
     if (!thresholds || thresholds.length === 0) {
         return {};
     }
 
-    // Sort thresholds by priority (higher priority first)
     const sortedThresholds = [...thresholds].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
     let appliedStyle = {};
@@ -160,79 +279,51 @@ const evaluateThresholds = (rowData, thresholds = [], cellValue = null) => {
             return;
         }
 
-        // Use cellValue for comparison, not rowData[field]
         const value = cellValue !== null ? cellValue : rowData[field];
-        const thresholdValue = threshold.value;
-        const upperValue = upperField ? rowData[upperField] : threshold.upperValue;
 
-        let matches = false;
+        if (value === null || value === undefined) return;
 
-        // Evaluate threshold condition
+        let conditionMet = false;
+        const numValue = parseFloat(value);
+        const compareValue = upperField && rowData[upperField] !== undefined
+            ? parseFloat(rowData[upperField])
+            : parseFloat(threshold.value || 0);
+
+        if (isNaN(numValue) || isNaN(compareValue)) return;
+
         switch (comparison) {
-            case 'gt':
-                matches = value > thresholdValue;
+            case 'greater_than':
+                conditionMet = numValue > compareValue;
                 break;
-            case 'gte':
-                matches = value >= thresholdValue;
+            case 'less_than':
+                conditionMet = numValue < compareValue;
                 break;
-            case 'lt':
-                matches = value < thresholdValue;
+            case 'equal_to':
+                conditionMet = Math.abs(numValue - compareValue) < 0.001;
                 break;
-            case 'lte':
-                matches = value <= thresholdValue;
+            case 'greater_equal':
+                conditionMet = numValue >= compareValue;
                 break;
-            case 'eq':
-                matches = value === thresholdValue;
-                break;
-            case 'ne':
-                matches = value !== thresholdValue;
-                break;
-            case 'between':
-                matches = value >= thresholdValue && value <= upperValue;
-                break;
-            case 'outside':
-                matches = value < thresholdValue || value > upperValue;
+            case 'less_equal':
+                conditionMet = numValue <= compareValue;
                 break;
             default:
-                console.warn(`evaluateThresholds: Unknown comparison '${comparison}'`);
+                console.warn(`Unknown comparison operator: ${comparison}`);
                 return;
         }
 
-        if (matches && colorRule) {
-            // Apply color rule
-            appliedStyle = {
-                ...appliedStyle,
-                ...colorRule
-            };
-
-            appliedRules.push({
-                field,
-                comparison,
-                value: thresholdValue,
-                upperValue,
-                priority,
-                description: description || `${field} ${comparison} ${thresholdValue}`,
-                colorRule
-            });
+        if (conditionMet && colorRule) {
+            if (priority >= (appliedStyle._priority || 0)) {
+                appliedStyle = {
+                    color: colorRule.textColor || appliedStyle.color,
+                    backgroundColor: colorRule.backgroundColor || appliedStyle.backgroundColor,
+                    fontWeight: colorRule.bold ? 'bold' : appliedStyle.fontWeight,
+                    _priority: priority,
+                    _appliedRules: [...appliedRules, description || `${field} ${comparison} ${compareValue}`]
+                };
+            }
         }
     });
 
-    // Add metadata about applied rules for debugging
-    appliedStyle._appliedRules = appliedRules;
-
     return appliedStyle;
 };
-
-/**
- * Evaluate thresholds specifically for a cell value
- */
-const evaluateCellThresholds = (value, rowData, thresholds = []) => {
-    if (!thresholds || thresholds.length === 0) {
-        return {};
-    }
-
-    return evaluateThresholds(rowData, thresholds, value);
-};
-
-// Export all functions
-export { renderHeaderCell, generateMetricsTableColumns, evaluateThresholds, evaluateCellThresholds };

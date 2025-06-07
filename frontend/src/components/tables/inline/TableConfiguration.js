@@ -1,15 +1,17 @@
-// src/components/tables/inline/TableConfiguration.js - Complete updated file with consolidated timeline classes
+// src/components/tables/inline/TableConfiguration.js - v3.0 CORRECTED: Full new class hierarchy support
+
 import React from 'react';
 import { Typography, Tag } from 'antd';
 import EditableCell from './EditableCell';
-import { getMarkerClasses, getMarkerStyles } from '../shared/TableThemeEngine';
+import {
+    getCellClasses,
+    getMarkerStyles
+} from '../shared/TableThemeEngine';
 
 const { Text } = Typography;
 
 /**
- * Format year display with new format
- * @param {number} year - Year value
- * @returns {string} Formatted year string
+ * Format year display with consistent format
  */
 export const formatYear = (year) => {
     if (year === 0) return 'Year 0';
@@ -18,26 +20,25 @@ export const formatYear = (year) => {
 
 /**
  * Check if a year matches any timeline marker
- * @param {number} year - Year to check
- * @param {Array} timelineMarkers - Array of timeline marker objects
- * @returns {Object|null} Matching marker or null
  */
 export const getTimelineMarker = (year, timelineMarkers = []) => {
     return timelineMarkers.find(marker => marker.year === year) || null;
 };
 
 /**
- * Get table configuration based on orientation
- * @param {string} orientation - 'horizontal' or 'vertical'
- * @param {Array} yearColumns - Array of year values
- * @param {Array} contractData - Array of contract/item data
- * @param {string} selectedDataField - Currently selected data field
- * @param {boolean} hideEmptyItems - Whether to hide empty rows/columns in read mode
- * @param {boolean} isEditing - Whether table is in edit mode
- * @param {Array} timelineMarkers - Timeline markers for highlighting
- * @returns {Object} Table configuration with rows, cols, and cell accessor functions
+ * Get table configuration with proper position data for new class hierarchy
  */
-export const getTableConfiguration = (orientation, yearColumns, contractData, selectedDataField, hideEmptyItems = false, isEditing = false, timelineMarkers = []) => {
+export const getTableConfiguration = (
+    orientation,
+    yearColumns,
+    contractData,
+    selectedDataField,
+    hideEmptyItems = false,
+    isEditing = false,
+    timelineMarkers = [],
+    selectedColumn = null,
+    primaryColumn = null
+) => {
     const hasDataInYear = (year, data, field) => {
         return data.some(item => {
             const timeSeries = item[field] || [];
@@ -52,22 +53,27 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
     };
 
     if (orientation === 'vertical') {
-        // Filter years if hiding empty items and in read mode
         const filteredYears = (hideEmptyItems && !isEditing)
             ? yearColumns.filter(year => hasDataInYear(year, contractData, selectedDataField))
             : yearColumns;
 
         return {
-            rows: filteredYears.map(year => ({
+            rows: filteredYears.map((year, rowIndex) => ({
                 key: `year-${year}`,
                 year,
-                timelineMarker: getTimelineMarker(year, timelineMarkers)
+                timelineMarker: getTimelineMarker(year, timelineMarkers),
+                rowIndex,
+                totalRows: filteredYears.length,
+                orientation
             })),
-            cols: contractData.map((contract, index) => ({
-                key: `contract-${index}`,
-                index,
+            cols: contractData.map((contract, colIndex) => ({
+                key: `contract-${colIndex}`,
+                index: colIndex,
                 item: contract,
-                title: contract.name || `Contract ${index + 1}`
+                title: contract.name || `Contract ${colIndex + 1}`,
+                colIndex,
+                totalCols: contractData.length,
+                orientation
             })),
             getCellData: (rowData, colData) => {
                 const year = rowData.year;
@@ -79,12 +85,20 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
                     rowIndex: colData.index,
                     year: year,
                     cellKey: `${colData.index}-${year}`,
-                    timelineMarker: rowData.timelineMarker
+                    timelineMarker: rowData.timelineMarker,
+                    position: {
+                        rowIndex: rowData.rowIndex,
+                        colIndex: colData.colIndex,
+                        totalRows: rowData.totalRows,
+                        totalCols: colData.totalCols,
+                        isHeaderRow: false,
+                        isHeaderCol: false,
+                        orientation
+                    }
                 };
             }
         };
     } else {
-        // Horizontal orientation
         const filteredContracts = (hideEmptyItems && !isEditing)
             ? contractData.filter(contract => hasDataInContract(contract, selectedDataField))
             : contractData;
@@ -94,16 +108,22 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
             : yearColumns;
 
         return {
-            rows: filteredContracts.map((contract, index) => ({
-                key: `contract-${index}`,
-                index,
+            rows: filteredContracts.map((contract, rowIndex) => ({
+                key: `contract-${rowIndex}`,
+                index: rowIndex,
                 item: contract,
-                name: contract.name || `Contract ${index + 1}`
+                name: contract.name || `Contract ${rowIndex + 1}`,
+                rowIndex,
+                totalRows: filteredContracts.length,
+                orientation
             })),
-            cols: filteredYears.map(year => ({
+            cols: filteredYears.map((year, colIndex) => ({
                 key: `year-${year}`,
                 year,
-                timelineMarker: getTimelineMarker(year, timelineMarkers)
+                timelineMarker: getTimelineMarker(year, timelineMarkers),
+                colIndex,
+                totalCols: filteredYears.length,
+                orientation
             })),
             getCellData: (rowData, colData) => {
                 const contract = rowData.item;
@@ -115,7 +135,16 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
                     rowIndex: rowData.index,
                     year: year,
                     cellKey: `${rowData.index}-${year}`,
-                    timelineMarker: colData.timelineMarker
+                    timelineMarker: colData.timelineMarker,
+                    position: {
+                        rowIndex: rowData.rowIndex,
+                        colIndex: colData.colIndex,
+                        totalRows: rowData.totalRows,
+                        totalCols: colData.totalCols,
+                        isHeaderRow: false,
+                        isHeaderCol: false,
+                        orientation
+                    }
                 };
             }
         };
@@ -123,7 +152,7 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
 };
 
 /**
- * Render a table cell (editable or display)
+ * Render table cell with new class hierarchy support
  */
 export const renderTableCell = (
     cellData,
@@ -133,44 +162,74 @@ export const renderTableCell = (
     modifiedCells,
     validationErrors,
     handleCellValidation,
-    handleCellModification
+    handleCellModification,
+    states = {}
 ) => {
-    const { value, rowIndex, year } = cellData;
+    const { value, rowIndex, year, timelineMarker, position } = cellData;
+
+    // CORRECTED: Generate semantic classes with new hierarchy
+    const cellClasses = getCellClasses({
+        position: {
+            ...position,
+            // Ensure we have all required fields for new class generation
+            rowIndex: position.rowIndex || 0,
+            colIndex: position.colIndex || 0,
+            totalRows: position.totalRows || 1,
+            totalCols: position.totalCols || 1,
+            isHeaderRow: position.isHeaderRow || false,
+            isHeaderCol: position.isHeaderCol || false,
+            orientation: position.orientation || 'horizontal'
+        },
+        states,
+        marker: timelineMarker,
+        orientation: position.orientation || 'horizontal'
+    });
+
+    const markerStyles = getMarkerStyles(timelineMarker);
 
     if (!isEditing) {
-        // Display mode
         if (value === null || value === undefined || value === '') {
-            return <Text type="secondary">-</Text>;
+            return (
+                <div className={cellClasses} style={markerStyles}>
+                    <Text type="secondary">-</Text>
+                </div>
+            );
         }
 
-        // Format based on field type
+        let formattedValue = value;
         if (currentFieldConfig?.type === 'currency') {
-            return `${value.toLocaleString()}`;
+            formattedValue = `${value.toLocaleString()}`;
         } else if (currentFieldConfig?.type === 'percentage') {
-            return `${value}%`;
+            formattedValue = `${value}%`;
         }
-        return value;
+
+        return (
+            <div className={cellClasses} style={markerStyles}>
+                {formattedValue}
+            </div>
+        );
     }
 
-    // Edit mode - render EditableCell
     return (
-        <EditableCell
-            value={value}
-            onChange={(newValue) => updateCellValue(rowIndex, year, newValue)}
-            rowIndex={rowIndex}
-            year={year}
-            fieldConfig={currentFieldConfig}
-            disabled={false}
-            modifiedCells={modifiedCells}
-            validationErrors={validationErrors}
-            onCellValidation={handleCellValidation}
-            onCellModification={handleCellModification}
-        />
+        <div className={cellClasses} style={markerStyles}>
+            <EditableCell
+                value={value}
+                onChange={(newValue) => updateCellValue(rowIndex, year, newValue)}
+                rowIndex={rowIndex}
+                year={year}
+                fieldConfig={currentFieldConfig}
+                disabled={false}
+                modifiedCells={modifiedCells}
+                validationErrors={validationErrors}
+                onCellValidation={handleCellValidation}
+                onCellModification={handleCellModification}
+            />
+        </div>
     );
 };
 
 /**
- * Generate table columns based on configuration - UPDATED with consolidated classes
+ * Generate table columns with FULL new class hierarchy support
  */
 export const generateTableColumns = (
     orientation,
@@ -182,43 +241,104 @@ export const generateTableColumns = (
     modifiedCells,
     validationErrors,
     handleCellValidation,
-    handleCellModification
+    handleCellModification,
+    selectedColumn = null,
+    primaryColumn = null
 ) => {
-    // First column (fixed) - UPDATED with timeline classes
+    // CORRECTED: First column with proper subheader detection
     const firstColumn = {
         title: orientation === 'vertical' ? 'Year' : 'Contract',
         dataIndex: orientation === 'vertical' ? 'year' : 'name',
         key: orientation === 'vertical' ? 'year' : 'name',
         fixed: 'left',
         width: orientation === 'vertical' ? 140 : 200,
-        render: (value, record) => {
+        onHeaderCell: () => {
+            const headerClasses = getCellClasses({
+                position: {
+                    rowIndex: 0,
+                    colIndex: 0,
+                    totalRows: 1,
+                    totalCols: (tableConfig.cols?.length || 0) + 1,
+                    isHeaderRow: true,
+                    isHeaderCol: true,
+                    orientation
+                },
+                states: {},
+                marker: null,
+                orientation
+            });
+
+            return { className: headerClasses };
+        },
+        onCell: (record, recordIndex) => {
+            const cellClasses = getCellClasses({
+                position: {
+                    rowIndex: recordIndex || 0,
+                    colIndex: 0,
+                    totalRows: tableConfig.rows?.length || 1,
+                    totalCols: (tableConfig.cols?.length || 0) + 1,
+                    isHeaderRow: false,  // This is NOT a header row
+                    isHeaderCol: true,   // This IS the header column (first column)
+                    orientation
+                },
+                states: {},
+                marker: orientation === 'vertical' ? record.timelineMarker : null,
+                orientation
+            });
+
+            return { className: cellClasses };
+        },
+        render: (value, record, rowIndex) => {
             if (orientation === 'vertical') {
-                // Year column with timeline markers - CONSOLIDATED CLASSES
+                // Year column with timeline markers - can be subheader if first row
                 const marker = record.timelineMarker;
-                const markerClasses = marker ? getMarkerClasses(marker, 'cell') : '';
-                const markerStyles = marker ? getMarkerStyles(marker) : {};
+
+                const cellClasses = getCellClasses({
+                    position: {
+                        rowIndex: rowIndex || 0,
+                        colIndex: 0,
+                        totalRows: tableConfig.rows?.length || 1,
+                        totalCols: (tableConfig.cols?.length || 0) + 1,
+                        isHeaderRow: false,
+                        isHeaderCol: true,
+                        orientation
+                    },
+                    states: {},
+                    marker,
+                    orientation
+                });
+
+                const markerStyles = getMarkerStyles(marker);
 
                 return (
-                    <div
-                        className={`timeline-cell ${markerClasses}`.trim()}
-                        style={markerStyles}
-                    >
-                        <span className="timeline-text">{formatYear(record.year)}</span>
+                    <div className={cellClasses} style={markerStyles}>
+                        <span>{formatYear(record.year)}</span>
                         {marker && (
-                            <Tag
-                                color={marker.color}
-                                size="small"
-                                className="cell-tag"
-                            >
+                            <Tag className="content-tag" color={marker.color} size="small">
                                 {marker.tag}
                             </Tag>
                         )}
                     </div>
                 );
             } else {
-                // Contract name column - no timeline classes needed
+                // Contract name column - automatically gets subheader in horizontal mode
+                const cellClasses = getCellClasses({
+                    position: {
+                        rowIndex: rowIndex || 0,
+                        colIndex: 0,
+                        totalRows: tableConfig.rows?.length || 1,
+                        totalCols: (tableConfig.cols?.length || 0) + 1,
+                        isHeaderRow: false,
+                        isHeaderCol: true,
+                        orientation
+                    },
+                    states: {},
+                    marker: null,
+                    orientation
+                });
+
                 return (
-                    <div className="cell-numerical">
+                    <div className={cellClasses}>
                         {record.item?.name || value || `Contract ${record.index + 1}`}
                     </div>
                 );
@@ -226,52 +346,93 @@ export const generateTableColumns = (
         }
     };
 
-    // Data columns - UPDATED with timeline classes
-    const dataColumns = tableConfig.cols.map((colConfig) => {
+    // CORRECTED: Data columns with proper class hierarchy
+    const dataColumns = (tableConfig.cols || []).map((colConfig, colIndex) => {
         const marker = colConfig.timelineMarker;
-        const markerClasses = marker ? getMarkerClasses(marker, 'header') : '';
-        const markerStyles = marker ? getMarkerStyles(marker) : {};
+        const columnKey = orientation === 'vertical' ? `contract-${colConfig.index}` : `year-${colConfig.year}`;
+        const isSelected = selectedColumn === columnKey;
+        const isPrimary = primaryColumn === columnKey;
+
+        const columnStates = {
+            selected: isSelected,
+            primary: isPrimary
+        };
 
         return {
             title: orientation === 'vertical' ?
                 colConfig.title :
                 (
-                    <div className={`timeline-header ${markerClasses}`.trim()} style={markerStyles}>
-                        <span className="timeline-text">{formatYear(colConfig.year)}</span>
+                    <div
+                        className={getCellClasses({
+                            position: {
+                                rowIndex: 0,
+                                colIndex: colIndex + 1,
+                                totalRows: 1,
+                                totalCols: (tableConfig.cols?.length || 0) + 1,
+                                isHeaderRow: true,
+                                isHeaderCol: false,
+                                orientation
+                            },
+                            states: columnStates,
+                            marker,
+                            orientation
+                        })}
+                        style={getMarkerStyles(marker)}
+                    >
+                        <span>{formatYear(colConfig.year)}</span>
                         {marker && (
-                            <Tag
-                                color={marker.color}
-                                size="small"
-                                className="cell-tag"
-                            >
+                            <Tag className="content-tag" color={marker.color} size="small">
                                 {marker.tag}
                             </Tag>
                         )}
                     </div>
                 ),
-            key: orientation === 'vertical' ? `contract-${colConfig.index}` : `year-${colConfig.year}`,
+            key: columnKey,
             width: 120,
             align: 'center',
-            className: marker ? getMarkerClasses(marker, 'column') : '',
             onHeaderCell: () => {
-                const headerMarkerClasses = marker ? getMarkerClasses(marker, 'header') : '';
-                const headerMarkerStyles = marker ? getMarkerStyles(marker) : {};
+                const headerClasses = getCellClasses({
+                    position: {
+                        rowIndex: 0,
+                        colIndex: colIndex + 1,
+                        totalRows: 1,
+                        totalCols: (tableConfig.cols?.length || 0) + 1,
+                        isHeaderRow: true,
+                        isHeaderCol: false,
+                        orientation
+                    },
+                    states: columnStates,
+                    marker,
+                    orientation
+                });
 
                 return {
-                    className: headerMarkerClasses,
-                    style: headerMarkerStyles
+                    className: headerClasses,
+                    style: getMarkerStyles(marker)
                 };
             },
-            onCell: () => {
-                const cellMarkerClasses = marker ? getMarkerClasses(marker, 'cell') : '';
-                const cellMarkerStyles = marker ? getMarkerStyles(marker) : {};
+            onCell: (record, recordIndex) => {
+                const cellClasses = getCellClasses({
+                    position: {
+                        rowIndex: recordIndex || 0,
+                        colIndex: colIndex + 1,
+                        totalRows: tableConfig.rows?.length || 1,
+                        totalCols: (tableConfig.cols?.length || 0) + 1,
+                        isHeaderRow: false,
+                        isHeaderCol: false,
+                        orientation
+                    },
+                    states: columnStates,
+                    marker,
+                    orientation
+                });
 
                 return {
-                    className: cellMarkerClasses,
-                    style: cellMarkerStyles
+                    className: cellClasses,
+                    style: getMarkerStyles(marker)
                 };
             },
-            render: (_, rowRecord) => {
+            render: (_, rowRecord, rowIndex) => {
                 const cellData = tableConfig.getCellData(rowRecord, colConfig);
 
                 return renderTableCell(
@@ -282,7 +443,8 @@ export const generateTableColumns = (
                     modifiedCells,
                     validationErrors,
                     handleCellValidation,
-                    handleCellModification
+                    handleCellModification,
+                    columnStates
                 );
             }
         };

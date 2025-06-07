@@ -1,11 +1,9 @@
-// src/components/tables/inline/EditableCell.jsx - Reusable editable cell component
+// src/components/tables/inline/EditableCell.jsx - v3.0 COMPLETE CORRECTED VERSION
 import React from 'react';
 import { InputNumber, Input } from 'antd';
 
 /**
  * Get appropriate Ant Design component based on field type
- * @param {string} fieldType - Field type ('currency', 'number', 'percentage', etc.)
- * @returns {React.Component} Ant Design component
  */
 export const getComponentByType = (fieldType) => {
   switch (fieldType) {
@@ -21,9 +19,6 @@ export const getComponentByType = (fieldType) => {
 
 /**
  * Validate cell value based on field configuration
- * @param {any} value - Value to validate
- * @param {Object} fieldConfig - Field configuration with validation rules
- * @returns {string|null} Error message or null if valid
  */
 export const validateCellValue = (value, fieldConfig) => {
   if (value === null || value === undefined || value === '') {
@@ -58,9 +53,6 @@ export const validateCellValue = (value, fieldConfig) => {
 
 /**
  * Navigate to a specific cell in the table
- * @param {HTMLTableElement} table - Table element
- * @param {number} rowIndex - Target row index (excluding header)
- * @param {number} cellIndex - Target cell index
  */
 export const navigateToCell = (table, rowIndex, cellIndex) => {
   const targetRow = table.rows[rowIndex + 1]; // Add 1 for header row
@@ -74,18 +66,7 @@ export const navigateToCell = (table, rowIndex, cellIndex) => {
 };
 
 /**
- * EditableCell - Reusable cell component for inline table editing
- * 
- * @param {any} value - Current cell value
- * @param {Function} onChange - Value change handler
- * @param {number} rowIndex - Row index for navigation
- * @param {number|string} year - Year/column identifier for navigation
- * @param {Object} fieldConfig - Field configuration with type and validation
- * @param {boolean} disabled - Whether cell is disabled
- * @param {Set} modifiedCells - Set of modified cell keys
- * @param {Map} validationErrors - Map of validation errors by cell key
- * @param {Function} onCellValidation - Validation handler
- * @param {Function} onCellModification - Modification tracking handler
+ * EditableCell - v3.0 CORRECTED: Accept parent styles, semantic classes applied to container
  */
 const EditableCell = ({
   value,
@@ -97,7 +78,9 @@ const EditableCell = ({
   modifiedCells = new Set(),
   validationErrors = new Map(),
   onCellValidation,
-  onCellModification
+  onCellModification,
+  className = '', // Accept additional classes (not used since semantic classes applied to parent)
+  style = {} // Accept additional styles from parent (marker styles, etc.)
 }) => {
   const cellKey = `${rowIndex}-${year}`;
   const hasError = validationErrors.has(cellKey);
@@ -120,7 +103,7 @@ const EditableCell = ({
   };
 
   const handleKeyDown = (e) => {
-    // Keyboard navigation logic stays the same...
+    // Keyboard navigation logic
     const currentCell = e.target;
     const table = currentCell.closest('table');
     const currentRow = currentCell.closest('tr');
@@ -164,7 +147,8 @@ const EditableCell = ({
       : 'transparent',
     borderColor: hasError ? '#ff4d4f' : undefined,
     transition: 'all 0.2s',
-    width: '100%'
+    width: '100%',
+    ...style // Merge with parent styles (marker styles, etc.)
   };
 
   // Base component props
@@ -206,6 +190,7 @@ const EditableCell = ({
   const Component = getComponentByType(fieldConfig.type);
 
   return (
+    // NOTE: EditableCell doesn't need className - semantic classes applied to parent container
     <div style={{ position: 'relative' }}>
       <Component {...componentProps} />
       {hasError && (
