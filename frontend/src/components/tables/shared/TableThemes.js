@@ -117,6 +117,7 @@ export const createThemeStyles = (themeName, token) => {
                 textAlign: 'center'
             },
             '.ant-table-tbody > tr > td': {
+                backgroundColor: '#fafafa',
                 padding: '0px 0px',
                 fontSize: '14px',
                 textAlign: 'center'
