@@ -71,10 +71,40 @@ The system follows a clear cascade where each layer can override the previous:
 .state.totals.selected    /* Selected totals styling */
 ```
 
-### CSS Custom Properties
+### Container Classes
 ```css
---marker-color        /* Injected at column/row level for marker theming */
+.table-theme-container    /* Theme container */
+.table-base              /* Table base class */
 ```
+
+## Class Concatenation System
+
+**Key Principle**: CSS classes are defined separately and concatenated together in HTML elements. The cascade hierarchy is achieved through CSS specificity and source order, NOT through nested selectors.
+
+### HTML Class Application Example:
+```html
+<!-- Selected milestone column header -->
+<div class="table-base content content.header marker.milestone state.selected state.header.selected"
+     style="--marker-color: #52c41a;">
+  Year +2
+</div>
+```
+
+### CSS Definition Pattern:
+```css
+/* Each class defined separately - NO nesting */
+.table-base { /* base table styling */ }
+.content { /* base content styling */ }
+.content.header { /* header content styling */ }
+.marker.milestone { /* milestone marker styling */ }
+.state.selected { /* selected state styling */ }
+.state.header.selected { /* selected header state styling */ }
+```
+
+**CSS Cascade Resolution**: 
+- More specific classes (.state.header.selected) override less specific (.state.selected)
+- Later classes in source order override earlier ones with same specificity
+- Marker styles can be overridden by state styles due to source order
 
 ## Orientation-Agnostic Design
 
@@ -338,7 +368,6 @@ const newMarker = { type: 'deadline', color: '#ff4d4f' };
 ```
 
 This architecture maintains all existing functionality while significantly improving maintainability and predictability of the theming system.
-
 
 
 # Table Theming System v3.0 Implementation Plan | 2025-01-07
