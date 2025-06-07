@@ -1,4 +1,4 @@
-// src/components/tables/metrics/TableConfiguration.js - Configuration utilities for MetricsTable
+// src/components/tables/metrics/TableConfiguration.js - Updated to use CSS classes
 import React from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
 import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
@@ -7,16 +7,15 @@ import { MetricsCell } from './MetricsCell';
 const { Text } = Typography;
 
 /**
- * Render header cell with tags and tooltips (aligned with InlineEditTable pattern)
+ * Render header cell with tags and tooltips - using CSS classes
  */
 const renderHeaderCell = (rowData) => {
     const { label = '', tooltip, tags = [] } = rowData;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {/* Main label with tooltip and inline tags */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <Text strong style={{ fontSize: '13px' }}>
+        <div className="metric-label">
+            <div className="metric-label-content">
+                <Text strong className="metric-label-text">
                     {label}
                 </Text>
                 {tooltip && (
@@ -33,9 +32,9 @@ const renderHeaderCell = (rowData) => {
                             </div>
                         )}
                     >
-                        {tooltip.icon === 'DollarOutlined' ? <DollarOutlined style={{ fontSize: '12px', color: '#999' }} /> :
-                            tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined style={{ fontSize: '12px', color: '#999' }} /> :
-                                <InfoCircleOutlined style={{ fontSize: '12px', color: '#999' }} />}
+                        {tooltip.icon === 'DollarOutlined' ? <DollarOutlined className="metric-tooltip-icon" /> :
+                            tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined className="metric-tooltip-icon" /> :
+                                <InfoCircleOutlined className="metric-tooltip-icon" />}
                     </Tooltip>
                 )}
 
@@ -45,7 +44,7 @@ const renderHeaderCell = (rowData) => {
                         key={index}
                         color={tag.color}
                         size="small"
-                        style={{ fontSize: '9px', lineHeight: '14px', margin: '0 2px' }}
+                        className="metric-tag"
                     >
                         {tag.text}
                     </Tag>
@@ -56,7 +55,7 @@ const renderHeaderCell = (rowData) => {
 };
 
 /**
- * Generate table columns configuration for MetricsTable (aligned with InlineEditTable pattern)
+ * Generate table columns configuration for MetricsTable - using CSS classes
  * @param {Array} data - Table row data
  * @param {Object} config - Table configuration
  * @param {Function} handleColumnSelect - Column selection handler
@@ -68,57 +67,32 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
         return [];
     }
 
-    // Header column (fixed left) - similar to InlineEditTable pattern
+    // Header column (fixed left)
     const headerColumn = {
         title: 'Metric',
         dataIndex: 'header',
         key: 'header',
         fixed: 'left',
         width: 200,
+        className: 'metric-label-column',
         render: (_, record) => renderHeaderCell(record)
     };
 
-    // Data columns with InlineEditTable styling pattern
+    // Data columns with CSS classes instead of inline styles
     const dataColumns = config.columns.map((columnConfig) => {
         const isSelected = config.selectedColumn === columnConfig.key;
         const isPrimary = columnConfig.primary;
 
-        // Use primary blue color for consistency with InlineEditTable marker pattern
-        const primaryColor = '#1677ff';
-
         return {
             title: (
                 <div
-                    style={{
-                        textAlign: 'center',
-                        fontWeight: isPrimary ? 600 : 500,
-                        color: isPrimary ? primaryColor : '#262626',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        padding: '6px 5px', // Align with InlineEditTable padding
-                        borderRadius: '4px'
-                    }}
+                    className={`metric-column-header header-clickable ${isPrimary ? 'header-primary' : ''} ${isSelected ? 'header-selected' : ''}`.trim()}
                     onClick={() => handleColumnSelect(columnConfig.key)}
-                    onMouseEnter={(e) => {
-                        if (!isPrimary && !isSelected) {
-                            e.target.style.backgroundColor = '#f5f5f5';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        if (!isPrimary && !isSelected) {
-                            e.target.style.backgroundColor = 'transparent';
-                        }
-                    }}
                 >
-                    <div style={{ fontSize: '13px' }}>
+                    <div className="metric-column-header-content">
                         {columnConfig.label}
                         {isPrimary && (
-                            <span style={{
-                                fontSize: '9px',
-                                color: primaryColor,
-                                marginLeft: '4px',
-                                fontWeight: 600
-                            }}>
+                            <span className="primary-indicator">
                                 (Primary)
                             </span>
                         )}
@@ -127,26 +101,15 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
             ),
             dataIndex: columnConfig.key,
             key: columnConfig.key,
-            width: columnConfig.width || 120, // Align with InlineEditTable width
+            width: columnConfig.width || 120,
             align: columnConfig.align || 'center',
-            // ALIGNED: Use exact InlineEditTable onHeaderCell pattern
+            className: `metric-data-column ${isPrimary ? 'cell-primary' : ''} ${isSelected ? 'cell-selected' : ''}`.trim(),
             onHeaderCell: () => ({
-                style: (isPrimary || isSelected) ? {
-                    backgroundColor: `${primaryColor}15`, // Same as InlineEditTable marker pattern
-                    borderColor: `${primaryColor}40`,
-                    borderWidth: '4px',
-                    borderLeft: '0px',
-                    borderRight: '0px'
-                } : {},
+                className: `metric-header-cell ${isPrimary ? 'header-primary' : ''} ${isSelected ? 'header-selected' : ''}`.trim(),
                 onClick: () => handleColumnSelect(columnConfig.key)
             }),
-            // ALIGNED: Use exact InlineEditTable onCell pattern
             onCell: (record) => ({
-                style: (isPrimary || isSelected) ? {
-                    backgroundColor: `${primaryColor}08`, // Same as InlineEditTable marker pattern
-                    borderLeft: '0px',
-                    borderRight: '0px'
-                } : {},
+                className: `metric-value-cell ${isPrimary ? 'cell-primary' : ''} ${isSelected ? 'cell-selected' : ''}`.trim(),
                 onClick: columnConfig.selectable && config.onColumnSelect ?
                     () => handleColumnSelect(columnConfig.key, record) : undefined
             }),
@@ -191,7 +154,7 @@ export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) =
             return;
         }
 
-        // FIXED: Use cellValue for comparison, not rowData[field]
+        // Use cellValue for comparison, not rowData[field]
         const value = cellValue !== null ? cellValue : rowData[field];
         const thresholdValue = rowData[field]; // This is the threshold to compare against
         let shouldApply = false;
@@ -274,7 +237,6 @@ export const evaluateCellThresholds = (value, rowData, thresholds = []) => {
         return {};
     }
 
-    // FIXED: Pass the cell value to evaluateThresholds
     return evaluateThresholds(rowData, thresholds, value);
 };
 
@@ -318,8 +280,6 @@ export const getDefaultFormatter = (dataType, options = {}) => {
     }
 };
 
-
-
 /**
  * Create column configuration for percentile data
  * @param {Array} percentiles - Array of percentile values
@@ -333,8 +293,8 @@ export const createPercentileColumns = (percentiles, primaryPercentile, options 
     return percentiles.map(p => ({
         key: `P${p}`,
         label: `P${p}`,
-        valueField,
         value: p,
+        valueField,
         primary: p === primaryPercentile,
         selectable,
         formatter,

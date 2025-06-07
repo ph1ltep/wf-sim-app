@@ -15,10 +15,10 @@ const MetricsTable = ({
     data = [],
     config = {},
     loading = false,
-    theme = 'metrics',
+    theme = 'metrics', // Default to metrics theme
     customTheme = null,
     additionalCSS = '',
-    additionalStyles = {}, // NEW: CSS-in-JS object overrides
+    additionalStyles = {},
     containerClassName = '',
     tableClassName = '',
     ...tableProps
@@ -34,9 +34,10 @@ const MetricsTable = ({
             containerClass: containerClassName,
             tableClass: tableClassName,
             additionalCSS,
-            additionalStyles // NEW: CSS-in-JS object support
+            additionalStyles
         });
     }, [baseTableTheme, additionalCSS, additionalStyles, containerClassName, tableClassName]);
+
 
     console.log('🎨 Theme Debug:', {
         themeName: finalTheme.theme?.name,
@@ -236,12 +237,12 @@ const MetricsTable = ({
     }
 
     return (
-        <div className={`table-container ${finalTheme.containerClass}`.trim()}>
+        <div className={`${finalTheme.containerClass}`.trim()}>
             {/* Apply theme CSS globally */}
             <style jsx global>{finalTheme.cssRules}</style>
 
             <Table
-                className={`table-base ${finalTheme.tableClass}`.trim()}
+                className={`${finalTheme.tableClass}`.trim()}
                 columns={tableColumns}
                 dataSource={tableData}
                 loading={loading}

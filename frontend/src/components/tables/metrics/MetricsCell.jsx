@@ -1,4 +1,4 @@
-// src/components/tables/metrics/MetricsCell.jsx - Updated to use CSS-in-JS theme classes
+// src/components/tables/metrics/MetricsCell.jsx - Updated to use CSS classes
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
 import { evaluateCellThresholds } from './TableConfiguration';
@@ -34,7 +34,7 @@ export const MetricsCell = ({
         return value;
     }, [value, rowData, columnConfig.formatter]);
 
-    // Evaluate thresholds for conditional styling
+    // Evaluate thresholds for conditional styling (still use inline for dynamic colors)
     const thresholdStyles = useMemo(() => {
         if (!rowData.thresholds || !Array.isArray(rowData.thresholds)) {
             return {};
@@ -46,6 +46,11 @@ export const MetricsCell = ({
     // Generate CSS classes based on state and thresholds
     const cellClasses = useMemo(() => {
         const classes = ['metric-value'];
+
+        // Add state classes
+        if (isPrimary) classes.push('cell-primary');
+        if (isSelected) classes.push('cell-selected');
+        if (isPrimary && isSelected) classes.push('cell-primary-selected');
 
         // Add threshold-based classes
         if (thresholdStyles._appliedRules) {
@@ -69,27 +74,19 @@ export const MetricsCell = ({
         }
 
         return classes.join(' ');
-    }, [thresholdStyles, columnConfig, rowData, formattedValue]);
+    }, [thresholdStyles, columnConfig, rowData, formattedValue, isPrimary, isSelected]);
 
-    // Combine base styles with threshold styles (for inline styles that can't be CSS classes)
+    // Only use inline styles for threshold colors (data-driven overrides)
     const inlineStyle = useMemo(() => {
-        const baseStyle = {
-            fontSize: '14px',
-            lineHeight: '22px',
-            fontWeight: isPrimary ? 500 : 400,
-            transition: 'all 0.2s ease'
-        };
-
-        // Apply threshold styles (remove internal properties)
+        // Remove internal properties and only keep actual CSS properties
         const { _appliedRules, ...domStyle } = thresholdStyles;
-
-        return { ...baseStyle, ...domStyle };
-    }, [isPrimary, thresholdStyles]);
+        return domStyle;
+    }, [thresholdStyles]);
 
     // Handle empty or invalid values
     if (formattedValue === null || formattedValue === undefined || formattedValue === '') {
         return (
-            <Text type="secondary" className={cellClasses} style={inlineStyle}>
+            <Text type="secondary" className={`${cellClasses} value-null`.trim()}>
                 -
             </Text>
         );

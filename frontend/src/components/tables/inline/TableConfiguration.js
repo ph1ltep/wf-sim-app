@@ -1,7 +1,8 @@
-// src/components/tables/inline/TableConfiguration.js
+// src/components/tables/inline/TableConfiguration.js - Updated to use CSS classes instead of inline styles
 import React from 'react';
 import { Typography, Tag } from 'antd';
 import EditableCell from './EditableCell';
+import { getMarkerClasses, getMarkerStyles } from '../shared/TableThemeEngine';
 
 const { Text } = Typography;
 
@@ -197,35 +198,22 @@ export const generateTableColumns = (
         width: orientation === 'vertical' ? 140 : 200,
         render: (value, record) => {
             if (orientation === 'vertical') {
-                // Year column with timeline markers - consistent with horizontal header styling
+                // Year column with timeline markers - use CSS classes
                 const marker = record.timelineMarker;
+                const markerClasses = marker ? getMarkerClasses(marker, 'cell') : '';
+                const markerStyles = marker ? getMarkerStyles(marker) : {};
+
                 return (
-                    <div style={{
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        color: marker ? marker.color : '#262626',
-                        backgroundColor: marker ? `${marker.color}15` : '#f5f5f5',
-                        padding: '6px 5px',
-                        textAlign: 'center',
-                        borderRadius: '4px',
-                        margin: '2px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                    }}>
-                        <span>{formatYear(record.year)}</span>
+                    <div
+                        className={`year-column ${markerClasses}`.trim()}
+                        style={markerStyles}
+                    >
+                        <span className="year-label">{formatYear(record.year)}</span>
                         {marker && (
                             <Tag
                                 color={marker.color}
                                 size="small"
-                                style={{
-                                    fontSize: '10px',
-                                    lineHeight: '16px',
-                                    margin: 0,
-                                    padding: '0 5px',
-                                    fontWeight: 600
-                                }}
+                                className="marker-tag"
                             >
                                 {marker.tag}
                             </Tag>
@@ -235,7 +223,7 @@ export const generateTableColumns = (
             } else {
                 // Contract name column
                 return (
-                    <div style={{ fontWeight: 500, padding: '4px 0' }}>
+                    <div className="contract-name">
                         {record.item?.name || value || `Contract ${record.index + 1}`}
                     </div>
                 );
@@ -246,35 +234,20 @@ export const generateTableColumns = (
     // Data columns
     const dataColumns = tableConfig.cols.map((colConfig) => {
         const marker = colConfig.timelineMarker;
+        const markerClasses = marker ? getMarkerClasses(marker, 'header') : '';
+        const markerStyles = marker ? getMarkerStyles(marker) : {};
 
         return {
             title: orientation === 'vertical' ?
                 colConfig.title :
                 (
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px'
-                    }}>
-                        <span style={{
-                            fontWeight: marker ? 600 : 500,
-                            color: marker ? marker.color : '#262626'
-                        }}>
-                            {formatYear(colConfig.year)}
-                        </span>
+                    <div className={`year-header ${markerClasses}`.trim()} style={markerStyles}>
+                        <span className="year-label">{formatYear(colConfig.year)}</span>
                         {marker && (
                             <Tag
                                 color={marker.color}
                                 size="small"
-                                style={{
-                                    fontSize: '9px',
-                                    lineHeight: '14px',
-                                    margin: 0,
-                                    padding: '0 4px',
-                                    fontWeight: 500
-                                }}
+                                className="marker-tag"
                             >
                                 {marker.tag}
                             </Tag>
@@ -284,21 +257,25 @@ export const generateTableColumns = (
             key: orientation === 'vertical' ? `contract-${colConfig.index}` : `year-${colConfig.year}`,
             width: 120,
             align: 'center',
-            className: marker ? 'timeline-marker-column' : '',
-            onHeaderCell: () => ({
-                style: marker ? {
-                    backgroundColor: `${marker.color}15`,
-                    borderColor: `${marker.color}40`,
-                    borderWidth: '2px'
-                } : {}
-            }),
-            onCell: () => ({
-                style: marker ? {
-                    backgroundColor: `${marker.color}08`,
-                    borderLeft: '0px',
-                    borderRight: '0px'
-                } : {}
-            }),
+            className: marker ? getMarkerClasses(marker, 'column') : '',
+            onHeaderCell: () => {
+                const headerMarkerClasses = marker ? getMarkerClasses(marker, 'header') : '';
+                const headerMarkerStyles = marker ? getMarkerStyles(marker) : {};
+
+                return {
+                    className: headerMarkerClasses,
+                    style: headerMarkerStyles
+                };
+            },
+            onCell: () => {
+                const cellMarkerClasses = marker ? getMarkerClasses(marker, 'cell') : '';
+                const cellMarkerStyles = marker ? getMarkerStyles(marker) : {};
+
+                return {
+                    className: cellMarkerClasses,
+                    style: cellMarkerStyles
+                };
+            },
             render: (_, rowRecord) => {
                 const cellData = tableConfig.getCellData(rowRecord, colConfig);
 

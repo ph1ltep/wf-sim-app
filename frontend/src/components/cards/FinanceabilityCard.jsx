@@ -182,6 +182,7 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
                     </Title>
 
                     <MetricsTable
+                        theme="metrics"
                         data={tableData}
                         config={tableConfig}
                         loading={false}

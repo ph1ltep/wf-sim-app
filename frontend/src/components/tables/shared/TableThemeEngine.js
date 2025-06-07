@@ -31,6 +31,10 @@ export const useTableTheme = (themeSource = 'standard') => {
         cssRules,
         token,
 
+        // Marker utilities - ADDED
+        getMarkerClasses,
+        getMarkerStyles,
+
         // Utility functions for dynamic styling
         getSelectionStyle: (isSelected, isPrimary = false) => {
             const style = {};
@@ -260,4 +264,43 @@ export const generateTableStyles = (themeConfig) => {
             table: { className: '' }
         };
     }
+};
+
+/**
+ * Generate dynamic marker classes from marker object
+ * @param {Object} marker - Marker object with type, key, tag properties
+ * @param {string} context - Context ('cell', 'row', 'column', 'header')
+ * @returns {string} Space-separated CSS class names
+ */
+export const getMarkerClasses = (marker, context = 'cell') => {
+    if (!marker) return '';
+
+    const classes = [`marker-${context}`];
+
+    if (marker.type) {
+        classes.push(`marker-type-${marker.type.toLowerCase().replace(/\s+/g, '-')}`);
+    }
+    if (marker.key) {
+        classes.push(`marker-key-${marker.key.toLowerCase().replace(/\s+/g, '-')}`);
+    }
+    if (marker.tag) {
+        classes.push(`marker-tag-${marker.tag.toLowerCase().replace(/\s+/g, '-')}`);
+    }
+
+    return classes.join(' ');
+};
+
+/**
+ * Generate dynamic marker inline styles (highest priority overrides)
+ * @param {Object} marker - Marker object with optional color property
+ * @returns {Object} Inline style object or empty object
+ */
+export const getMarkerStyles = (marker) => {
+    if (!marker || !marker.color) return {};
+
+    return {
+        '--marker-color': marker.color,
+        backgroundColor: `color-mix(in srgb, ${marker.color} 8%, transparent)`,
+        borderColor: `color-mix(in srgb, ${marker.color} 40%, transparent)`
+    };
 };

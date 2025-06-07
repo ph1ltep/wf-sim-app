@@ -43,11 +43,11 @@ const InlineEditTable = ({
     onAfterSave,
     onCancel,
     orientation = 'horizontal',
-    // Theme integration options
+    // Updated theme integration options
     theme = 'compact', // Use compact theme by default for inline editing
     customTheme = null,
     additionalCSS = '', // Legacy CSS string support
-    additionalStyles = {}, // NEW: CSS-in-JS object overrides
+    additionalStyles = {}, // CSS-in-JS object overrides
     containerClassName = '', // Allow cards to add container classes
     tableClassName = '', // Allow cards to add table classes
     // Timeline marker support
@@ -77,9 +77,10 @@ const InlineEditTable = ({
             containerClass: containerClassName,
             tableClass: tableClassName,
             additionalCSS,
-            additionalStyles // NEW: CSS-in-JS object support
+            additionalStyles
         });
     }, [baseTableTheme, additionalCSS, additionalStyles, containerClassName, tableClassName]);
+
 
     // Context and state
     const { getValueByPath, updateByPath } = useScenario();

@@ -226,6 +226,7 @@ const CapexDrawdownCard = ({
 
             {/* Table without controls */}
             <InlineEditTable
+                theme="timeline"  // or "compact" 
                 path={['settings', 'modules', 'cost', 'constructionPhase', 'costSources']}
                 dataFieldOptions={[
                     {
