@@ -1,9 +1,8 @@
-// src/components/tables/shared/TableThemes.js - Simple theme-specific overrides only
-import { size } from 'lodash';
+// src/components/tables/shared/TableThemes.js - Enhanced with consolidated classes
 import { hexToRgb } from '../../../utils/charts/colors';
 
 /**
- * Base table theme definitions - standardized classes, specific styling per theme
+ * Base table theme definitions
  */
 export const BASE_TABLE_THEMES = {
     // Standard Ant Design theme with minimal customization
@@ -19,7 +18,7 @@ export const BASE_TABLE_THEMES = {
         }
     },
 
-    // Compact theme for data entry and editing  
+    // Compact theme for data entry and editing
     compact: {
         name: 'Compact',
         description: 'Dense, space-efficient table for data entry',
@@ -45,6 +44,7 @@ export const BASE_TABLE_THEMES = {
         }
     },
 
+    // Timeline theme for project phases and milestones
     timeline: {
         name: 'Timeline',
         description: 'Optimized for timeline data with year markers and construction phases',
@@ -59,7 +59,7 @@ export const BASE_TABLE_THEMES = {
 };
 
 /**
- * Create theme-specific CSS styles - each theme gets exactly what it needs
+ * Create theme-specific CSS styles - consolidated and enhanced
  */
 export const createThemeStyles = (themeName, token) => {
     const primaryColor = token.colorPrimary || '#1677ff';
@@ -74,17 +74,20 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.table-base': {
                 width: '100%'
-                // Let Ant Design handle everything else
             },
-            // Selection states
+            // Basic cell and header states
             '.cell-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                borderLeft: `2px solid rgba(${primaryRgb}, 0.6)`,
+                borderRight: `2px solid rgba(${primaryRgb}, 0.6)`
             },
             '.cell-primary': {
                 fontWeight: 600
             },
             '.header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.15)`
+                backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                borderColor: `rgba(${primaryRgb}, 0.4)`,
+                borderWidth: '2px'
             },
             '.header-primary': {
                 fontWeight: 700,
@@ -94,16 +97,50 @@ export const createThemeStyles = (themeName, token) => {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
             },
-            // Basic marker support
-            '.marker-cell': {
-                '--marker-color': primaryColor
+            // Timeline classes - basic implementation
+            '.timeline-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 10px',
+                textAlign: 'center',
+                fontWeight: 500,
+                fontSize: '13px'
             },
-            '.marker-type-milestone': {
-                borderLeft: '3px solid var(--marker-color)'
+            '.timeline-header': {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '8px',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            '.timeline-text': {
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            // Generic layout classes
+            '.cell-icon': {
+                fontSize: '12px',
+                color: '#999'
+            },
+            '.cell-tag': {
+                fontSize: '10px',
+                lineHeight: '16px',
+                margin: '0 2px'
+            },
+            '.cell-numerical': {
+                fontSize: '14px',
+                lineHeight: '22px',
+                fontWeight: 400,
+                textAlign: 'right'
             }
         },
 
-        // Compact theme - tight spacing, clear borders, edit-focused
+        // Compact theme - tight spacing for data entry
         compact: {
             '.table-theme-container': {
                 position: 'relative',
@@ -111,27 +148,17 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.table-base': {
                 width: '100%'
-                // Ant Design handles base table styling
             },
             '.ant-table-thead > tr > th': {
                 padding: '4px 8px',
-                borderBottom: '1px solid #f0f0f0',
                 backgroundColor: '#fafafa',
                 fontSize: '12px',
-                fontWeight: 600
+                fontWeight: 600,
+                textAlign: 'center'
             },
             '.ant-table-tbody > tr > td': {
                 padding: '6px 8px',
-                fontSize: '13px'
-            },
-            '.ant-table-thead > tr > th::before': {
-                display: 'none'
-            },
-            '.ant-table-container': {
-                borderTop: 'none'
-            },
-            '.ant-table-thead': {
-                background: '#fafafa'
+                fontSize: '12px'
             },
             // Selection states for compact
             '.cell-selected': {
@@ -155,6 +182,49 @@ export const createThemeStyles = (themeName, token) => {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
             },
+            // Timeline classes optimized for compact editing
+            '.timeline-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '6px 5px',
+                borderRadius: '4px',
+                margin: '2px 0',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            '.timeline-header': {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '12px'
+            },
+            '.timeline-text': {
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            // Generic layout classes - compact sizing
+            '.cell-icon': {
+                fontSize: '12px',
+                color: '#999'
+            },
+            '.cell-tag': {
+                fontSize: '9px',
+                lineHeight: '14px',
+                margin: '0 2px'
+            },
+            '.cell-numerical': {
+                fontSize: '13px',
+                lineHeight: '20px',
+                fontWeight: 400,
+                textAlign: 'center'
+            },
             // Marker support for compact
             '.marker-cell': {
                 '--marker-color': primaryColor
@@ -166,40 +236,10 @@ export const createThemeStyles = (themeName, token) => {
             '.marker-type-phase': {
                 backgroundColor: 'color-mix(in srgb, var(--marker-color) 8%, transparent)',
                 borderTop: '2px solid color-mix(in srgb, var(--marker-color) 30%, transparent)'
-            },
-            '.year-column': {
-                textAlign: 'center',
-                fontWeight: 500,
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '6px 5px',
-                borderRadius: '4px',
-                margin: '2px 0'
-            },
-            '.year-header': {
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '13px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px'
-            },
-            '.contract-name': {
-                fontWeight: 500,
-                padding: '4px 0'
-            },
-            '.year-label': {
-                fontWeight: 600,
-                fontSize: '13px'
             }
         },
 
-        // Metrics theme - center-aligned, financial data optimized
+        // Metrics theme - center-aligned numerical display
         metrics: {
             '.table-theme-container': {
                 position: 'relative',
@@ -207,26 +247,23 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.table-base': {
                 width: '100%'
-                // Ant Design handles base table styling
             },
             '.ant-table-thead > tr > th': {
-                padding: '8px 4px',
+                padding: '8px 10px',
                 backgroundColor: '#fafafa',
                 fontSize: '13px',
                 fontWeight: 600,
                 textAlign: 'center'
             },
             '.ant-table-tbody > tr > td': {
-                padding: '8px 4px',
-                fontSize: '14px',
+                padding: '10px 12px',
+                fontSize: '13px',
                 textAlign: 'center'
             },
-            '.ant-table-thead': {
-                backgroundColor: '#fafafa'
-            },
-            // Selection states for metrics (different style)
+            // Selection states for metrics - rounded styling
             '.cell-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`
+                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                borderRadius: '4px'
             },
             '.cell-primary': {
                 fontWeight: 600
@@ -242,54 +279,65 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.header-clickable': {
                 cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                padding: '6px 5px',
+                borderRadius: '4px'
+            },
+            // Timeline classes for metrics - center-aligned
+            '.timeline-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 10px',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '13px',
+                borderRadius: '4px'
+            },
+            '.timeline-header': {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '13px',
+                borderRadius: '4px'
+            },
+            '.timeline-text': {
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            // Generic layout classes - metrics optimized
+            '.cell-icon': {
+                fontSize: '12px',
+                color: '#999'
+            },
+            '.cell-tag': {
+                fontSize: '10px',
+                lineHeight: '16px',
+                margin: '0 2px'
+            },
+            '.cell-numerical': {
+                fontSize: '14px',
+                lineHeight: '22px',
+                fontWeight: 400,
+                textAlign: 'center',
                 transition: 'all 0.2s ease'
             },
-            // Marker support for metrics
+            // Enhanced marker support for metrics
             '.marker-cell': {
                 '--marker-color': primaryColor
             },
             '.marker-type-milestone': {
-                borderLeft: '3px solid var(--marker-color)'
-            },
-            '.metric-label': {
-                fontWeight: 500,
-                fontSize: '13px'
-            },
-            '.metric-label-content': {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                flexWrap: 'wrap'
-            },
-            '.metric-label-text': {
-                fontSize: '13px'
-            },
-            '.metric-tooltip-icon': {
-                fontSize: '12px',
-                color: '#999'
-            },
-            '.metric-value': {
-                fontSize: '14px',
-                lineHeight: '22px',
-                fontWeight: 400,
-                transition: 'all 0.2s ease'
-            },
-            '.metric-column-header': {
-                textAlign: 'center',
-                padding: '6px 5px',
-                borderRadius: '4px'
-            },
-            '.metric-column-header-content': {
-                fontSize: '13px'
-            },
-            '.primary-indicator': {
-                fontSize: '9px',
-                marginLeft: '4px',
-                fontWeight: 600
+                borderLeft: '3px solid var(--marker-color)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color) 5%, transparent)'
             }
         },
 
-        // Add this to the themeStyles object in createThemeStyles function
+        // Timeline theme - enhanced timeline marker support
         timeline: {
             '.table-theme-container': {
                 position: 'relative',
@@ -297,7 +345,6 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.table-base': {
                 width: '100%'
-                // Ant Design handles base table styling
             },
             '.ant-table-thead > tr > th': {
                 padding: '6px 8px',
@@ -309,9 +356,6 @@ export const createThemeStyles = (themeName, token) => {
             '.ant-table-tbody > tr > td': {
                 padding: '8px 10px',
                 fontSize: '13px'
-            },
-            '.ant-table-thead': {
-                backgroundColor: '#fafafa'
             },
             // Selection states for timeline
             '.cell-selected': {
@@ -335,7 +379,50 @@ export const createThemeStyles = (themeName, token) => {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
             },
-            // Enhanced marker support for timeline features
+            // Enhanced timeline classes
+            '.timeline-cell': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '6px 5px',
+                borderRadius: '4px',
+                margin: '2px 0',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            '.timeline-header': {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px',
+                textAlign: 'center',
+                fontWeight: 600,
+                fontSize: '12px'
+            },
+            '.timeline-text': {
+                fontWeight: 600,
+                fontSize: '13px'
+            },
+            // Generic layout classes
+            '.cell-icon': {
+                fontSize: '12px',
+                color: '#999'
+            },
+            '.cell-tag': {
+                fontSize: '9px',
+                lineHeight: '14px',
+                margin: '0 2px'
+            },
+            '.cell-numerical': {
+                fontSize: '13px',
+                lineHeight: '20px',
+                fontWeight: 400,
+                textAlign: 'center'
+            },
+            // Enhanced marker support for timeline
             '.marker-cell': {
                 '--marker-color': primaryColor
             },
@@ -345,73 +432,14 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.marker-type-phase': {
                 backgroundColor: 'color-mix(in srgb, var(--marker-color) 8%, transparent)',
-                borderTop: '2px solid color-mix(in srgb, var(--marker-color) 30%, transparent)',
-                borderBottom: '1px solid color-mix(in srgb, var(--marker-color) 20%, transparent)'
+                borderTop: '2px solid color-mix(in srgb, var(--marker-color) 30%, transparent)'
             },
-            '.marker-tag': {
-                fontSize: '10px',
-                lineHeight: '14px',
-                margin: '0 2px',
-                padding: '0 4px'
-            },
-            '.marker-type-event': {
-                borderRadius: '4px',
-                backgroundColor: 'color-mix(in srgb, var(--marker-color) 10%, transparent)'
-            },
-            // Timeline-specific marker classes (legacy support)
-            '.timeline-marker-column': {
-                backgroundColor: 'rgba(250, 173, 20, 0.08)',
-                borderColor: 'rgba(250, 173, 20, 0.4)'
-            },
-            '.timeline-marker-row': {
-                position: 'relative',
-                transition: 'all 0.2s ease'
-            },
-            '.timeline-marker-cod': {
-                backgroundColor: 'rgba(52, 199, 89, 0.05)',
-                borderLeft: '3px solid #34c759'
-            },
-            '.timeline-marker-ntp': {
-                backgroundColor: 'rgba(255, 149, 0, 0.05)',
-                borderLeft: '3px solid #ff9500'
-            },
-            '.timeline-marker-dev': {
-                backgroundColor: 'rgba(0, 122, 255, 0.05)',
-                borderLeft: '3px solid #007aff'
-            },
-            '.timeline-marker-construction': {
+            '.marker-type-construction': {
                 backgroundColor: 'rgba(255, 59, 48, 0.05)',
                 borderLeft: '3px solid #ff3b30'
             },
-            '.year-column': {
-                textAlign: 'center',
-                fontWeight: 500,
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '6px 5px',
-                borderRadius: '4px',
-                margin: '2px 0'
-            },
-            '.year-header': {
-                textAlign: 'center',
-                fontWeight: 600,
-                fontSize: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px'
-            },
-            '.year-label': {
-                fontWeight: 600,
-                fontSize: '13px'
-            },
-            '.contract-name': {
-                fontWeight: 500,
-                padding: '4px 0'
+            '.timeline-marker-row': {
+                backgroundColor: `rgba(${primaryRgb}, 0.02)`
             }
         }
     };

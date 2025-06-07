@@ -1,4 +1,4 @@
-// src/components/tables/inline/TableConfiguration.js - Updated to use CSS classes instead of inline styles
+// src/components/tables/inline/TableConfiguration.js - Complete updated file with consolidated timeline classes
 import React from 'react';
 import { Typography, Tag } from 'antd';
 import EditableCell from './EditableCell';
@@ -59,21 +59,21 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
 
         return {
             rows: filteredYears.map(year => ({
+                key: `year-${year}`,
                 year,
-                type: 'year',
                 timelineMarker: getTimelineMarker(year, timelineMarkers)
             })),
-            cols: contractData.map((item, index) => ({
+            cols: contractData.map((contract, index) => ({
+                key: `contract-${index}`,
                 index,
-                item,
-                type: 'contract',
-                title: item.name || `Item ${index + 1}`
+                item: contract,
+                title: contract.name || `Contract ${index + 1}`
             })),
             getCellData: (rowData, colData) => {
                 const year = rowData.year;
                 const contract = colData.item;
-                const timeSeriesData = contract[selectedDataField] || [];
-                const dataPoint = timeSeriesData.find(dp => dp.year === year);
+                const timeSeries = contract[selectedDataField] || [];
+                const dataPoint = timeSeries.find(dp => dp.year === year);
                 return {
                     value: dataPoint?.value,
                     rowIndex: colData.index,
@@ -84,37 +84,32 @@ export const getTableConfiguration = (orientation, yearColumns, contractData, se
             }
         };
     } else {
-        // Filter contracts if hiding empty items and in read mode
+        // Horizontal orientation
         const filteredContracts = (hideEmptyItems && !isEditing)
             ? contractData.filter(contract => hasDataInContract(contract, selectedDataField))
             : contractData;
 
-        // Also filter years if hiding empty items and in read mode
         const filteredYears = (hideEmptyItems && !isEditing)
             ? yearColumns.filter(year => hasDataInYear(year, filteredContracts, selectedDataField))
             : yearColumns;
 
         return {
-            rows: filteredContracts.map((item, displayIndex) => {
-                // Find original index for proper updates
-                const realIndex = contractData.findIndex(c => c === item);
-                return {
-                    index: realIndex,
-                    item,
-                    type: 'contract',
-                    title: item.name || `Contract ${realIndex + 1}`
-                };
-            }),
+            rows: filteredContracts.map((contract, index) => ({
+                key: `contract-${index}`,
+                index,
+                item: contract,
+                name: contract.name || `Contract ${index + 1}`
+            })),
             cols: filteredYears.map(year => ({
+                key: `year-${year}`,
                 year,
-                type: 'year',
                 timelineMarker: getTimelineMarker(year, timelineMarkers)
             })),
             getCellData: (rowData, colData) => {
-                const year = colData.year;
                 const contract = rowData.item;
-                const timeSeriesData = contract[selectedDataField] || [];
-                const dataPoint = timeSeriesData.find(dp => dp.year === year);
+                const year = colData.year;
+                const timeSeries = contract[selectedDataField] || [];
+                const dataPoint = timeSeries.find(dp => dp.year === year);
                 return {
                     value: dataPoint?.value,
                     rowIndex: rowData.index,
@@ -175,7 +170,7 @@ export const renderTableCell = (
 };
 
 /**
- * Generate table columns based on configuration
+ * Generate table columns based on configuration - UPDATED with consolidated classes
  */
 export const generateTableColumns = (
     orientation,
@@ -189,7 +184,7 @@ export const generateTableColumns = (
     handleCellValidation,
     handleCellModification
 ) => {
-    // First column (fixed)
+    // First column (fixed) - UPDATED with timeline classes
     const firstColumn = {
         title: orientation === 'vertical' ? 'Year' : 'Contract',
         dataIndex: orientation === 'vertical' ? 'year' : 'name',
@@ -198,22 +193,22 @@ export const generateTableColumns = (
         width: orientation === 'vertical' ? 140 : 200,
         render: (value, record) => {
             if (orientation === 'vertical') {
-                // Year column with timeline markers - use CSS classes
+                // Year column with timeline markers - CONSOLIDATED CLASSES
                 const marker = record.timelineMarker;
                 const markerClasses = marker ? getMarkerClasses(marker, 'cell') : '';
                 const markerStyles = marker ? getMarkerStyles(marker) : {};
 
                 return (
                     <div
-                        className={`year-column ${markerClasses}`.trim()}
+                        className={`timeline-cell ${markerClasses}`.trim()}
                         style={markerStyles}
                     >
-                        <span className="year-label">{formatYear(record.year)}</span>
+                        <span className="timeline-text">{formatYear(record.year)}</span>
                         {marker && (
                             <Tag
                                 color={marker.color}
                                 size="small"
-                                className="marker-tag"
+                                className="cell-tag"
                             >
                                 {marker.tag}
                             </Tag>
@@ -221,9 +216,9 @@ export const generateTableColumns = (
                     </div>
                 );
             } else {
-                // Contract name column
+                // Contract name column - no timeline classes needed
                 return (
-                    <div className="contract-name">
+                    <div className="cell-numerical">
                         {record.item?.name || value || `Contract ${record.index + 1}`}
                     </div>
                 );
@@ -231,7 +226,7 @@ export const generateTableColumns = (
         }
     };
 
-    // Data columns
+    // Data columns - UPDATED with timeline classes
     const dataColumns = tableConfig.cols.map((colConfig) => {
         const marker = colConfig.timelineMarker;
         const markerClasses = marker ? getMarkerClasses(marker, 'header') : '';
@@ -241,13 +236,13 @@ export const generateTableColumns = (
             title: orientation === 'vertical' ?
                 colConfig.title :
                 (
-                    <div className={`year-header ${markerClasses}`.trim()} style={markerStyles}>
-                        <span className="year-label">{formatYear(colConfig.year)}</span>
+                    <div className={`timeline-header ${markerClasses}`.trim()} style={markerStyles}>
+                        <span className="timeline-text">{formatYear(colConfig.year)}</span>
                         {marker && (
                             <Tag
                                 color={marker.color}
                                 size="small"
-                                className="marker-tag"
+                                className="cell-tag"
                             >
                                 {marker.tag}
                             </Tag>

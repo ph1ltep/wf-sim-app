@@ -1,79 +1,65 @@
-// src/components/tables/MetricsTable.jsx - Updated to use CSS-in-JS theme system
+// src/components/tables/MetricsTable.jsx - Updated with consolidated classes
 import React, { useMemo, useCallback } from 'react';
-import { Table, Typography, Tooltip, Tag } from 'antd';
+import { Table, Typography, Tag, Tooltip } from 'antd';
 import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
-import { useTableTheme, composeTheme } from './shared/TableThemeEngine';
-import { ensureUniqueKeys, validateTableData } from './shared/TableDataOps';
+import { useTableTheme, composeTheme, validateTableData, ensureUniqueKeys } from './shared';
 import { MetricsCell } from './metrics/MetricsCell';
 
 const { Text } = Typography;
 
 /**
- * MetricsTable - Generic metrics table with CSS-in-JS theme integration
+ * MetricsTable - Enhanced metrics table with consolidated CSS classes
  */
 const MetricsTable = ({
     data = [],
     config = {},
     loading = false,
-    theme = 'metrics', // Default to metrics theme
+    theme = 'metrics',
     customTheme = null,
-    additionalCSS = '',
     additionalStyles = {},
+    additionalCSS = '',
     containerClassName = '',
     tableClassName = '',
     ...tableProps
 }) => {
-    // Theme composition: base theme + card overrides
+    // Theme composition: base theme + overrides
     const baseTableTheme = useTableTheme(customTheme || theme);
     const finalTheme = useMemo(() => {
-        if (!additionalCSS && !additionalStyles && !containerClassName && !tableClassName) {
-            return baseTableTheme;
-        }
-
         return composeTheme(baseTableTheme, {
-            containerClass: containerClassName,
-            tableClass: tableClassName,
+            additionalStyles,
             additionalCSS,
-            additionalStyles
+            containerClassName,
+            tableClassName
         });
-    }, [baseTableTheme, additionalCSS, additionalStyles, containerClassName, tableClassName]);
+    }, [baseTableTheme, additionalStyles, additionalCSS, containerClassName, tableClassName]);
 
-
-    console.log('🎨 Theme Debug:', {
-        themeName: finalTheme.theme?.name,
-        containerClass: finalTheme.containerClass,
-        cssRules: finalTheme.cssRules,
-        styles: finalTheme.styles
-    });
-
-    // Validate data structure using shared utilities
+    // Data validation
     const dataValidation = useMemo(() => {
-        const validation = validateTableData(data, 'MetricsTable');
-        return validation;
+        return validateTableData(data);
     }, [data]);
 
-    // Ensure unique keys using shared utility
     const tableData = useMemo(() => {
-        return ensureUniqueKeys(data, 'key');
-    }, [data]);
+        if (!dataValidation.isValid || !Array.isArray(data)) return [];
+        return data.map((row, index) => ({
+            ...row,
+            key: row.key || `row-${index}`
+        }));
+    }, [data, dataValidation.isValid]);
 
-    // Handle column selection (both cell and header clicks)
+    // Column selection handler
     const handleColumnSelect = useCallback((columnKey, rowData = null) => {
         if (!config.onColumnSelect) return;
-
-        const column = config.columns.find(col => col.key === columnKey);
-        if (!column) return;
-
-        // Pass the value from valueField, or the column key if no valueField specified
-        const value = column.valueField ? column.value : columnKey;
+        const value = rowData && rowData[columnKey] !== undefined ?
+            rowData[columnKey] :
+            columnKey;
         config.onColumnSelect(value, columnKey, rowData);
     }, [config]);
 
-    // Generate CSS classes for columns based on state
+    // Generate CSS classes for columns based on state - CONSOLIDATED
     const getColumnClasses = useCallback((columnConfig, isSelected, isPrimary) => {
         const classes = [];
 
-        if (columnConfig.selectable) classes.push('cell-selectable');
+        if (columnConfig.selectable) classes.push('header-clickable');
         if (isPrimary) classes.push('cell-primary');
         if (isSelected) classes.push('cell-selected');
         if (isPrimary && isSelected) classes.push('cell-primary-selected');
@@ -81,26 +67,25 @@ const MetricsTable = ({
         return classes.length > 0 ? classes.join(' ') : undefined;
     }, []);
 
-    // Generate CSS classes for headers based on state
+    // Generate CSS classes for headers based on state - CONSOLIDATED  
     const getHeaderClasses = useCallback((columnConfig, isSelected, isPrimary) => {
-        const classes = [];
+        const classes = ['header-clickable']; // Always clickable for metrics
 
-        if (columnConfig.selectable) classes.push('header-selectable');
         if (isPrimary) classes.push('header-primary');
         if (isSelected) classes.push('header-selected');
         if (isPrimary && isSelected) classes.push('header-primary-selected');
 
-        return classes.length > 0 ? classes.join(' ') : undefined;
+        return classes.join(' ');
     }, []);
 
-    // Render metric header with tooltips and tags
+    // Render metric header with consolidated classes
     const renderMetricHeader = useCallback((record) => {
         const { label = '', tooltip, tags = [] } = record;
 
         return (
             <div className="metric-label">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <Text strong style={{ fontSize: '13px' }}>
+                    <Text strong className="cell-numerical">
                         {label}
                     </Text>
                     {tooltip && (
@@ -117,9 +102,9 @@ const MetricsTable = ({
                                 </div>
                             )}
                         >
-                            {tooltip.icon === 'DollarOutlined' ? <DollarOutlined style={{ fontSize: '12px', color: '#999' }} /> :
-                                tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined style={{ fontSize: '12px', color: '#999' }} /> :
-                                    <InfoCircleOutlined style={{ fontSize: '12px', color: '#999' }} />}
+                            {tooltip.icon === 'DollarOutlined' ? <DollarOutlined className="cell-icon" /> :
+                                tooltip.icon === 'SafetyOutlined' ? <SafetyOutlined className="cell-icon" /> :
+                                    <InfoCircleOutlined className="cell-icon" />}
                         </Tooltip>
                     )}
                     {tags.length > 0 && tags.map((tag, index) => (
@@ -127,12 +112,7 @@ const MetricsTable = ({
                             key={index}
                             color={tag.color}
                             size="small"
-                            className="metric-tag"
-                            style={{
-                                fontSize: finalTheme.theme.name === 'compact' ? '9px' : '10px',
-                                lineHeight: '14px',
-                                margin: '0 2px'
-                            }}
+                            className="cell-tag"
                         >
                             {tag.text}
                         </Tag>
@@ -140,26 +120,26 @@ const MetricsTable = ({
                 </div>
             </div>
         );
-    }, [finalTheme]);
+    }, []);
 
-    // Generate table columns using CSS-in-JS theme system
+    // Generate table columns using consolidated classes
     const tableColumns = useMemo(() => {
         if (!config.columns || !Array.isArray(config.columns)) {
             return [];
         }
 
-        // Header column (fixed left) - using shared pattern
+        // Header column (fixed left) - using consolidated classes
         const headerColumn = {
             title: 'Metric',
             dataIndex: 'label',
             key: 'header',
             fixed: 'left',
             width: 200,
-            className: 'table-header-cell metric-label-column',
+            className: 'table-header-cell',
             render: (_, record) => renderMetricHeader(record)
         };
 
-        // Data columns with CSS-in-JS theme integration
+        // Data columns with consolidated CSS classes
         const dataColumns = config.columns.map((columnConfig) => {
             const isSelected = config.selectedColumn === columnConfig.key;
             const isPrimary = columnConfig.primary;
@@ -168,19 +148,12 @@ const MetricsTable = ({
                 title: (
                     <div
                         className={getHeaderClasses(columnConfig, isSelected, isPrimary)}
-                        style={{
-                            textAlign: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            padding: '6px 5px',
-                            borderRadius: '4px'
-                        }}
                         onClick={() => handleColumnSelect(columnConfig.key)}
                     >
-                        <div style={{ fontSize: '13px' }}>
+                        <div className="cell-numerical">
                             {columnConfig.label}
                             {isPrimary && (
-                                <span style={{
+                                <span className="cell-tag" style={{
                                     fontSize: '9px',
                                     marginLeft: '4px',
                                     fontWeight: 600
@@ -196,7 +169,7 @@ const MetricsTable = ({
                 width: columnConfig.width || 120,
                 align: columnConfig.align || 'center',
                 className: `table-data-cell ${getColumnClasses(columnConfig, isSelected, isPrimary) || ''}`.trim(),
-                // Use CSS classes instead of inline styles for selection
+                // Use consolidated CSS classes for cell styling
                 onHeaderCell: () => ({
                     className: getHeaderClasses(columnConfig, isSelected, isPrimary),
                     onClick: () => handleColumnSelect(columnConfig.key)
@@ -237,12 +210,12 @@ const MetricsTable = ({
     }
 
     return (
-        <div className={`${finalTheme.containerClass}`.trim()}>
+        <div className={finalTheme.containerClass}>
             {/* Apply theme CSS globally */}
             <style jsx global>{finalTheme.cssRules}</style>
 
             <Table
-                className={`${finalTheme.tableClass}`.trim()}
+                className={finalTheme.tableClass}
                 columns={tableColumns}
                 dataSource={tableData}
                 loading={loading}

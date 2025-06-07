@@ -1,5 +1,4 @@
-// src/components/tables/shared/TimelineUtils.js - Timeline marker utilities
-
+// src/components/tables/shared/TimelineUtils.js - Updated with consolidated timeline classes
 import { formatProjectYear } from './FormatUtils';
 
 /**
@@ -13,7 +12,7 @@ export const getTimelineMarker = (year, timelineMarkers = []) => {
 };
 
 /**
- * Create timeline-aware year column with marker styling
+ * Create timeline-aware year column with consolidated styling
  * @param {Object} options - Column options including timeline markers
  * @returns {Object} Enhanced year column configuration
  */
@@ -38,31 +37,19 @@ export const createTimelineYearColumn = (options = {}) => {
 
             if (marker) {
                 return (
-                    <div style={{
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        color: marker.color,
-                        backgroundColor: `${marker.color}15`,
-                        padding: '6px 5px',
-                        textAlign: 'center',
-                        borderRadius: '4px',
-                        margin: '2px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                    }}>
-                        <span>{formatProjectYear(year)}</span>
+                    <div
+                        className="timeline-cell"
+                        style={{
+                            '--marker-color': marker.color,
+                            color: marker.color,
+                            backgroundColor: `${marker.color}15`
+                        }}
+                    >
+                        <span className="timeline-text">{formatProjectYear(year)}</span>
                         {marker.tag && (
-                            <div style={{
-                                fontSize: '10px',
-                                lineHeight: '16px',
-                                margin: 0,
-                                padding: '0 5px',
-                                fontWeight: 600,
+                            <div className="cell-tag" style={{
                                 backgroundColor: marker.color,
-                                color: 'white',
-                                borderRadius: '2px'
+                                color: 'white'
                             }}>
                                 {marker.tag}
                             </div>
@@ -72,8 +59,8 @@ export const createTimelineYearColumn = (options = {}) => {
             }
 
             return (
-                <div style={{ fontWeight: 500, padding: '4px 0' }}>
-                    {formatProjectYear(year)}
+                <div className="timeline-cell">
+                    <span className="timeline-text">{formatProjectYear(year)}</span>
                 </div>
             );
         }
@@ -81,7 +68,7 @@ export const createTimelineYearColumn = (options = {}) => {
 };
 
 /**
- * Apply timeline markers to column headers
+ * Apply timeline markers to column headers - UPDATED with consolidated classes
  * @param {Array} dataColumns - Array of column configurations
  * @param {Array} timelineMarkers - Timeline markers for header styling
  * @param {Object} options - Additional options
@@ -99,29 +86,20 @@ export const applyTimelineMarkersToColumns = (dataColumns, timelineMarkers = [],
                 return {
                     ...columnConfig,
                     title: (
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px'
-                        }}>
-                            <span style={{
-                                fontWeight: marker ? 600 : 500,
-                                color: marker ? marker.color : '#262626'
-                            }}>
+                        <div className="timeline-header">
+                            <span
+                                className="timeline-text"
+                                style={{
+                                    fontWeight: 600,
+                                    color: marker ? marker.color : '#262626'
+                                }}
+                            >
                                 {formatProjectYear(year)}
                             </span>
                             {marker && (
-                                <div style={{
-                                    fontSize: '9px',
-                                    lineHeight: '14px',
-                                    margin: 0,
-                                    padding: '0 4px',
-                                    fontWeight: 500,
+                                <div className="cell-tag" style={{
                                     backgroundColor: marker.color,
-                                    color: 'white',
-                                    borderRadius: '2px'
+                                    color: 'white'
                                 }}>
                                     {marker.tag}
                                 </div>
@@ -131,6 +109,7 @@ export const applyTimelineMarkersToColumns = (dataColumns, timelineMarkers = [],
                     className: marker ? 'timeline-marker-column' : '',
                     onHeaderCell: () => ({
                         style: marker ? {
+                            '--marker-color': marker.color,
                             backgroundColor: `${marker.color}15`,
                             borderColor: `${marker.color}40`,
                             borderWidth: '2px'
@@ -138,9 +117,8 @@ export const applyTimelineMarkersToColumns = (dataColumns, timelineMarkers = [],
                     }),
                     onCell: () => ({
                         style: marker ? {
-                            backgroundColor: `${marker.color}08`,
-                            borderLeft: '0px',
-                            borderRight: '0px'
+                            '--marker-color': marker.color,
+                            backgroundColor: `${marker.color}08`
                         } : {}
                     })
                 };
@@ -149,4 +127,77 @@ export const applyTimelineMarkersToColumns = (dataColumns, timelineMarkers = [],
 
         return columnConfig;
     });
+};
+
+/**
+ * Generate timeline row classes for vertical orientation
+ * @param {Object} record - Table row record
+ * @param {string} orientation - Table orientation
+ * @returns {string|undefined} CSS class string or undefined
+ */
+export const getTimelineRowClasses = (record, orientation = 'vertical') => {
+    if (orientation !== 'vertical' || !record.timelineMarker) return undefined;
+
+    const classes = ['timeline-marker-row'];
+    const marker = record.timelineMarker;
+
+    if (marker.tag) {
+        classes.push(`timeline-marker-${marker.tag.toLowerCase().replace(/\s+/g, '-')}`);
+    }
+    if (marker.type) {
+        classes.push(`marker-type-${marker.type}`);
+    }
+    if (marker.key) {
+        classes.push(`marker-key-${marker.key}`);
+    }
+
+    return classes.join(' ');
+};
+
+/**
+ * Generate timeline marker styles for data-driven color overrides
+ * @param {Object} marker - Timeline marker object
+ * @returns {Object} CSS style object
+ */
+export const getTimelineMarkerStyles = (marker) => {
+    if (!marker || !marker.color) return {};
+
+    return {
+        '--marker-color': marker.color,
+        backgroundColor: `${marker.color}08`,
+        borderLeft: `3px solid ${marker.color}`
+    };
+};
+
+/**
+ * Enhanced timeline marker utilities for theme integration
+ */
+export const timelineUtils = {
+    getTimelineMarker,
+    createTimelineYearColumn,
+    applyTimelineMarkersToColumns,
+    getTimelineRowClasses,
+    getTimelineMarkerStyles,
+
+    /**
+     * Check if a record should have timeline styling
+     */
+    hasTimelineMarker: (record) => {
+        return record && record.timelineMarker && typeof record.timelineMarker === 'object';
+    },
+
+    /**
+     * Get marker color with fallback
+     */
+    getMarkerColor: (marker, fallbackColor = '#1677ff') => {
+        return marker && marker.color ? marker.color : fallbackColor;
+    },
+
+    /**
+     * Format timeline marker tag for display
+     */
+    formatMarkerTag: (marker) => {
+        if (!marker || !marker.tag) return '';
+        return marker.tag.toUpperCase();
+    }
 };
