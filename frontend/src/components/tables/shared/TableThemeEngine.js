@@ -51,11 +51,6 @@ export const getContentClasses = (position, orientation = 'horizontal') => {
 
     // Add cell/row/col classes
     classes.push('content-cell');
-    if (orientation === 'horizontal') {
-        classes.push('content-row');
-    } else {
-        classes.push('content-col');
-    }
 
     // CORRECTED: Add position-specific classes (mutually exclusive)
     if (position.isHeader) {
@@ -72,6 +67,31 @@ export const getContentClasses = (position, orientation = 'horizontal') => {
     return classes;
 };
 
+/**
+ * Generate row classes for <tr> elements
+ */
+export const getRowClasses = (orientation = 'horizontal') => {
+    const classes = [];
+
+    if (orientation === 'horizontal') {
+        classes.push('content-row');
+    }
+
+    return classes.join(' ');
+};
+
+/**
+ * Generate column classes for <col> elements  
+ */
+export const getColumnClasses = (orientation = 'horizontal') => {
+    const classes = [];
+
+    if (orientation === 'vertical') {
+        classes.push('content-col');
+    }
+
+    return classes.join(' ');
+};
 
 /**
  * Generate marker classes - separate class names to be concatenated

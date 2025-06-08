@@ -1,4 +1,4 @@
-// src/components/tables/metrics/TableConfiguration.js - v3.0 CORRECTED: Fix subheader vs header logic
+// src/components/tables/metrics/TableConfiguration.js - v3.0 OPTIMIZED: Eliminate double styling
 
 import React from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
@@ -12,30 +12,15 @@ import {
 const { Text } = Typography;
 
 /**
- * Render header cell with CORRECTED class hierarchy
- * This is for the actual table header, not subheader
+ * Render header cell with OPTIMIZED minimal inner styling
+ * NOTE: Semantic classes applied to outer <td> via onCell, not here
  */
 const renderHeaderCell = (rowData) => {
     const { label = '', tooltip, tags = [] } = rowData;
 
-    // CORRECTED: This is for the metric labels (first column), which should be subheaders, not headers
-    const headerClasses = getCellClasses({
-        position: {
-            rowIndex: 0, // This will vary per cell
-            colIndex: 0,
-            totalRows: 1, // Will be corrected in onCell
-            totalCols: 1, // Will be corrected in onCell  
-            isHeaderRow: false,  // CORRECTED: This is NOT a table header row
-            isHeaderCol: true,   // CORRECTED: This IS the first column (subheader)
-            orientation: 'horizontal'
-        },
-        states: {},
-        marker: null,
-        orientation: 'horizontal'
-    });
-
+    // OPTIMIZED: Simple content wrapper, no duplicate classes
     return (
-        <div className={headerClasses}>
+        <div className="content-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <Text strong style={{ fontSize: '13px' }}>
                     {label}
@@ -76,7 +61,7 @@ const renderHeaderCell = (rowData) => {
 };
 
 /**
- * Generate table columns with CORRECTED class hierarchy and mutual exclusivity
+ * Generate table columns with OPTIMIZED class hierarchy (no double styling)
  */
 export const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
     if (!config.columns || !Array.isArray(config.columns)) {
@@ -89,23 +74,28 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     const totalCols = config.columns.length + 1;
     const totalRows = data.length;
 
-    // CORRECTED: Header column - this contains the metric labels (subheaders)
+    // OPTIMIZED: Header column - semantic classes applied to outer elements only
     const headerColumn = {
-        title: 'Metric',
+        title: (
+            // OPTIMIZED: Simple title content, no duplicate classes
+            <div className="content-inner">
+                Metric
+            </div>
+        ),
         dataIndex: 'header',
         key: 'header',
         fixed: 'left',
         width: 200,
         onHeaderCell: () => {
-            // CORRECTED: This is the actual table header cell
+            // Apply semantic classes to <th> element
             const headerClasses = getCellClasses({
                 position: {
                     rowIndex: 0,
                     colIndex: 0,
-                    totalRows: 1, // Header row
+                    totalRows: 1,
                     totalCols,
-                    isHeaderRow: true,   // CORRECTED: This IS a table header
-                    isHeaderCol: true,   // CORRECTED: This IS a header column
+                    isHeaderRow: true,
+                    isHeaderCol: true,
                     orientation
                 },
                 states: {},
@@ -116,15 +106,15 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
             return { className: headerClasses };
         },
         onCell: (record, recordIndex) => {
-            // CORRECTED: These are the metric label cells (subheaders in first column)
+            // Apply semantic classes to <td> elements (metric label cells = subheaders)
             const cellClasses = getCellClasses({
                 position: {
                     rowIndex: recordIndex || 0,
                     colIndex: 0,
                     totalRows,
                     totalCols,
-                    isHeaderRow: false,  // CORRECTED: NOT a header row
-                    isHeaderCol: true,   // CORRECTED: IS the first column (makes it subheader)
+                    isHeaderRow: false,
+                    isHeaderCol: true,
                     orientation
                 },
                 states: {},
@@ -139,7 +129,7 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
 
     columns.push(headerColumn);
 
-    // CORRECTED: Data columns with proper header vs cell distinction
+    // OPTIMIZED: Data columns with no double styling
     const dataColumns = config.columns.map((columnConfig, colIndex) => {
         const isSelected = config.selectedColumn === columnConfig.key;
         const isPrimary = columnConfig.primary;
@@ -151,26 +141,24 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
 
         return {
             title: (
+                // OPTIMIZED: Simple title content wrapper
                 <div
-                    className={getCellClasses({
-                        position: {
-                            rowIndex: 0,
-                            colIndex: colIndex + 1,
-                            totalRows: 1, // Header row
-                            totalCols,
-                            isHeaderRow: true,   // CORRECTED: This IS a table header
-                            isHeaderCol: false,  // CORRECTED: This is NOT the first column
-                            orientation
-                        },
-                        states: columnStates,
-                        marker: null,
-                        orientation
-                    })}
+                    className="content-inner"
                     style={{
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                     }}
                     onClick={() => handleColumnSelect(columnConfig.key)}
+                    onMouseEnter={(e) => {
+                        if (!isPrimary && !isSelected) {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!isPrimary && !isSelected) {
+                            e.target.style.backgroundColor = 'transparent';
+                        }
+                    }}
                 >
                     <div style={{ fontSize: '13px' }}>
                         {columnConfig.label}
@@ -191,15 +179,15 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
             width: columnConfig.width || 120,
             align: columnConfig.align || 'center',
             onHeaderCell: () => {
-                // CORRECTED: Column headers (actual table headers)
+                // Apply semantic classes to <th> element
                 const headerClasses = getCellClasses({
                     position: {
                         rowIndex: 0,
                         colIndex: colIndex + 1,
                         totalRows: 1,
                         totalCols,
-                        isHeaderRow: true,   // CORRECTED: IS a header row
-                        isHeaderCol: false,  // CORRECTED: NOT the first column
+                        isHeaderRow: true,
+                        isHeaderCol: false,
                         orientation
                     },
                     states: columnStates,
@@ -213,15 +201,15 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                 };
             },
             onCell: (record, rowIndex) => {
-                // CORRECTED: Regular data cells (not headers, not subheaders)
+                // Apply semantic classes to <td> elements
                 const cellClasses = getCellClasses({
                     position: {
                         rowIndex: rowIndex || 0,
                         colIndex: colIndex + 1,
                         totalRows,
                         totalCols,
-                        isHeaderRow: false,  // CORRECTED: NOT a header row
-                        isHeaderCol: false,  // CORRECTED: NOT the first column
+                        isHeaderRow: false,
+                        isHeaderCol: false,
                         orientation
                     },
                     states: columnStates,
@@ -236,23 +224,26 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                 };
             },
             render: (value, record, rowIndex) => (
-                <MetricsCell
-                    value={value}
-                    rowData={record}
-                    columnConfig={columnConfig}
-                    isSelected={isSelected}
-                    isPrimary={isPrimary}
-                    position={{
-                        rowIndex: rowIndex || 0,
-                        colIndex: colIndex + 1,
-                        totalRows,
-                        totalCols,
-                        isHeaderRow: false,
-                        isHeaderCol: false,
-                        orientation
-                    }}
-                    states={columnStates}
-                />
+                // OPTIMIZED: MetricsCell wrapped in content-inner
+                <div className="content-inner">
+                    <MetricsCell
+                        value={value}
+                        rowData={record}
+                        columnConfig={columnConfig}
+                        isSelected={isSelected}
+                        isPrimary={isPrimary}
+                        position={{
+                            rowIndex: rowIndex || 0,
+                            colIndex: colIndex + 1,
+                            totalRows,
+                            totalCols,
+                            isHeaderRow: false,
+                            isHeaderCol: false,
+                            orientation
+                        }}
+                        states={columnStates}
+                    />
+                </div>
             )
         };
     });

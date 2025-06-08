@@ -165,32 +165,13 @@ export const renderTableCell = (
     handleCellModification,
     states = {}
 ) => {
-    const { value, rowIndex, year, timelineMarker, position } = cellData;
+    const { value, rowIndex, year } = cellData;
 
-    // CORRECTED: Generate semantic classes with new hierarchy
-    const cellClasses = getCellClasses({
-        position: {
-            ...position,
-            // Ensure we have all required fields for new class generation
-            rowIndex: position.rowIndex || 0,
-            colIndex: position.colIndex || 0,
-            totalRows: position.totalRows || 1,
-            totalCols: position.totalCols || 1,
-            isHeaderRow: position.isHeaderRow || false,
-            isHeaderCol: position.isHeaderCol || false,
-            orientation: position.orientation || 'horizontal'
-        },
-        states,
-        marker: timelineMarker,
-        orientation: position.orientation || 'horizontal'
-    });
-
-    const markerStyles = getMarkerStyles(timelineMarker);
-
+    // NOTE: Cell styling applied via onCell, not here
     if (!isEditing) {
         if (value === null || value === undefined || value === '') {
             return (
-                <div className={cellClasses} style={markerStyles}>
+                <div className="content-inner">
                     <Text type="secondary">-</Text>
                 </div>
             );
@@ -204,14 +185,14 @@ export const renderTableCell = (
         }
 
         return (
-            <div className={cellClasses} style={markerStyles}>
+            <div className="content-inner">
                 {formattedValue}
             </div>
         );
     }
 
     return (
-        <div className={cellClasses} style={markerStyles}>
+        <div className="content-inner">
             <EditableCell
                 value={value}
                 onChange={(newValue) => updateCellValue(rowIndex, year, newValue)}
@@ -227,7 +208,6 @@ export const renderTableCell = (
         </div>
     );
 };
-
 /**
  * Generate table columns with FULL new class hierarchy support
  */
@@ -245,7 +225,7 @@ export const generateTableColumns = (
     selectedColumn = null,
     primaryColumn = null
 ) => {
-    // CORRECTED: First column with proper subheader detection
+    // First column (fixed) - OPTIMIZED
     const firstColumn = {
         title: orientation === 'vertical' ? 'Year' : 'Contract',
         dataIndex: orientation === 'vertical' ? 'year' : 'name',
@@ -271,47 +251,34 @@ export const generateTableColumns = (
             return { className: headerClasses };
         },
         onCell: (record, recordIndex) => {
+            const marker = orientation === 'vertical' ? record.timelineMarker : null;
             const cellClasses = getCellClasses({
                 position: {
                     rowIndex: recordIndex || 0,
                     colIndex: 0,
                     totalRows: tableConfig.rows?.length || 1,
                     totalCols: (tableConfig.cols?.length || 0) + 1,
-                    isHeaderRow: false,  // This is NOT a header row
-                    isHeaderCol: true,   // This IS the header column (first column)
+                    isHeaderRow: false,
+                    isHeaderCol: true,
                     orientation
                 },
                 states: {},
-                marker: orientation === 'vertical' ? record.timelineMarker : null,
+                marker,
                 orientation
             });
 
-            return { className: cellClasses };
+            return {
+                className: cellClasses,
+                style: getMarkerStyles(marker)
+            };
         },
         render: (value, record, rowIndex) => {
             if (orientation === 'vertical') {
-                // Year column with timeline markers - can be subheader if first row
                 const marker = record.timelineMarker;
 
-                const cellClasses = getCellClasses({
-                    position: {
-                        rowIndex: rowIndex || 0,
-                        colIndex: 0,
-                        totalRows: tableConfig.rows?.length || 1,
-                        totalCols: (tableConfig.cols?.length || 0) + 1,
-                        isHeaderRow: false,
-                        isHeaderCol: true,
-                        orientation
-                    },
-                    states: {},
-                    marker,
-                    orientation
-                });
-
-                const markerStyles = getMarkerStyles(marker);
-
+                // OPTIMIZED: Minimal inner styling, no duplicate classes
                 return (
-                    <div className={cellClasses} style={markerStyles}>
+                    <div className="content-inner">
                         <span>{formatYear(record.year)}</span>
                         {marker && (
                             <Tag className="content-tag" color={marker.color} size="small">
@@ -321,24 +288,9 @@ export const generateTableColumns = (
                     </div>
                 );
             } else {
-                // Contract name column - automatically gets subheader in horizontal mode
-                const cellClasses = getCellClasses({
-                    position: {
-                        rowIndex: rowIndex || 0,
-                        colIndex: 0,
-                        totalRows: tableConfig.rows?.length || 1,
-                        totalCols: (tableConfig.cols?.length || 0) + 1,
-                        isHeaderRow: false,
-                        isHeaderCol: true,
-                        orientation
-                    },
-                    states: {},
-                    marker: null,
-                    orientation
-                });
-
+                // OPTIMIZED: Simple content wrapper
                 return (
-                    <div className={cellClasses}>
+                    <div className="content-inner">
                         {record.item?.name || value || `Contract ${record.index + 1}`}
                     </div>
                 );
@@ -346,7 +298,7 @@ export const generateTableColumns = (
         }
     };
 
-    // CORRECTED: Data columns with proper class hierarchy
+    // Data columns - OPTIMIZED
     const dataColumns = (tableConfig.cols || []).map((colConfig, colIndex) => {
         const marker = colConfig.timelineMarker;
         const columnKey = orientation === 'vertical' ? `contract-${colConfig.index}` : `year-${colConfig.year}`;
@@ -359,26 +311,11 @@ export const generateTableColumns = (
         };
 
         return {
+            // OPTIMIZED: Simple title without duplicate classes
             title: orientation === 'vertical' ?
                 colConfig.title :
                 (
-                    <div
-                        className={getCellClasses({
-                            position: {
-                                rowIndex: 0,
-                                colIndex: colIndex + 1,
-                                totalRows: 1,
-                                totalCols: (tableConfig.cols?.length || 0) + 1,
-                                isHeaderRow: true,
-                                isHeaderCol: false,
-                                orientation
-                            },
-                            states: columnStates,
-                            marker,
-                            orientation
-                        })}
-                        style={getMarkerStyles(marker)}
-                    >
+                    <div className="content-inner">
                         <span>{formatYear(colConfig.year)}</span>
                         {marker && (
                             <Tag className="content-tag" color={marker.color} size="small">

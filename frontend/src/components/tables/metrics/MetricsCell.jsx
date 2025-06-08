@@ -1,4 +1,5 @@
-// src/components/tables/metrics/MetricsCell.jsx - v3.0 CORRECTED: Class concatenation system
+// src/components/tables/metrics/MetricsCell.jsx - v3.0 OPTIMIZED: No duplicate styling
+
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
 import { evaluateThresholds } from './TableConfiguration';
@@ -41,7 +42,8 @@ const formatValue = (value, columnConfig) => {
 };
 
 /**
- * MetricsCell component - CORRECTED: semantic classes applied by parent (onCell)
+ * MetricsCell component - OPTIMIZED: semantic classes applied by parent <td>
+ * This component focuses purely on content rendering and threshold styling
  */
 export const MetricsCell = ({
     value,
@@ -49,10 +51,10 @@ export const MetricsCell = ({
     columnConfig = {},
     isSelected = false,
     isPrimary = false,
-    position = {}, // Position data (not used since classes applied by parent)
-    states = {}, // State data (not used since classes applied by parent)
-    className = '', // Additional classes from parent (not needed)
-    style = {} // Additional styles from parent (not needed)
+    position = {}, // Not used - classes applied by parent
+    states = {}, // Not used - classes applied by parent
+    className = '', // Not used - wrapped in content-inner
+    style = {} // Not used - wrapped in content-inner
 }) => {
     // Format the display value
     const formattedValue = useMemo(() => {
@@ -67,14 +69,14 @@ export const MetricsCell = ({
         return evaluateThresholds(rowData, columnConfig.thresholds, value);
     }, [rowData, columnConfig.thresholds, value]);
 
-    // CORRECTED: Don't generate semantic classes here - they're applied by parent onCell
-    // MetricsCell focuses on content rendering and threshold styling only
-
-    // Base cell styling with threshold overrides (threshold = highest precedence)
+    // OPTIMIZED: Only threshold styling applied directly to content
+    // Semantic styling handled by parent <td> element
     const cellStyle = useMemo(() => {
         const baseStyle = {
             fontWeight: isPrimary ? 600 : 400,
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            width: '100%',
+            textAlign: 'inherit' // Inherit from parent
         };
 
         // Apply threshold styles (remove internal properties for DOM)

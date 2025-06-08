@@ -1,5 +1,7 @@
 // src/components/tables/shared/TableThemes.js - v3.0 FINAL: Separate Class Definitions
 
+import { min } from "lodash";
+
 // Keep existing BASE_TABLE_THEMES configuration
 export const BASE_TABLE_THEMES = {
     standard: {
@@ -303,53 +305,46 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-
+            // '.ant-table-tbody > tr:hover > td': {
+            //     backgroundColor: 'inherit !important' // Prevent default hover
+            // },
+            '.ant-table-tbody > tr:hover > td.state-selected': {
+                backgroundColor: `rgba(${primaryRgb}, 0.08) !important`
+            },
             // Content hierarchy - timeline theme with column spreading
             '.content': {},
-            '.content-cell': {
-                padding: '6px 8px'
-            },
+            '.content-cell': {},
             '.content-row': {},
-            '.content-col': {
-            },
+            '.content-col': {},
             '.content-subheader': {
-                padding: '8px 12px',
                 fontWeight: 500,
-                borderRight: '2px solid #e0e0e0'
             },
             '.content-header': {
+                minWidth: '100px',
                 padding: '8px 10px',
                 fontWeight: 600,
                 backgroundColor: '#fafafa'
             },
+            '.content-header.marker-milestone': {
+                borderBottom: '2px solid var(--marker-color, #52c41a)',
+                backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 20%, transparent)',
+            },
 
             // Enhanced marker classes
             '.marker-milestone': {
-                borderLeft: '0px solid var(--marker-color, #52c41a)',
+                borderBottom: '2px solid var(--marker-color, #52c41a)',
                 backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 10%, transparent)',
                 position: 'relative'
             },
-            '.marker-milestone::before': {
-                content: '""',
-                position: 'absolute',
-                left: '-2px',
-                top: '50%',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--marker-color, #52c41a)',
-                transform: 'translateY(-50%)'
-            },
-
+            '.content-inner': {},
             // Content tag classes
             '.content-tag': {
-                fontSize: '10px',
+                fontSize: '9px',
                 lineHeight: '14px',
-                margin: '0 2px',
-                padding: '1px 5px',
+                padding: '1px 4px',
+                margin: '0 0 0 6px',
                 borderRadius: '5px',
-                fontWeight: 600,
-                textShadow: 'none'
+                display: 'inline-block'
             }
         }
     };
