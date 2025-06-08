@@ -1,4 +1,4 @@
-// src/components/tables/metrics/TableConfiguration.js - v3.0 OPTIMIZED: Eliminate double styling
+// src/components/tables/metrics/TableConfiguration.js - v3.1 FIXED: Semantic engine integration
 
 import React from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
@@ -12,13 +12,11 @@ import {
 const { Text } = Typography;
 
 /**
- * Render header cell with OPTIMIZED minimal inner styling
- * NOTE: Semantic classes applied to outer <td> via onCell, not here
+ * Render header cell with semantic classes applied by parent
  */
 const renderHeaderCell = (rowData) => {
     const { label = '', tooltip, tags = [] } = rowData;
 
-    // OPTIMIZED: Simple content wrapper, no duplicate classes
     return (
         <div className="content-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -61,7 +59,7 @@ const renderHeaderCell = (rowData) => {
 };
 
 /**
- * Generate table columns with OPTIMIZED class hierarchy (no double styling)
+ * Generate table columns using semantic class engine
  */
 export const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
     if (!config.columns || !Array.isArray(config.columns)) {
@@ -74,10 +72,9 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     const totalCols = config.columns.length + 1;
     const totalRows = data.length;
 
-    // OPTIMIZED: Header column - semantic classes applied to outer elements only
+    // Header column (metric labels) - using semantic classes
     const headerColumn = {
         title: (
-            // OPTIMIZED: Simple title content, no duplicate classes
             <div className="content-inner">
                 Metric
             </div>
@@ -129,47 +126,40 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
 
     columns.push(headerColumn);
 
-    // OPTIMIZED: Data columns with no double styling
+    // Data columns with semantic class engine
     const dataColumns = config.columns.map((columnConfig, colIndex) => {
         const isSelected = config.selectedColumn === columnConfig.key;
-        const isPrimary = columnConfig.primary;
+
+        // Use marker from config (no built-in primary logic)
+        const marker = columnConfig.marker || null;
+
 
         const columnStates = {
-            selected: isSelected,
-            primary: isPrimary
+            selected: isSelected
         };
 
         return {
             title: (
-                // OPTIMIZED: Simple title content wrapper
                 <div
                     className="content-inner"
                     style={{
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                     }}
-                    onClick={() => handleColumnSelect(columnConfig.key)}
-                    onMouseEnter={(e) => {
-                        if (!isPrimary && !isSelected) {
-                            e.target.style.backgroundColor = '#f5f5f5';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        if (!isPrimary && !isSelected) {
-                            e.target.style.backgroundColor = 'transparent';
-                        }
-                    }}
+                    onClick={() => handleColumnSelect(columnConfig.value || columnConfig.key)}
                 >
                     <div style={{ fontSize: '13px' }}>
                         {columnConfig.label}
-                        {isPrimary && (
-                            <span style={{
-                                fontSize: '9px',
-                                marginLeft: '4px',
-                                fontWeight: 600
-                            }}>
-                                (Primary)
-                            </span>
+                        {/* FIXED: Render marker tag instead of primary text */}
+                        {marker && marker.tag && (
+                            <Tag
+                                className="content-tag"
+                                color={marker.color}
+                                size="small"
+                                style={{ marginLeft: '4px' }}
+                            >
+                                {marker.tag}
+                            </Tag>
                         )}
                     </div>
                 </div>
@@ -191,13 +181,14 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                         orientation
                     },
                     states: columnStates,
-                    marker: null,
+                    marker,
                     orientation
                 });
 
                 return {
                     className: headerClasses,
-                    onClick: () => handleColumnSelect(columnConfig.key)
+                    style: getMarkerStyles(marker),
+                    onClick: () => handleColumnSelect(columnConfig.value || columnConfig.key, null, columnConfig)
                 };
             },
             onCell: (record, rowIndex) => {
@@ -213,25 +204,25 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                         orientation
                     },
                     states: columnStates,
-                    marker: null,
+                    marker,
                     orientation
                 });
 
                 return {
                     className: cellClasses,
+                    style: getMarkerStyles(marker),
                     onClick: columnConfig.selectable && config.onColumnSelect ?
-                        () => handleColumnSelect(columnConfig.key, record) : undefined
+                        () => handleColumnSelect(columnConfig.value || columnConfig.key, record, columnConfig) : undefined
                 };
             },
             render: (value, record, rowIndex) => (
-                // OPTIMIZED: MetricsCell wrapped in content-inner
                 <div className="content-inner">
                     <MetricsCell
                         value={value}
                         rowData={record}
                         columnConfig={columnConfig}
                         isSelected={isSelected}
-                        isPrimary={isPrimary}
+                        isPrimary={columnConfig.primary}
                         position={{
                             rowIndex: rowIndex || 0,
                             colIndex: colIndex + 1,
@@ -251,11 +242,12 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     return [...columns, ...dataColumns];
 };
 
-// Keep evaluateThresholds function unchanged
+// Keep evaluateThresholds function unchanged - it's working correctly
 export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) => {
     if (!thresholds || thresholds.length === 0) {
         return {};
     }
+
 
     const sortedThresholds = [...thresholds].sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
@@ -263,7 +255,25 @@ export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) =
     let appliedRules = [];
 
     sortedThresholds.forEach(threshold => {
-        const { field, comparison, colorRule, upperField, priority = 0, description } = threshold;
+        const { field, comparison, colorRule, priority = 0, description } = threshold;
+
+        // const isDSCR = rowData.key === 'dscr';
+        // if (isDSCR) {
+        //     console.log('🔍 DSCR Deep Debug:', {
+        //         field: field,
+        //         'rowData[field]': rowData[field],
+        //         'typeof rowData[field]': typeof rowData[field],
+        //         'rowData[field] === undefined': rowData[field] === undefined,
+        //         'rowData[field] === null': rowData[field] === null,
+        //         'rowData[field] === ""': rowData[field] === "",
+        //         'String(rowData[field])': String(rowData[field]),
+        //         'parseFloat(rowData[field])': parseFloat(rowData[field]),
+        //         'Number(rowData[field])': Number(rowData[field]),
+        //         'JSON.stringify(rowData[field])': JSON.stringify(rowData[field]),
+        //         'rowData keys': Object.keys(rowData),
+        //         'full rowData': rowData
+        //     });
+        // }
 
         if (!rowData.hasOwnProperty(field)) {
             console.warn(`evaluateThresholds: Field '${field}' not found in row data`);
@@ -275,10 +285,9 @@ export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) =
         if (value === null || value === undefined) return;
 
         let conditionMet = false;
-        const numValue = parseFloat(value);
-        const compareValue = upperField && rowData[upperField] !== undefined
-            ? parseFloat(rowData[upperField])
-            : parseFloat(threshold.value || 0);
+        const numValue = parseFloat(cellValue !== null ? cellValue : 0); // Cell value
+        const compareValue = parseFloat(rowData[field]); // Threshold reference value
+
 
         if (isNaN(numValue) || isNaN(compareValue)) return;
 
@@ -298,6 +307,12 @@ export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) =
             case 'less_equal':
                 conditionMet = numValue <= compareValue;
                 break;
+            case 'below':  // Add support for FinanceabilityConfig usage
+                conditionMet = numValue < compareValue;
+                break;
+            case 'above':  // Add support for FinanceabilityConfig usage
+                conditionMet = numValue > compareValue;
+                break;
             default:
                 console.warn(`Unknown comparison operator: ${comparison}`);
                 return;
@@ -305,13 +320,19 @@ export const evaluateThresholds = (rowData, thresholds = [], cellValue = null) =
 
         if (conditionMet && colorRule) {
             if (priority >= (appliedStyle._priority || 0)) {
-                appliedStyle = {
-                    color: colorRule.textColor || appliedStyle.color,
-                    backgroundColor: colorRule.backgroundColor || appliedStyle.backgroundColor,
-                    fontWeight: colorRule.bold ? 'bold' : appliedStyle.fontWeight,
-                    _priority: priority,
-                    _appliedRules: [...appliedRules, description || `${field} ${comparison} ${compareValue}`]
-                };
+                const result = typeof colorRule === 'function' ?
+                    colorRule(numValue, compareValue) :
+                    colorRule;
+
+                if (result) {
+                    appliedStyle = {
+                        color: result.color || appliedStyle.color,
+                        backgroundColor: result.backgroundColor || appliedStyle.backgroundColor,
+                        fontWeight: result.fontWeight || appliedStyle.fontWeight,
+                        _priority: priority,
+                        _appliedRules: [...appliedRules, description || `${field} ${comparison} ${compareValue}`]
+                    };
+                }
             }
         }
     });

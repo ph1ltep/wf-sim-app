@@ -117,6 +117,12 @@ export const createFinancialMetricsConfig = (context) => {
         selectable: true,
         align: 'center',
         width: 100,
+        // ADD: Marker support
+        marker: percentile === primaryPercentile ? {
+            type: 'primary',
+            color: '#1677ff',
+            tag: 'Primary'
+        } : null,
         formatter: (value, rowData) => {
             if (value === null || value === undefined || isNaN(value)) return '-';
 
@@ -506,7 +512,7 @@ const createFinancialThresholds = (financingData, scenarioData) => {
             {
                 field: 'target_irr_high',
                 comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a', fontWeight: 600 } : null,
+                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
                 priority: 5,
                 description: 'Project IRR >10% above target'
             }
@@ -522,7 +528,7 @@ const createFinancialThresholds = (financingData, scenarioData) => {
             {
                 field: 'target_equity_irr_high',
                 comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a', fontWeight: 600 } : null,
+                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
                 priority: 5,
                 description: 'Equity IRR >10% above target'
             }

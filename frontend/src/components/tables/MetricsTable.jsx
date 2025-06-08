@@ -3,7 +3,7 @@ import React, { useMemo, useCallback } from 'react';
 import { Table, Typography, Tag, Tooltip } from 'antd';
 import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useTableTheme, composeTheme, validateTableData, ensureUniqueKeys, getRowClasses } from './shared';
-import { MetricsCell } from './metrics/MetricsCell';
+import { MetricsCell, generateMetricsTableColumns } from './metrics';
 
 const { Text } = Typography;
 
@@ -33,50 +33,23 @@ const MetricsTable = ({
         });
     }, [baseTableTheme, additionalStyles, additionalCSS, containerClassName, tableClassName]);
 
-    // Data validation
+    // Data validation - ADDED
     const dataValidation = useMemo(() => {
-        return validateTableData(data);
+        return validateTableData(data, 'MetricsTable');
     }, [data]);
 
     const tableData = useMemo(() => {
         if (!dataValidation.isValid || !Array.isArray(data)) return [];
-        return data.map((row, index) => ({
-            ...row,
-            key: row.key || `row-${index}`
-        }));
+        return ensureUniqueKeys(data, 'key');
     }, [data, dataValidation.isValid]);
 
+
     // Column selection handler
-    const handleColumnSelect = useCallback((columnKey, rowData = null) => {
+    const handleColumnSelect = useCallback((key, rowData = null, columnConfig = null) => {
         if (!config.onColumnSelect) return;
-        const value = rowData && rowData[columnKey] !== undefined ?
-            rowData[columnKey] :
-            columnKey;
-        config.onColumnSelect(value, columnKey, rowData);
+        // Pass the key (percentile) directly, not cell value
+        config.onColumnSelect(key, columnConfig?.key || key, rowData);
     }, [config]);
-
-    // Generate CSS classes for columns based on state - CONSOLIDATED
-    const getColumnClasses = useCallback((columnConfig, isSelected, isPrimary) => {
-        const classes = [];
-
-        if (columnConfig.selectable) classes.push('header-clickable');
-        if (isPrimary) classes.push('cell-primary');
-        if (isSelected) classes.push('cell-selected');
-        if (isPrimary && isSelected) classes.push('cell-primary-selected');
-
-        return classes.length > 0 ? classes.join(' ') : undefined;
-    }, []);
-
-    // Generate CSS classes for headers based on state - CONSOLIDATED  
-    const getHeaderClasses = useCallback((columnConfig, isSelected, isPrimary) => {
-        const classes = ['header-clickable']; // Always clickable for metrics
-
-        if (isPrimary) classes.push('header-primary');
-        if (isSelected) classes.push('header-selected');
-        if (isPrimary && isSelected) classes.push('header-primary-selected');
-
-        return classes.join(' ');
-    }, []);
 
     // Render metric header with consolidated classes
     const renderMetricHeader = useCallback((record) => {
@@ -122,77 +95,10 @@ const MetricsTable = ({
         );
     }, []);
 
-    // Generate table columns using consolidated classes
+    // Generate table columns using refactored semantic engine
     const tableColumns = useMemo(() => {
-        if (!config.columns || !Array.isArray(config.columns)) {
-            return [];
-        }
-
-        // Header column (fixed left) - using consolidated classes
-        const headerColumn = {
-            title: 'Metric',
-            dataIndex: 'label',
-            key: 'header',
-            fixed: 'left',
-            width: 200,
-            className: 'table-header-cell',
-            render: (_, record) => renderMetricHeader(record)
-        };
-
-        // Data columns with consolidated CSS classes
-        const dataColumns = config.columns.map((columnConfig) => {
-            const isSelected = config.selectedColumn === columnConfig.key;
-            const isPrimary = columnConfig.primary;
-
-            return {
-                title: (
-                    <div
-                        className={getHeaderClasses(columnConfig, isSelected, isPrimary)}
-                        onClick={() => handleColumnSelect(columnConfig.key)}
-                    >
-                        <div className="cell-numerical">
-                            {columnConfig.label}
-                            {isPrimary && (
-                                <span className="cell-tag" style={{
-                                    fontSize: '9px',
-                                    marginLeft: '4px',
-                                    fontWeight: 600
-                                }}>
-                                    (Primary)
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                ),
-                dataIndex: columnConfig.key,
-                key: columnConfig.key,
-                width: columnConfig.width || 120,
-                align: columnConfig.align || 'center',
-                className: `table-data-cell ${getColumnClasses(columnConfig, isSelected, isPrimary) || ''}`.trim(),
-                // Use consolidated CSS classes for cell styling
-                onHeaderCell: () => ({
-                    className: getHeaderClasses(columnConfig, isSelected, isPrimary),
-                    onClick: () => handleColumnSelect(columnConfig.key)
-                }),
-                onCell: (record) => ({
-                    className: getColumnClasses(columnConfig, isSelected, isPrimary),
-                    onClick: columnConfig.selectable && config.onColumnSelect ?
-                        () => handleColumnSelect(columnConfig.key, record) : undefined
-                }),
-                render: (value, record) => (
-                    <MetricsCell
-                        value={value}
-                        rowData={record}
-                        columnConfig={columnConfig}
-                        isSelected={isSelected}
-                        isPrimary={isPrimary}
-                    />
-                )
-            };
-        });
-
-        return [headerColumn, ...dataColumns];
-    }, [config, handleColumnSelect, renderMetricHeader, getColumnClasses, getHeaderClasses]);
+        return generateMetricsTableColumns(tableData, config, handleColumnSelect);
+    }, [tableData, config, handleColumnSelect]);
 
     // Validation checks
     if (!config.columns || !Array.isArray(config.columns)) {
@@ -200,7 +106,6 @@ const MetricsTable = ({
         return <div>Invalid table configuration</div>;
     }
 
-    // Handle validation errors properly
     if (!dataValidation.isValid) {
         const errorMessage = Array.isArray(dataValidation.errors)
             ? dataValidation.errors.join(', ')
@@ -209,14 +114,15 @@ const MetricsTable = ({
         return <div>Invalid table data: {errorMessage}</div>;
     }
 
+
     return (
         <div className={finalTheme.containerClass}>
-            {/* Apply theme CSS globally */}
+            {/* FIXED: Add missing CSS injection */}
             <style jsx global>{finalTheme.cssRules}</style>
 
             <Table
                 className={finalTheme.tableClass}
-                columns={tableColumns}
+                columns={tableColumns} // Will fix in TC tasks
                 dataSource={tableData}
                 loading={loading}
                 rowKey="key"

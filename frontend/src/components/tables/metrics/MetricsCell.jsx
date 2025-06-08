@@ -1,4 +1,4 @@
-// src/components/tables/metrics/MetricsCell.jsx - v3.0 OPTIMIZED: No duplicate styling
+// src/components/tables/metrics/MetricsCell.jsx - v3.1 FIXED: Semantic class integration
 
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
@@ -9,41 +9,51 @@ const { Text } = Typography;
 /**
  * Format value based on column configuration
  */
-const formatValue = (value, columnConfig) => {
+const formatValue = (value, columnConfig, rowData) => {
     if (value === null || value === undefined || value === '') return null;
 
-    const { format, precision = 2, prefix = '', suffix = '' } = columnConfig;
+    // PRIORITY 1: Use columnConfig.formatter if provided (FinanceabilityConfig)
+    if (columnConfig.formatter && typeof columnConfig.formatter === 'function') {
+        return columnConfig.formatter(value, rowData);
+    }
 
-    let formattedValue = value;
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return value.toString();
+
+    // PRIORITY 2: Smart precision based on value magnitude
+    let precision = 2;
+    const absValue = Math.abs(numValue);
+
+    if (absValue >= 1000000) {
+        precision = 1; // Large numbers: 1 decimal
+    } else if (absValue >= 1000) {
+        precision = 0; // Thousands: no decimals
+    } else if (absValue < 1 && absValue > 0) {
+        precision = 3; // Small numbers: 3 decimals
+    }
+
+    const { format, prefix = '', suffix = '' } = columnConfig;
 
     switch (format) {
         case 'currency':
-            formattedValue = parseFloat(value).toLocaleString(undefined, {
-                style: 'currency',
-                currency: 'USD',
+            return `${prefix}$${numValue.toLocaleString(undefined, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
-            });
-            break;
+            })}${suffix}`;
         case 'percentage':
-            formattedValue = `${parseFloat(value).toFixed(precision)}%`;
-            break;
+            return `${prefix}${numValue.toFixed(precision)}%${suffix}`;
         case 'number':
-            formattedValue = parseFloat(value).toLocaleString(undefined, {
+        default:
+            return `${prefix}${numValue.toLocaleString(undefined, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
-            });
-            break;
-        default:
-            formattedValue = value.toString();
+            })}${suffix}`;
     }
-
-    return `${prefix}${formattedValue}${suffix}`;
 };
 
 /**
- * MetricsCell component - OPTIMIZED: semantic classes applied by parent <td>
- * This component focuses purely on content rendering and threshold styling
+ * MetricsCell component - UPDATED: Works with semantic class system
+ * Semantic classes applied by parent <td>, this component handles content + thresholds
  */
 export const MetricsCell = ({
     value,
@@ -51,39 +61,81 @@ export const MetricsCell = ({
     columnConfig = {},
     isSelected = false,
     isPrimary = false,
-    position = {}, // Not used - classes applied by parent
-    states = {}, // Not used - classes applied by parent
+    position = {}, // Not used for styling - semantic classes applied by parent
+    states = {}, // Not used for styling - semantic classes applied by parent
     className = '', // Not used - wrapped in content-inner
     style = {} // Not used - wrapped in content-inner
 }) => {
     // Format the display value
     const formattedValue = useMemo(() => {
-        return formatValue(value, columnConfig);
-    }, [value, columnConfig]);
+        return formatValue(value, columnConfig, rowData);
+    }, [value, columnConfig, rowData]);
 
-    // Evaluate thresholds for styling (PRESERVED: highest precedence)
+
+    // Evaluate thresholds for styling (HIGHEST PRECEDENCE - supersedes all theme styling)
     const thresholdStyles = useMemo(() => {
-        if (!columnConfig.thresholds || !Array.isArray(columnConfig.thresholds)) {
+        const thresholds = rowData.thresholds || columnConfig.thresholds;
+
+        if (!thresholds || !Array.isArray(thresholds) || thresholds.length === 0) {
             return {};
         }
-        return evaluateThresholds(rowData, columnConfig.thresholds, value);
+
+        // DETAILED DSCR DEBUGGING
+        // if (rowData.key === 'dscr') {
+        //     console.log('🎯 DSCR SPECIFIC DEBUG:', {
+        //         rowKey: rowData.key,
+        //         cellValue: value,
+        //         valueType: typeof value,
+        //         rowData: rowData,
+        //         hasThresholds: !!(rowData.thresholds),
+        //         thresholds: rowData.thresholds,
+        //         covenantThreshold: rowData.covenantThreshold,
+        //         covenantThresholdType: typeof rowData.covenantThreshold
+        //     });
+        // }
+
+        if (!rowData.thresholds || !Array.isArray(rowData.thresholds) || rowData.thresholds.length === 0) {
+            if (rowData.key === 'dscr') {
+                console.log('❌ DSCR: No thresholds found');
+            }
+            return {};
+        }
+
+
+        const result = evaluateThresholds(rowData, rowData.thresholds, value);
+
+        // if (rowData.key === 'dscr') {
+        //     console.log('🔍 DSCR evaluateThresholds result:', result);
+        // }
+
+        // DEBUG: Log threshold evaluation
+        if (process.env.NODE_ENV === 'development' && Object.keys(result).length > 0) {
+            console.log('Threshold applied:', {
+                rowKey: rowData.key,
+                value,
+                thresholds: columnConfig.thresholds,
+                appliedStyles: result
+            });
+        }
+
+        return result;
     }, [rowData, columnConfig.thresholds, value]);
 
-    // OPTIMIZED: Only threshold styling applied directly to content
-    // Semantic styling handled by parent <td> element
+
+    // UPDATED: Minimal base styling - let semantic classes handle most styling
     const cellStyle = useMemo(() => {
         const baseStyle = {
-            fontWeight: isPrimary ? 600 : 400,
             transition: 'all 0.2s ease',
-            width: '100%',
-            textAlign: 'inherit' // Inherit from parent
+            width: '100%'
+            // Removed: fontWeight, textAlign - handled by semantic classes
         };
 
         // Apply threshold styles (remove internal properties for DOM)
         const { _appliedRules, _priority, ...domThresholdStyles } = thresholdStyles;
 
+        // Threshold styles override everything (highest precedence)
         return { ...baseStyle, ...domThresholdStyles };
-    }, [isPrimary, thresholdStyles]);
+    }, [thresholdStyles]);
 
     // Handle empty or invalid values
     if (formattedValue === null || formattedValue === undefined || formattedValue === '') {

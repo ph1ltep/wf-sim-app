@@ -46,7 +46,9 @@ export const BASE_TABLE_THEMES = {
 
 export const createThemeStyles = (themeName, token) => {
     const primaryColor = token?.colorPrimary || '#1677ff';
+    const primaryColorActive = token?.colorPrimaryActive || '#16ccff';
     const primaryRgb = primaryColor.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
+    const primaryRgbActive = primaryColorActive.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
 
     const themeStyles = {
         standard: {
@@ -216,7 +218,12 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-
+            '.ant-table-tbody > tr:hover > td': {
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent) 10%) !important'
+            },
+            '.ant-table-tbody > tr:hover > td.state-selected': {
+                //backgroundColor: `rgba(${primaryRgb}, 0.08) !important`
+            },
             // Content hierarchy - metrics theme
             '.content': {
                 textAlign: 'center'
@@ -226,63 +233,39 @@ export const createThemeStyles = (themeName, token) => {
             },
             '.content-row': {},
             '.content-col': {},
-            '.content-subheader': {
-                padding: '8px 10px',
-                textAlign: 'left',
-                fontWeight: 500,
-                backgroundColor: '#f5f5f5'
-            },
+            '.content-subheader': {},
             '.content-header': {
+                minWidth: '100px',
                 padding: '8px 10px',
-                textAlign: 'center',
                 fontWeight: 600,
                 backgroundColor: '#fafafa'
             },
-            '.content-summary': {
-                padding: '8px 10px',
-                borderTop: '2px solid #d9d9d9',
-                backgroundColor: '#f0f0f0',
-                fontWeight: 600,
-                textAlign: 'center'
+            '.content-header.marker-primary': {
+                //borderBottom: '2px solid var(--marker-color, #52c41a)',
+                //backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 10%, transparent)',
             },
-            '.content-totals': {
-                padding: '8px 10px',
-                borderLeft: '2px solid #d9d9d9',
-                backgroundColor: '#f0f0f0',
-                fontWeight: 600,
-                textAlign: 'center'
-            },
-
             // Marker classes
-            '.marker-milestone': {
-                borderLeft: '3px solid var(--marker-color, #52c41a)',
+            '.marker-primary': {
+                borderBottom: '2px solid var(--marker-color, #52c41a)',
                 backgroundColor: 'color-mix(in srgb, var(--marker-color, #52c41a) 5%, transparent)',
-                borderRadius: '0 4px 4px 0'
+                position: 'relative'
             },
-
             // State classes
             '.state-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.08)`,
+                //backgroundColor: `rgba(${primaryRgb}, 0.12)`,
                 borderRadius: '4px'
             },
-            '.state-primary': {
-                color: primaryColor,
-                fontWeight: 700
-            },
-
             // State-position combinations
             '.state-header-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.12)`,
+                //backgroundColor: `rgba(${primaryRgb}, 0.12)`,
                 borderRadius: '4px 4px 0 0',
-                boxShadow: `0 2px 0px rgba(${primaryRgb}, 0.2)`
+                //boxShadow: `0 2px 0px rgba(${primaryRgbActive}, 0.2)`,
+                boxShadow: `0px 2px 0px #ff0000`,
+                borderBottom: `2px solid rgba(${primaryRgb}, 0.2)`
             },
             '.state-header-primary': {
                 color: primaryColor,
                 fontWeight: 700
-            },
-            '.state-subheader-selected': {
-                backgroundColor: `rgba(${primaryRgb}, 0.1)`,
-                borderRadius: '4px 0 0 4px'
             },
 
             // Content tag classes
@@ -306,10 +289,7 @@ export const createThemeStyles = (themeName, token) => {
                 width: '100%'
             },
             '.ant-table-tbody > tr:hover > td': {
-                //backgroundColor: 'inherit !important', // Prevent default hover
-                //filter: 'brightness(0.8) !important'
-                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent) 20%) !important'
-
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent)) !important'
             },
             '.ant-table-tbody > tr:hover > td.state-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.08) !important`
