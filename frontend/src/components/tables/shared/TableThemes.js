@@ -305,9 +305,12 @@ export const createThemeStyles = (themeName, token) => {
             '.table-base': {
                 width: '100%'
             },
-            // '.ant-table-tbody > tr:hover > td': {
-            //     backgroundColor: 'inherit !important' // Prevent default hover
-            // },
+            '.ant-table-tbody > tr:hover > td': {
+                //backgroundColor: 'inherit !important', // Prevent default hover
+                //filter: 'brightness(0.8) !important'
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent) 20%) !important'
+
+            },
             '.ant-table-tbody > tr:hover > td.state-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.08) !important`
             },

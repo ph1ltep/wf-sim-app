@@ -1,4 +1,4 @@
-# Table Theming System Documentation - v3.0 Final
+# Table Theming System Documentation - v3.1 Updated
 
 ## Overview
 
@@ -11,9 +11,9 @@ The table theming system provides a **semantic state-first architecture** with c
 | Principle | Implementation |
 |-----------|----------------|
 | **Semantic Classes** | Class names describe purpose, not structure (`.content-header` vs `.year-column-header`) |
-| **Class Concatenation** | CSS classes defined separately, combined in HTML (`class="table-base content content-cell content-row marker-milestone state-selected"`) |
+| **Class Concatenation** | CSS classes defined separately, combined in HTML (`class="table-base content content-cell marker-milestone state-selected"`) |
 | **Hierarchy via Specificity** | More specific classes override less specific ones (`.state-header-selected` > `.state-selected`) |
-| **Minimal Overrides** | Only define what needs to change from Ant Design defaults |
+| **Element-Appropriate Placement** | Classes applied to correct HTML elements (`content-row` on `<tr>`, `content-cell` on `<td>`) |
 
 ### Styling Hierarchy (Override Chain)
 
@@ -39,7 +39,7 @@ The table theming system provides a **semantic state-first architecture** with c
 10. Component Inline Style Injection (thresholds, marker colors) - highest precedence
 ```
 
-## Class Structure
+## Class Structure & Placement
 
 ### Container Classes
 - `.table-theme-container` - Theme container wrapper
@@ -48,18 +48,21 @@ The table theming system provides a **semantic state-first architecture** with c
 ### Content Type Classes
 - `.content` - Base content styling (minimal, let Ant Design handle most)
 
-### Content Structure Classes (NEW)
-- `.content-cell` - Individual cell styling (replaces old `.content-data`)
-- `.content-row` - Row-level styling (horizontal orientation)
-- `.content-col` - Column-level styling (vertical orientation)
+### Content Structure Classes (UPDATED)
+- `.content-cell` - Individual cell styling (applied to `<td>` elements)
+- `.content-row` - Row-level styling (applied to `<tr>` elements via `onRow`)
+- `.content-col` - Column-level styling (applied to cells in vertical orientation only)
+
+**IMPORTANT:** Class placement has been corrected:
+- `content-row` → Applied to `<tr>` elements via `onRow` prop
+- `content-cell` → Applied to `<td>` elements via `onCell` prop  
+- `content-col` → Applied to `<td>` elements in vertical orientation (not `<col>` elements)
 
 ### Content Position Classes
 - `.content-subheader` - Sub-header styling (first column horizontal, first row vertical) - **MUTUALLY EXCLUSIVE with `.content-header`**
 - `.content-header` - Main header styling (actual table headers) - **SUPERSEDES and EXCLUDES `.content-subheader`**
 - `.content-summary` - Summary cells (bottom row horizontal, right column vertical)
 - `.content-totals` - Totals cells (right column horizontal, bottom row vertical)
-
-**Important**: `.content-header` and `.content-subheader` are mutually exclusive. A cell will get one OR the other, never both.
 
 ### Marker Classes
 - `.marker-milestone` - Timeline milestone markers
@@ -103,58 +106,50 @@ const cellClasses = getCellClasses({
   marker: { type: 'milestone', color: '#52c41a' },
   orientation: 'horizontal'
 });
-// Returns: "table-base content content-cell content-row marker-milestone state-selected"
+// Returns: "table-base content content-cell marker-milestone state-selected"
 
-// Generate classes for a subheader (first column in horizontal mode)
-const subheaderClasses = getCellClasses({
-  position: { 
-    rowIndex: 1, 
-    colIndex: 0,  // First column = subheader in horizontal mode
-    totalRows: 5, 
-    totalCols: 4, 
-    isHeaderRow: false, 
-    isHeaderCol: true,
-    orientation: 'horizontal'
-  },
-  states: {},
-  marker: null,
-  orientation: 'horizontal'
-});
-// Returns: "table-base content content-cell content-row content-subheader"
+// Generate row classes for <tr> elements
+const rowClasses = getRowClasses('horizontal');
+// Returns: "content-row"
 ```
 
-### HTML Output Examples
+### HTML Class Application
+
+**UPDATED:** Correct element targeting for classes:
 
 ```html
-<!-- Selected milestone data cell in horizontal mode -->
-<div class="table-base content content-cell content-row marker-milestone state-selected"
-     style="--marker-color: #52c41a;">
-  <span>Year +2</span>
-  <Tag className="content-tag">COD</Tag>
-</div>
-
-<!-- Contract name subheader in horizontal mode -->
-<div class="table-base content content-cell content-row content-subheader">
-  Contract Alpha
-</div>
-
-<!-- Year header with marker in vertical mode -->
-<div class="table-base content content-cell content-col content-subheader marker-milestone"
-     style="--marker-color: #52c41a;">
-  <span>Year +2</span>
-  <Tag className="content-tag">COD</Tag>
-</div>
+<!-- Correct class placement -->
+<tr class="content-row">
+  <td class="table-base content content-cell content-subheader">Contract Alpha</td>
+  <td class="table-base content content-cell marker-milestone state-selected" 
+      style="--marker-color: #52c41a;">
+    Year +2
+  </td>
+</tr>
 ```
 
-### CSS Custom Properties
+### Table Component Integration
 
-Marker colors are injected via CSS custom properties:
+Both InlineEditTable and MetricsTable use this pattern:
 
-```css
-.marker.milestone {
-  border-left: 3px solid var(--marker-color, #52c41a);
-  background-color: color-mix(in srgb, var(--marker-color, #52c41a) 5%, transparent);
-}
+```javascript
+// 1. Import the utilities
+import { useTableTheme, getRowClasses } from './shared/TableThemeEngine';
+
+// 2. Apply row classes via onRow
+<Table
+  onRow={(record) => ({
+    className: getRowClasses(orientation)
+  })}
+  columns={columns}
+  // ... other props
+/>
+
+// 3. Apply cell classes via onCell in column definitions
+onCell: (record, rowIndex) => ({
+  className: getCellClasses({ position, states, marker }),
+  style: getMarkerStyles(marker)
+})
 ```
 
 ## Available Themes
@@ -182,167 +177,206 @@ Any theme works with any table type because all themes implement the same semant
 <MetricsTable theme="standard" />     // Clean minimal
 ```
 
+## Ant Design Override Strategies
+
+### Common Override Patterns
+
+The theming system provides several strategies for overriding Ant Design's default behaviors:
+
+#### 1. Row Hover Effects
+
+**Default Ant Design Behavior:** Light gray background on row hover
+**Our Override:** Respects existing cell colors and applies contextual darkening
+
+```css
+.ant-table-tbody > tr:hover > td {
+  backgroundColor: color-mix(in srgb, currentColor 5%, var(--marker-color, transparent) 20%) !important;
+}
+```
+
+**How it works:**
+- `currentColor 5%` - Slightly darkens the existing background
+- `var(--marker-color, transparent) 20%` - Blends in marker color when present
+- Falls back to `transparent` when no marker color is set
+- Respects all existing cell states (selected, markers, etc.)
+
+#### 2. Disable Default Hover (Alternative)
+
+```css
+.ant-table-tbody > tr:hover > td {
+  background-color: inherit !important;
+}
+```
+
+#### 3. Selective Hover Re-enabling
+
+```css
+.ant-table-tbody > tr:hover > td.state-selected {
+  backgroundColor: rgba(22, 119, 255, 0.12) !important;
+}
+```
+
+#### 4. Header Styling Override
+
+```css
+.ant-table-thead > tr > th {
+  padding: 4px 8px;
+  backgroundColor: #fafafa;
+  borderBottom: 1px solid #f0f0f0;
+}
+```
+
+#### 5. Border and Spacing Overrides
+
+```css
+.ant-table-container {
+  borderTop: none;
+}
+
+.ant-table-thead > tr > th::before {
+  display: none; /* Remove column resize handles */
+}
+```
+
+### Advanced Color Mixing Techniques
+
+#### Using CSS `color-mix()` for Dynamic Colors
+
+```css
+/* Darken any background by 10% */
+.my-cell:hover {
+  backgroundColor: color-mix(in srgb, currentColor 90%, black 10%);
+}
+
+/* Blend with theme colors */
+.marker-milestone {
+  backgroundColor: color-mix(in srgb, var(--marker-color) 10%, transparent 90%);
+}
+
+/* Complex multi-color blending */
+.state-selected:hover {
+  backgroundColor: color-mix(in srgb, 
+    var(--primary-color) 15%, 
+    var(--marker-color, transparent) 10%, 
+    currentColor 75%
+  );
+}
+```
+
+#### CSS Custom Properties for Dynamic Theming
+
+```css
+/* Set at component level */
+.table-base {
+  --primary-color: #1677ff;
+  --primary-rgb: 22, 119, 255;
+  --marker-color: transparent; /* Default, overridden per cell */
+}
+
+/* Use in styles */
+.state-selected {
+  backgroundColor: rgba(var(--primary-rgb), 0.08);
+}
+```
+
 ## Orientation-Agnostic Design
 
 The same class system works for both horizontal and vertical orientations:
 
 ### Horizontal Mode (Years as Columns)
-- Headers: Top row (`.content.header`)
-- Selected Column: Entire year column (`.state.selected`)
-- Summary: Bottom row (`.content.summary`)
-- Totals: Right-most column (`.content.totals`)
+- Headers: Top row (`.content-header` on `<td>`)
+- Row styling: Each `<tr>` gets `.content-row`
+- Selected Column: Entire year column gets `.state-selected` on cells
+- Summary: Bottom row gets `.content-summary`
+- Totals: Right-most column gets `.content-totals`
 
 ### Vertical Mode (Years as Rows)
-- Headers: Left column (`.content.header`) 
-- Selected Row: Entire year row (`.state.selected`)
-- Summary: Right-most column (`.content.summary`)
-- Totals: Bottom row (`.content.totals`)
+- Headers: Left column (`.content-header` on `<td>`)
+- Row styling: Each `<tr>` gets `.content-row`
+- Column styling: Cells also get `.content-col` when in vertical mode
+- Selected Row: Entire year row gets `.state-selected` on cells
+- Summary: Right-most column gets `.content-summary`
+- Totals: Bottom row gets `.content-totals`
 
-## Integration Guide
+## CSS Custom Properties
 
-### Table Components
-
-Both InlineEditTable and MetricsTable use identical patterns:
-
-```javascript
-// 1. Generate semantic classes for each cell
-const cellClasses = getCellClasses({ position, states, marker });
-
-// 2. Apply to container element
-<div className={cellClasses} style={getMarkerStyles(marker)}>
-  <Component value={value} />
-</div>
-
-// 3. Use onHeaderCell/onCell for column-wide classes
-onCell: (record, rowIndex) => ({
-  className: getCellClasses({ position, states, marker }),
-  style: getMarkerStyles(marker)
-})
-```
-
-### Component Architecture
-
-```
-TableConfiguration.js
-├── Generates semantic classes via getCellClasses()
-├── Applies classes to container elements
-└── Components focus on their core functionality
-    ├── EditableCell: Editing logic + validation
-    └── MetricsCell: Value formatting + threshold styling
-```
-
-## Theme Development
-
-### Adding New Themes
-
-1. **Define base configuration**:
-```javascript
-// In BASE_TABLE_THEMES
-myTheme: {
-  name: 'MyTheme',
-  containerClass: 'table-theme-container',
-  tableClass: 'table-base', 
-  table: { size: 'small', bordered: true }
-}
-```
-
-2. **Define CSS classes** (only override what's needed):
-```javascript
-// In createThemeStyles()
-myTheme: {
-  '.content': { fontSize: '14px' },
-  '.state.selected': { backgroundColor: '#e6f7ff' },
-  '.marker.milestone': { borderLeft: '3px solid var(--marker-color)' }
-}
-```
-
-### Adding New Marker Types
-
-Marker types are generated dynamically from data:
-
-```javascript
-const newMarker = { type: 'deadline', color: '#ff4d4f' };
-// Automatically generates: .marker.deadline class
-```
-
-Add styling to themes as needed:
-```css
-.marker.deadline {
-  border: '2px solid var(--marker-color)',
-  background-color: 'transparent'
-}
-```
-
-## Technical Details
-
-### CSS Specificity Strategy
-
-Classes are ordered by specificity to ensure proper cascade:
-
-| Specificity | Class Example | Purpose | Notes |
-|-------------|---------------|---------|-------|
-| Low | `.content` | Base styling | Foundation layer |
-| Low-Medium | `.content-cell`, `.content-row`, `.content-col` | Structure styling | Layout-specific |
-| Medium | `.content-subheader` | Position styling | Orientation-aware |
-| Medium-High | `.content-header` | Position styling | Supersedes subheader |
-| High | `.marker-milestone` | Feature styling | Timeline markers |
-| Higher | `.state-selected` | Interaction styling | User states |
-| Highest | `.state-header-selected` | Combined feature + interaction | Most specific |
-
-### Timeline Theme Column Spreading
-
-The timeline theme includes special `.content-col` styling for improved layout:
+Marker colors and theme values are injected via CSS custom properties:
 
 ```css
-.content-col {
-  minWidth: '120px',
-  width: 'auto', 
-  flex: '1 1 auto'  /* Columns spread across available width */
+.marker-milestone {
+  border-left: 3px solid var(--marker-color, #52c41a);
+  background-color: color-mix(in srgb, var(--marker-color, #52c41a) 5%, transparent);
 }
 ```
 
-This ensures timeline columns distribute evenly across the screen width rather than bunching up on the left.
-
-### Performance Considerations
-
-- **CSS-in-JS caching**: Styles cached per theme instance
-- **Minimal class generation**: Only generate classes when needed
-- **Reduced CSS output**: ~60% fewer classes than previous system
-- **Efficient cascade**: CSS specificity handles hierarchy
-
-### Breaking Changes from v2.x
-
-| Old Pattern | New Pattern | Reason |
-|-------------|-------------|--------|
-| Nested CSS selectors | Separate class definitions | Class concatenation system |
-| Component-specific classes | Semantic content classes | Better reusability |
-| Inline style overrides | Theme-based styling | Cleaner separation |
-| Manual class composition | `getCellClasses()` utility | Consistent generation |
+Applied via inline styles on elements:
+```javascript
+style={{
+  '--marker-color': marker.color,
+  '--primary-color': token.colorPrimary
+}}
+```
 
 ## Migration Notes
 
 When updating existing components:
 
-1. **Replace manual class composition** with `getCellClasses()`
-2. **Move inline styles to themes** where possible
-3. **Use semantic position data** instead of hardcoded classes
-4. **Preserve threshold coloring** as inline injection (highest precedence)
-5. **Update imports** to use new utilities from TableThemeEngine
+1. **Import getRowClasses** and apply via `onRow` prop on Table components
+2. **Verify class placement** - `content-row` should only appear on `<tr>` elements
+3. **Update hover overrides** - Use the new color-mix pattern for better color blending
+4. **Test orientation switching** - Ensure classes apply correctly in both modes
+5. **Preserve threshold coloring** as inline injection (highest precedence)
 
 ## Best Practices
 
 ### Do ✅
 - Use `getCellClasses()` for all cell class generation
-- Apply semantic classes to container elements
-- Preserve component focus (EditableCell = editing, MetricsCell = formatting)
+- Use `getRowClasses()` for row class generation via `onRow`
+- Apply semantic classes to correct HTML elements
 - Use CSS custom properties for dynamic values (marker colors)
-- Define only needed overrides in themes
+- Use `color-mix()` for sophisticated color blending
+- Test both orientations when making changes
 
 ### Don't ❌
-- Don't generate classes manually
-- Don't apply semantic classes directly to functional components
-- Don't override Ant Design basics unless theme specifically needs it
+- Don't apply `content-row` to `<td>` elements
+- Don't try to use `<col>` elements for `content-col` classes
+- Don't override Ant Design hover without considering existing cell states
 - Don't use nested CSS selectors in theme definitions
-- Don't create component-specific classes (use semantic ones)
+- Don't hardcode colors when CSS custom properties are available
 
-This architecture provides a maintainable, predictable theming system that scales across table types while minimizing complexity and maximizing reusability.
+## Future Extensibility
+
+### Adding New Hover Effects
+
+```css
+/* Custom hover pattern */
+.my-theme .ant-table-tbody > tr:hover > td {
+  backgroundColor: color-mix(in srgb, 
+    var(--hover-color, #f0f0f0) 30%, 
+    currentColor 70%
+  ) !important;
+  transition: background-color 0.2s ease;
+}
+```
+
+### Adding New Marker Types
+
+```javascript
+// Dynamic class generation supports new types
+const newMarker = { type: 'deadline', color: '#ff4d4f' };
+// Automatically generates: .marker-deadline
+```
+
+### Adding New States
+
+```css
+/* Easy to extend state system */
+.state-highlighted { 
+  outline: 2px solid var(--highlight-color);
+}
+.state-header-highlighted { 
+  background-color: color-mix(in srgb, var(--highlight-color) 15%, currentColor 85%);
+}
+```
+
+This architecture maintains all existing functionality while providing sophisticated color handling and proper semantic class placement across all table elements.

@@ -2,7 +2,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { Table, Typography, Tag, Tooltip } from 'antd';
 import { InfoCircleOutlined, DollarOutlined, SafetyOutlined } from '@ant-design/icons';
-import { useTableTheme, composeTheme, validateTableData, ensureUniqueKeys } from './shared';
+import { useTableTheme, composeTheme, validateTableData, ensureUniqueKeys, getRowClasses } from './shared';
 import { MetricsCell } from './metrics/MetricsCell';
 
 const { Text } = Typography;
@@ -224,6 +224,9 @@ const MetricsTable = ({
                 size={finalTheme.tableProps.size}
                 bordered={finalTheme.tableProps.bordered}
                 scroll={{ x: 'max-content' }}
+                onRow={(record) => ({
+                    className: getRowClasses('horizontal') // MetricsTable is always horizontal
+                })}
                 {...tableProps}
             />
         </div>

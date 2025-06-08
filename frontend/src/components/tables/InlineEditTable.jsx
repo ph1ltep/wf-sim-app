@@ -21,7 +21,8 @@ import {
     useTableTheme,
     composeTheme,
     validateTableStructure,
-    ensureUniqueKeys
+    ensureUniqueKeys,
+    getRowClasses
 } from './shared';
 
 const { confirm } = Modal;
@@ -528,17 +529,25 @@ const InlineEditTable = ({
                 bordered={finalTheme.tableProps.bordered}
                 scroll={{ x: 'max-content' }}
                 rowClassName={getTimelineRowClasses}
-                onRow={orientation === 'vertical' ? (record) => {
-                    const marker = record.timelineMarker;
-                    return {
-                        className: getTimelineRowClasses(record),
-                        style: marker ? {
-                            backgroundColor: `${marker.color}08`,
-                            borderTop: `2px solid ${marker.color}30`,
-                            borderBottom: `1px solid ${marker.color}20`
-                        } : {}
-                    };
-                } : undefined}
+                onRow={orientation === 'vertical' ?
+                    (record) => {
+                        const marker = record.timelineMarker;
+                        const baseRowClasses = getRowClasses(orientation);
+                        const timelineClasses = getTimelineRowClasses(record);
+
+                        return {
+                            className: [baseRowClasses, timelineClasses].filter(Boolean).join(' '),
+                            style: marker ? {
+                                backgroundColor: `${marker.color}08`,
+                                borderTop: `2px solid ${marker.color}30`,
+                                borderBottom: `1px solid ${marker.color}20`
+                            } : {}
+                        };
+                    } :
+                    (record) => ({
+                        className: getRowClasses(orientation)
+                    })
+                }
                 {...tableProps}
             />
         </div>
