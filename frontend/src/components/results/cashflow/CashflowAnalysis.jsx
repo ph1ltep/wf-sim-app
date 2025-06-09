@@ -1,5 +1,5 @@
 // src/components/results/cashflow/CashflowAnalysis.jsx - Main cashflow analysis page
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Space, Typography, Divider, Button, Alert, Spin } from 'antd';
 import {
     ReloadOutlined,
@@ -12,11 +12,9 @@ import { useCashflow } from '../../../contexts/CashflowContext';
 import { FormSection, ResponsiveFieldRow } from '../../contextFields/layouts';
 import PercentileSelector from './components/PercentileSelector';
 
-// Import card components (will be created in next tasks)
+// Import card components
 import CashflowTimelineCard from '../../cards/CashflowTimelineCard';
 import FinanceabilityCard from '../../cards/FinanceabilityCard';
-// import DriverExplorerCard from '../../cards/DriverExplorerCard';
-// import CashflowTableCard from '../../cards/CashflowTableCard';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -126,19 +124,29 @@ const PlaceholderCard = ({ cardConfig, ...props }) => {
     );
 };
 
-// Main Component
 const CashflowAnalysis = () => {
     const { scenarioData } = useScenario();
     const {
         cashflowData,
         loading,
-        lastUpdated,
         transformError,
-        isDataStale,
         availablePercentiles,
         selectedPercentiles,
+        // UPDATED: Use the new initialization-aware methods
+        isInitialized,
+        isInitializing,
+        systemReady,
+        initializeAndRefresh,
         refreshCashflowData
     } = useCashflow();
+
+    // ADDED: Initialize on first mount if not already initialized
+    useEffect(() => {
+        if (!isInitialized && !isInitializing && scenarioData) {
+            console.log('💹 Cash Flows accessed for first time, initializing...');
+            initializeAndRefresh();
+        }
+    }, [isInitialized, isInitializing, scenarioData, initializeAndRefresh]);
 
     // Local state for card visibility
     const [cardVisibility, setCardVisibility] = useState(() => {
@@ -186,8 +194,8 @@ const CashflowAnalysis = () => {
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
-                            onClick={refreshCashflowData}
-                            loading={loading}
+                            onClick={initializeAndRefresh} // UPDATED: Use initialization method for errors
+                            loading={loading || isInitializing}
                         >
                             Retry
                         </Button>
@@ -201,7 +209,7 @@ const CashflowAnalysis = () => {
                         type="error"
                         showIcon
                         action={
-                            <Button size="small" onClick={refreshCashflowData} loading={loading}>
+                            <Button size="small" onClick={initializeAndRefresh} loading={loading || isInitializing}>
                                 Retry
                             </Button>
                         }
@@ -213,8 +221,8 @@ const CashflowAnalysis = () => {
 
     // Get enabled cards sorted by order
     const enabledCards = Object.entries(CASHFLOW_CARD_REGISTRY)
-        .filter(([cardId, config]) => cardVisibility[cardId] && config.enabled) // Check both visibility and enabled
-        .sort(([, a], [, b]) => (a.order || 999) - (b.order || 999)); // Handle missing order gracefully
+        .filter(([cardId, config]) => cardVisibility[cardId] && config.enabled)
+        .sort(([, a], [, b]) => (a.order || 999) - (b.order || 999));
 
     return (
         <div className="cashflow-analysis" style={{ padding: '20px' }}>
@@ -225,9 +233,18 @@ const CashflowAnalysis = () => {
                 </Col>
                 <Col>
                     <Space>
-                        {isDataStale && (
+                        {/* UPDATED: Show initialization status */}
+                        {isInitializing && (
                             <Alert
-                                message="Data may be stale"
+                                message="Initializing..."
+                                type="info"
+                                size="small"
+                                showIcon
+                            />
+                        )}
+                        {!systemReady && !isInitializing && (
+                            <Alert
+                                message="Prerequisites missing"
                                 type="warning"
                                 size="small"
                                 showIcon
@@ -236,10 +253,10 @@ const CashflowAnalysis = () => {
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
-                            onClick={refreshCashflowData}
-                            loading={loading}
+                            onClick={isInitialized ? refreshCashflowData : initializeAndRefresh} // UPDATED: Choose appropriate method
+                            loading={loading || isInitializing}
                         >
-                            Refresh Data
+                            {isInitialized ? 'Refresh Data' : 'Initialize'}
                         </Button>
                     </Space>
                 </Col>
@@ -253,9 +270,15 @@ const CashflowAnalysis = () => {
                     levels for different data sources.
                 </Paragraph>
 
-                {lastUpdated && (
+                {/* UPDATED: Show initialization status instead of lastUpdated */}
+                {isInitializing && (
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                        Last updated: {lastUpdated.toLocaleString()}
+                        Initializing prerequisites and calculating metrics...
+                    </Text>
+                )}
+                {isInitialized && !isInitializing && (
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                        System initialized and ready
                     </Text>
                 )}
             </FormSection>
@@ -320,9 +343,9 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cards Section */}
-            {loading ? (
+            {loading || isInitializing ? (
                 <Card>
-                    <Spin tip="Loading cashflow analysis..." style={{
+                    <Spin tip={isInitializing ? "Initializing cashflow system..." : "Loading cashflow analysis..."} style={{
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
@@ -333,12 +356,12 @@ const CashflowAnalysis = () => {
                 <Card>
                     <Alert
                         message="No Cashflow Data"
-                        description="Please refresh the data to generate cashflow analysis."
+                        description="Please initialize the cashflow system to generate analysis."
                         type="info"
                         showIcon
                         action={
-                            <Button onClick={refreshCashflowData} loading={loading}>
-                                Refresh Data
+                            <Button onClick={initializeAndRefresh} loading={loading || isInitializing}>
+                                Initialize System
                             </Button>
                         }
                     />
@@ -379,7 +402,9 @@ const CashflowAnalysis = () => {
                                     lineItemCount: cashflowData.lineItems?.length,
                                     aggregationKeys: Object.keys(cashflowData.aggregations || {}),
                                     financeMetricKeys: Object.keys(cashflowData.financeMetrics || {}),
-                                    selectedPercentiles
+                                    selectedPercentiles,
+                                    isInitialized,
+                                    systemReady
                                 }, null, 2)}
                             </pre>
                         </Card>

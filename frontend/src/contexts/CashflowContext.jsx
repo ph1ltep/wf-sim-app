@@ -1,4 +1,4 @@
-// src/contexts/CashflowContext.jsx - Fixed with proper error handling
+// src/contexts/CashflowContext.jsx - Complete lazy initialization implementation
 import React, { createContext, useContext, useCallback, useState, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import { useScenario } from './ScenarioContext';
@@ -6,7 +6,7 @@ import { getPercentileSourcesFromRegistry, createPerSourceDefaults } from '../ut
 import { transformScenarioToCashflow } from '../utils/cashflow/transform';
 import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
 import { validate } from '../utils/validate';
-import { refreshAllMetrics } from '../utils/metricsUtils';
+import { initializeCashflowSystem, isCashflowSystemReady } from '../utils/cashflow/initialization';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
@@ -197,13 +197,19 @@ validateRegistry();
 export const CashflowProvider = ({ children }) => {
     const { getValueByPath, scenarioData, updateByPath } = useScenario();
 
+    // Core state
     const [loading, setLoading] = useState(false);
     const [cashflowData, setCashflowData] = useState(null);
     const [transformError, setTransformError] = useState(null);
 
-    // Use ref to prevent infinite loops
+    // Lazy initialization state
+    const [isInitialized, setIsInitialized] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(false);
+
+    // Refs to prevent concurrent operations and infinite loops
     const refreshTimeoutRef = useRef(null);
     const lastScenarioIdRef = useRef(null);
+    const refreshInProgressRef = useRef(false);
 
     // Basic percentile info with error handling
     const availablePercentiles = useMemo(() => {
@@ -248,28 +254,175 @@ export const CashflowProvider = ({ children }) => {
         perSource: {}
     }));
 
-    // Test percentile mode when it changes
-    React.useEffect(() => {
-        if (selectedPercentiles && scenarioData) {
-            console.log('🔄 Percentile selection changed:', {
-                strategy: selectedPercentiles.strategy,
-                unified: selectedPercentiles.unified,
-                perSourceCount: Object.keys(selectedPercentiles.perSource).length
-            });
+    // Check if system appears ready (for UI hints)
+    const systemReady = useMemo(() => {
+        return scenarioData ? isCashflowSystemReady(getValueByPath) : false;
+    }, [scenarioData, getValueByPath]);
 
-            // Validate unified mode
-            if (selectedPercentiles.strategy === 'unified') {
-                const isValidPercentile = availablePercentiles.includes(selectedPercentiles.unified);
-                if (!isValidPercentile) {
-                    console.warn('⚠️ Invalid unified percentile:', selectedPercentiles.unified, 'Available:', availablePercentiles);
-                } else {
-                    console.log('✅ Valid unified percentile:', selectedPercentiles.unified);
-                }
-            }
+    /**
+     * Initialize and refresh cashflow data (for first access)
+     * This is the main entry point when Cash Flows is accessed for the first time
+     */
+    const initializeAndRefresh = useCallback(async () => {
+        if (!scenarioData) {
+            setTransformError('No active scenario available');
+            setCashflowData(null);
+            return null;
         }
-    }, [selectedPercentiles, availablePercentiles, scenarioData]);
 
-    // Update defaults when scenario loads - prevent infinite loop
+        // Prevent concurrent operations
+        if (refreshInProgressRef.current) {
+            console.log('⏳ Operation already in progress, skipping');
+            return null;
+        }
+
+        refreshInProgressRef.current = true;
+        setIsInitializing(true);
+        setLoading(true);
+        setTransformError(null);
+
+        try {
+            console.log('🚀 Starting cashflow system initialization and refresh');
+
+            // Step 1: Initialize the system (prerequisites + metrics)
+            const initSuccess = await initializeCashflowSystem(
+                scenarioData,
+                getValueByPath,
+                updateByPath,
+                {
+                    onProgress: (step) => console.log(`📋 ${step}`)
+                }
+            );
+
+            if (!initSuccess) {
+                throw new Error('Failed to initialize cashflow system');
+            }
+
+            // Step 2: Transform to cashflow data
+            console.log('💹 Transforming to cashflow data...');
+            const transformedData = await transformScenarioToCashflow(
+                scenarioData,
+                CASHFLOW_SOURCE_REGISTRY,
+                selectedPercentiles,
+                getValueByPath
+            );
+
+            if (transformedData) {
+                setCashflowData(transformedData);
+                setIsInitialized(true);
+                console.log('✅ Cashflow initialization and refresh completed');
+                message.success('Cashflow data initialized successfully');
+                return transformedData;
+            } else {
+                throw new Error('Transform returned no data');
+            }
+
+        } catch (error) {
+            console.error('❌ Cashflow initialization failed:', error);
+            setTransformError(error.message || 'Failed to initialize cashflow data');
+            setCashflowData(null);
+            setIsInitialized(false);
+            message.error('Failed to initialize cashflow data');
+            return null;
+        } finally {
+            setLoading(false);
+            setIsInitializing(false);
+            refreshInProgressRef.current = false;
+        }
+    }, [scenarioData, selectedPercentiles, getValueByPath, updateByPath]);
+
+    /**
+     * Simple refresh for subsequent refreshes (no initialization)
+     */
+    const refreshCashflowData = useCallback(async () => {
+        if (!scenarioData) {
+            setTransformError('No active scenario available');
+            setCashflowData(null);
+            return null;
+        }
+
+        // If not initialized yet, use full initialization
+        if (!isInitialized) {
+            return initializeAndRefresh();
+        }
+
+        // Prevent concurrent operations
+        if (refreshInProgressRef.current) {
+            console.log('⏳ Refresh already in progress, skipping');
+            return null;
+        }
+
+        refreshInProgressRef.current = true;
+        setLoading(true);
+        setTransformError(null);
+
+        try {
+            console.log('🔄 Refreshing cashflow data (system already initialized)');
+
+            const transformedData = await transformScenarioToCashflow(
+                scenarioData,
+                CASHFLOW_SOURCE_REGISTRY,
+                selectedPercentiles,
+                getValueByPath
+            );
+
+            if (transformedData) {
+                setCashflowData(transformedData);
+                message.success('Cashflow data refreshed');
+                return transformedData;
+            } else {
+                setTransformError('Transform returned no data');
+                setCashflowData(null);
+                return null;
+            }
+
+        } catch (error) {
+            console.error('❌ Refresh failed:', error);
+            setTransformError(error.message || 'Failed to refresh cashflow data');
+            setCashflowData(null);
+            message.error('Failed to refresh cashflow data');
+            return null;
+        } finally {
+            setLoading(false);
+            refreshInProgressRef.current = false;
+        }
+    }, [scenarioData, selectedPercentiles, getValueByPath, isInitialized, initializeAndRefresh]);
+
+    // Simple update function for percentile changes
+    const updatePercentileSelection = useCallback((newSelection) => {
+        setSelectedPercentiles(newSelection);
+
+        // Debounce refresh to prevent rapid firing
+        if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+        }
+
+        refreshTimeoutRef.current = setTimeout(() => {
+            if (cashflowData && isInitialized) {
+                refreshCashflowData();
+            }
+        }, 100);
+
+        return true;
+    }, [cashflowData, isInitialized, refreshCashflowData]);
+
+    // Reset initialization state when scenario changes
+    React.useEffect(() => {
+        const currentScenarioId = scenarioData?._id || scenarioData?.name || 'new';
+
+        if (currentScenarioId !== lastScenarioIdRef.current) {
+            lastScenarioIdRef.current = currentScenarioId;
+
+            // Reset state for new scenario
+            setIsInitialized(false);
+            setCashflowData(null);
+            setTransformError(null);
+
+            console.log('📋 Scenario changed, reset cashflow initialization state');
+        }
+    }, [scenarioData]);
+
+    // Update percentile defaults when scenario loads
     React.useEffect(() => {
         if (primaryPercentile && percentileSources.length > 0) {
             setSelectedPercentiles(prev => {
@@ -291,100 +444,26 @@ export const CashflowProvider = ({ children }) => {
         }
     }, [primaryPercentile, percentileSources]);
 
-    // Simple update function
-    const updatePercentileSelection = useCallback((newSelection) => {
-        setSelectedPercentiles(newSelection);
-
-        // Debounce refresh to prevent rapid firing
-        if (refreshTimeoutRef.current) {
-            clearTimeout(refreshTimeoutRef.current);
-        }
-
-        refreshTimeoutRef.current = setTimeout(() => {
-            if (cashflowData) {
-                refreshCashflowData();
-            }
-        }, 100);
-
-        return true;
-    }, [cashflowData]);
-
-    // Safe refresh with comprehensive error handling
-    const refreshCashflowData = useCallback(async () => {
-        if (!scenarioData) {
-            setTransformError('No active scenario available');
-            setCashflowData(null);
-            return null;
-        }
-
-        if (loading) {
-            console.log('Refresh already in progress, skipping');
-            return null;
-        }
-
-        setLoading(true);
-        setTransformError(null);
-
-        try {
-            console.log('Starting cashflow transformation with data:', {
-                scenarioId: scenarioData._id || 'new',
-                selectedPercentiles,
-                availablePercentiles
+    // Log percentile changes for debugging
+    React.useEffect(() => {
+        if (selectedPercentiles && scenarioData) {
+            console.log('🔄 Percentile selection changed:', {
+                strategy: selectedPercentiles.strategy,
+                unified: selectedPercentiles.unified,
+                perSourceCount: Object.keys(selectedPercentiles.perSource).length
             });
 
-            // ADDED: Refresh metrics before cashflow transformation
-            if (updateByPath) {
-                console.log('🔄 Refreshing metrics before cashflow transformation...');
-                await refreshAllMetrics(scenarioData, updateByPath);
-            }
-
-            const transformedData = await transformScenarioToCashflow(
-                scenarioData,
-                CASHFLOW_SOURCE_REGISTRY,
-                selectedPercentiles,
-                getValueByPath
-            );
-
-            if (transformedData) {
-                setCashflowData(transformedData);
-                message.success('Cashflow data refreshed');
-                return transformedData;
-            } else {
-                setTransformError('Transform returned no data');
-                setCashflowData(null);
-                return null;
-            }
-        } catch (error) {
-            console.error('Transform error:', error);
-            setTransformError(error.message || 'Failed to transform cashflow data');
-            setCashflowData(null);
-            message.error('Failed to refresh cashflow data');
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    }, [scenarioData, selectedPercentiles, getValueByPath, loading, updateByPath]);
-
-    // Auto-refresh when scenario changes - prevent infinite loop
-    React.useEffect(() => {
-        const currentScenarioId = scenarioData?._id || scenarioData?.name || 'new';
-
-        // Only refresh if scenario actually changed
-        if (currentScenarioId !== lastScenarioIdRef.current) {
-            lastScenarioIdRef.current = currentScenarioId;
-
-            if (scenarioData && !loading) {
-                // Debounce the refresh
-                if (refreshTimeoutRef.current) {
-                    clearTimeout(refreshTimeoutRef.current);
+            // Validate unified mode
+            if (selectedPercentiles.strategy === 'unified') {
+                const isValidPercentile = availablePercentiles.includes(selectedPercentiles.unified);
+                if (!isValidPercentile) {
+                    console.warn('⚠️ Invalid unified percentile:', selectedPercentiles.unified, 'Available:', availablePercentiles);
+                } else {
+                    console.log('✅ Valid unified percentile:', selectedPercentiles.unified);
                 }
-
-                refreshTimeoutRef.current = setTimeout(() => {
-                    refreshCashflowData();
-                }, 100);
             }
         }
-    }, [scenarioData, refreshCashflowData, loading]);
+    }, [selectedPercentiles, availablePercentiles, scenarioData]);
 
     // Cleanup timeouts
     React.useEffect(() => {
@@ -401,6 +480,11 @@ export const CashflowProvider = ({ children }) => {
         loading,
         transformError,
 
+        // Lazy initialization state
+        isInitialized,
+        isInitializing,
+        systemReady,
+
         // Percentiles
         availablePercentiles,
         primaryPercentile,
@@ -409,7 +493,8 @@ export const CashflowProvider = ({ children }) => {
         updatePercentileSelection,
 
         // Actions
-        refreshCashflowData,
+        initializeAndRefresh, // For first access and error recovery
+        refreshCashflowData,  // For subsequent refreshes
 
         // Config
         sourceRegistry: CASHFLOW_SOURCE_REGISTRY
