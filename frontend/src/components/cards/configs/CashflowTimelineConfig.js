@@ -1,5 +1,5 @@
 // src/components/cards/configs/CashflowTimelineConfig.js - CashflowTimelineCard configuration factory
-import { addRefinancingAnnotations } from '../../../utils/charts';
+import { addRefinancingAnnotations, getFinancialColorScheme, getSemanticColor } from '../../../utils/charts';
 
 /**
  * Create timeline chart configuration for CashflowTimelineCard
@@ -12,7 +12,8 @@ export const createTimelineChartConfig = (context) => {
         selectedPercentiles,
         showDebtService = true,
         showEquityCashflow = true,
-        lineItems = []
+        lineItems = [],
+        token
     } = context;
 
     if (!cashflowData || !cashflowData.aggregations) {
@@ -55,14 +56,14 @@ export const createTimelineChartConfig = (context) => {
         equityCashflowData,
         showDebtService,
         showEquityCashflow
-    });
+    }, { token });
 
     // Create layout with annotations
     let layout = createTimelineLayout(cashflowData.metadata.currency);
 
     // Add refinancing window annotations
     const refinancingWindows = [
-        { startYear: 5, endYear: 7, label: 'Typical Refinancing Window', color: '#faad14' }
+        { startYear: 5, endYear: 7, label: 'Typical Refinancing Window', color: getSemanticColor('warning', 5, token) }
     ];
     layout = addRefinancingAnnotations(layout, refinancingWindows);
 
@@ -72,9 +73,12 @@ export const createTimelineChartConfig = (context) => {
 /**
  * Build chart traces for timeline visualization
  * @param {Object} traceData - Data for all trace types
+ * @param {Object} options - Additional objects, in array form.
  * @returns {Array} Array of Plotly trace objects
  */
-const buildTimelineTraces = (traceData) => {
+const buildTimelineTraces = (traceData, options = {}) => {
+    const { token } = options;
+
     const {
         totalRevenue,
         totalCosts,
@@ -85,81 +89,73 @@ const buildTimelineTraces = (traceData) => {
         showEquityCashflow
     } = traceData;
 
+    // Financial colors defined directly (no token support needed)
+    const colors = {
+        revenue: getFinancialColorScheme('revenue'),           // green[7] - deep green
+        costs: getFinancialColorScheme('costs'),               // red[6] - deep red
+        profit: getFinancialColorScheme('netCashflow'),        // blue[4] - light blue for net
+        debt: getFinancialColorScheme('debtService'),          // volcano[5] - warm red-orange
+        equity: getFinancialColorScheme('freeCashflow'),       // cyan[7] - dark cyan
+        breakeven: getFinancialColorScheme('breakeven')        // grey[5] - neutral
+    };
+
     const traces = [];
 
-    // Revenue trace (positive, green)
+    // Revenue trace (deep green - strong positive)
     traces.push({
         x: totalRevenue.data.map(d => d.year),
         y: totalRevenue.data.map(d => d.value),
         type: 'scatter',
         mode: 'lines+markers',
         name: 'Revenue',
-        line: { color: '#52c41a', width: 3 },
+        line: { color: colors.revenue, width: 3 },
         marker: { size: 6 },
         yaxis: 'y',
         hovertemplate: 'Year: %{x}<br>Revenue: $%{y:,.0f}<extra></extra>'
     });
 
-    // Costs trace (negative, red)
+    // Costs trace (deep red - clearly negative)
     traces.push({
         x: totalCosts.data.map(d => d.year),
         y: totalCosts.data.map(d => -d.value),
         type: 'scatter',
         mode: 'lines+markers',
         name: 'Costs',
-        line: { color: '#ff4d4f', width: 3 },
+        line: { color: colors.costs, width: 3 },
         marker: { size: 6 },
         yaxis: 'y',
         hovertemplate: 'Year: %{x}<br>Costs: $%{y:,.0f}<extra></extra>'
     });
 
-    // Net cashflow trace (blue)
+    // Net cashflow trace (blue - analytical result)
     traces.push({
         x: netCashflow.data.map(d => d.year),
         y: netCashflow.data.map(d => d.value),
         type: 'scatter',
         mode: 'lines+markers',
         name: 'Net Cash Flow',
-        line: { color: '#1890ff', width: 4 },
+        line: { color: colors.profit, width: 4 },
         marker: { size: 8 },
         yaxis: 'y',
         hovertemplate: 'Year: %{x}<br>Net Cash Flow: $%{y:,.0f}<extra></extra>'
     });
 
-    // FIXED: Add debt service on secondary axis when enabled and data exists
+    // Debt service (red-orange - debt burden)
     if (debtServiceData?.data && showDebtService) {
-        console.log('Adding debt service trace with', debtServiceData.data.length, 'points');
         traces.push({
             x: debtServiceData.data.map(d => d.year),
             y: debtServiceData.data.map(d => d.value),
             type: 'scatter',
             mode: 'lines+markers',
             name: 'Debt Service',
-            line: { color: '#722ed1', width: 2, dash: 'dot' },
+            line: { color: colors.debt, width: 2, dash: 'dot' },
             marker: { size: 5 },
             yaxis: 'y2',
             hovertemplate: 'Year: %{x}<br>Debt Service: $%{y:,.0f}<extra></extra>'
         });
     }
 
-    // FIXED: Add equity cash flow on primary axis when enabled and data exists
-    if (equityCashflowData?.data && showEquityCashflow) {
-        console.log('Adding equity cash flow trace with', equityCashflowData.data.length, 'points');
-        traces.push({
-            x: equityCashflowData.data.map(d => d.year),
-            y: equityCashflowData.data.map(d => d.value),
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: 'Free Cash Flow to Equity',
-            line: { color: '#13c2c2', width: 2 },
-            marker: { size: 5 },
-            yaxis: 'y',
-            hovertemplate: 'Year: %{x}<br>Equity Cash Flow: $%{y:,.0f}<extra></extra>'
-        });
-    }
-
-
-    // Add equity cash flow on primary axis
+    // Free cash flow to equity (dark cyan - investor focused)
     if (equityCashflowData?.data && showEquityCashflow) {
         traces.push({
             x: equityCashflowData.data.map(d => d.year),
@@ -167,14 +163,14 @@ const buildTimelineTraces = (traceData) => {
             type: 'scatter',
             mode: 'lines+markers',
             name: 'Free Cash Flow to Equity',
-            line: { color: '#13c2c2', width: 2 },
+            line: { color: colors.equity, width: 2 },
             marker: { size: 5 },
             yaxis: 'y',
             hovertemplate: 'Year: %{x}<br>Equity Cash Flow: $%{y:,.0f}<extra></extra>'
         });
     }
 
-    // Add zero line
+    // Zero line (neutral gray)
     const years = netCashflow.data.map(d => d.year);
     traces.push({
         x: years,
@@ -182,7 +178,7 @@ const buildTimelineTraces = (traceData) => {
         type: 'scatter',
         mode: 'lines',
         name: 'Break-even',
-        line: { color: '#999', width: 1, dash: 'dash' },
+        line: { color: colors.breakeven, width: 1, dash: 'dash' },
         yaxis: 'y',
         showlegend: false,
         hoverinfo: 'skip'

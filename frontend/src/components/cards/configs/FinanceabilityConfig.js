@@ -1,6 +1,7 @@
 // frontend/src/components/cards/configs/FinanceabilityConfig.js - Fixed column labels and chart filtering
 
 import { addCovenantAnnotations } from '../../../utils/charts/annotations';
+import { getFinancialColorScheme, getSemanticColor } from '../../../utils/charts/colors';
 
 /**
  * Create financial metrics table configuration for FinanceabilityCard
@@ -8,6 +9,8 @@ import { addCovenantAnnotations } from '../../../utils/charts/annotations';
  * @returns {Object} { data, config } for MetricsTable
  */
 export const createFinancialMetricsConfig = (context) => {
+    const { token } = context; // Add token to context
+
     const {
         financingData,
         availablePercentiles,
@@ -120,7 +123,7 @@ export const createFinancialMetricsConfig = (context) => {
         // ADD: Marker support
         marker: percentile === primaryPercentile ? {
             type: 'primary',
-            color: '#1677ff',
+            color: getSemanticColor('primary', 5, token), // Use token-aware colors
             tag: 'Primary'
         } : null,
         formatter: (value, rowData) => {
@@ -324,18 +327,11 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
         projectLife = 20
     } = options;
 
-    console.log('prepareFinancialTimelineData called with:', {
-        metrics,
-        selectedPercentile,
-        showAllPercentiles,
-        availablePercentiles
-    });
-
     const traces = [];
     const colors = {
-        dscr: '#1890ff',
-        llcr: '#52c41a',
-        icr: '#faad14'
+        dscr: getFinancialColorScheme('dscr'),    // blue[5] or token.colorPrimary
+        llcr: getFinancialColorScheme('llcr'),    // blue[6] (deeper blue)
+        icr: getFinancialColorScheme('icr')       // blue[4] (lighter blue)
     };
 
     // Marker symbols for different metrics

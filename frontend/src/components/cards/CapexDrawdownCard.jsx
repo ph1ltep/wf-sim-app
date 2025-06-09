@@ -7,6 +7,7 @@ import { InlineEditTable } from '../tables';
 import { TableControls } from '../tables/inline/TableControls';
 import { FieldCard } from '../contextFields';
 import { generateConstructionCostSources } from '../../utils/drawdownUtils';
+import { getSemanticColor } from '../../utils/charts';
 
 const { Text } = Typography;
 
@@ -104,9 +105,9 @@ const CapexDrawdownCard = ({
 
     // Timeline markers using actual metrics
     const timelineMarkers = useMemo(() => [
-        { year: developmentStartYear, tag: 'DEV', type: 'milestone', color: '#1677ff', label: 'Development Start' },
-        { year: ntpYear, tag: 'NTP', type: 'milestone', color: '#fa8c16', label: 'Notice to Proceed' },
-        { year: 0, tag: 'COD', type: 'milestone', color: '#52c41a', label: 'Commercial Operation' }
+        { year: developmentStartYear, tag: 'DEV', type: 'milestone', color: getSemanticColor('development', 5), label: 'Development Start' },
+        { year: ntpYear, tag: 'NTP', type: 'milestone', color: getSemanticColor('construction', 5), label: 'Notice to Proceed' },
+        { year: 0, tag: 'COD', type: 'milestone', color: getSemanticColor('operation', 5), label: 'Commercial Operation' }
     ], [developmentStartYear, ntpYear]);
 
     // Handle before save

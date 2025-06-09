@@ -1,5 +1,5 @@
 // src/components/tables/shared/TableThemes.js - v3.0 FINAL: Separate Class Definitions
-
+import { blue, green, red, orange, grey } from '@ant-design/colors';
 import { min } from "lodash";
 
 // Keep existing BASE_TABLE_THEMES configuration
@@ -45,10 +45,18 @@ export const BASE_TABLE_THEMES = {
 // src/components/tables/shared/TableThemes.js - v3.0 UPDATED: New content hierarchy + timeline column sizing
 
 export const createThemeStyles = (themeName, token) => {
-    const primaryColor = token?.colorPrimary || '#1677ff';
-    const primaryColorActive = token?.colorPrimaryActive || '#16ccff';
-    const primaryRgb = primaryColor.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
-    const primaryRgbActive = primaryColorActive.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
+    // Use token colors with Ant Design color fallbacks
+    const primaryColor = token?.colorPrimary || blue[5];
+    const primaryColorActive = token?.colorPrimary || blue[7];
+    const successColor = token?.colorSuccess || green[5];
+    const errorColor = token?.colorError || red[5];
+    const warningColor = token?.colorWarning || orange[5];
+
+    // Extract RGB for rgba usage
+    const primaryRgb = extractRgb(primaryColor);
+    const primaryRgbActive = extractRgb(primaryColor);
+    const successRgb = extractRgb(successColor);
+    const errorRgb = extractRgb(errorColor);
 
     const themeStyles = {
         standard: {
@@ -289,7 +297,7 @@ export const createThemeStyles = (themeName, token) => {
                 width: '100%'
             },
             '.ant-table-tbody > tr:hover > td': {
-                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent)) !important'
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, var(--marker-color, transparent) 10%) !important'
             },
             '.ant-table-tbody > tr:hover > td.state-selected': {
                 backgroundColor: `rgba(${primaryRgb}, 0.08) !important`
@@ -334,6 +342,14 @@ export const createThemeStyles = (themeName, token) => {
 
     const normalizedThemeName = themeName.toLowerCase();
     return themeStyles[normalizedThemeName] || themeStyles.standard;
+};
+
+// Helper function to extract RGB from hex or token
+const extractRgb = (color) => {
+    if (color.startsWith('#')) {
+        return color.replace('#', '').match(/.{2}/g)?.map(x => parseInt(x, 16)).join(', ') || '22, 119, 255';
+    }
+    return '22, 119, 255'; // fallback
 };
 
 // Keep existing utility functions unchanged
