@@ -40,17 +40,20 @@ const CashflowTimelineCard = ({ cashflowData, selectedPercentiles }) => {
         return createMultiplierSummary(cashflowData?.lineItems);
     }, [cashflowData]);
 
-    // Add new useMemo for controls and metadata:
+    // FIXED: Update controls configuration to check for both debt service components
     const controlsConfig = useMemo(() => {
-        const debtServiceLineItem = cashflowData?.lineItems?.find(item => item.id === 'operationalDebtService');
+        // Check for either operationalInterest or operationalPrincipal
+        const interestLineItem = cashflowData?.lineItems?.find(item => item.id === 'operationalInterest');
+        const principalLineItem = cashflowData?.lineItems?.find(item => item.id === 'operationalPrincipal');
+        const hasDebtService = !!(interestLineItem || principalLineItem);
 
         return createChartControlsConfig({
             showDebtService,
             showEquityCashflow,
             onToggleDebtService: setShowDebtService,
             onToggleEquityCashflow: setShowEquityCashflow,
-            hasDebtService: !!debtServiceLineItem,
-            hasEquityCashflow: !!debtServiceLineItem
+            hasDebtService,
+            hasEquityCashflow: hasDebtService // Equity cashflow depends on debt service
         });
     }, [showDebtService, showEquityCashflow, cashflowData]);
 

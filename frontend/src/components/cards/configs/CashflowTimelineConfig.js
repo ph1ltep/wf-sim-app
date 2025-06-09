@@ -23,17 +23,14 @@ export const createTimelineChartConfig = (context) => {
     const { totalCosts, totalRevenue, netCashflow } = cashflowData.aggregations;
     const primaryPercentile = selectedPercentiles?.unified || 50;
 
-    // Find debt service and equity cashflow line items
-    const debtServiceLineItem = lineItems.find(item => item.id === 'operationalDebtService');
+    // FIXED: Find both interest and principal line items for debt service
+    const interestLineItem = lineItems.find(item => item.id === 'operationalInterest');
+    const principalLineItem = lineItems.find(item => item.id === 'operationalPrincipal');
 
-    // Get debt service data
+    // FIXED: Combine interest and principal to create total debt service
     let debtServiceData = null;
-    if (debtServiceLineItem && showDebtService) {
-        if (debtServiceLineItem.percentileData?.has(primaryPercentile)) {
-            debtServiceData = { data: debtServiceLineItem.percentileData.get(primaryPercentile) };
-        } else if (debtServiceLineItem.data) {
-            debtServiceData = { data: debtServiceLineItem.data };
-        }
+    if ((interestLineItem || principalLineItem) && showDebtService) {
+        debtServiceData = combineDebtServiceData(interestLineItem, principalLineItem, primaryPercentile);
     }
 
     // Calculate equity cash flow (net cashflow - debt service)
@@ -68,6 +65,59 @@ export const createTimelineChartConfig = (context) => {
     layout = addRefinancingAnnotations(layout, refinancingWindows);
 
     return { data: traces, layout };
+};
+
+/**
+ * ADDED: Combine interest and principal line items into total debt service
+ * @param {Object} interestLineItem - Interest payments line item
+ * @param {Object} principalLineItem - Principal payments line item  
+ * @param {number} primaryPercentile - Primary percentile to use
+ * @returns {Object|null} Combined debt service data
+ */
+const combineDebtServiceData = (interestLineItem, principalLineItem, primaryPercentile) => {
+    // Get data from both sources
+    let interestData = null;
+    let principalData = null;
+
+    if (interestLineItem) {
+        if (interestLineItem.percentileData?.has(primaryPercentile)) {
+            interestData = interestLineItem.percentileData.get(primaryPercentile);
+        } else if (interestLineItem.data) {
+            interestData = interestLineItem.data;
+        }
+    }
+
+    if (principalLineItem) {
+        if (principalLineItem.percentileData?.has(primaryPercentile)) {
+            principalData = principalLineItem.percentileData.get(primaryPercentile);
+        } else if (principalLineItem.data) {
+            principalData = principalLineItem.data;
+        }
+    }
+
+    // If no data from either source, return null
+    if (!interestData && !principalData) {
+        return null;
+    }
+
+    // Create maps for easier lookup
+    const interestMap = new Map((interestData || []).map(d => [d.year, d.value || 0]));
+    const principalMap = new Map((principalData || []).map(d => [d.year, d.value || 0]));
+
+    // Get all years from both datasets
+    const allYears = new Set([
+        ...(interestData || []).map(d => d.year),
+        ...(principalData || []).map(d => d.year)
+    ]);
+
+    // Combine data for each year
+    const combinedData = Array.from(allYears).map(year => ({
+        year,
+        value: (interestMap.get(year) || 0) + (principalMap.get(year) || 0)
+    })).filter(d => d.value > 0) // Only include years with actual debt service
+        .sort((a, b) => a.year - b.year);
+
+    return { data: combinedData };
 };
 
 /**
