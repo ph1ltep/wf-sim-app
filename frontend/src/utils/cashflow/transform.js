@@ -154,6 +154,19 @@ export const transformScenarioToCashflow = async (
 ) => {
     console.log('🔄 Starting enhanced cashflow transformation with multi-percentile support...');
 
+    // If scenarioData is null or stale, construct a fresh data getter
+    const getFreshScenarioData = () => {
+        if (!scenarioData) {
+            // Reconstruct scenario data from getValueByPath when needed
+            console.log('📊 Using getValueByPath for fresh scenario data');
+            return {
+                settings: getValueByPath(['settings'], {}),
+                simulation: getValueByPath(['simulation'], {})
+            };
+        }
+        return scenarioData;
+    };
+
     // Test percentile mode
     testUnifiedPercentileMode(selectedPercentiles, registry, getValueByPath);
 
@@ -460,14 +473,14 @@ export const transformScenarioToCashflow = async (
         hasAllPercentiles: netCashflowAllPercentiles.size > 0
     };
 
-    // Calculate enhanced finance metrics (REPLACED SECTION)
+    // Calculate enhanced finance metrics - use fresh scenario data
     console.log('🧮 Calculating enhanced finance metrics...');
-    const financeMetrics = enhancedFinanceMetrics(aggregations, availablePercentiles, scenarioData, lineItems);
+    const freshScenarioData = getFreshScenarioData();
+    const financeMetrics = enhancedFinanceMetrics(aggregations, availablePercentiles, freshScenarioData, lineItems);
 
     const result = { metadata, lineItems, aggregations, financeMetrics };
 
     console.log(`✅ Enhanced transformation complete: ${lineItems.length} items, multi-percentile support enabled`);
-
 
     return result;
 };

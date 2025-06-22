@@ -110,12 +110,12 @@ export const MetricsCell = ({
 
         // DEBUG: Log threshold evaluation
         if (process.env.NODE_ENV === 'development' && Object.keys(result).length > 0) {
-            console.log('Threshold applied:', {
-                rowKey: rowData.key,
-                value,
-                thresholds: columnConfig.thresholds,
-                appliedStyles: result
-            });
+            // console.log('Threshold applied:', {
+            //     rowKey: rowData.key,
+            //     value,
+            //     thresholds: columnConfig.thresholds,
+            //     appliedStyles: result
+            // });
         }
 
         return result;

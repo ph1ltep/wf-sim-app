@@ -7,6 +7,7 @@ import { transformScenarioToCashflow } from '../utils/cashflow/transform';
 import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
 import { validate } from '../utils/validate';
 import { initializeCashflowSystem, isCashflowSystemReady } from '../utils/cashflow/initialization';
+import useInputSim from '../hooks/useInputSim';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
@@ -196,6 +197,7 @@ validateRegistry();
 
 export const CashflowProvider = ({ children }) => {
     const { getValueByPath, scenarioData, updateByPath } = useScenario();
+    const { updateDistributions } = useInputSim();
 
     // Core state
     const [loading, setLoading] = useState(false);
@@ -261,7 +263,7 @@ export const CashflowProvider = ({ children }) => {
 
     /**
      * Initialize and refresh cashflow data (for first access)
-     * This is the main entry point when Cash Flows is accessed for the first time
+     * Updated to use getValueByPath for fresh data after initialization
      */
     const initializeAndRefresh = useCallback(async () => {
         if (!scenarioData) {
@@ -284,11 +286,12 @@ export const CashflowProvider = ({ children }) => {
         try {
             console.log('🚀 Starting cashflow system initialization and refresh');
 
-            // Step 1: Initialize the system (prerequisites + metrics)
+            // Step 1: Initialize all dependencies (distributions → construction → metrics)
             const initSuccess = await initializeCashflowSystem(
                 scenarioData,
                 getValueByPath,
                 updateByPath,
+                updateDistributions,
                 {
                     onProgress: (step) => console.log(`📋 ${step}`)
                 }
@@ -298,13 +301,17 @@ export const CashflowProvider = ({ children }) => {
                 throw new Error('Failed to initialize cashflow system');
             }
 
-            // Step 2: Transform to cashflow data
-            console.log('💹 Transforming to cashflow data...');
+            // Step 2: Small delay to ensure React state updates are committed
+            console.log('⏳ Ensuring data updates are committed...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Step 3: Transform using null scenarioData to force fresh data access
+            console.log('💹 Transforming to cashflow data with fresh scenario data...');
             const transformedData = await transformScenarioToCashflow(
-                scenarioData,
+                null, // Pass null to force use of getValueByPath for fresh data
                 CASHFLOW_SOURCE_REGISTRY,
                 selectedPercentiles,
-                getValueByPath
+                getValueByPath // This always returns current data from scenario context
             );
 
             if (transformedData) {
@@ -329,8 +336,8 @@ export const CashflowProvider = ({ children }) => {
             setIsInitializing(false);
             refreshInProgressRef.current = false;
         }
-    }, [scenarioData, selectedPercentiles, getValueByPath, updateByPath]);
-
+    }, [scenarioData, selectedPercentiles, getValueByPath, updateByPath, updateDistributions]);
+    
     /**
      * Simple refresh for subsequent refreshes (no initialization)
      */
