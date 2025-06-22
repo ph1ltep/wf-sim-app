@@ -8,6 +8,7 @@ import { TableControls } from '../tables/inline/TableControls';
 import { FieldCard } from '../contextFields';
 import { generateConstructionCostSources } from '../../utils/drawdownUtils';
 import { getSemanticColor } from '../../utils/charts';
+import { initializeConstructionSourcesSimple } from '../../utils/dependencies';
 
 const { Text } = Typography;
 
@@ -26,16 +27,11 @@ const CapexDrawdownCard = ({
     let costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources']);
     const currency = getValueByPath(['settings', 'project', 'currency', 'local'], 'USD');
 
-    // Simple initialization check and fix
-    useEffect(() => {
-        if (scenarioData && (!costSources || !Array.isArray(costSources) || costSources.length === 0)) {
-            console.log('🏗️ Initializing construction cost sources');
-            const codDate = getValueByPath(['settings', 'project', 'windFarm', 'codDate']);
-            updateByPath({
-                'settings.modules.cost.constructionPhase.costSources': generateConstructionCostSources(codDate)
-            });
-        }
-    }, [scenarioData, costSources, updateByPath, getValueByPath]);
+useEffect(() => {
+    if (scenarioData && (!costSources || !Array.isArray(costSources) || costSources.length === 0)) {
+        initializeConstructionSourcesSimple(getValueByPath, updateByPath);
+    }
+}, [scenarioData, costSources, getValueByPath, updateByPath]);
 
     // Re-get the data after potential initialization
     costSources = getValueByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], []);

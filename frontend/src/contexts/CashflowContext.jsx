@@ -8,6 +8,8 @@ import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
 import { validate } from '../utils/validate';
 import { initializeCashflowSystem, isCashflowSystemReady } from '../utils/cashflow/initialization';
 import useInputSim from '../hooks/useInputSim';
+import { initializeCashflowDependencies } from '../utils/dependencies';
+
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
@@ -272,7 +274,6 @@ export const CashflowProvider = ({ children }) => {
             return null;
         }
 
-        // Prevent concurrent operations
         if (refreshInProgressRef.current) {
             console.log('⏳ Operation already in progress, skipping');
             return null;
@@ -284,40 +285,29 @@ export const CashflowProvider = ({ children }) => {
         setTransformError(null);
 
         try {
-            console.log('🚀 Starting cashflow system initialization and refresh');
-
-            // Step 1: Initialize all dependencies (distributions → construction → metrics)
-            const initSuccess = await initializeCashflowSystem(
-                scenarioData,
+            // Step 1: Initialize all dependencies
+            const dependenciesOk = await initializeCashflowDependencies(
                 getValueByPath,
                 updateByPath,
                 updateDistributions,
-                {
-                    onProgress: (step) => console.log(`📋 ${step}`)
-                }
+                scenarioData
             );
 
-            if (!initSuccess) {
-                throw new Error('Failed to initialize cashflow system');
+            if (!dependenciesOk) {
+                throw new Error('Failed to initialize dependencies');
             }
 
-            // Step 2: Small delay to ensure React state updates are committed
-            console.log('⏳ Ensuring data updates are committed...');
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Step 3: Transform using null scenarioData to force fresh data access
-            console.log('💹 Transforming to cashflow data with fresh scenario data...');
+            // Step 2: Transform to cashflow data
             const transformedData = await transformScenarioToCashflow(
-                null, // Pass null to force use of getValueByPath for fresh data
+                null,
                 CASHFLOW_SOURCE_REGISTRY,
                 selectedPercentiles,
-                getValueByPath // This always returns current data from scenario context
+                getValueByPath
             );
 
             if (transformedData) {
                 setCashflowData(transformedData);
                 setIsInitialized(true);
-                console.log('✅ Cashflow initialization and refresh completed');
                 message.success('Cashflow data initialized successfully');
                 return transformedData;
             } else {
