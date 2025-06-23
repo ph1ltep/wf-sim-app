@@ -132,7 +132,10 @@ const CashflowAnalysis = () => {
         transformError,
         availablePercentiles,
         selectedPercentiles,
-        refreshCashflowData
+        refreshCashflowData,
+        // NEW: Stage tracking
+        refreshStage,
+        isRefreshing
     } = useCashflow();
 
     // Auto-initialize on first access if not already initialized
@@ -160,10 +163,25 @@ const CashflowAnalysis = () => {
         }));
     };
 
-    // UPDATED: Single refresh handler
+    // Single refresh handler
     const handleRefresh = () => {
-        refreshCashflowData(true); // Force refresh everything
+        refreshCashflowData(true);
     };
+
+    // NEW: Get stage display info
+    const getStageDisplay = (stage) => {
+        const stageInfo = {
+            idle: { text: 'Ready', icon: '✅', color: '#52c41a' },
+            distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
+            construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
+            metrics: { text: 'Calculating metrics', icon: '🧮', color: '#722ed1' },
+            transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
+            complete: { text: 'Complete', icon: '✅', color: '#52c41a' }
+        };
+        return stageInfo[stage] || stageInfo.idle;
+    };
+
+    const currentStageDisplay = getStageDisplay(refreshStage);
 
     // Handle no active scenario
     if (!scenarioData) {
@@ -233,21 +251,32 @@ const CashflowAnalysis = () => {
                 </Col>
                 <Col>
                     <Space>
-                        {loading && (
+                        {/* NEW: Enhanced status display with stage info */}
+                        {isRefreshing && (
                             <Alert
-                                message="Refreshing..."
+                                message={
+                                    <Space size="small">
+                                        <span>{currentStageDisplay.icon}</span>
+                                        <span>{currentStageDisplay.text}...</span>
+                                    </Space>
+                                }
                                 type="info"
                                 size="small"
-                                showIcon
+                                showIcon={false}
+                                style={{
+                                    borderColor: currentStageDisplay.color,
+                                    backgroundColor: `${currentStageDisplay.color}10`
+                                }}
                             />
                         )}
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
                             onClick={handleRefresh}
-                            loading={loading}
+                            loading={isRefreshing}
+                            disabled={isRefreshing}
                         >
-                            Refresh Data
+                            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
                         </Button>
                     </Space>
                 </Col>
@@ -261,17 +290,27 @@ const CashflowAnalysis = () => {
                     levels for different data sources.
                 </Paragraph>
 
-                {/* UPDATED: Simplified status text */}
-                {loading && (
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                        Refreshing dependencies and calculating metrics...
-                    </Text>
-                )}
-                {!loading && cashflowData && (
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                        Data ready - last refreshed: {new Date().toLocaleTimeString()}
-                    </Text>
-                )}
+                {/* NEW: Enhanced status text with stage progression */}
+                <div style={{ marginTop: '8px' }}>
+                    {isRefreshing ? (
+                        <Space size="large" style={{ fontSize: '12px', color: '#666' }}>
+                            <span style={{ color: currentStageDisplay.color }}>
+                                {currentStageDisplay.icon} {currentStageDisplay.text}...
+                            </span>
+                            {refreshStage !== 'distributions' && (
+                                <span style={{ color: '#52c41a' }}>✅ Previous stages complete</span>
+                            )}
+                        </Space>
+                    ) : cashflowData ? (
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            ✅ Data ready - last refreshed: {new Date().toLocaleTimeString()}
+                        </Text>
+                    ) : (
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            Click "Refresh Data" to initialize the cashflow analysis
+                        </Text>
+                    )}
+                </div>
             </FormSection>
 
             <Divider />
@@ -382,7 +421,7 @@ const CashflowAnalysis = () => {
             )}
 
             {/* Debug Information (Development Only) */}
-            {process.env.NODE_ENV === 'development' && cashflowData && (
+            {/* {process.env.NODE_ENV === 'development' && cashflowData && (
                 <>
                     <Divider />
                     <FormSection title="Debug Information" level={4}>
@@ -394,13 +433,14 @@ const CashflowAnalysis = () => {
                                     aggregationKeys: Object.keys(cashflowData.aggregations || {}),
                                     financeMetricKeys: Object.keys(cashflowData.financeMetrics || {}),
                                     selectedPercentiles,
-                                    loading
+                                    refreshStage,
+                                    isRefreshing
                                 }, null, 2)}
                             </pre>
                         </Card>
                     </FormSection>
                 </>
-            )}
+            )} */}
         </div>
     );
 };

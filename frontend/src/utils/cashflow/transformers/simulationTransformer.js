@@ -67,7 +67,7 @@ export const extractPercentileData = (dataSource, dataReferences, sourceConfig) 
 
     const extractedData = percentileResult.data || [];
 
-    console.log(`📊 Extracted P${percentile} data: ${extractedData.length} points for ${sourceConfig.id}`);
+    //console.log(`📊 Extracted P${percentile} data: ${extractedData.length} points for ${sourceConfig.id}`);
 
     return extractedData;
 };

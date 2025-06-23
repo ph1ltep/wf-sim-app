@@ -25,7 +25,7 @@ export const contractsToAnnualCosts = (dataSource, dataReferences, sourceConfig)
 
     if (result.length > 0) {
         const totalFees = result.reduce((sum, item) => sum + item.value, 0);
-        console.log(`📋 Contract fees: ${result.length} years, total ${totalFees.toLocaleString()}`);
+        //console.log(`📋 Contract fees: ${result.length} years, total ${totalFees.toLocaleString()}`);
     }
 
     return result;
