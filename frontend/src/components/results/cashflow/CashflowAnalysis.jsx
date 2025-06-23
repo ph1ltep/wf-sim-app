@@ -132,21 +132,16 @@ const CashflowAnalysis = () => {
         transformError,
         availablePercentiles,
         selectedPercentiles,
-        // UPDATED: Use the new initialization-aware methods
-        isInitialized,
-        isInitializing,
-        systemReady,
-        initializeAndRefresh,
         refreshCashflowData
     } = useCashflow();
 
-    // ADDED: Initialize on first mount if not already initialized
+    // Auto-initialize on first access if not already initialized
     useEffect(() => {
-        if (!isInitialized && !isInitializing && scenarioData) {
+        if (!cashflowData && !loading && scenarioData) {
             console.log('💹 Cash Flows accessed for first time, initializing...');
-            initializeAndRefresh();
+            refreshCashflowData(false); // Auto-initialize with dependency checking
         }
-    }, [isInitialized, isInitializing, scenarioData, initializeAndRefresh]);
+    }, [cashflowData, loading, scenarioData, refreshCashflowData]);
 
     // Local state for card visibility
     const [cardVisibility, setCardVisibility] = useState(() => {
@@ -163,6 +158,11 @@ const CashflowAnalysis = () => {
             ...prev,
             [cardId]: !prev[cardId]
         }));
+    };
+
+    // UPDATED: Single refresh handler
+    const handleRefresh = () => {
+        refreshCashflowData(true); // Force refresh everything
     };
 
     // Handle no active scenario
@@ -194,8 +194,8 @@ const CashflowAnalysis = () => {
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
-                            onClick={initializeAndRefresh} // UPDATED: Use initialization method for errors
-                            loading={loading || isInitializing}
+                            onClick={handleRefresh}
+                            loading={loading}
                         >
                             Retry
                         </Button>
@@ -209,7 +209,7 @@ const CashflowAnalysis = () => {
                         type="error"
                         showIcon
                         action={
-                            <Button size="small" onClick={initializeAndRefresh} loading={loading || isInitializing}>
+                            <Button size="small" onClick={handleRefresh} loading={loading}>
                                 Retry
                             </Button>
                         }
@@ -233,19 +233,10 @@ const CashflowAnalysis = () => {
                 </Col>
                 <Col>
                     <Space>
-                        {/* UPDATED: Show initialization status */}
-                        {isInitializing && (
+                        {loading && (
                             <Alert
-                                message="Initializing..."
+                                message="Refreshing..."
                                 type="info"
-                                size="small"
-                                showIcon
-                            />
-                        )}
-                        {!systemReady && !isInitializing && (
-                            <Alert
-                                message="Prerequisites missing"
-                                type="warning"
                                 size="small"
                                 showIcon
                             />
@@ -253,10 +244,10 @@ const CashflowAnalysis = () => {
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
-                            onClick={isInitialized ? refreshCashflowData : initializeAndRefresh} // UPDATED: Choose appropriate method
-                            loading={loading || isInitializing}
+                            onClick={handleRefresh}
+                            loading={loading}
                         >
-                            {isInitialized ? 'Refresh Data' : 'Initialize'}
+                            Refresh Data
                         </Button>
                     </Space>
                 </Col>
@@ -270,15 +261,15 @@ const CashflowAnalysis = () => {
                     levels for different data sources.
                 </Paragraph>
 
-                {/* UPDATED: Show initialization status instead of lastUpdated */}
-                {isInitializing && (
+                {/* UPDATED: Simplified status text */}
+                {loading && (
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                        Initializing prerequisites and calculating metrics...
+                        Refreshing dependencies and calculating metrics...
                     </Text>
                 )}
-                {isInitialized && !isInitializing && (
+                {!loading && cashflowData && (
                     <Text type="secondary" style={{ fontSize: '12px' }}>
-                        System initialized and ready
+                        Data ready - last refreshed: {new Date().toLocaleTimeString()}
                     </Text>
                 )}
             </FormSection>
@@ -343,9 +334,9 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cards Section */}
-            {loading || isInitializing ? (
+            {loading ? (
                 <Card>
-                    <Spin tip={isInitializing ? "Initializing cashflow system..." : "Loading cashflow analysis..."} style={{
+                    <Spin tip="Refreshing cashflow analysis..." style={{
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
@@ -356,12 +347,12 @@ const CashflowAnalysis = () => {
                 <Card>
                     <Alert
                         message="No Cashflow Data"
-                        description="Please initialize the cashflow system to generate analysis."
+                        description="Please refresh to initialize the cashflow system."
                         type="info"
                         showIcon
                         action={
-                            <Button onClick={initializeAndRefresh} loading={loading || isInitializing}>
-                                Initialize System
+                            <Button onClick={handleRefresh} loading={loading}>
+                                Refresh Data
                             </Button>
                         }
                     />
@@ -403,8 +394,7 @@ const CashflowAnalysis = () => {
                                     aggregationKeys: Object.keys(cashflowData.aggregations || {}),
                                     financeMetricKeys: Object.keys(cashflowData.financeMetrics || {}),
                                     selectedPercentiles,
-                                    isInitialized,
-                                    systemReady
+                                    loading
                                 }, null, 2)}
                             </pre>
                         </Card>

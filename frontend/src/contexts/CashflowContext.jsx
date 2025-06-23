@@ -8,7 +8,12 @@ import { CashflowSourceRegistrySchema } from 'schemas/yup/cashflow';
 import { validate } from '../utils/validate';
 import { initializeCashflowSystem, isCashflowSystemReady } from '../utils/cashflow/initialization';
 import useInputSim from '../hooks/useInputSim';
-import { initializeCashflowDependencies } from '../utils/dependencies';
+import { generateConstructionCostSources } from '../utils/drawdownUtils';
+import { refreshAllMetrics } from '../utils/metricsUtils';
+import {
+    isDistributionsComplete,
+    isConstructionSourcesComplete
+} from '../utils/dependencies/checkFunctions';
 
 
 const CashflowContext = createContext();
@@ -264,86 +269,17 @@ export const CashflowProvider = ({ children }) => {
     }, [scenarioData, getValueByPath]);
 
     /**
-     * Initialize and refresh cashflow data (for first access)
-     * Updated to use getValueByPath for fresh data after initialization
+     * Refresh cashflow data with dependency checking and initialization
+     * @param {boolean} force - If true, refresh everything regardless of current state
+     * @returns {Promise<Object|null>} Cashflow data or null on failure
      */
-    const initializeAndRefresh = useCallback(async () => {
+    const refreshCashflowData = useCallback(async (force = false) => {
         if (!scenarioData) {
             setTransformError('No active scenario available');
             setCashflowData(null);
             return null;
         }
 
-        if (refreshInProgressRef.current) {
-            console.log('⏳ Operation already in progress, skipping');
-            return null;
-        }
-
-        refreshInProgressRef.current = true;
-        setIsInitializing(true);
-        setLoading(true);
-        setTransformError(null);
-
-        try {
-            // Step 1: Initialize all dependencies
-            const dependenciesOk = await initializeCashflowDependencies(
-                getValueByPath,
-                updateByPath,
-                updateDistributions,
-                scenarioData
-            );
-
-            if (!dependenciesOk) {
-                throw new Error('Failed to initialize dependencies');
-            }
-
-            // Step 2: Transform to cashflow data
-            const transformedData = await transformScenarioToCashflow(
-                null,
-                CASHFLOW_SOURCE_REGISTRY,
-                selectedPercentiles,
-                getValueByPath
-            );
-
-            if (transformedData) {
-                setCashflowData(transformedData);
-                setIsInitialized(true);
-                message.success('Cashflow data initialized successfully');
-                return transformedData;
-            } else {
-                throw new Error('Transform returned no data');
-            }
-
-        } catch (error) {
-            console.error('❌ Cashflow initialization failed:', error);
-            setTransformError(error.message || 'Failed to initialize cashflow data');
-            setCashflowData(null);
-            setIsInitialized(false);
-            message.error('Failed to initialize cashflow data');
-            return null;
-        } finally {
-            setLoading(false);
-            setIsInitializing(false);
-            refreshInProgressRef.current = false;
-        }
-    }, [scenarioData, selectedPercentiles, getValueByPath, updateByPath, updateDistributions]);
-    
-    /**
-     * Simple refresh for subsequent refreshes (no initialization)
-     */
-    const refreshCashflowData = useCallback(async () => {
-        if (!scenarioData) {
-            setTransformError('No active scenario available');
-            setCashflowData(null);
-            return null;
-        }
-
-        // If not initialized yet, use full initialization
-        if (!isInitialized) {
-            return initializeAndRefresh();
-        }
-
-        // Prevent concurrent operations
         if (refreshInProgressRef.current) {
             console.log('⏳ Refresh already in progress, skipping');
             return null;
@@ -351,11 +287,41 @@ export const CashflowProvider = ({ children }) => {
 
         refreshInProgressRef.current = true;
         setLoading(true);
-        setTransformError(null);
+        setTransformError(null); // Clear previous errors
 
         try {
-            console.log('🔄 Refreshing cashflow data (system already initialized)');
+            // Step 1: Distribution Analysis
+            if (force || !isDistributionsComplete(getValueByPath)) {
+                console.log('🔄 Refreshing distributions...');
+                const success = await updateDistributions();
+                if (!success) throw new Error('Distribution refresh failed');
+            } else {
+                console.log('✅ Distributions already complete');
+            }
 
+            // Step 2: Construction Cost Sources
+            if (force || !isConstructionSourcesComplete(getValueByPath)) {
+                console.log('🔄 Refreshing construction sources...');
+                const codDate = getValueByPath(['settings', 'project', 'windFarm', 'codDate']);
+                const result = await updateByPath({
+                    'settings.modules.cost.constructionPhase.costSources': generateConstructionCostSources(codDate)
+                });
+                if (!result.isValid) throw new Error('Construction sources update failed');
+            } else {
+                console.log('✅ Construction sources already complete');
+            }
+
+            // Step 3: Metrics Refresh
+            console.log('🔄 Refreshing metrics...');
+            const metricUpdates = await refreshAllMetrics(scenarioData, updateByPath);
+            if (Object.keys(metricUpdates).length === 0) {
+                console.warn('⚠️ No metrics were updated - this may indicate missing data');
+            } else {
+                console.log('✅ Metrics refreshed');
+            }
+
+            // Step 4: Transform to Cashflow Data
+            console.log('🔄 Transforming to cashflow data...');
             const transformedData = await transformScenarioToCashflow(
                 scenarioData,
                 CASHFLOW_SOURCE_REGISTRY,
@@ -365,16 +331,14 @@ export const CashflowProvider = ({ children }) => {
 
             if (transformedData) {
                 setCashflowData(transformedData);
-                message.success('Cashflow data refreshed');
+                message.success('Cashflow data refreshed successfully');
                 return transformedData;
             } else {
-                setTransformError('Transform returned no data');
-                setCashflowData(null);
-                return null;
+                throw new Error('Transform returned no data');
             }
 
         } catch (error) {
-            console.error('❌ Refresh failed:', error);
+            console.error('❌ Cashflow refresh failed:', error);
             setTransformError(error.message || 'Failed to refresh cashflow data');
             setCashflowData(null);
             message.error('Failed to refresh cashflow data');
@@ -383,7 +347,8 @@ export const CashflowProvider = ({ children }) => {
             setLoading(false);
             refreshInProgressRef.current = false;
         }
-    }, [scenarioData, selectedPercentiles, getValueByPath, isInitialized, initializeAndRefresh]);
+    }, [scenarioData, selectedPercentiles, getValueByPath, updateByPath]);
+
 
     // Simple update function for percentile changes
     const updatePercentileSelection = useCallback((newSelection) => {
@@ -478,8 +443,8 @@ export const CashflowProvider = ({ children }) => {
         transformError,
 
         // Lazy initialization state
-        isInitialized,
-        isInitializing,
+        isInitialized: !!cashflowData,
+        isInitializing: loading,
         systemReady,
 
         // Percentiles
@@ -490,7 +455,6 @@ export const CashflowProvider = ({ children }) => {
         updatePercentileSelection,
 
         // Actions
-        initializeAndRefresh, // For first access and error recovery
         refreshCashflowData,  // For subsequent refreshes
 
         // Config

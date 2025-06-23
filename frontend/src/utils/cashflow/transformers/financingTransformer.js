@@ -26,7 +26,7 @@ export const debtDrawdownToAnnualCosts = (dataSource, dataReferences, sourceConf
         // Get debt financing ratio (convert % to decimal)
         const debtFinancingRatio = (financing.debtFinancingRatio || 70) / 100;
 
-        console.log(`💰 Processing debt drawdown with ${debtFinancingRatio * 100}% debt financing ratio`);
+        //console.log(`💰 Processing debt drawdown with ${debtFinancingRatio * 100}% debt financing ratio`);
 
         // Calculate debt drawdown by year
         const debtDrawdownByYear = new Map();
@@ -61,7 +61,7 @@ export const debtDrawdownToAnnualCosts = (dataSource, dataReferences, sourceConf
             .sort((a, b) => a.year - b.year);
 
         const totalDebtDrawn = debtDrawdown.reduce((sum, item) => sum + item.value, 0);
-        console.log(`💰 Debt drawdown: ${debtDrawdown.length} years, total ${totalDebtDrawn.toLocaleString()}`);
+        //console.log(`💰 Debt drawdown: ${debtDrawdown.length} years, total ${totalDebtDrawn.toLocaleString()}`);
 
         return debtDrawdown;
 
@@ -93,7 +93,7 @@ export const interestDuringConstruction = (dataSource, dataReferences, sourceCon
         const shouldCapitalize = financing.idcCapitalization !== false; // Default to true
 
         if (!shouldCapitalize) {
-            console.log('🏗️ IDC not capitalized - returning empty array');
+            //console.log('🏗️ IDC not capitalized - returning empty array');
             return [];
         }
 
@@ -135,7 +135,7 @@ export const interestDuringConstruction = (dataSource, dataReferences, sourceCon
         });
 
         const totalIDC = idcByYear.reduce((sum, item) => sum + item.value, 0);
-        console.log(`🏗️ IDC: ${idcByYear.length} years, total ${totalIDC.toLocaleString()}`);
+        //console.log(`🏗️ IDC: ${idcByYear.length} years, total ${totalIDC.toLocaleString()}`);
 
         return idcByYear;
 
@@ -208,7 +208,7 @@ export const operationalInterestPayments = (dataSource, dataReferences, sourceCo
         }
 
         const totalInterest = interestPayments.reduce((sum, item) => sum + item.value, 0);
-        console.log(`💰 Interest payments: ${interestPayments.length} years, total ${totalInterest.toLocaleString()}`);
+        //console.log(`💰 Interest payments: ${interestPayments.length} years, total ${totalInterest.toLocaleString()}`);
 
         return interestPayments;
 
@@ -281,7 +281,7 @@ export const operationalPrincipalPayments = (dataSource, dataReferences, sourceC
         }
 
         const totalPrincipal = principalPayments.reduce((sum, item) => sum + item.value, 0);
-        console.log(`💰 Principal payments: ${principalPayments.length} years, total ${totalPrincipal.toLocaleString()}`);
+        //console.log(`💰 Principal payments: ${principalPayments.length} years, total ${totalPrincipal.toLocaleString()}`);
 
         return principalPayments;
 
