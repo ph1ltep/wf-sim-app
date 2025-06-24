@@ -218,6 +218,7 @@ export const getFinancialColorScheme = (metricType) => {
         // Cash flow components (distinct color families)
         revenue: green[7],           // #237804 - deep green (strong positive income)
         costs: red[6],               // #cf1322 - deep red (clearly negative outflow)
+        cost: red[6],               // #cf1322 - deep red (clearly negative outflow)
         profit: blue[5],             // #1890ff - blue (analytical, net result)
 
         // Coverage ratios (blues with distinct shades for differentiation)

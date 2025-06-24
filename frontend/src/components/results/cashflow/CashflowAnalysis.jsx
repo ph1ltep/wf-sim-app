@@ -15,6 +15,7 @@ import PercentileSelector from './components/PercentileSelector';
 // Import card components
 import CashflowTimelineCard from '../../cards/CashflowTimelineCard';
 import FinanceabilityCard from '../../cards/FinanceabilityCard';
+import DriverExplorerCard from '../../cards/DriverExplorerCard';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -39,7 +40,16 @@ export const CASHFLOW_CARD_REGISTRY = {
         name: 'Financeability Analysis',
         category: 'Investment',
         description: 'Bankability metrics, DSCR analysis, and covenant compliance assessment'
-    }
+    },
+    driverExplorer: {
+        component: DriverExplorerCard,
+        enabled: true,
+        gridProps: { span: 24 },
+        props: {
+            title: "Value Driver Analysis",
+            showMetricsTable: true
+        }
+    },
 };
 
 // Card Error Boundary Component

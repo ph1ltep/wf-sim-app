@@ -29,18 +29,18 @@ export {
 export {
     discoverPercentiles,
     getDefaultSensitivityRange,
-    createPercentileOptions
+    createPercentileOptions,
 } from './percentileUtils';
 
 export {
     calculateDynamicSensitivity,
-    calculateMultiMetricSensitivity
+    calculateMultiMetricSensitivity,
 } from './sensitivityAnalysis';
 
 export {
     SUPPORTED_METRICS,
-    getIndustryClassification,
-    extractMetricValue
+    extractMetricValue,
+    createMetricSelectorOptions,
 } from './sensitivityMetrics';
 
 // Re-export everything for convenience

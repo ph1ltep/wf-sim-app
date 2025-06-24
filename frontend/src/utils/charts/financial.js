@@ -1,11 +1,11 @@
-// frontend/src/utils/charts/financial.js - Financial-specific chart utilities
+// Update frontend/src/utils/charts/financial.js - SIMPLIFIED VERSION
 
-import { getSemanticColor, createColorWithOpacity } from './colors';
+import { getFinancialColorScheme, getSemanticColor, createColorWithOpacity } from './colors';
 
 /**
- * Prepare tornado chart data for sensitivity analysis
+ * Prepare tornado chart data for sensitivity analysis - SIMPLIFIED
  * @param {Object} params - Chart parameters
- * @param {Array} params.sensitivityResults - Results from calculateDynamicSensitivity
+ * @param {Array} params.sensitivityResults - Results from performRegistryBasedSensitivityAnalysis
  * @param {string} params.targetMetric - Target metric (npv, irr, etc.)
  * @param {string} params.highlightedDriver - Driver ID to highlight
  * @param {Object} params.metricConfig - Metric configuration from SUPPORTED_METRICS
@@ -26,9 +26,7 @@ export const prepareTornadoChartData = ({
         return null;
     }
 
-    // Sort by impact magnitude (descending)
     const sortedResults = [...sensitivityResults].sort((a, b) => b.impact - a.impact);
-    const maxImpact = Math.max(...sortedResults.map(r => r.impact));
 
     const data = [{
         type: 'bar',
@@ -39,10 +37,15 @@ export const prepareTornadoChartData = ({
         textposition: 'auto',
         marker: {
             color: sortedResults.map(r => {
-                if (r.variable === highlightedDriver) {
+                if (r.variableId === highlightedDriver) {
                     return getSemanticColor('primary', 7); // Highlighted
                 }
-                return getDriverColor(r.category, r.impact / maxImpact);
+
+                // SIMPLIFIED: Direct call to getFinancialColorScheme
+                if (r.variableType === 'multiplier') {
+                    return getFinancialColorScheme(r.category); // 'escalation', 'pricing'
+                }
+                return getFinancialColorScheme(r.variableType); // 'revenue', 'cost'
             }),
             line: { color: '#fff', width: 1 }
         },
@@ -54,90 +57,83 @@ export const prepareTornadoChartData = ({
             'Low (P%{customdata.percentileRange.lower}): %{customdata.lowValue}<br>' +
             'High (P%{customdata.percentileRange.upper}): %{customdata.highValue}<br>' +
             'Variable Range: %{customdata.variableValues.low} → %{customdata.variableValues.high}<br>' +
-            'Confidence: %{customdata.percentileRange.confidenceInterval}%' +
+            'Confidence: %{customdata.percentileRange.confidenceInterval}%<br>' +
+            'Type: %{customdata.displayCategory}' +
             '<extra></extra>'
     }];
 
     const layout = {
-        title: `${metricConfig.label} Sensitivity Analysis`,
+        title: '',  // Title handled by card header
         xaxis: {
             title: `${metricConfig.label} Impact`,
             tickformat: metricConfig.units === 'currency' ? '$,.0s' :
-                metricConfig.units === 'percentage' ? '.1f' : '.2f'
+                metricConfig.units === 'percentage' ? '.1%' : '.2f',
+            showgrid: true,
+            gridcolor: '#f0f0f0'
         },
-        yaxis: { title: 'Input Variables' },
-        margin: { t: 60, b: 60, l: 150, r: 60 },
-        height: Math.max(400, sortedResults.length * 40 + 120),
+        yaxis: {
+            title: 'Variables',
+            showgrid: false,
+            automargin: true
+        },
+        margin: { t: 20, b: 80, l: 120, r: 80 },
+        height: Math.max(400, sortedResults.length * 40 + 100),
         plot_bgcolor: '#fafafa',
-        paper_bgcolor: '#ffffff'
+        showlegend: false
     };
 
-    return { data, layout };
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+        displaylogo: false
+    };
+
+    return { data, layout, config };
 };
 
 /**
- * Get color for driver based on category and impact magnitude
- * @param {string} category - Variable category
- * @param {number} relativeImpact - Impact relative to maximum (0-1)
- * @returns {string} Color code
+ * Create tornado chart click handler for variable highlighting
+ * @param {Function} onVariableSelect - Callback function for variable selection
+ * @returns {Function} Plotly click event handler
  */
-export const getDriverColor = (category, relativeImpact) => {
-    const intensity = Math.max(0.4, relativeImpact); // Minimum 40% intensity
+export const createTornadoClickHandler = (onVariableSelect) => {
+    return (eventData) => {
+        if (eventData.points && eventData.points.length > 0) {
+            const point = eventData.points[0];
+            const variableData = point.customdata;
 
-    const categoryColors = {
-        'revenue': '#52c41a',     // Green
-        'cost': '#ff4d4f',       // Red  
-        'financing': '#1890ff',  // Blue
-        'escalation': '#faad14', // Orange
-        'pricing': '#52c41a',    // Green
-        'energy': '#52c41a',     // Green
-        'maintenance': '#ff4d4f', // Red
-        'construction': '#722ed1' // Purple
+            if (variableData && onVariableSelect) {
+                onVariableSelect(variableData.variableId, variableData);
+            }
+        }
     };
-
-    const baseColor = categoryColors[category] || '#666666';
-    return createColorWithOpacity(baseColor, intensity);
 };
 
 /**
- * Prepare dual-axis sensitivity chart (impact vs uncertainty)
- * @param {Array} sensitivityResults - Sensitivity analysis results
- * @param {Object} options - Chart options
- * @returns {Object} Plotly chart data and layout
+ * Update tornado chart colors based on highlighted variable
+ * @param {Object} plotlyDiv - Plotly chart div element
+ * @param {Array} sensitivityResults - Sensitivity results
+ * @param {string} highlightedDriver - Driver ID to highlight
+ * @returns {void}
  */
-export const prepareSensitivityScatterPlot = (sensitivityResults, options = {}) => {
-    const { targetMetric, metricConfig } = options;
+export const updateTornadoHighlight = (plotlyDiv, sensitivityResults, highlightedDriver) => {
+    if (!plotlyDiv || !sensitivityResults) return;
 
-    if (!sensitivityResults || !sensitivityResults.length) {
-        return null;
-    }
+    const sortedResults = [...sensitivityResults].sort((a, b) => b.impact - a.impact);
 
-    const data = [{
-        type: 'scatter',
-        mode: 'markers+text',
-        x: sensitivityResults.map(r => r.impact),
-        y: sensitivityResults.map(r => r.percentileRange.confidenceInterval),
-        text: sensitivityResults.map(r => r.variable),
-        textposition: 'top center',
-        marker: {
-            size: 12,
-            color: sensitivityResults.map(r => getDriverColor(r.category, 1.0)),
-            line: { color: '#fff', width: 2 }
-        },
-        hovertemplate:
-            '<b>%{text}</b><br>' +
-            `${metricConfig.label} Impact: %{x}<br>` +
-            'Confidence Range: %{y}%' +
-            '<extra></extra>'
-    }];
+    const newColors = sortedResults.map(r => {
+        if (r.variableId === highlightedDriver) {
+            return getSemanticColor('primary', 7);
+        }
 
-    const layout = {
-        title: `Impact vs Uncertainty: ${metricConfig.label}`,
-        xaxis: { title: `${metricConfig.label} Impact` },
-        yaxis: { title: 'Confidence Range (%)' },
-        margin: { t: 60, b: 60, l: 80, r: 60 },
-        height: 500
-    };
+        // SIMPLIFIED: Direct call
+        if (r.variableType === 'multiplier') {
+            return getFinancialColorScheme(r.category);
+        }
+        return getFinancialColorScheme(r.variableType);
+    });
 
-    return { data, layout };
+    const update = { 'marker.color': [newColors] };
+    window.Plotly?.restyle(plotlyDiv, update, [0]);
 };

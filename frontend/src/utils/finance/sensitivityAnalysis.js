@@ -1,4 +1,4 @@
-// frontend/src/utils/finance/sensitivityAnalysis.js - Dynamic sensitivity calculation
+// Fix frontend/src/utils/finance/sensitivityAnalysis.js - REMOVE getVariableColor references
 
 import { SUPPORTED_METRICS, extractMetricValue } from './sensitivityMetrics';
 import { calculateAllMetricsWithPayback } from './calculations';
@@ -56,6 +56,113 @@ const createBaseScenario = (variables, distributionAnalysis, percentile) => {
     });
 
     return baseScenario;
+};
+
+/**
+ * Discover variables with distributions from CASHFLOW_SOURCE_REGISTRY
+ * @param {Object} registry - CASHFLOW_SOURCE_REGISTRY object
+ * @returns {Array} Array of variable objects for sensitivity analysis
+ */
+export const discoverVariablesFromRegistry = (registry) => {
+    const variables = [];
+
+    // Extract multipliers with percentiles
+    if (registry.multipliers) {
+        registry.multipliers.forEach(source => {
+            if (source.hasPercentiles) {
+                variables.push({
+                    id: source.id,
+                    label: source.description || source.id,
+                    category: source.category,
+                    hasPercentiles: true,
+                    path: source.path,
+                    variableType: 'multiplier',
+                    registryCategory: 'multipliers'
+                });
+            }
+        });
+    }
+
+    // Extract revenues with percentiles
+    if (registry.revenues) {
+        registry.revenues.forEach(source => {
+            if (source.hasPercentiles) {
+                variables.push({
+                    id: source.id,
+                    label: source.description || source.id,
+                    category: source.category,
+                    hasPercentiles: true,
+                    path: source.path,
+                    variableType: 'revenue',
+                    registryCategory: 'revenues'
+                });
+            }
+        });
+    }
+
+    // Extract costs with percentiles (if any exist in the future)
+    if (registry.costs) {
+        registry.costs.forEach(source => {
+            if (source.hasPercentiles) {
+                variables.push({
+                    id: source.id,
+                    label: source.description || source.id,
+                    category: source.category,
+                    hasPercentiles: true,
+                    path: source.path,
+                    variableType: 'cost',
+                    registryCategory: 'costs'
+                });
+            }
+        });
+    }
+
+    return variables;
+};
+
+/**
+ * Enhance variables with distribution metadata
+ * @param {Array} variables - Variables from discoverVariablesFromRegistry
+ * @param {Object} distributionAnalysis - Distribution analysis data from scenario
+ * @returns {Array} Enhanced variables with distribution metadata
+ */
+export const enhanceVariablesWithDistributionMetadata = (variables, distributionAnalysis) => {
+    return variables.map(variable => {
+        const varData = getDistributionData(variable, distributionAnalysis);
+
+        const metadata = {
+            hasDistributionData: !!varData,
+            distributionType: null,
+            availablePercentiles: [],
+            hasTimeSeriesData: false
+        };
+
+        if (varData) {
+            // Extract distribution type if available
+            if (varData.distribution?.type) {
+                metadata.distributionType = varData.distribution.type;
+            }
+
+            // Get available percentiles from results
+            if (varData.results && Array.isArray(varData.results)) {
+                metadata.availablePercentiles = varData.results
+                    .map(r => r.percentile?.value || r.percentile)
+                    .filter(p => typeof p === 'number')
+                    .sort((a, b) => a - b);
+            }
+
+            // Check if data has time series (multiple years)
+            const firstResult = varData.results?.[0];
+            if (firstResult?.data && Array.isArray(firstResult.data)) {
+                metadata.hasTimeSeriesData = firstResult.data.length > 1;
+            }
+        }
+
+        return {
+            ...variable,
+            distributionMetadata: metadata
+        };
+    });
 };
 
 /**
@@ -154,11 +261,6 @@ export const calculateDynamicSensitivity = ({
                         low: lowPct.data?.[0]?.value || 'N/A',
                         base: basePct.data?.[0]?.value || 'N/A',
                         high: highPct.data?.[0]?.value || 'N/A'
-                    },
-                    // Distribution metadata
-                    distributionInfo: {
-                        type: varData.distribution?.type || 'Unknown',
-                        hasTimeSeriesData: Array.isArray(basePct.data) && basePct.data.length > 1
                     }
                 };
             } catch (error) {
