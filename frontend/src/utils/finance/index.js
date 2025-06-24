@@ -26,6 +26,23 @@ export {
     generateFinancingRecommendations
 } from './analysis';
 
+export {
+    discoverPercentiles,
+    getDefaultSensitivityRange,
+    createPercentileOptions
+} from './percentileUtils';
+
+export {
+    calculateDynamicSensitivity,
+    calculateMultiMetricSensitivity
+} from './sensitivityAnalysis';
+
+export {
+    SUPPORTED_METRICS,
+    getIndustryClassification,
+    extractMetricValue
+} from './sensitivityMetrics';
+
 // Re-export everything for convenience
 export * from './calculations';
 export * from './analysis';

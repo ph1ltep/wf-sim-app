@@ -183,12 +183,6 @@ Legend: ☐ Not Started ◐ In-Progress ☑ Done 🔥 Cleanup
 
 ---
 
-## Files to Remove/Delete 🗑️
-- 🔥 UCC-1 Remove frontend/src/components/results/cashflow/xbase/xCashflowSummaryCard.jsx
-- 🔥 UCC-1 Remove frontend/src/components/results/cashflow/xbase/xCashflowDetailCard.jsx
-
----
-
 ## Technical Considerations & Patterns
 
 ### Established Code Patterns:

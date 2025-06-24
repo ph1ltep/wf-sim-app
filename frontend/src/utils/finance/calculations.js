@@ -361,3 +361,58 @@ export const calculateFinancialMetrics = (financialData, scenarioData) => {
         icrData: icr
     };
 };
+
+
+/**
+ * Calculate payback period from cash flow data
+ * @param {Array} netCashflows - Array of {year, value} objects
+ * @param {number} initialInvestment - Initial investment amount (optional)
+ * @returns {number|null} Payback period in years, null if never pays back
+ */
+export const calculatePaybackPeriod = (netCashflows, initialInvestment = null) => {
+    if (!Array.isArray(netCashflows) || netCashflows.length === 0) {
+        return null;
+    }
+
+    // Sort by year to ensure proper order
+    const sortedCashflows = [...netCashflows].sort((a, b) => a.year - b.year);
+
+    let cumulativeCashflow = 0;
+    let lastNegativeYear = null;
+
+    for (let i = 0; i < sortedCashflows.length; i++) {
+        const yearData = sortedCashflows[i];
+        cumulativeCashflow += yearData.value;
+
+        if (cumulativeCashflow < 0) {
+            lastNegativeYear = i;
+        } else if (cumulativeCashflow >= 0 && lastNegativeYear !== null) {
+            // Found payback year - use linear interpolation
+            const prevCumulative = cumulativeCashflow - yearData.value;
+            const fraction = Math.abs(prevCumulative) / yearData.value;
+            return yearData.year - 1 + fraction;
+        }
+    }
+
+    return null; // Never pays back
+};
+
+/**
+ * Enhanced calculateAllMetrics to include payback period
+ * @param {Object} cashflowData - Complete cashflow data structure
+ * @param {Object} options - Calculation options
+ * @returns {Object} All calculated metrics including payback period
+ */
+export const calculateAllMetricsWithPayback = (cashflowData, options = {}) => {
+    // Get existing metrics from the current calculateFinancialMetrics function
+    const existingMetrics = calculateFinancialMetrics(cashflowData, options);
+
+    // Add payback period calculation
+    const netCashflows = cashflowData?.aggregations?.netCashflow?.data || [];
+    const paybackPeriod = calculatePaybackPeriod(netCashflows);
+
+    return {
+        ...existingMetrics,
+        paybackPeriod
+    };
+};
