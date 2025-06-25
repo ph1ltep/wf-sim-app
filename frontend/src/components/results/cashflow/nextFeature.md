@@ -62,7 +62,7 @@ CASHFLOW_SOURCE_REGISTRY = {
 ```
 
 #### SENSITIVITY_SOURCE_REGISTRY (New)
-Contains indirect variables for sensitivity analysis using `CashflowSourceRegistrySchema`:
+Contains indirect variables for sensitivity analysis using `SensitivitySourceRegistrySchema` (based on `RegistrySourceSchema`):
 ```javascript
 SENSITIVITY_SOURCE_REGISTRY = {
   data: { /* Same global data structure */ },
@@ -89,6 +89,27 @@ SENSITIVITY_SOURCE_REGISTRY = {
 }
 ```
 
+### Schema Definitions
+Both registries follow the same base schema pattern:
+
+```javascript
+// schemas/yup/cashflow.js - Enhanced schema support
+const SensitivitySourceRegistrySchema = Yup.object().shape({
+    data: RegistryDataSchema.required(),
+    technical: Yup.array().of(RegistrySourceSchema).default([]),
+    financial: Yup.array().of(RegistrySourceSchema).default([]),
+    operational: Yup.array().of(RegistrySourceSchema).default([])
+});
+
+// Registry discovery function supports array of either schema type
+const discoverAllSensitivityVariables = (registries) => {
+  // registries can be array of CashflowSourceRegistrySchema or SensitivitySourceRegistrySchema
+  const registryArray = Array.isArray(registries) ? registries : [registries];
+  // ... processing logic
+};
+```
+```
+
 ### SENSITIVITY_SOURCE_REGISTRY Variable Definitions
 
 | Variable ID | Category | Path | Has Percentiles | Dependencies | Description |
@@ -107,11 +128,13 @@ SENSITIVITY_SOURCE_REGISTRY = {
 ### Variable Discovery Implementation
 ```javascript
 const discoverAllSensitivityVariables = (registries) => {
+  // Support array of either CashflowSourceRegistrySchema or SensitivitySourceRegistrySchema
   const registryArray = Array.isArray(registries) ? registries : [registries];
   const variables = [];
   
   registryArray.forEach(registry => {
-    ['multipliers', 'costs', 'revenues', 'technical', 'financial'].forEach(section => {
+    // Standard sections for CashflowSourceRegistrySchema
+    ['multipliers', 'costs', 'revenues'].forEach(section => {
       if (registry[section]) {
         registry[section].forEach(source => {
           if (source.hasPercentiles) {
@@ -120,7 +143,24 @@ const discoverAllSensitivityVariables = (registries) => {
               label: source.description,
               category: source.category,
               path: source.path,
-              source: registry === CASHFLOW_SOURCE_REGISTRY ? 'direct' : 'indirect'
+              source: 'direct'
+            });
+          }
+        });
+      }
+    });
+    
+    // Additional sections for SensitivitySourceRegistrySchema
+    ['technical', 'financial', 'operational'].forEach(section => {
+      if (registry[section]) {
+        registry[section].forEach(source => {
+          if (source.hasPercentiles) {
+            variables.push({
+              id: source.id,
+              label: source.description,
+              category: source.category,
+              path: source.path,
+              source: 'indirect'
             });
           }
         });
@@ -283,7 +323,7 @@ export const SUPPORTED_METRICS = {
 ### Core Theming Principles
 1. **UI Components**: Use Ant Design for buttons, selects, cards, alerts, etc.
 2. **Charts & Tables**: Use our theming functions (`getFinancialColorScheme`, `getSemanticColor`, `generateChartColorPalette`)
-3. **MetricsTables & InlineEditTables**: Use custom theming when these components are required for data display
+3. **MetricsTables & InlineEditTables**: Use custom theming following `TableThemes.js` and `TableThemes.md` patterns
 4. **Metrics**: Define thresholds with `colorRule` functions that call theming utilities
 5. **No Static Colors**: Don't embed colors in SUPPORTED_METRICS - use dynamic theming
 
@@ -299,32 +339,50 @@ const getChartColor = (result, index, totalCount, highlightedId) => {
     return generateChartColorPalette(totalCount)[index];
   }
   
-  return getCategoryColor(result.category); // Useful wrapper
+  return getCategoryColorScheme(result.category); // New standardized function
 };
+```
 
-// Category color mapping - USEFUL WRAPPER (encapsulates logic)
-const getCategoryColor = (category) => {
-  switch (category) {
-    case 'revenue':
-    case 'commercial':
-      return getFinancialColorScheme('revenue');
-    case 'costs':
-    case 'operational': 
-      return getFinancialColorScheme('costs');
-    case 'financing':
-      return getFinancialColorScheme('debtService');
-    case 'technical':
-      return getSemanticColor('info', 6);
-    default:
-      return getSemanticColor('neutral', 6);
-  }
+### Standardized Category Colors
+Add to `frontend/src/utils/charts/colors.js`:
+
+```javascript
+/**
+ * Get standardized category color scheme for sensitivity analysis
+ * @param {string} category - Variable category
+ * @param {number} shade - Color shade (default 6)
+ * @returns {string} Hex color code
+ */
+export const getCategoryColorScheme = (category, shade = 6) => {
+    const categoryMap = {
+        // Technical variables - info blue family
+        technical: blue[shade],          // #1677ff - primary blue for technical metrics
+        
+        // Revenue/Commercial - green family (positive association)
+        revenue: green[shade],           // #389e0d - success green for revenue
+        commercial: green[shade],        // #389e0d - same as revenue
+        
+        // Costs/Operational - red family (cost association)
+        costs: red[shade],               // #cf1322 - error red for costs
+        operational: orange[shade],      // #d48806 - warning orange for operations
+        
+        // Financing - purple family (sophisticated/financial)
+        financing: purple[shade],        // #531dab - royal purple for financing
+        financial: purple[shade],        // #531dab - same as financing
+        
+        // Default fallback
+        default: grey[shade]             // #595959 - neutral grey for uncategorized
+    };
+
+    return categoryMap[category] || categoryMap.default;
 };
+```
 ```
 
 ### Wrapper Function Guidelines
 
 #### ✅ USEFUL Wrappers (Keep These):
-- `getCategoryColor()` - Encapsulates complex category-to-color mapping
+- `getCategoryColorScheme()` - Now standardized in colors.js for consistent category coloring
 - `evaluateMetricThresholds()` - Handles complex threshold evaluation with context
 - `formatCategoryLabel()` - Meaningful data transformation
 
@@ -332,6 +390,25 @@ const getCategoryColor = (category) => {
 - Simple pass-through functions that just call existing utilities
 - Functions that only access simple properties
 - Wrappers that don't add any logic or transformation
+
+### Table Theming Integration
+For any MetricsTables or InlineEditTables used in the Driver Explorer Card, follow established patterns from `TableThemes.js` and `TableThemes.md`:
+
+```javascript
+// Use established table theming patterns
+import { useTableTheme } from '../../tables/shared/TableThemeEngine';
+
+const DriverExplorerCard = () => {
+  // Apply table theming when tables are needed
+  const tableTheme = useTableTheme('metrics', token);
+  
+  return (
+    <div className={tableTheme.containerClass}>
+      {/* Table components with proper theming */}
+    </div>
+  );
+};
+```
 
 ---
 
@@ -392,10 +469,32 @@ Focus on rich chart visualization with enhanced interactivity:
 ### Interactive Elements
 1. **Chart Type Selector**: Tornado vs Heatmap with intelligent defaults
 2. **Target Metric Dropdown**: All supported metrics with descriptions
-3. **Percentile Range Selector**: Start with available percentile range (P10-P90), respect CashflowContext baseline (unified vs per-source)
+3. **Percentile Range Selector**: Dynamic based on ScenarioContext configured percentiles (minimum 3), respect CashflowContext baseline
 4. **Aggregation Method**: Min/Max/Mean for time-series metrics
 5. **Enhanced Hover**: Detailed impact info with variable ranges and units
 6. **Category Filtering**: Show/hide Technical, Financial, Commercial variables
+
+### Percentile Configuration Strategy
+The Driver Explorer Card dynamically adapts to percentile configurations:
+
+**ScenarioContext Integration**:
+- Use configured percentiles from ScenarioContext (e.g., P10, P25, P50, P75, P90)
+- Support minimum of 3 percentiles, scale to any number configured
+- Define high/low percentiles as outer bounds of available range
+- Use CashflowContext baseline percentile as center point
+
+**Dynamic Range Selection**:
+```javascript
+// Example with 5 configured percentiles: [10, 25, 50, 75, 90]
+const configuredPercentiles = scenarioContext.percentiles; // [10, 25, 50, 75, 90]
+const baselinePercentile = cashflowContext.selectedPercentile; // 50 (unified) or per-source
+const minPercentile = Math.min(...configuredPercentiles); // 10
+const maxPercentile = Math.max(...configuredPercentiles); // 90
+
+// User can select any range within configured bounds
+const defaultLow = configuredPercentiles[1]; // 25 (second lowest)
+const defaultHigh = configuredPercentiles[configuredPercentiles.length - 2]; // 75 (second highest)
+```
 
 ---
 
@@ -574,23 +673,23 @@ Impact significance determined by threshold system referencing Return Targets:
 ### 1. Core Infrastructure 🏗️ 🏷️Critical
 - ☐ CI-1 Create `frontend/src/utils/timeSeries/aggregation.js` with comprehensive aggregation methods
 - ☐ CI-2 Create `frontend/src/contexts/SensitivityRegistry.js` with SENSITIVITY_SOURCE_REGISTRY
-- ☐ CI-3 Enhance `schemas/yup/cashflow.js` to support technical/financial sections in registry schema
-- ☐ CI-4 Implement `discoverAllSensitivityVariables()` function supporting dual registry discovery
+- ☐ CI-3 Create `SensitivitySourceRegistrySchema` in `schemas/yup/cashflow.js` based on `RegistrySourceSchema`
+- ☐ CI-4 Implement `discoverAllSensitivityVariables()` function supporting array of either registry schema type
 - ☐ CI-5 Create reusable aggregation strategies for wind industry metrics (DSCR min, NPV sum, etc.)
 
 ### 2. Metrics & Theming Configuration 🎨 🏷️Critical
 - ☐ MTC-1 Update `SUPPORTED_METRICS` with `impactFormat` and comprehensive `thresholds`
 - ☐ MTC-2 Implement threshold `colorRule` functions using direct theming calls (`getFinancialColorScheme`)
 - ☐ MTC-3 Add LCOE calculation function to `frontend/src/utils/finance/calculations.js`
-- ☐ MTC-4 Create `getCategoryColor()` wrapper function for category-to-color mapping
+- ☐ MTC-4 Create `getCategoryColorScheme()` function in `colors.js` with standardized category colors
 - ☐ MTC-5 Implement smart chart coloring: `generateChartColorPalette()` for >8 variables, categories for ≤8
 
 ### 3. Sensitivity Analysis Engine 🧮 🏷️Critical
 - ☐ SAE-1 Enhance `frontend/src/utils/finance/sensitivityAnalysis.js` with dual registry support
-- ☐ SAE-2 Implement one-at-a-time sensitivity analysis using percentile-based approach
+- ☐ SAE-2 Implement one-at-a-time sensitivity analysis using dynamic percentile configuration from ScenarioContext
 - ☐ SAE-3 Add time-series aggregation integration for multi-year financial metrics
 - ☐ SAE-4 Create threshold evaluation system with Return Targets integration
-- ☐ SAE-5 Add comprehensive error handling and data validation for edge cases
+- ☐ SAE-5 Add comprehensive error handling supporting minimum 3 percentiles, scaling to any number configured
 
 ### 4. Chart Components & Visualization 📊 🏷️Critical
 - ☐ CCV-1 Create `frontend/src/components/charts/SensitivityCharts.jsx` with chart type registry
@@ -616,9 +715,9 @@ Impact significance determined by threshold system referencing Return Targets:
 ### 7. Supporting Components 🧩 🏷️High
 - ☐ SC-1 Create `frontend/src/components/cards/components/ControlsRow.jsx` for sensitivity controls
 - ☐ SC-2 Build `frontend/src/components/cards/components/InsightsPanel.jsx` for analysis summary
-- ☐ SC-3 Add `SensitivityRangeSelector` with available percentile range (no presets, respect CashflowContext baseline)
+- ☐ SC-3 Add `SensitivityRangeSelector` with dynamic percentile support from ScenarioContext (minimum 3, scales to any number)
 - ☐ SC-4 Create variable category filtering component with checkbox groups
-- ☐ SC-5 Implement variable search and sorting functionality
+- ☐ SC-5 Implement variable search and sorting functionality with table theming following `TableThemes.js` patterns
 
 ### 8. Performance & Optimization 🚀 🏷️Medium
 - ☐ PO-1 Implement sensitivity data pre-computation in CashflowContext refresh cycle
@@ -661,10 +760,11 @@ Impact significance determined by threshold system referencing Return Targets:
 - `frontend/src/components/cards/components/InsightsPanel.jsx` - Results summary component
 
 ### Files to Modify:
-- `schemas/yup/cashflow.js` - Enhance schema with technical/financial sections
+- `schemas/yup/cashflow.js` - Add `SensitivitySourceRegistrySchema` based on `RegistrySourceSchema`
+- `frontend/src/utils/charts/colors.js` - Add `getCategoryColorScheme()` function with standardized category colors
 - `frontend/src/utils/finance/sensitivityMetrics.js` - Add LCOE and enhanced SUPPORTED_METRICS
 - `frontend/src/utils/finance/calculations.js` - Add calculateLCOE function
-- `frontend/src/utils/finance/sensitivityAnalysis.js` - Enhanced with dual registry support
+- `frontend/src/utils/finance/sensitivityAnalysis.js` - Enhanced with dual registry support and dynamic percentile handling
 - `frontend/src/contexts/CashflowContext.jsx` - Add sensitivity data computation to refresh workflow
 - `frontend/src/components/cards/index.js` - Export updated DriverExplorerCard
 
