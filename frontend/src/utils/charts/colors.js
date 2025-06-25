@@ -266,6 +266,36 @@ export const getFinancialColorScheme = (metricType) => {
 };
 
 /**
+ * Get standardized category color scheme for sensitivity variables
+ * @param {string} category - Variable category
+ * @returns {string} Hex color code
+ */
+export const getCategoryColorScheme = (category) => {
+    const categoryMap = {
+        // Direct variable types (from CASHFLOW_SOURCE_REGISTRY)
+        revenue: green[6],           // #389e0d - success green for revenue
+        cost: red[6],                // #cf1322 - error red for costs
+        multiplier: blue[5],         // #1890ff - primary blue for multipliers
+
+        // Indirect variable types (from SENSITIVITY_SOURCE_REGISTRY)
+        technical: purple[6],        // #531dab - royal purple for technical
+        financing: orange[6],        // #d48806 - warning orange for financing
+        operational: cyan[6],        // #08979c - dark cyan for operational
+
+        // Subcategories
+        escalation: blue[5],         // #1890ff - primary blue for escalation
+        pricing: green[5],           // #52c41a - lighter green for pricing
+        contract: volcano[5],        // #fa541c - warm red-orange for contracts
+
+        // Defaults
+        unknown: grey[6],            // #595959 - neutral grey
+        default: grey[5]             // #8c8c8c - lighter grey
+    };
+
+    return categoryMap[category] || categoryMap.default;
+};
+
+/**
  * Create color with opacity
  * @param {string} color - Base color (hex)
  * @param {number} opacity - Opacity value (0-1)

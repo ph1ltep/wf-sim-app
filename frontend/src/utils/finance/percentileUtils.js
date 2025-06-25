@@ -55,3 +55,29 @@ export const createPercentileOptions = (percentiles) => {
         key: `percentile-${p.value}`
     }));
 };
+
+/**
+ * Get sensitivity range from simulation percentiles configuration
+ * @param {Object} simulationConfig - simulation config with percentiles array and primaryPercentile
+ * @returns {Object} { lower, upper, base }
+ */
+export const getSensitivityRangeFromSimulation = (simulationConfig) => {
+    const percentiles = simulationConfig?.percentiles || [];
+    const primaryPercentile = simulationConfig?.primaryPercentile || 50;
+
+    if (percentiles.length === 0) {
+        return { lower: 25, upper: 75, base: 50 };
+    }
+
+    // Extract values from PercentileSchema array
+    const availableValues = percentiles.map(p => p.value).sort((a, b) => a - b);
+
+    // Use existing function
+    const range = getDefaultSensitivityRange(availableValues, primaryPercentile);
+
+    return {
+        lower: range.lowerPercentile,
+        upper: range.upperPercentile,
+        base: primaryPercentile
+    };
+};

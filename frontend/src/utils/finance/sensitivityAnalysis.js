@@ -1,299 +1,253 @@
-// Fix frontend/src/utils/finance/sensitivityAnalysis.js - REMOVE getVariableColor references
+// frontend/src/utils/finance/sensitivityAnalysis.js
+// Complete simplified sensitivity analysis
 
-import { SUPPORTED_METRICS, extractMetricValue } from './sensitivityMetrics';
-import { calculateAllMetricsWithPayback } from './calculations';
+import { SUPPORTED_METRICS } from './sensitivityMetrics';
+import { aggregateTimeSeries, getAggregationMethod, getAggregationOptions } from '../timeSeries/aggregation';
+import { discoverAllSensitivityVariables } from '../../contexts/SensitivityRegistry';
+import { getSensitivityRangeFromSimulation } from './percentileUtils';
 
 /**
- * Find percentile result from distribution analysis results
- * @param {Array} results - Distribution results array
- * @param {number} targetPercentile - Target percentile value
- * @returns {Object|null} Percentile result object
+ * Find percentile result from distribution analysis
  */
 const findPercentileResult = (results, targetPercentile) => {
     if (!Array.isArray(results)) return null;
 
     return results.find(result => {
-        if (result.percentile?.value === targetPercentile) return true;
-        if (result.percentile === targetPercentile) return true;
-        return false;
+        const percentile = result.percentile?.value || result.percentile;
+        return percentile === targetPercentile;
     });
 };
 
 /**
- * Get distribution data for a variable from scenario analysis
- * @param {Object} variable - Variable configuration from registry
- * @param {Object} distributionAnalysis - Distribution analysis data
- * @returns {Object|null} Distribution data
+ * Get distribution data for a variable
  */
 const getDistributionData = (variable, distributionAnalysis) => {
-    // Extract the variable key from the path
-    // Path format: ['simulation', 'inputSim', 'distributionAnalysis', 'variableKey']
     const variableKey = variable.path[variable.path.length - 1];
-
-    return distributionAnalysis[variableKey] || null;
+    return distributionAnalysis?.[variableKey] || null;
 };
 
 /**
- * Create base scenario with all variables at specified percentile
- * @param {Array} variables - All variables from registry
- * @param {Object} distributionAnalysis - Distribution analysis data
- * @param {number} percentile - Target percentile
- * @returns {Object} Base scenario configuration
+ * Apply multipliers to time-series data
+ * CRITICAL: This must happen BEFORE aggregation for accurate impact calculation
  */
-const createBaseScenario = (variables, distributionAnalysis, percentile) => {
-    const baseScenario = {};
+const applyMultipliers = (timeSeries, multipliers, getValueByPath) => {
+    if (!multipliers?.length || !timeSeries?.length) return timeSeries;
 
-    variables.forEach(variable => {
-        if (variable.hasPercentiles) {
-            const varData = getDistributionData(variable, distributionAnalysis);
-            if (varData?.results) {
-                const percentileResult = findPercentileResult(varData.results, percentile);
-                if (percentileResult) {
-                    baseScenario[variable.id] = percentileResult;
-                }
+    return timeSeries.map(dataPoint => {
+        let adjustedValue = dataPoint.value;
+
+        multipliers.forEach(multiplier => {
+            const multiplierValue = getValueByPath(multiplier.path);
+            if (multiplierValue == null) return;
+
+            switch (multiplier.operation) {
+                case 'multiply':
+                    adjustedValue *= multiplierValue;
+                    break;
+                case 'compound':
+                    adjustedValue *= Math.pow(1 + multiplierValue, dataPoint.year);
+                    break;
+                case 'add':
+                    adjustedValue += multiplierValue;
+                    break;
+                default:
+                    console.warn(`Unknown multiplier operation: ${multiplier.operation}`);
             }
-        }
+        });
+
+        return { ...dataPoint, value: adjustedValue };
     });
-
-    return baseScenario;
 };
 
 /**
- * Discover variables with distributions from CASHFLOW_SOURCE_REGISTRY
- * @param {Object} registry - CASHFLOW_SOURCE_REGISTRY object
- * @returns {Array} Array of variable objects for sensitivity analysis
+ * Get time-series data for a variable at specific percentile
  */
-export const discoverVariablesFromRegistry = (registry) => {
-    const variables = [];
+const getTimeSeriesAtPercentile = (variable, percentile, distributionAnalysis, getValueByPath) => {
+    // For non-percentile variables, use static value
+    if (!variable.hasPercentiles) {
+        const baseValue = getValueByPath(variable.path);
+        if (baseValue == null) return null;
 
-    // Extract multipliers with percentiles
-    if (registry.multipliers) {
-        registry.multipliers.forEach(source => {
-            if (source.hasPercentiles) {
-                variables.push({
-                    id: source.id,
-                    label: source.description || source.id,
-                    category: source.category,
-                    hasPercentiles: true,
-                    path: source.path,
-                    variableType: 'multiplier',
-                    registryCategory: 'multipliers'
-                });
-            }
-        });
+        return Array.from({ length: 26 }, (_, index) => ({ year: index, value: baseValue }));
     }
 
-    // Extract revenues with percentiles
-    if (registry.revenues) {
-        registry.revenues.forEach(source => {
-            if (source.hasPercentiles) {
-                variables.push({
-                    id: source.id,
-                    label: source.description || source.id,
-                    category: source.category,
-                    hasPercentiles: true,
-                    path: source.path,
-                    variableType: 'revenue',
-                    registryCategory: 'revenues'
-                });
-            }
-        });
+    // For percentile variables, get distribution data
+    const varData = getDistributionData(variable, distributionAnalysis);
+    if (!varData?.results) return null;
+
+    const percentileResult = findPercentileResult(varData.results, percentile);
+    if (!percentileResult) return null;
+
+    // Handle time-series data
+    if (percentileResult.data && Array.isArray(percentileResult.data)) {
+        return percentileResult.data.map((value, index) => ({ year: index, value }));
     }
 
-    // Extract costs with percentiles (if any exist in the future)
-    if (registry.costs) {
-        registry.costs.forEach(source => {
-            if (source.hasPercentiles) {
-                variables.push({
-                    id: source.id,
-                    label: source.description || source.id,
-                    category: source.category,
-                    hasPercentiles: true,
-                    path: source.path,
-                    variableType: 'cost',
-                    registryCategory: 'costs'
-                });
-            }
-        });
+    // Handle single value - expand to time-series
+    const value = percentileResult.data?.[0]?.value || percentileResult.value || percentileResult;
+    if (typeof value === 'number') {
+        return Array.from({ length: 26 }, (_, index) => ({ year: index, value }));
     }
 
-    return variables;
+    return null;
 };
 
 /**
- * Enhance variables with distribution metadata
- * @param {Array} variables - Variables from discoverVariablesFromRegistry
- * @param {Object} distributionAnalysis - Distribution analysis data from scenario
- * @returns {Array} Enhanced variables with distribution metadata
+ * Calculate impact for a single variable
  */
-export const enhanceVariablesWithDistributionMetadata = (variables, distributionAnalysis) => {
-    return variables.map(variable => {
-        const varData = getDistributionData(variable, distributionAnalysis);
+const calculateVariableImpact = (variable, targetMetric, percentileRange, distributionAnalysis, getValueByPath) => {
+    const { lower, upper, base } = percentileRange;
+    const metricConfig = SUPPORTED_METRICS[targetMetric];
 
-        const metadata = {
-            hasDistributionData: !!varData,
-            distributionType: null,
-            availablePercentiles: [],
-            hasTimeSeriesData: false
-        };
+    if (!metricConfig) {
+        console.warn(`Unknown metric: ${targetMetric}`);
+        return null;
+    }
 
-        if (varData) {
-            // Extract distribution type if available
-            if (varData.distribution?.type) {
-                metadata.distributionType = varData.distribution.type;
-            }
+    const aggregationMethod = getAggregationMethod(targetMetric);
+    const aggregationOptions = getAggregationOptions(targetMetric);
 
-            // Get available percentiles from results
-            if (varData.results && Array.isArray(varData.results)) {
-                metadata.availablePercentiles = varData.results
-                    .map(r => r.percentile?.value || r.percentile)
-                    .filter(p => typeof p === 'number')
-                    .sort((a, b) => a - b);
-            }
+    try {
+        // Get time-series for each percentile case
+        const baseTimeSeries = getTimeSeriesAtPercentile(variable, base, distributionAnalysis, getValueByPath);
+        const lowTimeSeries = getTimeSeriesAtPercentile(variable, lower, distributionAnalysis, getValueByPath);
+        const highTimeSeries = getTimeSeriesAtPercentile(variable, upper, distributionAnalysis, getValueByPath);
 
-            // Check if data has time series (multiple years)
-            const firstResult = varData.results?.[0];
-            if (firstResult?.data && Array.isArray(firstResult.data)) {
-                metadata.hasTimeSeriesData = firstResult.data.length > 1;
-            }
+        if (!baseTimeSeries || !lowTimeSeries || !highTimeSeries) {
+            return null;
+        }
+
+        // Apply multipliers FIRST (critical for accurate calculations)
+        const baseWithMultipliers = applyMultipliers(baseTimeSeries, variable.multipliers, getValueByPath);
+        const lowWithMultipliers = applyMultipliers(lowTimeSeries, variable.multipliers, getValueByPath);
+        const highWithMultipliers = applyMultipliers(highTimeSeries, variable.multipliers, getValueByPath);
+
+        // Then aggregate to get final metric values
+        const baseValue = aggregateTimeSeries(baseWithMultipliers, aggregationMethod, aggregationOptions);
+        const lowValue = aggregateTimeSeries(lowWithMultipliers, aggregationMethod, aggregationOptions);
+        const highValue = aggregateTimeSeries(highWithMultipliers, aggregationMethod, aggregationOptions);
+
+        if (baseValue == null || lowValue == null || highValue == null) {
+            return null;
         }
 
         return {
-            ...variable,
-            distributionMetadata: metadata
+            variableId: variable.id,
+            variable: variable.label || variable.id,
+            category: variable.category,
+            displayCategory: variable.displayCategory || variable.category,
+            source: variable.source,
+            variableType: variable.variableType,
+
+            // Values
+            baseValue,
+            lowValue,
+            highValue,
+            impact: Math.abs(highValue - lowValue),
+
+            // Metadata
+            percentileRange: {
+                lower,
+                base,
+                upper,
+                confidenceInterval: upper - lower
+            },
+            variableValues: {
+                low: lowTimeSeries[0]?.value || 'N/A',
+                base: baseTimeSeries[0]?.value || 'N/A',
+                high: highTimeSeries[0]?.value || 'N/A'
+            }
         };
-    });
+    } catch (error) {
+        console.error(`Error calculating impact for ${variable.id}:`, error);
+        return null;
+    }
 };
 
 /**
- * Calculate dynamic sensitivity analysis using real distribution percentiles
- * @param {Object} params - Calculation parameters
- * @param {Array} params.variables - Variables from discoverVariablesFromRegistry
+ * Main sensitivity analysis function - SIMPLIFIED
+ * @param {Object} params - Analysis parameters
+ * @param {Object} params.cashflowRegistry - CASHFLOW_SOURCE_REGISTRY
+ * @param {Object} params.sensitivityRegistry - SENSITIVITY_SOURCE_REGISTRY
+ * @param {string} params.targetMetric - Target metric key (npv, irr, etc.)
+ * @param {Object} params.simulationConfig - simulation config with percentiles array and primaryPercentile
  * @param {Object} params.distributionAnalysis - Distribution analysis data
- * @param {Function} params.cashflowEngine - Function to calculate cashflow metrics
- * @param {number} params.basePercentile - Base case percentile (usually primary)
- * @param {number} params.lowerPercentile - Lower bound percentile
- * @param {number} params.upperPercentile - Upper bound percentile
- * @param {string} params.targetMetric - Target metric to analyze
- * @returns {Array} Sensitivity analysis results
+ * @param {Function} params.getValueByPath - Path resolver function
+ * @returns {Array} Sensitivity results sorted by impact magnitude
  */
-export const calculateDynamicSensitivity = ({
-    variables,
+export const calculateSensitivityAnalysis = ({
+    cashflowRegistry,
+    sensitivityRegistry,
+    targetMetric,
+    simulationConfig,
     distributionAnalysis,
-    cashflowEngine,
-    basePercentile,
-    lowerPercentile,
-    upperPercentile,
-    targetMetric
+    getValueByPath
 }) => {
-    const metric = SUPPORTED_METRICS[targetMetric];
-    if (!metric) {
-        throw new Error(`Unsupported metric: ${targetMetric}`);
-    }
-
-    // Create base scenario with all variables at base percentile
-    const baseScenario = createBaseScenario(variables, distributionAnalysis, basePercentile);
-
-    // Calculate base case metrics
-    const baseResults = cashflowEngine(baseScenario);
-    const baseValue = extractMetricValue(baseResults, targetMetric);
-
-    if (baseValue === null) {
-        console.warn(`Could not extract ${targetMetric} from base case results`);
+    // Input validation
+    if (!SUPPORTED_METRICS[targetMetric]) {
+        console.error(`Unsupported target metric: ${targetMetric}`);
         return [];
     }
 
-    // Calculate sensitivity for each variable
-    const sensitivityResults = variables
-        .filter(variable => variable.hasPercentiles)
-        .map(variable => {
-            try {
-                const varData = getDistributionData(variable, distributionAnalysis);
+    if (!distributionAnalysis || !getValueByPath) {
+        console.error('Missing required analysis data');
+        return [];
+    }
 
-                if (!varData?.results) {
-                    console.warn(`No distribution data for variable: ${variable.id}`);
-                    return null;
-                }
+    // Get percentile range using utility function - pass the whole simulation config
+    const percentileRange = getSensitivityRangeFromSimulation(simulationConfig);
 
-                // Get percentile results
-                const basePct = findPercentileResult(varData.results, basePercentile);
-                const lowPct = findPercentileResult(varData.results, lowerPercentile);
-                const highPct = findPercentileResult(varData.results, upperPercentile);
+    // Discover all variables from both registries
+    const variables = discoverAllSensitivityVariables(cashflowRegistry, sensitivityRegistry);
 
-                if (!basePct || !lowPct || !highPct) {
-                    console.warn(`Missing percentile data for variable: ${variable.id}`);
-                    return null;
-                }
+    if (variables.length === 0) {
+        console.warn('No variables found for sensitivity analysis');
+        return [];
+    }
 
-                // Calculate low case (variable at lower percentile, others at base)
-                const lowScenario = { ...baseScenario, [variable.id]: lowPct };
-                const lowResults = cashflowEngine(lowScenario);
-                const lowValue = extractMetricValue(lowResults, targetMetric);
-
-                // Calculate high case (variable at upper percentile, others at base)
-                const highScenario = { ...baseScenario, [variable.id]: highPct };
-                const highResults = cashflowEngine(highScenario);
-                const highValue = extractMetricValue(highResults, targetMetric);
-
-                if (lowValue === null || highValue === null) {
-                    console.warn(`Could not calculate ${targetMetric} for variable: ${variable.id}`);
-                    return null;
-                }
-
-                return {
-                    variable: variable.label || variable.id,
-                    variableId: variable.id,
-                    category: variable.category,
-                    metric: targetMetric,
-                    baseValue,
-                    lowValue,
-                    highValue,
-                    impact: Math.abs(highValue - lowValue),
-                    // Store percentile info for communication
-                    percentileRange: {
-                        lower: lowerPercentile,
-                        base: basePercentile,
-                        upper: upperPercentile,
-                        confidenceInterval: upperPercentile - lowerPercentile
-                    },
-                    // Store actual variable values for tooltip
-                    variableValues: {
-                        low: lowPct.data?.[0]?.value || 'N/A',
-                        base: basePct.data?.[0]?.value || 'N/A',
-                        high: highPct.data?.[0]?.value || 'N/A'
-                    }
-                };
-            } catch (error) {
-                console.error(`Error calculating sensitivity for ${variable.id}:`, error);
-                return null;
-            }
-        })
+    // Calculate impact for each variable
+    const results = variables
+        .map(variable => calculateVariableImpact(variable, targetMetric, percentileRange, distributionAnalysis, getValueByPath))
         .filter(Boolean) // Remove null results
         .sort((a, b) => b.impact - a.impact); // Sort by impact magnitude
 
-    return sensitivityResults;
+    return results;
 };
 
 /**
- * Calculate sensitivity for multiple metrics simultaneously
- * @param {Object} params - Same as calculateDynamicSensitivity
- * @param {Array} params.targetMetrics - Array of target metric keys
- * @returns {Object} Results keyed by metric
+ * Calculate sensitivity for multiple metrics
  */
 export const calculateMultiMetricSensitivity = ({ targetMetrics, ...params }) => {
     const results = {};
 
     targetMetrics.forEach(metric => {
         try {
-            results[metric] = calculateDynamicSensitivity({
-                ...params,
-                targetMetric: metric
-            });
+            results[metric] = calculateSensitivityAnalysis({ ...params, targetMetric: metric });
         } catch (error) {
-            console.error(`Error calculating sensitivity for metric ${metric}:`, error);
+            console.error(`Error calculating sensitivity for ${metric}:`, error);
             results[metric] = [];
         }
     });
 
     return results;
+};
+
+/**
+ * Utility functions
+ */
+export const filterByImpact = (results, minImpact = 0) => {
+    return results.filter(result => result.impact >= minImpact);
+};
+
+export const getTopVariables = (results, count = 5) => {
+    return results.slice(0, count);
+};
+
+export const groupByCategory = (results) => {
+    return results.reduce((groups, result) => {
+        const category = result.displayCategory;
+        if (!groups[category]) groups[category] = [];
+        groups[category].push(result);
+        return groups;
+    }, {});
 };

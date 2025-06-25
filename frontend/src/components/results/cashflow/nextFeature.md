@@ -1,5 +1,5 @@
 # Driver Explorer Card - Product Requirements Document
-Version: v2.2 | Date: 2025-06-25 | Author: Development Team
+Version: v2.3 | Date: 2025-06-25 | Author: Development Team
 
 ---
 
@@ -26,149 +26,199 @@ We implement **One-at-a-Time Sensitivity Analysis** that leverages existing Mont
 
 **How it works**: For each variable, compare target metric values between lower percentile (P25) and upper percentile (P75) while holding all other variables at their base case (P50).
 
+**Critical Data Flow**:
+1. **Percentile Selection**: Uses unified percentile picker from CashflowContext (not separate percentile handling)
+2. **Multiplier Application**: Apply escalation/multipliers to time-series FIRST
+3. **Aggregation**: Aggregate the multiplier-adjusted time-series to get final metric values
+4. **Impact Calculation**: Compare aggregated values to determine sensitivity impact
+
 **Why this approach**:
 - ✅ Uses existing percentile-based simulation results
 - ✅ Simple to understand and explain to stakeholders
 - ✅ Fast computation using existing data infrastructure
 - ✅ Clear attribution to individual variables
 - ✅ Aligns with existing CashflowContext percentile selection system
-
-**Data Requirements**:
-- Existing percentile simulation results (P10, P25, P50, P75, P90)
-- Target metric values for each percentile from CashflowContext
-- Variable metadata from dual registry system
+- ✅ Leverages existing multiplier system for time-series escalation
 
 ---
 
-## 3. Dual Registry Architecture
+## 3. Dual Registry Architecture & Data Relationships
 
 ### Problem Statement
-Adding sensitivity variables to `CASHFLOW_SOURCE_REGISTRY` would contaminate cash flow tables with indirect variables that don't directly create cash flows.
+We need to analyze both **direct** and **indirect** variables affecting financial metrics:
 
-### Solution: Dual Registry System
+- **Direct Variables**: Already in `CASHFLOW_SOURCE_REGISTRY` - create cash flows directly (energy price, contract fees, operational costs)
+- **Indirect Variables**: Need `SENSITIVITY_SOURCE_REGISTRY` - affect calculations indirectly (availability → energy production → revenue)
 
-#### CASHFLOW_SOURCE_REGISTRY (Unchanged)
-Remains focused on direct cash flow generation using `CashflowSourceRegistrySchema`:
+### CASHFLOW_SOURCE_REGISTRY Integration
+The Driver Explorer leverages existing `CASHFLOW_SOURCE_REGISTRY` entries as the primary source of sensitivity variables:
+
 ```javascript
-CASHFLOW_SOURCE_REGISTRY = {
-  data: { projectLife: [...], numWTGs: [...], currency: [...] },
-  multipliers: [
-    { id: 'electricityPrice', path: [...], hasPercentiles: true },
-    { id: 'escalationRate', path: [...], hasPercentiles: true }
-  ],
-  costs: [ /* direct cost sources */ ],
-  revenues: [ /* direct revenue sources */ ]
+// Example: Direct variable already in CASHFLOW_SOURCE_REGISTRY
+{
+    id: 'energyPrice',
+    description: 'Electricity Price',
+    category: 'revenue',
+    hasPercentiles: true,
+    path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyPrice'],
+    multipliers: [
+        {
+            id: 'price_escalation',
+            operation: 'compound',
+            path: ['settings', 'modules', 'revenue', 'priceEscalation']
+        }
+    ]
 }
 ```
 
-#### SENSITIVITY_SOURCE_REGISTRY (New)
-Contains indirect variables for sensitivity analysis using `SensitivitySourceRegistrySchema` (based on `RegistrySourceSchema`):
-```javascript
-SENSITIVITY_SOURCE_REGISTRY = {
-  data: { /* Same global data structure */ },
-  
-  technical: [
-    {
-      id: 'availability',
-      path: ['simulation', 'inputSim', 'distributionAnalysis', 'availability'],
-      category: 'technical',
-      hasPercentiles: true,
-      description: 'Wind turbine availability factor'
-    }
-  ],
-  
-  financial: [
-    {
-      id: 'costOfEquity',
-      path: ['settings', 'modules', 'financing', 'costOfEquity'],
-      category: 'financing',
-      hasPercentiles: false,
-      description: 'Required return rate for equity investors'
-    }
-  ]
-}
-```
+**Data Flow for Direct Variables**:
+1. Get time-series at P25 while others at P50
+2. Apply existing multipliers (escalation, etc.)
+3. Aggregate multiplier-adjusted time-series
+4. Calculate financial metric (NPV, IRR, etc.)
+5. Compare with P75 case to get impact
 
-### Schema Definitions
-Both registries follow the same base schema pattern:
+### SENSITIVITY_SOURCE_REGISTRY for Indirect Variables
+
+For variables that don't directly create cash flows but affect financial calculations:
 
 ```javascript
-// schemas/yup/cashflow.js - Enhanced schema support
-const SensitivitySourceRegistrySchema = Yup.object().shape({
-    data: RegistryDataSchema.required(),
-    technical: Yup.array().of(RegistrySourceSchema).default([]),
-    financial: Yup.array().of(RegistrySourceSchema).default([]),
-    operational: Yup.array().of(RegistrySourceSchema).default([])
-});
-
-// Registry discovery function supports array of either schema type
-const discoverAllSensitivityVariables = (registries) => {
-  // registries can be array of CashflowSourceRegistrySchema or SensitivitySourceRegistrySchema
-  const registryArray = Array.isArray(registries) ? registries : [registries];
-  // ... processing logic
+export const SENSITIVITY_SOURCE_REGISTRY = {
+    technical: [
+        {
+            id: 'availability',
+            description: 'Wind Turbine Availability Factor',
+            category: 'technical',
+            hasPercentiles: true,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'availability'],
+            affects: ['revenues.energy'], // References CASHFLOW_SOURCE_REGISTRY entry
+            multipliers: [], // Inherits multipliers from affected entry
+            data: {
+                units: '%',
+                impactType: 'multiplicative' // How it affects the target
+            }
+        },
+        {
+            id: 'windVariability',
+            description: 'Wind Resource Variability',
+            category: 'technical',
+            hasPercentiles: true,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability'],
+            affects: ['revenues.energy'],
+            multipliers: [],
+            data: {
+                units: '%',
+                impactType: 'multiplicative'
+            }
+        }
+    ],
+    
+    financial: [
+        {
+            id: 'interestRate',
+            description: 'Debt Interest Rate',
+            category: 'financing',
+            hasPercentiles: false,
+            path: ['settings', 'modules', 'financing', 'interestRate'],
+            affects: ['financing.debtService'],
+            multipliers: [],
+            data: {
+                units: '%',
+                impactType: 'recalculation' // Requires full debt schedule recalc
+            }
+        },
+        {
+            id: 'taxRate',
+            description: 'Corporate Tax Rate',
+            category: 'financing',
+            hasPercentiles: false,
+            path: ['settings', 'modules', 'financing', 'taxRate'],
+            affects: ['financing.taxShield'],
+            multipliers: [],
+            data: {
+                units: '%',
+                impactType: 'recalculation'
+            }
+        }
+    ],
+    
+    operational: [
+        {
+            id: 'degradationRate',
+            description: 'Annual Performance Degradation Rate',
+            category: 'technical',
+            hasPercentiles: false,
+            path: ['settings', 'project', 'windFarm', 'degradationRate'],
+            affects: ['revenues.energy'],
+            multipliers: [],
+            data: {
+                units: '%/year',
+                impactType: 'time_series_modifier'
+            }
+        }
+    ]
 };
 ```
-```
 
-### SENSITIVITY_SOURCE_REGISTRY Variable Definitions
+### Variable Discovery Function
 
-| Variable ID | Category | Path | Has Percentiles | Dependencies | Description |
-|------------|----------|------|----------------|--------------|-------------|
-| `availability` | technical | `['simulation', 'inputSim', 'distributionAnalysis', 'availability']` | Yes | Distribution Analysis | Wind turbine availability factor |
-| `windVariability` | technical | `['simulation', 'inputSim', 'distributionAnalysis', 'windVariability']` | Yes | Distribution Analysis | Wind resource variability affecting energy production |
-| `capacityFactor` | technical | `['settings', 'project', 'windFarm', 'capacityFactor']` | No | Project Settings | Net capacity factor of wind farm |
-| `degradationRate` | technical | `['settings', 'project', 'windFarm', 'degradationRate']` | No | Project Settings | Annual performance degradation rate |
-| `costOfEquity` | financing | `['settings', 'modules', 'financing', 'costOfEquity']` | No | Financing Module | Required return rate for equity investors |
-| `debtRatio` | financing | `['settings', 'modules', 'financing', 'debtRatio']` | No | Financing Module | Debt to total capital ratio |
-| `interestRate` | financing | `['settings', 'modules', 'financing', 'interestRate']` | No | Financing Module | Debt interest rate |
-| `taxRate` | financing | `['settings', 'modules', 'financing', 'taxRate']` | No | Financing Module | Corporate tax rate |
-| `insuranceCost` | operational | `['settings', 'project', 'costs', 'insurance']` | No | Project Settings | Annual insurance cost |
-| `landLeaseCost` | operational | `['settings', 'project', 'costs', 'landLease']` | No | Project Settings | Annual land lease payments |
-
-### Variable Discovery Implementation
 ```javascript
-const discoverAllSensitivityVariables = (registries) => {
-  // Support array of either CashflowSourceRegistrySchema or SensitivitySourceRegistrySchema
-  const registryArray = Array.isArray(registries) ? registries : [registries];
-  const variables = [];
-  
-  registryArray.forEach(registry => {
-    // Standard sections for CashflowSourceRegistrySchema
+/**
+ * Discover all variables for sensitivity analysis from dual registry system
+ * @param {Object} cashflowRegistry - CASHFLOW_SOURCE_REGISTRY
+ * @param {Object} sensitivityRegistry - SENSITIVITY_SOURCE_REGISTRY
+ * @returns {Array} Combined array of all sensitivity variables
+ */
+export const discoverAllSensitivityVariables = (cashflowRegistry, sensitivityRegistry) => {
+    const variables = [];
+    
+    // Extract direct variables from CASHFLOW_SOURCE_REGISTRY
     ['multipliers', 'costs', 'revenues'].forEach(section => {
-      if (registry[section]) {
-        registry[section].forEach(source => {
-          if (source.hasPercentiles) {
-            variables.push({
-              id: source.id,
-              label: source.description,
-              category: source.category,
-              path: source.path,
-              source: 'direct'
+        if (cashflowRegistry[section]) {
+            cashflowRegistry[section].forEach(source => {
+                if (source.hasPercentiles) {
+                    variables.push({
+                        id: source.id,
+                        label: source.description || source.id,
+                        category: source.category,
+                        path: source.path,
+                        hasPercentiles: true,
+                        variableType: section.slice(0, -1), // 'revenues' -> 'revenue'
+                        source: 'direct',
+                        registryCategory: section,
+                        multipliers: source.multipliers || [],
+                        units: source.data?.units || ''
+                    });
+                }
             });
-          }
-        });
-      }
+        }
     });
     
-    // Additional sections for SensitivitySourceRegistrySchema
+    // Extract indirect variables from SENSITIVITY_SOURCE_REGISTRY
     ['technical', 'financial', 'operational'].forEach(section => {
-      if (registry[section]) {
-        registry[section].forEach(source => {
-          if (source.hasPercentiles) {
-            variables.push({
-              id: source.id,
-              label: source.description,
-              category: source.category,
-              path: source.path,
-              source: 'indirect'
+        if (sensitivityRegistry[section]) {
+            sensitivityRegistry[section].forEach(source => {
+                if (source.hasPercentiles) {
+                    variables.push({
+                        id: source.id,
+                        label: source.description || source.id,
+                        category: source.category,
+                        path: source.path,
+                        hasPercentiles: true,
+                        variableType: source.category,
+                        source: 'indirect',
+                        registryCategory: section,
+                        affects: source.affects || [],
+                        multipliers: source.multipliers || [],
+                        units: source.data?.units || '',
+                        impactType: source.data?.impactType || 'multiplicative'
+                    });
+                }
             });
-          }
-        });
-      }
+        }
     });
-  });
-  
-  return variables;
+    
+    return variables;
 };
 ```
 
@@ -179,48 +229,39 @@ const discoverAllSensitivityVariables = (registries) => {
 ### The Challenge
 Financial metrics are provided as time-series spanning project lifetime (20+ years). Sensitivity analysis needs single values for impact comparison.
 
-### Reusable Aggregation Function
-Create `frontend/src/utils/timeSeries/aggregation.js`:
+### Multiplier-First Approach
+**Critical**: Multipliers must be applied BEFORE aggregation to ensure accurate impact calculation.
 
 ```javascript
-export const aggregateTimeSeries = (data, method, options = {}) => {
-  if (!Array.isArray(data) || data.length === 0) return null;
-  
-  const {
-    filter = 'all',           // 'all', 'operational', 'construction', 'early', 'late'
-    discountRate = 0,         // For NPV calculations
-    precision = 2,            // Decimal places
-    weights = null            // Custom weights array
-  } = options;
-
-  // Apply filters
-  let filteredData = data;
-  switch (filter) {
-    case 'operational': filteredData = data.filter(d => d.year > 0); break;
-    case 'construction': filteredData = data.filter(d => d.year <= 0); break;
-    case 'early': filteredData = data.filter(d => d.year > 0 && d.year <= 5); break;
-    case 'late': filteredData = data.filter(d => d.year > 15); break;
-  }
-
-  const values = filteredData.map(d => d.value).filter(v => typeof v === 'number');
-  if (values.length === 0) return null;
-
-  let result;
-  switch (method) {
-    case 'mean': result = values.reduce((sum, val) => sum + val, 0) / values.length; break;
-    case 'min': result = Math.min(...values); break;
-    case 'max': result = Math.max(...values); break;
-    case 'sum': result = values.reduce((sum, val) => sum + val, 0); break;
-    case 'npv':
-      result = filteredData.reduce((npv, d) => {
-        const discountFactor = Math.pow(1 + discountRate, -d.year);
-        return npv + (d.value * discountFactor);
-      }, 0);
-      break;
-    default: throw new Error(`Unsupported aggregation method: ${method}`);
-  }
-
-  return precision > 0 ? Number(result.toFixed(precision)) : Math.round(result);
+/**
+ * Complete data flow for sensitivity analysis
+ */
+const calculateVariableImpact = (variable, targetMetric, percentileRange) => {
+    // 1. Get base case (P50)
+    const baseTimeSeries = getTimeSeriesAtPercentile(variable, 50);
+    const baseWithMultipliers = applyMultipliers(baseTimeSeries, variable.multipliers);
+    const baseValue = aggregateTimeSeries(baseWithMultipliers, getAggregationMethod(targetMetric));
+    
+    // 2. Get low case (P25)
+    const lowTimeSeries = getTimeSeriesAtPercentile(variable, 25);
+    const lowWithMultipliers = applyMultipliers(lowTimeSeries, variable.multipliers);
+    const lowValue = aggregateTimeSeries(lowWithMultipliers, getAggregationMethod(targetMetric));
+    
+    // 3. Get high case (P75)
+    const highTimeSeries = getTimeSeriesAtPercentile(variable, 75);
+    const highWithMultipliers = applyMultipliers(highTimeSeries, variable.multipliers);
+    const highValue = aggregateTimeSeries(highWithMultipliers, getAggregationMethod(targetMetric));
+    
+    // 4. Calculate impact
+    return {
+        variable: variable.label,
+        variableId: variable.id,
+        baseValue,
+        lowValue,
+        highValue,
+        impact: Math.abs(highValue - lowValue),
+        percentileRange: { lower: 25, upper: 75, base: 50 }
+    };
 };
 ```
 
@@ -242,14 +283,105 @@ export const aggregateTimeSeries = (data, method, options = {}) => {
 | `earlyYears` | Average of years 1-5 | Early performance | None (built-in filter) |
 | `operationalMean` | Average of operational years | Operational performance | None (built-in filter) |
 
-### Wind Industry Aggregation Strategies
+### Filter Options for Wind Industry
 
-| Metric | Aggregation Method | Rationale |
-|--------|-------------------|-----------|
-| NPV, IRR | Use final value | Already lifetime aggregated metrics |
-| DSCR, ICR | `min` with `operational` filter | Lenders care about worst-case covenant compliance |
-| LCOE | `mean` with lifecycle weighting | Standard levelized cost methodology |
-| Cash Flow | `sum` for lifetime totals | Cumulative impact analysis |
+| Filter | Description | Typical Use |
+|--------|-------------|-------------|
+| `all` | All project years | NPV, IRR calculations |
+| `operational` | Years > 0 | DSCR, operational cash flows |
+| `construction` | Years ≤ 0 | Construction costs, capex |
+| `early` | Years 1-5 | Early operational performance |
+| `late` | Years 15+ | Late-life performance |
+
+### Implementation
+
+```javascript
+// frontend/src/utils/timeSeries/aggregation.js
+export const aggregateTimeSeries = (data, method, options = {}) => {
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const {
+        filter = 'all',
+        discountRate = 0,
+        precision = 2,
+        weights = null
+    } = options;
+
+    // Apply period filters
+    let filteredData = data;
+    switch (filter) {
+        case 'operational': 
+            filteredData = data.filter(d => d.year > 0); 
+            break;
+        case 'construction': 
+            filteredData = data.filter(d => d.year <= 0); 
+            break;
+        case 'early': 
+            filteredData = data.filter(d => d.year > 0 && d.year <= 5); 
+            break;
+        case 'late': 
+            filteredData = data.filter(d => d.year > 15); 
+            break;
+        default:
+            filteredData = data;
+    }
+
+    const values = filteredData.map(d => d.value).filter(v => typeof v === 'number');
+    if (values.length === 0) return null;
+
+    let result;
+    switch (method) {
+        case 'mean':
+            if (weights && weights.length === values.length) {
+                const weightedSum = values.reduce((sum, val, i) => sum + (val * weights[i]), 0);
+                const weightSum = weights.reduce((sum, w) => sum + w, 0);
+                result = weightedSum / weightSum;
+            } else {
+                result = values.reduce((sum, val) => sum + val, 0) / values.length;
+            }
+            break;
+        case 'min':
+            result = Math.min(...values);
+            break;
+        case 'max':
+            result = Math.max(...values);
+            break;
+        case 'sum':
+            result = values.reduce((sum, val) => sum + val, 0);
+            break;
+        case 'npv':
+            result = filteredData.reduce((npv, d) => {
+                const discountFactor = Math.pow(1 + discountRate, -d.year);
+                return npv + (d.value * discountFactor);
+            }, 0);
+            break;
+        case 'first':
+            result = values[0];
+            break;
+        case 'last':
+            result = values[values.length - 1];
+            break;
+        default:
+            throw new Error(`Unsupported aggregation method: ${method}`);
+    }
+
+    return precision > 0 ? Number(result.toFixed(precision)) : result;
+};
+
+// Wind industry specific aggregation strategies
+export const WIND_INDUSTRY_AGGREGATIONS = {
+    npv: { method: 'npv', options: { filter: 'all' } },
+    irr: { method: 'first', options: { filter: 'all' } },
+    equityIRR: { method: 'first', options: { filter: 'all' } },
+    minDSCR: { method: 'min', options: { filter: 'operational' } },
+    avgDSCR: { method: 'mean', options: { filter: 'operational' } },
+    llcr: { method: 'first', options: { filter: 'all' } },
+    paybackPeriod: { method: 'first', options: { filter: 'all' } },
+    lcoe: { method: 'first', options: { filter: 'all' } },
+    totalCashflow: { method: 'sum', options: { filter: 'operational' } },
+    breakEvenYear: { method: 'first', options: { filter: 'all' } }
+};
+```
 
 ---
 
@@ -257,62 +389,204 @@ export const aggregateTimeSeries = (data, method, options = {}) => {
 
 ### SUPPORTED_METRICS Configuration
 
-| Metric Key | Label | Format | Path | Aggregation | Aggregation Options | Threshold References |
-|------------|-------|---------|------|-------------|-------------------|-------------------|
-| `npv` | NPV | currency | `['npv']` | value | None | `['settings', 'returnTargets', 'minNPV']` |
-| `irr` | Project IRR | percentage | `['irr']` | value | None | `['settings', 'returnTargets', 'minIRR']` |
-| `equityIRR` | Equity IRR | percentage | `['equityIRR']` | value | None | `['settings', 'returnTargets', 'minEquityIRR']` |
-| `minDSCR` | Minimum DSCR | ratio | `['dscr']` | min | `{ filter: 'operational' }` | `['settings', 'modules', 'financing', 'dscr', 'covenant']` |
-| `avgDSCR` | Average DSCR | ratio | `['dscr']` | mean | `{ filter: 'operational' }` | `['settings', 'modules', 'financing', 'dscr', 'target']` |
-| `llcr` | LLCR | ratio | `['llcr']` | value | None | `['settings', 'modules', 'financing', 'llcr', 'target']` |
-| `paybackPeriod` | Payback Period | years | `['paybackPeriod']` | value | None | `['settings', 'returnTargets', 'maxPayback']` |
-| `lcoe` | LCOE | currency | `['lcoe']` | value | None | `['settings', 'returnTargets', 'maxLCOE']` |
-| `totalCashflow` | Total Cash Flow | currency | `['cashflow']` | sum | `{ filter: 'operational' }` | None |
-| `breakEvenYear` | Break Even Year | years | `['breakEvenYear']` | value | None | `['settings', 'returnTargets', 'maxBreakEven']` |
+All metrics include `impactFormat` for proper display and `thresholds` for visual feedback:
 
 ```javascript
 export const SUPPORTED_METRICS = {
-  npv: { 
-    label: 'NPV',
-    format: 'currency',
-    path: ['npv'],
-    aggregation: 'value',
-    units: '$',
-    description: 'Net Present Value of project cash flows',
-    impactFormat: (value) => `$${(value / 1000000).toFixed(1)}M`,
-    thresholds: [
-      {
-        path: ['settings', 'returnTargets', 'minNPV'],
-        comparison: 'below',
-        transform: (value) => value * 1000000,
-        colorRule: (value, threshold) => value < threshold ? 
-          { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-        priority: 4,
-        description: 'NPV below minimum target'
-      }
-    ]
-  },
-  
-  minDSCR: { 
-    label: 'Minimum DSCR',
-    format: 'ratio',
-    path: ['dscr'],
-    aggregation: 'min',
-    aggregationOptions: { filter: 'operational' },
-    units: 'x',
-    description: 'Lowest Debt Service Coverage Ratio during operations',
-    impactFormat: (value) => `${value.toFixed(2)}x`,
-    thresholds: [
-      {
-        path: ['settings', 'modules', 'financing', 'dscr', 'covenant'],
-        comparison: 'below',
-        colorRule: (value, threshold) => value < threshold ?
-          { color: getFinancialColorScheme('covenant'), fontWeight: 600 } : null,
-        priority: 6,
-        description: 'DSCR breaches debt covenant'
-      }
-    ]
-  }
+    npv: { 
+        label: 'NPV',
+        format: 'currency',
+        path: ['npv'],
+        aggregation: 'value',
+        units: '$',
+        description: 'Net Present Value of project cash flows',
+        impactFormat: (value) => `$${(value / 1000000).toFixed(1)}M`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'minNPV'],
+                comparison: 'below',
+                transform: (value) => value * 1000000,
+                colorRule: (value, threshold) => value < threshold ? 
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 4,
+                description: 'NPV below minimum target'
+            }
+        ]
+    },
+    
+    irr: {
+        label: 'Project IRR',
+        format: 'percentage',
+        path: ['irr'],
+        aggregation: 'value',
+        units: '%',
+        description: 'Internal Rate of Return for project',
+        impactFormat: (value) => `${(value * 100).toFixed(1)}%`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'minIRR'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 5,
+                description: 'IRR below minimum target'
+            }
+        ]
+    },
+    
+    minDSCR: { 
+        label: 'Minimum DSCR',
+        format: 'ratio',
+        path: ['dscr'],
+        aggregation: 'min',
+        aggregationOptions: { filter: 'operational' },
+        units: 'x',
+        description: 'Lowest Debt Service Coverage Ratio during operations',
+        impactFormat: (value) => `${value.toFixed(2)}x`,
+        thresholds: [
+            {
+                path: ['settings', 'modules', 'financing', 'dscr', 'covenant'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('covenant'), fontWeight: 600 } : null,
+                priority: 6,
+                description: 'DSCR breaches debt covenant'
+            }
+        ]
+    },
+    
+    equityIRR: {
+        label: 'Equity IRR',
+        format: 'percentage',
+        path: ['equityIRR'],
+        aggregation: 'value',
+        units: '%',
+        description: 'Internal Rate of Return for equity investors',
+        impactFormat: (value) => `${(value * 100).toFixed(1)}%`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'minEquityIRR'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 4,
+                description: 'Equity IRR below minimum target'
+            }
+        ]
+    },
+    
+    avgDSCR: {
+        label: 'Average DSCR',
+        format: 'ratio',
+        path: ['dscr'],
+        aggregation: 'mean',
+        aggregationOptions: { filter: 'operational' },
+        units: 'x',
+        description: 'Average Debt Service Coverage Ratio during operations',
+        impactFormat: (value) => `${value.toFixed(2)}x`,
+        thresholds: [
+            {
+                path: ['settings', 'modules', 'financing', 'dscr', 'target'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('caution'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'Average DSCR below target'
+            }
+        ]
+    },
+    
+    llcr: {
+        label: 'LLCR',
+        format: 'ratio',
+        path: ['llcr'],
+        aggregation: 'value',
+        units: 'x',
+        description: 'Loan Life Coverage Ratio',
+        impactFormat: (value) => `${value.toFixed(2)}x`,
+        thresholds: [
+            {
+                path: ['settings', 'modules', 'financing', 'llcr', 'target'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('caution'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'LLCR below target'
+            }
+        ]
+    },
+    
+    paybackPeriod: {
+        label: 'Payback Period',
+        format: 'years',
+        path: ['paybackPeriod'],
+        aggregation: 'value',
+        units: 'years',
+        description: 'Time to recover initial investment',
+        impactFormat: (value) => `${value.toFixed(1)} years`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'maxPayback'],
+                comparison: 'above',
+                colorRule: (value, threshold) => value > threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'Payback period exceeds maximum target'
+            }
+        ]
+    },
+    
+    lcoe: {
+        label: 'LCOE',
+        format: 'currency',
+        path: ['lcoe'],
+        aggregation: 'value',
+        units: '$/MWh',
+        description: 'Levelized Cost of Energy',
+        impactFormat: (value) => `$${value.toFixed(2)}/MWh`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'maxLCOE'],
+                comparison: 'above',
+                colorRule: (value, threshold) => value > threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'LCOE exceeds maximum target'
+            }
+        ]
+    },
+    
+    totalCashflow: {
+        label: 'Total Cash Flow',
+        format: 'currency',
+        path: ['cashflow'],
+        aggregation: 'sum',
+        aggregationOptions: { filter: 'operational' },
+        units: '$',
+        description: 'Total operational cash flows',
+        impactFormat: (value) => `$${(value / 1000000).toFixed(1)}M`,
+        thresholds: []
+    },
+    
+    breakEvenYear: {
+        label: 'Break Even Year',
+        format: 'years',
+        path: ['breakEvenYear'],
+        aggregation: 'value',
+        units: 'years',
+        description: 'Year when cumulative cash flow turns positive',
+        impactFormat: (value) => `Year ${value.toFixed(0)}`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'maxBreakEven'],
+                comparison: 'above',
+                colorRule: (value, threshold) => value > threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'Break-even year exceeds maximum target'
+            }
+        ]
+    }
 };
 ```
 
@@ -322,91 +596,111 @@ export const SUPPORTED_METRICS = {
 
 ### Core Theming Principles
 1. **UI Components**: Use Ant Design for buttons, selects, cards, alerts, etc.
-2. **Charts & Tables**: Use our theming functions (`getFinancialColorScheme`, `getSemanticColor`, `generateChartColorPalette`)
-3. **MetricsTables & InlineEditTables**: Use custom theming following `TableThemes.js` and `TableThemes.md` patterns
-4. **Metrics**: Define thresholds with `colorRule` functions that call theming utilities
-5. **No Static Colors**: Don't embed colors in SUPPORTED_METRICS - use dynamic theming
+2. **Financial Charts**: Use `getFinancialColorScheme()` for consistent financial color coding
+3. **Category Colors**: Use `getCategoryColorScheme()` for variable type differentiation
+4. **Threshold Indicators**: Use `colorRule` functions for visual feedback on metric thresholds
 
-### Chart Color Strategy
+### Color Scheme Implementation
+
 ```javascript
-// Use generateChartColorPalette() for many variables, categories for few
-const getChartColor = (result, index, totalCount, highlightedId) => {
-  if (result.variableId === highlightedId) {
-    return getSemanticColor('primary', 7);
-  }
-  
-  if (totalCount > 8) {
-    return generateChartColorPalette(totalCount)[index];
-  }
-  
-  return getCategoryColorScheme(result.category); // New standardized function
+// frontend/src/utils/charts/colors.js additions
+
+/**
+ * Get standardized category color scheme for sensitivity variables
+ * @param {string} category - Variable category
+ * @returns {string} Color hex code
+ */
+export const getCategoryColorScheme = (category) => {
+    const categoryColors = {
+        // Direct variable types (from CASHFLOW_SOURCE_REGISTRY)
+        'revenue': '#52c41a',      // Green
+        'cost': '#ff4d4f',         // Red
+        'multiplier': '#1890ff',   // Blue
+        
+        // Indirect variable types (from SENSITIVITY_SOURCE_REGISTRY)
+        'technical': '#722ed1',    // Purple
+        'financing': '#fa8c16',    // Orange
+        'operational': '#13c2c2',  // Cyan
+        
+        // Subcategories
+        'escalation': '#1890ff',   // Blue
+        'pricing': '#52c41a',      // Green
+        'contract': '#fa541c',     // Orange-red
+        
+        // Defaults
+        'unknown': '#8c8c8c',      // Gray
+        'default': '#d9d9d9'       // Light gray
+    };
+    
+    return categoryColors[category] || categoryColors.default;
+};
+
+/**
+ * Generate chart color palette for large variable sets
+ * @param {Array} variables - Array of variables
+ * @param {string} highlightedVariable - Variable ID to highlight
+ * @returns {Array} Array of color hex codes
+ */
+export const generateChartColorPalette = (variables, highlightedVariable = null) => {
+    if (variables.length <= 8) {
+        // Use category-based coloring for small sets
+        return variables.map(variable => {
+            if (variable.id === highlightedVariable) {
+                return getSemanticColor('primary', 7); // Highlight color
+            }
+            return getCategoryColorScheme(variable.category);
+        });
+    } else {
+        // Use generated palette for large sets
+        const baseColors = [
+            '#1890ff', '#52c41a', '#fa541c', '#722ed1',
+            '#13c2c2', '#fa8c16', '#eb2f96', '#f5222d'
+        ];
+        
+        return variables.map((variable, index) => {
+            if (variable.id === highlightedVariable) {
+                return getSemanticColor('primary', 7);
+            }
+            return baseColors[index % baseColors.length];
+        });
+    }
 };
 ```
 
-### Standardized Category Colors
-Add to `frontend/src/utils/charts/colors.js`:
+### Threshold-Based Visual Feedback
 
 ```javascript
 /**
- * Get standardized category color scheme for sensitivity analysis
- * @param {string} category - Variable category
- * @param {number} shade - Color shade (default 6)
- * @returns {string} Hex color code
+ * Evaluate metric thresholds and apply visual styling
+ * @param {number} value - Metric value
+ * @param {Object} metricConfig - Configuration from SUPPORTED_METRICS
+ * @param {Function} getValueByPath - Function to get threshold values
+ * @returns {Object} Style object with color and fontWeight
  */
-export const getCategoryColorScheme = (category, shade = 6) => {
-    const categoryMap = {
-        // Technical variables - info blue family
-        technical: blue[shade],          // #1677ff - primary blue for technical metrics
+export const evaluateMetricThresholds = (value, metricConfig, getValueByPath) => {
+    if (!metricConfig.thresholds || metricConfig.thresholds.length === 0) {
+        return null;
+    }
+    
+    // Sort thresholds by priority (higher priority first)
+    const sortedThresholds = metricConfig.thresholds.sort((a, b) => b.priority - a.priority);
+    
+    for (const threshold of sortedThresholds) {
+        const thresholdValue = getValueByPath(threshold.path);
+        if (thresholdValue === null || thresholdValue === undefined) continue;
         
-        // Revenue/Commercial - green family (positive association)
-        revenue: green[shade],           // #389e0d - success green for revenue
-        commercial: green[shade],        // #389e0d - same as revenue
+        const transformedValue = threshold.transform ? 
+            threshold.transform(thresholdValue) : thresholdValue;
         
-        // Costs/Operational - red family (cost association)
-        costs: red[shade],               // #cf1322 - error red for costs
-        operational: orange[shade],      // #d48806 - warning orange for operations
-        
-        // Financing - purple family (sophisticated/financial)
-        financing: purple[shade],        // #531dab - royal purple for financing
-        financial: purple[shade],        // #531dab - same as financing
-        
-        // Default fallback
-        default: grey[shade]             // #595959 - neutral grey for uncategorized
-    };
-
-    return categoryMap[category] || categoryMap.default;
-};
-```
-```
-
-### Wrapper Function Guidelines
-
-#### ✅ USEFUL Wrappers (Keep These):
-- `getCategoryColorScheme()` - Now standardized in colors.js for consistent category coloring
-- `evaluateMetricThresholds()` - Handles complex threshold evaluation with context
-- `formatCategoryLabel()` - Meaningful data transformation
-
-#### ❌ USELESS Wrappers (Avoid These):
-- Simple pass-through functions that just call existing utilities
-- Functions that only access simple properties
-- Wrappers that don't add any logic or transformation
-
-### Table Theming Integration
-For any MetricsTables or InlineEditTables used in the Driver Explorer Card, follow established patterns from `TableThemes.js` and `TableThemes.md`:
-
-```javascript
-// Use established table theming patterns
-import { useTableTheme } from '../../tables/shared/TableThemeEngine';
-
-const DriverExplorerCard = () => {
-  // Apply table theming when tables are needed
-  const tableTheme = useTableTheme('metrics', token);
-  
-  return (
-    <div className={tableTheme.containerClass}>
-      {/* Table components with proper theming */}
-    </div>
-  );
+        const meetsCondition = threshold.comparison === 'below' ? 
+            value < transformedValue : value > transformedValue;
+            
+        if (meetsCondition && threshold.colorRule) {
+            return threshold.colorRule(value, transformedValue);
+        }
+    }
+    
+    return null;
 };
 ```
 
@@ -417,22 +711,97 @@ const DriverExplorerCard = () => {
 ### Chart Type Registry
 ```javascript
 export const SENSITIVITY_CHART_TYPES = {
-  tornado: {
-    label: 'Impact Ranking',
-    description: 'Single-value impact comparison',
-    component: TornadoChart,
-    dataType: 'aggregated',
-    defaultFor: ['npv', 'irr', 'lcoe', 'paybackPeriod', 'equityIRR'],
-    icon: 'BarChartOutlined'
-  },
-  heatmap: {
-    label: 'Time-Series Analysis',
-    description: 'Year-by-year impact visualization', 
-    component: SensitivityHeatmap,
-    dataType: 'timeSeries',
-    defaultFor: ['dscr', 'icr', 'cashflow'],
-    icon: 'HeatMapOutlined'
-  }
+    tornado: {
+        label: 'Impact Ranking',
+        description: 'Single-value impact comparison',
+        component: TornadoChart,
+        dataType: 'aggregated',
+        defaultFor: ['npv', 'irr', 'lcoe', 'paybackPeriod', 'equityIRR'],
+        icon: 'BarChartOutlined'
+    },
+    heatmap: {
+        label: 'Time-Series Analysis',
+        description: 'Year-by-year impact visualization', 
+        component: SensitivityHeatmap,
+        dataType: 'timeSeries',
+        defaultFor: ['dscr', 'icr', 'cashflow'],
+        icon: 'HeatMapOutlined'
+    }
+};
+```
+
+### Enhanced Tornado Chart Implementation
+
+```javascript
+// frontend/src/utils/charts/financial.js
+export const prepareTornadoChartData = ({
+    sensitivityResults,
+    targetMetric,
+    highlightedDriver,
+    metricConfig
+}) => {
+    if (!sensitivityResults || !sensitivityResults.length || !metricConfig) {
+        return null;
+    }
+
+    const sortedResults = [...sensitivityResults].sort((a, b) => b.impact - a.impact);
+    
+    // Generate colors using new color scheme
+    const colors = generateChartColorPalette(sortedResults, highlightedDriver);
+
+    const data = [{
+        type: 'bar',
+        orientation: 'h',
+        x: sortedResults.map(r => r.impact),
+        y: sortedResults.map(r => r.variable),
+        text: sortedResults.map(r => metricConfig.impactFormat(r.impact)),
+        textposition: 'auto',
+        marker: {
+            color: colors,
+            line: { color: '#fff', width: 1 }
+        },
+        customdata: sortedResults,
+        hovertemplate:
+            '<b>%{y}</b><br>' +
+            `${metricConfig.label} Impact: %{text}<br>` +
+            'Base (P%{customdata.percentileRange.base}): %{customdata.baseValue}<br>' +
+            'Low (P%{customdata.percentileRange.lower}): %{customdata.lowValue}<br>' +
+            'High (P%{customdata.percentileRange.upper}): %{customdata.highValue}<br>' +
+            'Variable Range: %{customdata.variableValues.low} → %{customdata.variableValues.high}<br>' +
+            'Confidence: %{customdata.percentileRange.confidenceInterval}%<br>' +
+            'Type: %{customdata.displayCategory}<br>' +
+            'Source: %{customdata.source}' +
+            '<extra></extra>'
+    }];
+
+    const layout = {
+        title: '',
+        xaxis: {
+            title: `${metricConfig.label} Impact`,
+            tickformat: metricConfig.units === 'currency' ? '$,.0s' :
+                metricConfig.units === 'percentage' ? '.1%' : '.2f',
+            showgrid: true,
+            gridcolor: '#f0f0f0'
+        },
+        yaxis: {
+            title: 'Variables',
+            showgrid: false,
+            automargin: true
+        },
+        margin: { t: 20, b: 80, l: 120, r: 80 },
+        height: Math.max(400, sortedResults.length * 40 + 100),
+        plot_bgcolor: '#fafafa',
+        showlegend: false
+    };
+
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+        displaylogo: false
+    };
+
+    return { data, layout, config };
 };
 ```
 
@@ -583,206 +952,338 @@ const value = {
 
 ---
 
-## 11. Error Handling & Validation
-
-### Data Validation
-```javascript
-const validateSensitivityData = (sensitivityData, targetMetric) => {
-  if (!sensitivityData) {
-    return { valid: false, error: 'Sensitivity analysis not available. Ensure cash flow analysis is complete.' };
-  }
-  
-  if (!sensitivityData.variables?.length) {
-    return { valid: false, error: 'No sensitivity variables found.' };
-  }
-  
-  if (!sensitivityData.results?.[targetMetric]) {
-    return { valid: false, error: `No sensitivity results available for ${targetMetric}.` };
-  }
-  
-  return { valid: true };
-};
-```
-
-### Error States & Recovery
-- **No Sensitivity Data**: Show loading state or guide user to refresh cash flow analysis
-- **Missing Target Metric**: Default to available metric or show metric selection
-- **Invalid Data**: Provide specific troubleshooting steps
-- **Calculation Errors**: Graceful degradation with retry options
-
----
-
-## 12. Wind Industry Standards & Conventions
-
-### Variable Categories
-- **Technical**: Wind speed, availability, capacity factor, degradation
-- **Commercial**: Electricity prices, contract escalation, market factors
-- **Financial**: Cost of capital, debt terms, tax rates
-- **Operational**: O&M costs, insurance, major repairs
-
-### Display Conventions
-- **Currency**: Project base currency with M/k scaling
-- **Percentages**: Two decimal places (8.25%)
-- **Ratios**: Two decimal places (1.35x)
-- **Years**: One decimal place (7.3 years)
-- **Energy**: MWh for production, $/MWh for LCOE
-
-### Threshold-Based Impact Classification
-Impact significance determined by threshold system referencing Return Targets:
-- **Below Target**: Red coloring using `getFinancialColorScheme('poor')`
-- **At Target**: Neutral coloring using standard metric colors
-- **Above Target**: Green coloring using `getFinancialColorScheme('excellent')`
-- **Covenant Breach**: Special highlighting using `getFinancialColorScheme('covenant')`
-
----
-
-## 13. Quality Gates & Acceptance Criteria
-
-### Functional Requirements
-- ✅ **Variable Discovery**: Successfully extract variables from both registries
-- ✅ **Sensitivity Calculation**: Accurate one-at-a-time analysis with proper impact ranking
-- ✅ **Chart Visualization**: Clear tornado chart with proper formatting and hover details
-- ✅ **Percentile Integration**: Respect CashflowContext percentile selection strategies
-- ✅ **Time-Series Aggregation**: Proper handling of multi-year financial metrics
-- ✅ **Error Handling**: Graceful degradation with helpful error messages
-
-### Performance Requirements
-- ✅ **Initial Load**: < 2 seconds for typical variable sets (10-15 variables)
-- ✅ **Interaction Response**: < 300ms for percentile/aggregation changes
-- ✅ **Memory Usage**: Efficient caching without memory leaks
-- ✅ **Chart Rendering**: Smooth interactions with large variable sets (20+ variables)
-
-### User Experience Requirements
-- ✅ **Clarity**: Business stakeholders can understand impact rankings without technical knowledge
-- ✅ **Interactivity**: Rich hover information with proper units and formatting
-- ✅ **Responsiveness**: Works well on different screen sizes
-- ✅ **Integration**: Seamless integration with existing Cash Flow workspace
-
-### Technical Requirements
-- ✅ **Code Quality**: Follows established patterns from FinanceabilityCard and CashflowTimelineCard
-- ✅ **Reusability**: Time-series aggregation utility can be used throughout application
-- ✅ **Maintainability**: Registry-driven approach makes adding new variables straightforward
-- ✅ **Testing**: Comprehensive unit tests for core calculations and edge cases
-
----
-
-## Implementation Task List
+## 11. Implementation Task List
 
 **Legend:** ☐ Not Started ◐ In-Progress ☑ Done 🔥 Cleanup
 
 ### 1. Core Infrastructure 🏗️ 🏷️Critical
-- ☐ CI-1 Create `frontend/src/utils/timeSeries/aggregation.js` with comprehensive aggregation methods
-- ☐ CI-2 Create `frontend/src/contexts/SensitivityRegistry.js` with SENSITIVITY_SOURCE_REGISTRY
-- ☐ CI-3 Create `SensitivitySourceRegistrySchema` in `schemas/yup/cashflow.js` based on `RegistrySourceSchema`
-- ☐ CI-4 Implement `discoverAllSensitivityVariables()` function supporting array of either registry schema type
-- ☐ CI-5 Create reusable aggregation strategies for wind industry metrics (DSCR min, NPV sum, etc.)
+### Status: ✅ COMPLETED
+
+- ☑ **CI-1** Create `frontend/src/utils/timeSeries/aggregation.js` with all supported aggregation methods (`mean`, `min`, `max`, `sum`, `npv`, `first`, `last`) and wind industry strategies
+- ☑ **CI-2** Create `frontend/src/contexts/SensitivityRegistry.js` with `SENSITIVITY_SOURCE_REGISTRY` using proper schema structure with `.data` property and fixed `.affects` references to specific `.id` values
+- ☑ **CI-3** Add `SensitivitySourceSchema` and `SensitivityRegistrySchema` to `schemas/yup/cashflow.js` with clean, single schema structure (no confusing wrappers)
+- ☑ **CI-4** Implement optimized `calculateSensitivityAnalysis()` with dual registry support (separate parameters), multiplier-first approach, and comprehensive error handling
+- ☑ **CI-5** Create wind industry aggregation strategies with proper filter and option handling, integrated into CI-1 implementation
 
 ### 2. Metrics & Theming Configuration 🎨 🏷️Critical
-- ☐ MTC-1 Update `SUPPORTED_METRICS` with `impactFormat` and comprehensive `thresholds`
-- ☐ MTC-2 Implement threshold `colorRule` functions using direct theming calls (`getFinancialColorScheme`)
-- ☐ MTC-3 Add LCOE calculation function to `frontend/src/utils/finance/calculations.js`
-- ☐ MTC-4 Create `getCategoryColorScheme()` function in `colors.js` with standardized category colors
-- ☐ MTC-5 Implement smart chart coloring: `generateChartColorPalette()` for >8 variables, categories for ≤8
+### Status: ✅ COMPLETED
 
-### 3. Sensitivity Analysis Engine 🧮 🏷️Critical
-- ☐ SAE-1 Enhance `frontend/src/utils/finance/sensitivityAnalysis.js` with dual registry support
-- ☐ SAE-2 Implement one-at-a-time sensitivity analysis using dynamic percentile configuration from ScenarioContext
-- ☐ SAE-3 Add time-series aggregation integration for multi-year financial metrics
-- ☐ SAE-4 Create threshold evaluation system with Return Targets integration
-- ☐ SAE-5 Add comprehensive error handling supporting minimum 3 percentiles, scaling to any number configured
+- ☑ **MTC-1** Update `SUPPORTED_METRICS` with `impactFormat` functions and comprehensive `thresholds` configuration
+- ☑ **MTC-2** Implement threshold `colorRule` functions using `getFinancialColorScheme` for visual feedback, moved `evaluateMetricThresholds` to proper location (`sensitivityMetrics.js`)
+- ☑ **MTC-3** Add LCOE calculation function to `frontend/src/utils/finance/calculations.js` with proper wind industry methodology
+- ☑ **MTC-4** Create `getCategoryColorScheme()` function in `colors.js` with standardized category colors following existing format (hex colors in comments)
+- ☑ **MTC-5** Use existing `generateChartColorPalette()` without modifications - no changes needed, existing implementation is optimal
+
+### 3. Enhanced Sensitivity Analysis Engine 🧮 🏷️Critical
+### Status: ✅ COMPLETED
+
+- ☑ **SAE-1** Enhance `frontend/src/utils/finance/sensitivityAnalysis.js` with dual registry support (CASHFLOW + SENSITIVITY registries)
+- ☑ **SAE-2** Implement dynamic percentile configuration from ScenarioContext using `getSensitivityRangeFromSimulation()` utility function (simplified, no over-engineering)
+- ☑ **SAE-3** Add time-series aggregation integration for multi-year financial metrics (already integrated via `aggregateTimeSeries`)
+- ☑ **SAE-4** Create threshold evaluation system with Return Targets integration using existing `evaluateMetricThresholds` function
+- ☑ **SAE-5** Add comprehensive error handling with input validation and graceful degradation
+
+**Files to Create/Modify:**
+- `frontend/src/utils/finance/sensitivityAnalysis.js` (major enhancement)
 
 ### 4. Chart Components & Visualization 📊 🏷️Critical
-- ☐ CCV-1 Create `frontend/src/components/charts/SensitivityCharts.jsx` with chart type registry
-- ☐ CCV-2 Implement `prepareTornadoChartData()` with smart coloring and enhanced hover templates
-- ☐ CCV-3 Add chart interaction handlers for variable highlighting and selection
-- ☐ CCV-4 Create heatmap chart component for time-series sensitivity analysis
-- ☐ CCV-5 Implement responsive chart sizing and mobile-friendly interactions
+- ☐ **CCV-1** Enhance `prepareTornadoChartData()` in `financial.js` with smart coloring and enhanced hover templates
+- ☐ **CCV-2** Fix chart interaction handlers for variable highlighting and selection
+- ☐ **CCV-3** Create chart type registry supporting future heatmap implementation
+- ☐ **CCV-4** Implement responsive chart sizing and mobile-friendly interactions
+- ☐ **CCV-5** Add educational hover templates with proper units, ranges, and impact formatting
 
-### 5. Driver Explorer Card Component 🎯 🏷️Critical
-- ☐ DEC-1 Build main `frontend/src/components/cards/DriverExplorerCard.jsx` component
-- ☐ DEC-2 Create controls row with metric selector, percentile range, and aggregation method
-- ☐ DEC-3 Implement chart type switching with intelligent defaults based on metric type
-- ☐ DEC-4 Add insights panel with analysis summary and key findings
-- ☐ DEC-5 Integrate with CashflowContext for data access following established patterns
+**Files to Create/Modify:**
+- `frontend/src/utils/charts/financial.js` (enhance)
+- `frontend/src/components/charts/SensitivityCharts.jsx` (create for future)
 
-### 6. CashflowContext Integration 🔄 🏷️Critical
-- ☐ CCI-1 Add sensitivity data computation to CashflowContext refresh workflow
-- ☐ CCI-2 Store `sensitivityData` alongside existing cash flow data in context state
-- ☐ CCI-3 Follow FinanceabilityCard and CashflowTimelineCard patterns for data access
-- ☐ CCI-4 Integrate sensitivity computation into existing refresh chain (no separate caching)
-- ☐ CCI-5 Ensure sensitivity data refreshes when cash flow data refreshes
+### 5. Driver Explorer Card Component Enhancement 🎯 🏷️Critical
+- ☐ **DEC-1** Debug and enhance existing `DriverExplorerCard.jsx` following established patterns from FinanceabilityCard
+- ☐ **DEC-2** Fix controls row with metric selector, percentile range selector, and aggregation method picker
+- ☐ **DEC-3** Implement proper data flow from CashflowContext with pre-computed sensitivity data
+- ☐ **DEC-4** Add insights panel with analysis summary showing top drivers and variance analysis
+- ☐ **DEC-5** Ensure integration with existing card registry system in CashflowAnalysis.jsx
 
-### 7. Supporting Components 🧩 🏷️High
-- ☐ SC-1 Create `frontend/src/components/cards/components/ControlsRow.jsx` for sensitivity controls
-- ☐ SC-2 Build `frontend/src/components/cards/components/InsightsPanel.jsx` for analysis summary
-- ☐ SC-3 Add `SensitivityRangeSelector` with dynamic percentile support from ScenarioContext (minimum 3, scales to any number)
-- ☐ SC-4 Create variable category filtering component with checkbox groups
-- ☐ SC-5 Implement variable search and sorting functionality with table theming following `TableThemes.js` patterns
+**Files to Create/Modify:**
+- `frontend/src/components/cards/DriverExplorerCard.jsx` (major enhancement)
+- `frontend/src/components/cards/configs/DriverExplorerConfig.js` (enhance)
 
-### 8. Performance & Optimization 🚀 🏷️Medium
-- ☐ PO-1 Implement sensitivity data pre-computation in CashflowContext refresh cycle
-- ☐ PO-2 Add memoization for card-level metric selection and aggregation
-- ☐ PO-3 Optimize registry variable discovery with initialization caching
-- ☐ PO-4 Add loading states that align with CashflowContext loading patterns
-- ☐ PO-5 Ensure efficient data flow from context to card without redundant computation
+### 6. CashflowContext Integration 🔄 🏷️High
+- ☐ **CCI-1** Add sensitivity data computation to CashflowContext refresh workflow following established patterns
+- ☐ **CCI-2** Store `sensitivityData` alongside existing cash flow data in context state
+- ☐ **CCI-3** Follow established FinanceabilityCard and CashflowTimelineCard patterns for data access
+- ☐ **CCI-4** Integrate sensitivity computation into existing refresh chain (no separate caching)
+- ☐ **CCI-5** Ensure sensitivity data refreshes when cash flow data refreshes
 
-### 9. Error Handling & Validation 🔧 🏷️Medium
-- ☐ EHV-1 Implement focused `validateSensitivityData()` for computed sensitivity results
-- ☐ EHV-2 Add graceful degradation when sensitivity data is not available
-- ☐ EHV-3 Create helpful error messages aligned with CashflowContext error patterns
-- ☐ EHV-4 Handle missing target metrics with automatic fallback selection
-- ☐ EHV-5 Add retry mechanisms that integrate with CashflowContext refresh
+**Files to Create/Modify:**
+- `frontend/src/contexts/CashflowContext.jsx` (modify)
 
-### 10. Testing & Quality Assurance 🧪 🏷️Low
-- ☐ TQA-1 Add comprehensive unit tests for `aggregateTimeSeries()` function with all supported methods
-- ☐ TQA-2 Test sensitivity analysis calculations with various registry configurations
-- ☐ TQA-3 Validate chart interactions and data flow between components
-- ☐ TQA-4 Test CashflowContext integration and refresh patterns
-- ☐ TQA-5 Performance testing with large variable sets (20+ variables)
+### 7. Component Creation & Support 🔧 🏷️Medium
+- ☐ **CCS-1** Enhance existing `SensitivityRangeSelector` component with proper percentile discovery
+- ☐ **CCS-2** Create `InsightsPanel` component for analysis summary and key findings display
+- ☐ **CCS-3** Enhance existing config utilities in `DriverExplorerConfig.js` with table and footer configurations
+- ☐ **CCS-4** Add proper error boundaries and loading states with meaningful error messages
+- ☐ **CCS-5** Create educational footer content explaining sensitivity methodology
 
-### 11. Cleanup & Documentation 🔥 🏷️Low
-- ☐ CLD-1 Remove existing placeholder DriverExplorerCard implementation
-- ☐ CLD-2 Clean up unused imports and legacy sensitivity analysis patterns
-- ☐ CLD-3 Update component exports in `frontend/src/components/cards/index.js`
-- ☐ CLD-4 Create usage documentation for time-series aggregation utility
-- ☐ CLD-5 Document sensitivity analysis methodology and Return Targets integration
+**Files to Create/Modify:**
+- `frontend/src/components/results/cashflow/components/SensitivityRangeSelector.jsx` (enhance)
+- `frontend/src/components/cards/components/InsightsPanel.jsx` (create)
+- `frontend/src/components/cards/configs/DriverExplorerConfig.js` (enhance)
 
----
+### 8. Testing & Quality Assurance 🧪 🏷️Low  
+- ☐ **TQA-1** Add comprehensive unit tests for `aggregateTimeSeries()` function with all supported methods and filters
+- ☐ **TQA-2** Test sensitivity analysis calculations with various registry configurations and edge cases
+- ☐ **TQA-3** Validate chart interactions and data flow between components
+- ☐ **TQA-4** Test CashflowContext integration and refresh patterns
+- ☐ **TQA-5** Performance testing with large variable sets (20+ variables)
 
-## Files to Create/Modify
-
-### New Files:
-- `frontend/src/utils/timeSeries/aggregation.js` - Reusable time-series aggregation utility
-- `frontend/src/contexts/SensitivityRegistry.js` - SENSITIVITY_SOURCE_REGISTRY definition
-- `frontend/src/components/charts/SensitivityCharts.jsx` - Chart components and registry
-- `frontend/src/components/cards/DriverExplorerCard.jsx` - Main component (complete rebuild)
-- `frontend/src/components/cards/components/ControlsRow.jsx` - Sensitivity analysis controls
-- `frontend/src/components/cards/components/InsightsPanel.jsx` - Results summary component
-
-### Files to Modify:
-- `schemas/yup/cashflow.js` - Add `SensitivitySourceRegistrySchema` based on `RegistrySourceSchema`
-- `frontend/src/utils/charts/colors.js` - Add `getCategoryColorScheme()` function with standardized category colors
-- `frontend/src/utils/finance/sensitivityMetrics.js` - Add LCOE and enhanced SUPPORTED_METRICS
-- `frontend/src/utils/finance/calculations.js` - Add calculateLCOE function
-- `frontend/src/utils/finance/sensitivityAnalysis.js` - Enhanced with dual registry support and dynamic percentile handling
-- `frontend/src/contexts/CashflowContext.jsx` - Add sensitivity data computation to refresh workflow
-- `frontend/src/components/cards/index.js` - Export updated DriverExplorerCard
+### 9. Cleanup & Documentation 🔥 🏷️Low
+- 🔥 **CLD-1** Remove or fix broken existing DriverExplorerCard implementation if incompatible
+- 🔥 **CLD-2** Clean up unused imports and legacy sensitivity analysis patterns
+- ☐ **CLD-3** Update component exports in `frontend/src/components/cards/index.js`
+- ☐ **CLD-4** Create usage documentation for time-series aggregation utility
+- ☐ **CLD-5** Document sensitivity analysis methodology and Return Targets integration
 
 ---
 
-## Success Metrics
+## 12. Quality Gates & Acceptance Criteria
+
+### Functional Requirements ✅
+- **Variable Discovery**: Successfully extract variables from both CASHFLOW and SENSITIVITY registries
+- **Multiplier-First Processing**: Apply multipliers to time-series before aggregation for accurate impact calculation
+- **Sensitivity Calculation**: Accurate one-at-a-time analysis with proper impact ranking
+- **Chart Visualization**: Clear tornado chart with proper formatting, colors, and hover details
+- **Percentile Integration**: Respect CashflowContext percentile selection (unified with rest of workspace)
+- **Time-Series Aggregation**: Proper handling of multi-year financial metrics with all supported methods
+- **Error Handling**: Graceful degradation with helpful error messages
+
+### Technical Success ✅
+- **Performance**: Sub-second response times for interactive changes
+- **Reliability**: Zero crashes or data loss during normal operation
+- **Extensibility**: New variables can be added through registry configuration only
+- **Integration**: Seamless workflow integration with existing Cash Flow workspace
+- **Data Flow**: Proper multiplier application before aggregation ensures accurate impact calculations
+
+### User Experience ✅
+- **Clarity**: Business stakeholders can understand impact rankings without technical knowledge
+- **Interactivity**: Rich hover information with proper units, ranges, and impact formatting
+- **Responsiveness**: Works well on different screen sizes
+- **Visual Feedback**: Color-coded variables by category and threshold-based styling
+- **Educational Value**: Clear explanation of methodology and confidence intervals
+
+### Wind Industry Compliance ✅
+- **Metric Standards**: Support for standard wind project financial metrics (NPV, IRR, DSCR, LLCR, LCOE)
+- **Time Period Filters**: Proper operational vs construction period filtering
+- **Aggregation Methods**: Industry-appropriate aggregation strategies for each metric type
+- **Threshold Integration**: Integration with Return Targets for automatic risk assessment
+- **Multiplier Support**: Proper escalation and pricing multiplier application
+
+---
+
+## 13. Success Metrics
 
 ### Business Impact
 - **Decision Support**: Stakeholders can identify top 3-5 value drivers affecting project returns
 - **Risk Management**: Clear visibility into which variables create highest financial risk
 - **Optimization Focus**: Actionable insights for improving project performance
+- **Communication**: Executive-ready visualizations for investment committee presentations
 
-### Technical Success
-- **Performance**: Sub-second response times for interactive changes
-- **Reliability**: Zero crashes or data loss during normal operation
-- **Extensibility**: New variables can be added through registry configuration only
+### Technical Implementation
+- **Data Accuracy**: Multiplier-first approach ensures accurate impact calculations
+- **Performance**: Fast computation using pre-computed CashflowContext data
+- **Maintainability**: Registry-driven approach makes adding new variables straightforward
+- **Consistency**: Follows established patterns from other Cash Flow workspace cards
 
 ### User Adoption
 - **Ease of Use**: Non-technical users can interpret results without training
 - **Actionability**: Results directly inform contract negotiations and design decisions
 - **Integration**: Natural workflow integration with existing cash flow analysis
+- **Educational Value**: Users understand methodology and can explain results to stakeholders
+
+---
+
+## 14. Files Summary
+
+### Files to Create:
+- `frontend/src/utils/timeSeries/aggregation.js` - Complete time-series aggregation utility
+- `frontend/src/contexts/SensitivityRegistry.js` - SENSITIVITY_SOURCE_REGISTRY definition
+- `frontend/src/components/charts/SensitivityCharts.jsx` - Chart components and registry (future)
+- `frontend/src/components/cards/components/InsightsPanel.jsx` - Analysis summary component
+
+### Files to Modify:
+- `schemas/yup/cashflow.js` - Add SensitivitySourceRegistrySchema
+- `frontend/src/utils/charts/colors.js` - Add category colors and palette generation
+- `frontend/src/utils/finance/sensitivityMetrics.js` - Enhanced SUPPORTED_METRICS 
+- `frontend/src/utils/finance/calculations.js` - Add LCOE calculation
+- `frontend/src/utils/finance/sensitivityAnalysis.js` - Enhanced with dual registry and multiplier-first approach
+- `frontend/src/utils/charts/financial.js` - Enhanced tornado chart preparation
+- `frontend/src/contexts/CashflowContext.jsx` - Add sensitivity data computation
+- `frontend/src/components/cards/DriverExplorerCard.jsx` - Major enhancement following established patterns
+- `frontend/src/components/cards/configs/DriverExplorerConfig.js` - Enhanced configuration utilities
+- `frontend/src/components/results/cashflow/components/SensitivityRangeSelector.jsx` - Enhanced component
+- `frontend/src/components/cards/index.js` - Updated exports
+
+---
+
+## 15. Implementation Notes
+
+### Critical Dependencies
+- **Multiplier System**: Must apply multipliers before aggregation for accurate calculations
+- **Registry Architecture**: Dual registry system (CASHFLOW + SENSITIVITY) for comprehensive variable coverage
+- **CashflowContext Integration**: Follow established patterns from FinanceabilityCard and CashflowTimelineCard
+- **Percentile Unity**: Use same percentile selection as rest of Cash Flow workspace
+
+### Key Technical Decisions
+1. **Multiplier-First Approach**: Apply escalation/multipliers to time-series, then aggregate results
+2. **Registry-Based Discovery**: Leverage existing CASHFLOW_SOURCE_REGISTRY plus new SENSITIVITY_SOURCE_REGISTRY
+3. **Context Integration**: Pre-compute sensitivity data in CashflowContext refresh cycle
+4. **Visual Design**: Category-based coloring for ≤8 variables, generated palette for >8 variables
+5. **Threshold Integration**: Automatic visual feedback based on Return Targets configuration
+
+### Development Workflow
+- Start with Core Infrastructure (CI tasks) to establish foundation
+- Move to Metrics & Theming (MTC tasks) for proper display
+- Implement Enhanced Sensitivity Engine (SAE tasks) for core calculations
+- Build Chart Components (CCV tasks) for visualization
+- Enhance Driver Explorer Card (DEC tasks) for user interface
+- Integrate with CashflowContext (CCI tasks) for data flow
+- Add supporting components (CCS tasks) for complete functionality
+- Test and document (TQA/CLD tasks) for production readiness
+
+This PRD provides complete specification for implementing the Driver Explorer Card feature with proper integration into the existing Cash Flow Analysis workspace while following established architectural patterns and wind industry best practices.
+
+## Current Status Details
+
+### Key Deliverables Completed:
+
+#### ✅ Time-Series Aggregation (`aggregation.js`)
+- All 7 aggregation methods implemented per PRD
+- Wind industry period filters: `operational`, `construction`, `early`, `late`
+- WIND_INDUSTRY_AGGREGATIONS mapping for all financial metrics
+- Weighted mean support and NPV discounting
+- Clean JSDoc documentation, no over-engineering
+
+#### ✅ Sensitivity Registry (`SensitivityRegistry.js`)  
+- SENSITIVITY_SOURCE_REGISTRY with technical/financial/operational categories
+- Fixed `.affects` property to reference specific CASHFLOW_SOURCE_REGISTRY `.id` values
+- Dual registry discovery function with separate parameters (no array complications)
+- Proper multiplier support for escalating variables
+
+#### ✅ Schema Implementation (`cashflow.js`)
+- Clean `SensitivitySourceSchema` and `SensitivityRegistrySchema`
+- No confusing wrapper schemas or over-engineering
+- Extends base patterns consistently
+
+#### ✅ Optimized Sensitivity Analysis (`sensitivityAnalysis.js`)
+- Multiplier-first approach (critical for accurate impact calculations)
+- Clean, coherent structure with single main function
+- Separate registry parameters for clarity
+- Comprehensive utility functions for filtering and processing
+
+### Architecture Decisions Finalized:
+- **Multiplier-First**: Apply escalation/multipliers to time-series BEFORE aggregation
+- **Dual Registry**: CASHFLOW_SOURCE_REGISTRY (direct) + SENSITIVITY_SOURCE_REGISTRY (indirect)
+- **Separate Parameters**: Functions take cashflowRegistry and sensitivityRegistry separately
+- **Clean Schemas**: Single, focused schema structure without unnecessary wrappers
+- **Wind Industry Focus**: All aggregations follow wind project finance standards
+
+#### ✅ Enhanced SUPPORTED_METRICS (`sensitivityMetrics.js`)
+- Complete configuration for all wind industry financial metrics
+- `impactFormat` functions for proper display (e.g., `$2.1M`, `3.2%`, `1.25x`)
+- Comprehensive `thresholds` with `colorRule` functions calling `getFinancialColorScheme`
+- Priority-based threshold evaluation for visual feedback
+- Return Targets integration for automatic risk assessment
+
+#### ✅ Threshold Evaluation System (`sensitivityMetrics.js`)
+- `evaluateMetricThresholds()` function properly located in sensitivityMetrics.js
+- Uses existing threshold evaluation pattern from TableConfiguration.js
+- Integrates with Return Targets configuration
+- Supports both path-based and fixed thresholds
+- Priority-based style application
+
+#### ✅ LCOE Calculation (`calculations.js`)
+- `calculateLCOE()` function with proper wind industry methodology
+- `calculateLCOEFromCashflow()` for integration with existing data structures
+- Present value calculations with discount rate support
+- Comprehensive error handling and validation
+
+#### ✅ Category Color Scheme (`colors.js`)
+- `getCategoryColorScheme()` following existing getFinancialColorScheme format
+- Hex colors in comments matching established patterns
+- Standardized colors for direct vs indirect variable types
+- Technical/financial/operational category support
+- Proper fallback handling
+
+#### ✅ Smart Chart Coloring Strategy
+- Use existing `generateChartColorPalette()` without modifications
+- Category-based coloring for ≤8 variables using `getCategoryColorScheme()`
+- Generated palette for >8 variables using existing function
+- Highlight color support for selected variables
+
+### Architecture Decisions Finalized:
+- **Proper Code Organization**: `evaluateMetricThresholds` in sensitivityMetrics.js, not colors.js
+- **Follow Existing Patterns**: getCategoryColorScheme matches getFinancialColorScheme format
+- **Don't Over-Engineer**: Use existing generateChartColorPalette without changes
+- **Threshold Integration**: Complete integration with Return Targets configuration
+- **Visual Feedback**: Automatic color coding based on financial thresholds
+
+### Files Created/Modified:
+- ✅ `frontend/src/utils/finance/sensitivityMetrics.js` (enhanced - metrics + thresholds + evaluation)
+- ✅ `frontend/src/utils/finance/calculations.js` (modified - LCOE functions added)
+- ✅ `frontend/src/utils/charts/colors.js` (modified - getCategoryColorScheme added)
+
+### Integration Points:
+- **Return Targets**: Threshold evaluation reads from settings.returnTargets configuration
+- **Financial Colors**: Uses existing getFinancialColorScheme for consistent theming
+- **Table System**: Compatible with existing MetricsDataTable threshold evaluation
+- **Chart System**: Integrates with existing chart color palette generation
+
+#### ✅ Simplified Percentile Configuration (`percentileUtils.js`)
+- `getSensitivityRangeFromSimulation()` function takes whole simulation config object
+- Uses existing `getDefaultSensitivityRange()` function internally
+- No over-engineering - passes PercentileSchema array directly
+- Returns simple `{ lower, upper, base }` object
+
+#### ✅ Enhanced Sensitivity Analysis Engine (`sensitivityAnalysis.js`)
+- Complete rewrite with multiplier-first approach (critical for accuracy)
+- Dual registry support with separate parameters (cashflow + sensitivity)
+- Dynamic percentile range calculation from ScenarioContext
+- Time-series aggregation integration for multi-year metrics
+- Comprehensive error handling and input validation
+
+#### ✅ Threshold Evaluation Integration (`sensitivityMetrics.js`)
+- Uses existing `evaluateMetricThresholds` function from MTC-2
+- Return Targets integration for automatic risk assessment
+- Priority-based threshold evaluation with visual feedback
+- Proper color rule application using `getFinancialColorScheme`
+
+#### ✅ Core Data Flow Architecture
+- **Multiplier-First**: Apply escalation/multipliers to time-series BEFORE aggregation
+- **Registry Discovery**: Extract variables from both CASHFLOW and SENSITIVITY registries
+- **Percentile Processing**: Get time-series at different percentiles for comparison
+- **Impact Calculation**: Compare aggregated metric values to determine sensitivity
+- **Result Formatting**: Sort by impact magnitude with comprehensive metadata
+
+### Architecture Decisions Finalized:
+- **Simplified Interface**: Pass simulation config object directly, no complex parameters
+- **Use Existing Functions**: Leverage `getDefaultSensitivityRange` and `evaluateMetricThresholds`
+- **No Over-Engineering**: Removed unnecessary wrapper functions and validation layers. Uses existing functions, passes objects directly
+- **Multiplier-First Flow**: Critical for accurate impact calculations with escalation
+- **Dual Registry Support**: Clean separation of direct vs indirect variables
+
+### Files Created/Modified:
+- ✅ `frontend/src/utils/finance/sensitivityAnalysis.js` (complete rewrite - optimized)
+- ✅ `frontend/src/utils/finance/percentileUtils.js` (enhanced - added `getSensitivityRangeFromSimulation`)
+
+### Integration Points:
+- **ScenarioContext**: Reads percentiles array and primaryPercentile directly
+- **Registry System**: Uses `discoverAllSensitivityVariables` from dual registry architecture
+- **Time-Series Aggregation**: Integrates with `aggregateTimeSeries` utility from CI tasks
+- **Threshold System**: Uses `evaluateMetricThresholds` from MTC tasks
+- **Multiplier System**: Applies multipliers before aggregation for accurate calculations
+
+### Performance Characteristics:
+- **Fast Computation**: Pre-computed aggregation strategies for each metric type
+- **Memory Efficient**: Minimal data transformation, reuse time-series arrays
+- **Error Resilient**: Graceful handling of missing data and invalid inputs
+- **Scalable**: Supports any number of variables and percentiles from ScenarioContext

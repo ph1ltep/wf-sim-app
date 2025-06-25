@@ -33,7 +33,6 @@ export {
 } from './percentileUtils';
 
 export {
-    calculateDynamicSensitivity,
     calculateMultiMetricSensitivity,
 } from './sensitivityAnalysis';
 

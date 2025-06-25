@@ -124,6 +124,55 @@ const CashflowSourceRegistrySchema = Yup.object().shape({
     revenues: Yup.array().of(RegistrySourceSchema).default([])
 });
 
+const SensitivitySourceRegistrySchema = yup.object().shape({
+
+    technical: yup.array().of(RegistrySourceSchema).optional(),
+    financial: yup.array().of(RegistrySourceSchema).optional(),
+    operational: yup.array().of(RegistrySourceSchema).optional(),
+    multipliers: yup.array().of(RegistrySourceSchema).optional() // Support multipliers if needed
+});
+
+/**
+ * Schema for sensitivity source entries
+ * Extends base RegistrySourceSchema with sensitivity-specific properties
+ */
+const SensitivitySourceSchema = yup.object().shape({
+    id: yup.string().required('Source ID is required'),
+    description: yup.string().required('Source description is required'),
+    category: yup.string().required('Source category is required'),
+    hasPercentiles: yup.boolean().default(false),
+    path: yup.array().of(yup.string()).required('Source path is required'),
+    affects: yup.array().of(yup.string()).optional(), // Array of CASHFLOW_SOURCE_REGISTRY IDs
+    multipliers: yup.array().of(MultiplierSourceSchema).optional(),
+    data: yup.object().shape({
+        units: yup.string().optional(),
+        impactType: yup.string().oneOf(['multiplicative', 'additive', 'recalculation', 'time_series_modifier']).optional()
+    }).optional()
+});
+
+/**
+ * Schema for SENSITIVITY_SOURCE_REGISTRY structure
+ */
+const SensitivityRegistrySchema = yup.object().shape({
+    technical: yup.array().of(SensitivitySourceSchema).optional(),
+    financial: yup.array().of(SensitivitySourceSchema).optional(),
+    operational: yup.array().of(SensitivitySourceSchema).optional()
+});
+
+/**
+ * Validate SENSITIVITY_SOURCE_REGISTRY structure
+ * @param {Object} registry - Registry to validate
+ * @returns {Promise<Object>} Validated registry
+ */
+const validateSensitivityRegistry = async (registry) => {
+    try {
+        return await SensitivityRegistrySchema.validate(registry);
+    } catch (error) {
+        console.error('SENSITIVITY_SOURCE_REGISTRY validation failed:', error);
+        throw error;
+    }
+};
+
 module.exports = {
     SimplifiedCashflowDataSourceSchema,
     SimplifiedLineItemSchema,
@@ -133,5 +182,8 @@ module.exports = {
     AppliedMultiplierSchema,
     CashflowSourceRegistrySchema,
     RegistrySourceSchema,
-    RegistryDataSchema
+    RegistryDataSchema,
+    SensitivitySourceSchema,
+    SensitivityRegistrySchema,
+    validateSensitivityRegistry
 };

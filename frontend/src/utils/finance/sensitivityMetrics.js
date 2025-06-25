@@ -1,276 +1,237 @@
-// frontend/src/utils/finance/sensitivityMetrics.js - Simplified threshold structure
+// Enhanced frontend/src/utils/finance/sensitivityMetrics.js
+// Complete SUPPORTED_METRICS configuration with impactFormat and thresholds
 
 import { getFinancialColorScheme } from '../charts/colors';
+import { evaluateThresholds } from '../../components/tables/metrics/TableConfiguration';
 
+/**
+ * Complete metrics configuration for Driver Explorer Card
+ * Each metric includes formatting, aggregation, and threshold rules
+ */
 export const SUPPORTED_METRICS = {
     npv: {
-        label: 'Net Present Value',
-        units: 'currency',
-        formatValue: (value, currency = '$') => `${currency}${(value / 1000000).toFixed(1)}M`,
-        impactFormat: (impact, currency = '$') => `±${currency}${(Math.abs(impact) / 1000000).toFixed(1)}M`,
-        description: 'Total value creation from project cash flows',
-        calculationPath: 'npv',
-        chartColor: 'npv',
-
+        label: 'NPV',
+        format: 'currency',
+        path: ['npv'],
+        aggregation: 'value',
+        units: '$',
+        description: 'Net Present Value of project cash flows',
+        impactFormat: (value) => `$${(Math.abs(value) / 1000000).toFixed(1)}M`,
         thresholds: [
             {
-                path: ['settings', 'metrics', 'totalMW'], // Will be transformed to NPV threshold
-                comparison: 'above',
-                transform: (totalMW) => totalMW * 500000, // $500k per MW baseline for "good"
-                colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('excellent') } : null,
-                priority: 5,
-                description: 'NPV above baseline ($500k/MW)'
-            },
-            {
-                path: null, // Fixed threshold
-                comparison: 'above',
-                threshold: 0, // Break-even
-                colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('good') } :
-                    { color: getFinancialColorScheme('concerning') },
-                priority: 10,
-                description: 'NPV positive/negative'
+                path: ['settings', 'returnTargets', 'minNPV'],
+                comparison: 'below',
+                transform: (value) => value * 1000000,
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 4,
+                description: 'NPV below minimum target'
             }
         ]
     },
 
     irr: {
         label: 'Project IRR',
-        units: 'percentage',
-        formatValue: (value) => `${value.toFixed(1)}%`,
-        impactFormat: (impact) => `±${Math.abs(impact).toFixed(1)}%`,
-        description: 'Internal rate of return for total project investment',
-        calculationPath: 'irr',
-        chartColor: 'irr',
-
+        format: 'percentage',
+        path: ['irr'],
+        aggregation: 'value',
+        units: '%',
+        description: 'Internal Rate of Return for project',
+        impactFormat: (value) => `${(Math.abs(value) * 100).toFixed(1)}%`,
         thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'projectIRRTarget'],
+                path: ['settings', 'returnTargets', 'minIRR'],
                 comparison: 'below',
                 colorRule: (value, threshold) => value < threshold ?
-                    { color: getFinancialColorScheme('concerning') } : null,
-                priority: 8,
-                description: 'Project IRR below target'
-            },
-            {
-                path: ['settings', 'modules', 'financing', 'projectIRRTarget'],
-                comparison: 'above',
-                transform: (target) => target * 1.2, // 20% above target for excellent
-                colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('excellent') } : null,
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
                 priority: 5,
-                description: 'Project IRR excellent performance'
+                description: 'IRR below minimum target'
             }
         ]
     },
 
     equityIRR: {
         label: 'Equity IRR',
-        units: 'percentage',
-        formatValue: (value) => `${value.toFixed(1)}%`,
-        impactFormat: (impact) => `±${Math.abs(impact).toFixed(1)}%`,
-        description: 'Internal rate of return for equity investors after debt service',
-        calculationPath: 'equityIRR',
-        chartColor: 'equityIRR',
-
+        format: 'percentage',
+        path: ['equityIRR'],
+        aggregation: 'value',
+        units: '%',
+        description: 'Internal Rate of Return for equity investors',
+        impactFormat: (value) => `${(Math.abs(value) * 100).toFixed(1)}%`,
         thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'equityIRRTarget'],
+                path: ['settings', 'returnTargets', 'minEquityIRR'],
                 comparison: 'below',
                 colorRule: (value, threshold) => value < threshold ?
-                    { color: getFinancialColorScheme('concerning') } : null,
-                priority: 8,
-                description: 'Equity IRR below target'
-            },
-            {
-                path: ['settings', 'modules', 'financing', 'equityIRRTarget'],
-                comparison: 'above',
-                transform: (target) => target * 1.15, // 15% above target for excellent
-                colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('excellent') } : null,
-                priority: 5,
-                description: 'Equity IRR excellent performance'
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 4,
+                description: 'Equity IRR below minimum target'
             }
         ]
     },
 
-    dscr: {
+    minDSCR: {
         label: 'Minimum DSCR',
-        units: 'ratio',
-        formatValue: (value) => value.toFixed(2),
-        impactFormat: (impact) => `±${Math.abs(impact).toFixed(2)}`,
-        description: 'Lowest debt service coverage ratio during operational period',
-        calculationPath: 'dscr.minimum',
-        chartColor: 'dscr',
-
+        format: 'ratio',
+        path: ['dscr'],
+        aggregation: 'min',
+        aggregationOptions: { filter: 'operational' },
+        units: 'x',
+        description: 'Lowest Debt Service Coverage Ratio during operations',
+        impactFormat: (value) => `${Math.abs(value).toFixed(2)}x`,
         thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'covenantThreshold'],
+                path: ['settings', 'modules', 'financing', 'dscr', 'covenant'],
                 comparison: 'below',
                 colorRule: (value, threshold) => value < threshold ?
-                    { color: getFinancialColorScheme('concerning'), fontWeight: 600 } : null,
-                priority: 10,
-                description: 'DSCR below covenant threshold'
-            },
+                    { color: getFinancialColorScheme('covenant'), fontWeight: 600 } : null,
+                priority: 6,
+                description: 'DSCR breaches debt covenant'
+            }
+        ]
+    },
+
+    avgDSCR: {
+        label: 'Average DSCR',
+        format: 'ratio',
+        path: ['dscr'],
+        aggregation: 'mean',
+        aggregationOptions: { filter: 'operational' },
+        units: 'x',
+        description: 'Average Debt Service Coverage Ratio during operations',
+        impactFormat: (value) => `${Math.abs(value).toFixed(2)}x`,
+        thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'covenantThreshold'],
-                comparison: 'above',
-                transform: (covenant) => covenant * 1.15, // 15% above covenant for excellent
-                colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('excellent') } : null,
-                priority: 5,
-                description: 'DSCR excellent coverage'
+                path: ['settings', 'modules', 'financing', 'dscr', 'target'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('caution'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'Average DSCR below target'
+            }
+        ]
+    },
+
+    llcr: {
+        label: 'LLCR',
+        format: 'ratio',
+        path: ['llcr'],
+        aggregation: 'value',
+        units: 'x',
+        description: 'Loan Life Coverage Ratio',
+        impactFormat: (value) => `${Math.abs(value).toFixed(2)}x`,
+        thresholds: [
+            {
+                path: ['settings', 'modules', 'financing', 'llcr', 'target'],
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('caution'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'LLCR below target'
             }
         ]
     },
 
     paybackPeriod: {
         label: 'Payback Period',
+        format: 'years',
+        path: ['paybackPeriod'],
+        aggregation: 'value',
         units: 'years',
-        formatValue: (value) => `${value.toFixed(1)} years`,
-        impactFormat: (impact) => `±${Math.abs(impact).toFixed(1)} years`,
-        description: 'Time to recover initial investment from cumulative cash flows',
-        calculationPath: 'paybackPeriod',
-        chartColor: 'paybackPeriod',
-
+        description: 'Time to recover initial investment',
+        impactFormat: (value) => `${Math.abs(value).toFixed(1)} years`,
         thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'targetPaybackPeriod'],
+                path: ['settings', 'returnTargets', 'maxPayback'],
                 comparison: 'above',
                 colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('concerning') } : null,
-                priority: 8,
-                description: 'Payback period above target'
-            },
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'Payback period exceeds maximum target'
+            }
+        ]
+    },
+
+    lcoe: {
+        label: 'LCOE',
+        format: 'currency',
+        path: ['lcoe'],
+        aggregation: 'value',
+        units: '$/MWh',
+        description: 'Levelized Cost of Energy',
+        impactFormat: (value) => `$${Math.abs(value).toFixed(2)}/MWh`,
+        thresholds: [
             {
-                path: ['settings', 'modules', 'financing', 'targetPaybackPeriod'],
-                comparison: 'below',
-                transform: (target) => target * 0.8, // 20% better than target for excellent
-                colorRule: (value, threshold) => value < threshold ?
-                    { color: getFinancialColorScheme('excellent') } : null,
-                priority: 5,
-                description: 'Excellent payback performance'
-            },
-            {
-                path: null, // Fixed industry threshold
+                path: ['settings', 'returnTargets', 'maxLCOE'],
                 comparison: 'above',
-                threshold: 12, // Industry concerning threshold
                 colorRule: (value, threshold) => value > threshold ?
-                    { color: getFinancialColorScheme('concerning'), fontWeight: 600 } : null,
-                priority: 6,
-                description: 'Payback exceeds industry benchmark'
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'LCOE exceeds maximum target'
+            }
+        ]
+    },
+
+    totalCashflow: {
+        label: 'Total Cash Flow',
+        format: 'currency',
+        path: ['cashflow'],
+        aggregation: 'sum',
+        aggregationOptions: { filter: 'operational' },
+        units: '$',
+        description: 'Total operational cash flows',
+        impactFormat: (value) => `$${(Math.abs(value) / 1000000).toFixed(1)}M`,
+        thresholds: [] // No specific thresholds for total cashflow
+    },
+
+    breakEvenYear: {
+        label: 'Break Even Year',
+        format: 'years',
+        path: ['breakEvenYear'],
+        aggregation: 'value',
+        units: 'years',
+        description: 'Year when cumulative cash flow turns positive',
+        impactFormat: (value) => `Year ${Math.abs(value).toFixed(0)}`,
+        thresholds: [
+            {
+                path: ['settings', 'returnTargets', 'maxBreakEven'],
+                comparison: 'above',
+                colorRule: (value, threshold) => value > threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'Break-even year exceeds maximum target'
             }
         ]
     }
 };
 
 /**
- * Get metric classification using existing threshold evaluation patterns
- * @param {string} metricKey - Metric key
- * @param {number} value - Metric value
- * @param {Function} getValueByPath - Function to read from scenario
- * @returns {Object} { color, fontWeight, appliedRules } or {}
+ * Create metric selector options for UI components
+ * @returns {Array} Options array for Select components
  */
-export const getMetricClassification = (metricKey, value, getValueByPath) => {
-    const metric = SUPPORTED_METRICS[metricKey];
-
-    if (!metric?.thresholds || value === null || value === undefined) {
-        return {};
-    }
-
-    // Build evaluation thresholds following existing pattern
-    const evaluationThresholds = metric.thresholds.map(threshold => {
-        let thresholdValue;
-
-        if (threshold.path) {
-            // Read from context
-            const contextValue = getValueByPath(threshold.path, 0);
-            thresholdValue = threshold.transform ? threshold.transform(contextValue) : contextValue;
-        } else {
-            // Use fixed threshold
-            thresholdValue = threshold.threshold;
-        }
-
-        return {
-            field: 'value', // We'll pass the metric value as 'value' field
-            comparison: threshold.comparison,
-            colorRule: (val, thresh) => threshold.colorRule(val, thresholdValue),
-            priority: threshold.priority,
-            description: threshold.description
-        };
-    });
-
-    // Use existing threshold evaluation (same as TableConfiguration.js)
-    const evaluationData = { value: value };
-    const appliedStyle = evaluateThresholds(evaluationData, evaluationThresholds, value);
-
-    return appliedStyle;
+export const createMetricSelectorOptions = () => {
+    return Object.entries(SUPPORTED_METRICS).map(([key, config]) => ({
+        value: key,
+        label: config.label,
+        description: config.description
+    }));
 };
 
 /**
- * Use existing evaluateThresholds pattern (simplified)
- * @param {Object} rowData - Row data
- * @param {Array} thresholds - Threshold configurations
- * @param {number} cellValue - Cell value
- * @returns {Object} Applied styles
+ * Extract metric value from calculation results
+ * @param {Object} results - Calculation results
+ * @param {string} targetMetric - Target metric key
+ * @returns {number|null} Extracted value
  */
-const evaluateThresholds = (rowData, thresholds = [], cellValue) => {
-    if (!thresholds || thresholds.length === 0) return {};
+export const extractMetricValue = (results, targetMetric) => {
+    const metricConfig = SUPPORTED_METRICS[targetMetric];
+    if (!metricConfig || !results) return null;
 
-    const sortedThresholds = [...thresholds].sort((a, b) => (b.priority || 0) - (a.priority || 0));
-    let appliedStyle = {};
-    let appliedRules = [];
-
-    sortedThresholds.forEach(threshold => {
-        const { comparison, colorRule, priority = 0, description } = threshold;
-
-        let conditionMet = false;
-
-        switch (comparison) {
-            case 'below':
-            case 'less_than':
-                conditionMet = cellValue < 0; // Will be set by colorRule
-                break;
-            case 'above':
-            case 'greater_than':
-                conditionMet = cellValue > 0; // Will be set by colorRule
-                break;
-            default:
-                return;
-        }
-
-        if (colorRule) {
-            const result = colorRule(cellValue, 0); // Threshold handled inside colorRule
-
-            if (result && priority >= (appliedStyle._priority || 0)) {
-                appliedStyle = {
-                    ...appliedStyle,
-                    ...result,
-                    _priority: priority
-                };
-                appliedRules.push(description);
-            }
-        }
-    });
-
-    appliedStyle._appliedRules = appliedRules;
-    return appliedStyle;
-};
-
-/**
- * Extract metric value from cashflow results
- */
-export const extractMetricValue = (cashflowResults, metricKey) => {
-    const metric = SUPPORTED_METRICS[metricKey];
-    if (!metric || !cashflowResults) return null;
-
-    const path = metric.calculationPath.split('.');
-    let value = cashflowResults;
-
-    for (const key of path) {
+    // Navigate the path to get the value
+    let value = results;
+    for (const pathSegment of metricConfig.path) {
         if (value && typeof value === 'object') {
-            value = value[key];
+            value = value[pathSegment];
         } else {
             return null;
         }
@@ -280,29 +241,40 @@ export const extractMetricValue = (cashflowResults, metricKey) => {
 };
 
 /**
- * Get all supported metric keys
+ * Evaluate metric thresholds for sensitivity analysis
+ * Uses existing threshold evaluation pattern from TableConfiguration.js
+ * @param {number} value - Metric value
+ * @param {Object} metricConfig - Configuration from SUPPORTED_METRICS
+ * @param {Function} getValueByPath - Function to get threshold values
+ * @returns {Object|null} Style object with color and fontWeight
  */
-export const getSupportedMetricKeys = () => {
-    return Object.keys(SUPPORTED_METRICS);
-};
+export const evaluateMetricThresholds = (value, metricConfig, getValueByPath) => {
+    if (!metricConfig.thresholds || metricConfig.thresholds.length === 0 || value == null) {
+        return null;
+    }
 
-/**
- * Get metric configuration
- */
-export const getMetricConfig = (metricKey) => {
-    return SUPPORTED_METRICS[metricKey] || null;
-};
+    // Convert to format expected by existing evaluateThresholds
+    const evaluationThresholds = metricConfig.thresholds.map(threshold => {
+        let thresholdValue;
 
-/**
- * Create options for metric selector
- */
-export const createMetricSelectorOptions = (excludeMetrics = []) => {
-    return Object.entries(SUPPORTED_METRICS)
-        .filter(([key]) => !excludeMetrics.includes(key))
-        .map(([key, metric]) => ({
-            value: key,
-            label: metric.label,
-            description: metric.description,
-            key: `metric-${key}`
-        }));
+        if (threshold.path) {
+            const contextValue = getValueByPath(threshold.path);
+            thresholdValue = threshold.transform ?
+                threshold.transform(contextValue) : contextValue;
+        } else {
+            thresholdValue = threshold.threshold;
+        }
+
+        return {
+            field: 'value',
+            comparison: threshold.comparison,
+            colorRule: (val) => threshold.colorRule(val, thresholdValue),
+            priority: threshold.priority,
+            description: threshold.description
+        };
+    });
+
+    // Use existing pattern from TableConfiguration.js
+    const evaluationData = { value: value };
+    return evaluateThresholds(evaluationData, evaluationThresholds, value);
 };

@@ -416,3 +416,74 @@ export const calculateAllMetricsWithPayback = (cashflowData, options = {}) => {
         paybackPeriod
     };
 };
+
+/**
+ * Calculate Levelized Cost of Energy (LCOE)
+ * @param {Array} costs - Annual cost time-series with {year, value} structure
+ * @param {Array} energy - Annual energy production time-series with {year, value} structure  
+ * @param {number} discountRate - Discount rate for NPV calculations
+ * @returns {number|null} LCOE in $/MWh
+ */
+export const calculateLCOE = (costs, energy, discountRate) => {
+    if (!Array.isArray(costs) || !Array.isArray(energy) || costs.length === 0 || energy.length === 0) {
+        return null;
+    }
+
+    if (discountRate < 0 || discountRate > 1) {
+        console.warn('Discount rate should be between 0 and 1');
+        return null;
+    }
+
+    // Calculate present value of costs
+    const pvCosts = costs.reduce((pv, costPoint) => {
+        const discountFactor = Math.pow(1 + discountRate, -costPoint.year);
+        return pv + (costPoint.value * discountFactor);
+    }, 0);
+
+    // Calculate present value of energy production
+    const pvEnergy = energy.reduce((pv, energyPoint) => {
+        const discountFactor = Math.pow(1 + discountRate, -energyPoint.year);
+        return pv + (energyPoint.value * discountFactor);
+    }, 0);
+
+    // LCOE = PV(Costs) / PV(Energy)
+    if (pvEnergy === 0) {
+        console.warn('Total energy production is zero, cannot calculate LCOE');
+        return null;
+    }
+
+    return pvCosts / pvEnergy;
+};
+
+/**
+ * Calculate LCOE from cash flow data
+ * @param {Object} cashflowData - Cash flow data with costs and energy production
+ * @param {number} discountRate - Discount rate
+ * @returns {number|null} LCOE value
+ */
+export const calculateLCOEFromCashflow = (cashflowData, discountRate = 0.08) => {
+    if (!cashflowData?.costs || !cashflowData?.energy) {
+        console.warn('Missing cost or energy data for LCOE calculation');
+        return null;
+    }
+
+    // Extract cost time-series (sum all cost categories)
+    const costTimeSeries = [];
+    const energyTimeSeries = cashflowData.energy;
+
+    // Aggregate all cost categories by year
+    Object.values(cashflowData.costs).forEach(costCategory => {
+        if (Array.isArray(costCategory)) {
+            costCategory.forEach(costPoint => {
+                const existingYear = costTimeSeries.find(c => c.year === costPoint.year);
+                if (existingYear) {
+                    existingYear.value += costPoint.value;
+                } else {
+                    costTimeSeries.push({ year: costPoint.year, value: costPoint.value });
+                }
+            });
+        }
+    });
+
+    return calculateLCOE(costTimeSeries, energyTimeSeries, discountRate);
+};

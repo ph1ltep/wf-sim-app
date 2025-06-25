@@ -178,6 +178,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     ]
 };
 
+
 // Simple registry validation using existing schema validation
 const validateRegistry = async () => {
     try {
