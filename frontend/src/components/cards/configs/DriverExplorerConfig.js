@@ -1,5 +1,4 @@
-// Create frontend/src/components/cards/configs/DriverExplorerConfig.js
-
+// Fixed frontend/src/components/cards/configs/DriverExplorerConfig.js
 import { getFinancialColorScheme } from '../../../utils/charts/colors';
 
 /**
@@ -143,5 +142,88 @@ export const createDriverInsights = (sensitivityResults, metricConfig) => {
             maxImpact: metricConfig.impactFormat(sortedResults[0].impact),
             minImpact: metricConfig.impactFormat(sortedResults[sortedResults.length - 1].impact)
         }
+    };
+};
+
+/**
+ * Create chart configuration options for DriverExplorerCard
+ * @param {string} targetMetric - Target metric
+ * @param {number} variableCount - Number of variables
+ * @returns {Array} Chart configuration options
+ */
+export const createChartConfigOptions = (targetMetric, variableCount) => {
+    const options = [
+        {
+            key: 'tornado',
+            label: 'Impact Ranking',
+            description: 'Horizontal bar chart showing variable impact magnitude',
+            suitable: variableCount >= 1 && variableCount <= 20,
+            recommended: ['npv', 'irr', 'lcoe', 'paybackPeriod'].includes(targetMetric)
+        },
+        {
+            key: 'heatmap',
+            label: 'Time-Series Analysis',
+            description: 'Year-by-year impact visualization',
+            suitable: variableCount >= 2 && variableCount <= 15,
+            recommended: ['dscr', 'icr', 'cashflow'].includes(targetMetric)
+        }
+    ];
+
+    return options.filter(opt => opt.suitable);
+};
+
+/**
+ * Create aggregation method options for sensitivity analysis
+ * @param {string} targetMetric - Target metric
+ * @returns {Array} Aggregation method options
+ */
+export const createAggregationMethodOptions = (targetMetric) => {
+    const methods = {
+        npv: [
+            { value: 'npv', label: 'Net Present Value', description: 'DCF-based aggregation' },
+            { value: 'sum', label: 'Simple Sum', description: 'Sum of annual values' }
+        ],
+        irr: [
+            { value: 'irr', label: 'Internal Rate of Return', description: 'IRR calculation' }
+        ],
+        lcoe: [
+            { value: 'lcoe', label: 'Levelized Cost', description: 'LCOE methodology' }
+        ],
+        dscr: [
+            { value: 'min', label: 'Minimum DSCR', description: 'Lowest annual ratio' },
+            { value: 'mean', label: 'Average DSCR', description: 'Average over project life' }
+        ],
+        default: [
+            { value: 'mean', label: 'Average', description: 'Mean value over time' },
+            { value: 'sum', label: 'Total', description: 'Sum of all values' },
+            { value: 'min', label: 'Minimum', description: 'Lowest value' },
+            { value: 'max', label: 'Maximum', description: 'Highest value' }
+        ]
+    };
+
+    return methods[targetMetric] || methods.default;
+};
+
+/**
+ * Create display options for DriverExplorerCard
+ * @param {Object} options - Display configuration options
+ * @returns {Object} Display configuration
+ */
+export const createDisplayOptions = (options = {}) => {
+    const {
+        showInsights = true,
+        showTable = false,
+        showFooter = true,
+        compactMode = false,
+        chartHeight = null
+    } = options;
+
+    return {
+        showInsights,
+        showTable,
+        showFooter,
+        compactMode,
+        chartHeight: chartHeight || (compactMode ? 300 : null),
+        cardStyle: compactMode ? { minHeight: 500 } : { minHeight: 700 }
     };
 };
