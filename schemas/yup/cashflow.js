@@ -101,7 +101,7 @@ const RegistryDataSchema = Yup.object().shape({
 
 const RegistrySourceSchema = Yup.object().shape({
     id: Yup.string().required('Source ID is required'),
-    name: Yup.string().optional(),
+    displayName: Yup.string().optional(),
     path: Yup.array().of(Yup.string()).required('Primary path is required'),
     references: Yup.array().of(
         Yup.array().of(Yup.string())
@@ -139,7 +139,7 @@ const SensitivitySourceRegistrySchema = Yup.object().shape({
  */
 const SensitivitySourceSchema = Yup.object().shape({
     id: Yup.string().required('Source ID is required'),
-    name: Yup.string().optional(),
+    displayName: Yup.string().optional(),
     description: Yup.string().required('Source description is required'),
     category: Yup.string().required('Source category is required'),
     hasPercentiles: Yup.boolean().default(false),

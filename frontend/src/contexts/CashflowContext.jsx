@@ -15,7 +15,6 @@ import {
 } from '../utils/dependencies/checkFunctions';
 import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
 import { SENSITIVITY_SOURCE_REGISTRY } from './SensitivityRegistry';
-import { name } from 'plotly.js/lib/scatter';
 
 
 const CashflowContext = createContext();
@@ -61,7 +60,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     costs: [
         {
             id: 'capexDrawdown',
-            name: 'CAPEX Drawdown',
+            displayName: 'CAPEX Drawdown',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             category: 'construction',
             hasPercentiles: false,
@@ -72,7 +71,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'debtDrawdown',
-            name: 'Debt Drawdown',
+            displayName: 'Debt Drawdown',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -86,7 +85,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'interestDuringConstruction',
-            name: 'CAPEX Interest',
+            displayName: 'CAPEX Interest',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -100,7 +99,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'operationalInterest',
-            name: 'OPEX Interest',
+            displayName: 'OPEX Interest',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -114,7 +113,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'operationalPrincipal',
-            name: 'OPEX Principal',
+            displayName: 'OPEX Principal',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -128,7 +127,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'contractFees',
-            name: 'Contract Fees',
+            displayName: 'Contract Fees',
             path: ['settings', 'modules', 'contracts', 'oemContracts'],
             category: 'contracts',
             hasPercentiles: false,
@@ -140,7 +139,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'majorRepairs',
-            name: 'Major Repairs',
+            displayName: 'Major Repairs',
             path: ['settings', 'modules', 'cost', 'majorRepairEvents'],
             category: 'maintenance',
             hasPercentiles: false,
@@ -152,7 +151,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'insurancePremium',
-            name: 'Insurance Premium',
+            displayName: 'Insurance Premium',
             path: ['settings', 'modules', 'risk', 'insurancePremium'],
             category: 'insurance',
             hasPercentiles: false,
@@ -164,7 +163,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'reserveFunds',
-            name: 'Reserve Funds',
+            displayName: 'Reserve Funds',
             path: ['settings', 'modules', 'risk', 'reserveFunds'],
             category: 'reserves',
             hasPercentiles: false,
@@ -177,7 +176,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     revenues: [
         {
             id: 'energyRevenue',
-            name: 'Energy Revenue',
+            displayName: 'Energy Revenue',
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'],
             category: 'energy',
             hasPercentiles: true,

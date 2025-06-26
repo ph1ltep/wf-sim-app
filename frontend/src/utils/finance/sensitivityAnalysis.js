@@ -138,7 +138,7 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
         const totalSpread = Math.abs(leftPercent) + Math.abs(rightPercent);
 
         // Get variable display name and units
-        const variableName = variable.name || variable.label || variable.id;
+        const variableName = variable.id; // ✅ Just use the ID, simple and clean
         const variableUnits = variable.displayUnit || variable.data?.units || '';
         const metricUnits = metricConfig.units === 'currency' ? '$' : '';
 
