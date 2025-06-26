@@ -1,14 +1,15 @@
 // frontend/src/components/cards/DriverExplorerCard.jsx
-// Created from scratch using actual existing functions
+// Update with all necessary imports and structural changes
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { Card, Alert, Empty, Select, Row, Col, Space, Typography, Spin, Divider } from 'antd';
+import { Card, Alert, Empty, Select, Row, Col, Space, Typography } from 'antd';
 import { BarChartOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { useCashflow } from '../../contexts/CashflowContext';
 import { useScenario } from '../../contexts/ScenarioContext';
 import SensitivityRangeSelector from '../results/cashflow/components/SensitivityRangeSelector';
 import InsightsPanel from './components/InsightsPanel';
+import TargetMetricRangeVisualizer from './components/TargetMetricRangeVisualizer'; // ADD THIS IMPORT
 import { SENSITIVITY_SOURCE_REGISTRY, discoverAllSensitivityVariables } from '../../contexts/SensitivityRegistry';
 import { SUPPORTED_METRICS, createMetricSelectorOptions } from '../../utils/finance/sensitivityMetrics';
 import { calculateSensitivityAnalysis } from '../../utils/finance/sensitivityAnalysis';
@@ -24,7 +25,7 @@ const DriverExplorerCard = ({
     defaultMetric = 'npv',
     showInsights = true
 }) => {
-    const { cashflowData, loading, transformError, sourceRegistry } = useCashflow();
+    const { cashflowData, sensitivityData, loading, transformError, sourceRegistry } = useCashflow();
     const { getValueByPath, scenarioData } = useScenario();
 
     // State management
@@ -91,28 +92,11 @@ const DriverExplorerCard = ({
         }
     }, [variables, distributionAnalysis, targetMetric, lowerPercentile, upperPercentile, basePercentile, metricConfig, sourceRegistry, getValueByPath]);
 
-    // Prepare tornado chart data
-    const tornadoChartData = useMemo(() => {
-        if (!sensitivityResults.length || !metricConfig) {
-            return null;
-        }
-
-        return prepareTornadoChartData({
-            sensitivityResults,
-            targetMetric,
-            highlightedDriver,
-            metricConfig,
-            options: {
-                showVariableCount: true,
-                includeConfidenceInTitle: true
-            }
-        });
-    }, [sensitivityResults, targetMetric, highlightedDriver, metricConfig]);
-
-    // Handle variable selection
-    const handleVariableSelect = useCallback((variableId) => {
-        setHighlightedDriver(variableId === highlightedDriver ? null : variableId);
-    }, [highlightedDriver]);
+    // Handle highlighted driver variable ID
+    const highlightedVariableId = useMemo(() => {
+        return highlightedDriver && sensitivityResults.length > 0 ?
+            sensitivityResults.find(r => r.variable === highlightedDriver)?.variableId : null;
+    }, [highlightedDriver, sensitivityResults]);
 
     // Handle percentile range changes
     const handlePercentileRangeChange = useCallback((lower, upper) => {
@@ -126,15 +110,49 @@ const DriverExplorerCard = ({
         setHighlightedDriver(null); // Reset highlighting when metric changes
     }, []);
 
+    // ADD: Handle driver selection from insights panel
+    const handleDriverSelect = useCallback((variableId) => {
+        const newHighlighted = variableId === highlightedDriver ? null : variableId;
+        setHighlightedDriver(newHighlighted);
+    }, [highlightedDriver]);
+
     // Create metric selector options
     const metricOptions = useMemo(() => {
         return createMetricSelectorOptions();
     }, []);
 
+    // Chart data preparation
+    const chartData = useMemo(() => {
+        if (!sensitivityResults.length || !metricConfig) return null;
+
+        return prepareTornadoChartData({
+            sensitivityResults,
+            targetMetric,
+            highlightedDriver: highlightedVariableId,
+            metricConfig,
+            options: {
+                showVariableCount: true
+            }
+        });
+    }, [sensitivityResults, targetMetric, highlightedVariableId, metricConfig]);
+
+    // Chart click handler
+    const handleChartClick = useMemo(() => {
+        return createTornadoClickHandler(setHighlightedDriver);
+    }, []);
+
     // Error handling - follow established patterns
     if (transformError) {
         return (
-            <Card title={title} extra={icon} {...cardProps}>
+            <Card
+                title={
+                    <Space>
+                        {icon}
+                        {title}
+                    </Space>
+                }
+                {...cardProps}
+            >
                 <Alert
                     message="Data Transform Error"
                     description={transformError}
@@ -147,7 +165,15 @@ const DriverExplorerCard = ({
 
     if (!cashflowData) {
         return (
-            <Card title={title} extra={icon} {...cardProps}>
+            <Card
+                title={
+                    <Space>
+                        {icon}
+                        {title}
+                    </Space>
+                }
+                {...cardProps}
+            >
                 <Empty description="No cashflow data available" />
             </Card>
         );
@@ -155,7 +181,15 @@ const DriverExplorerCard = ({
 
     if (!distributionAnalysis) {
         return (
-            <Card title={title} extra={icon} {...cardProps}>
+            <Card
+                title={
+                    <Space>
+                        {icon}
+                        {title}
+                    </Space>
+                }
+                {...cardProps}
+            >
                 <Alert
                     message="No Distribution Data"
                     description="No simulation distribution analysis found. Please run distributions first."
@@ -166,9 +200,17 @@ const DriverExplorerCard = ({
         );
     }
 
-    if (variables.length === 0) {
+    if (sensitivityResults.length === 0) {
         return (
-            <Card title={title} extra={icon} {...cardProps}>
+            <Card
+                title={
+                    <Space>
+                        {icon}
+                        {title}
+                    </Space>
+                }
+                {...cardProps}
+            >
                 <Alert
                     message="No Variables Available"
                     description="No variables with distribution data found for sensitivity analysis."
@@ -181,14 +223,17 @@ const DriverExplorerCard = ({
 
     return (
         <Card
-            title={title}
-            extra={icon}
+            title={
+                <Space>
+                    {icon}
+                    {title}
+                </Space>
+            }
             {...cardProps}
-            style={{ height: '100%', ...cardProps.style }}
         >
-            {/* Controls Row */}
+            {/* Controls Row - Remove visualizer from here */}
             <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                <Col span={8}>
+                <Col span={6}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                         <Text strong>Target Metric</Text>
                         <Select
@@ -196,108 +241,83 @@ const DriverExplorerCard = ({
                             onChange={handleMetricChange}
                             style={{ width: '100%' }}
                             options={metricOptions}
-                            disabled={loading}
                         />
                     </Space>
                 </Col>
-                <Col span={16}>
-                    <SensitivityRangeSelector
-                        getValueByPath={getValueByPath}
-                        lowerPercentile={lowerPercentile}
-                        upperPercentile={upperPercentile}
-                        primaryPercentile={basePercentile}
-                        onRangeChange={handlePercentileRangeChange}
-                        disabled={loading}
-                    />
+                <Col span={18}>
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                        <Text strong>Sensitivity Range</Text>
+                        <SensitivityRangeSelector
+                            getValueByPath={getValueByPath}
+                            lowerPercentile={lowerPercentile}
+                            upperPercentile={upperPercentile}
+                            primaryPercentile={basePercentile}
+                            onRangeChange={handlePercentileRangeChange}
+                            disabled={loading}
+                        />
+                        {/* Visualizer removed from here */}
+                    </Space>
                 </Col>
             </Row>
+            {/* NEW: Visualizer above chart */}
+            <TargetMetricRangeVisualizer
+                sensitivityResults={sensitivityResults}
+                metricConfig={metricConfig}
+                selectedRange={{ lower: lowerPercentile, upper: upperPercentile }}
+                getValueByPath={getValueByPath}
+            />
 
-            <Divider style={{ margin: '16px 0' }} />
-
-            {/* Chart Section */}
-            <div style={{ position: 'relative', minHeight: 400 }}>
-                <Spin spinning={loading} size="large">
-                    {tornadoChartData ? (
-                        <Plot
-                            data={tornadoChartData.data}
-                            layout={tornadoChartData.layout}
-                            config={tornadoChartData.config}
-                            style={{ width: '100%' }}
-                            onClick={createTornadoClickHandler(handleVariableSelect)}
+            {/* Main Content - Chart only */}
+            <Row>
+                <Col span={24}>
+                    <div style={{ height: 400 }}>
+                        {chartData ? (
+                            <Plot
+                                data={chartData.data}
+                                layout={chartData.layout}
+                                config={chartData.config}
+                                onClick={handleChartClick}
+                                style={{ width: '100%', height: '100%' }}
+                            />
+                        ) : (
+                            <Empty description="No chart data available" />
+                        )}
+                    </div>
+                </Col>
+            </Row>
+            {/* Insights Panel - Full width at bottom */}
+            {showInsights && (
+                <Row style={{ marginTop: 16 }}>
+                    <Col span={24}>
+                        <InsightsPanel
+                            sensitivityResults={sensitivityResults}
+                            metricConfig={metricConfig}
+                            targetMetric={targetMetric}
+                            highlightedDriver={highlightedDriver}
+                            confidenceLevel={upperPercentile - lowerPercentile}
+                            onDriverSelect={handleDriverSelect}
+                            layout="horizontal" // Add this prop
                         />
-                    ) : (
-                        <Empty description="No sensitivity data available" />
-                    )}
-                </Spin>
-            </div>
-
-            {/* Insights Panel */}
-            {showInsights && sensitivityResults.length > 0 && (
-                <>
-                    <Divider style={{ margin: '16px 0' }} />
-                    <InsightsPanel
-                        sensitivityResults={sensitivityResults}
-                        metricConfig={metricConfig}
-                        targetMetric={targetMetric}
-                        highlightedDriver={highlightedDriver}
-                        confidenceLevel={upperPercentile - lowerPercentile}
-                    />
-                </>
+                    </Col>
+                </Row>
             )}
 
-            {/* Footer Information */}
-            <div style={{
-                marginTop: 16,
-                padding: 8,
-                background: '#f6f8fa',
-                borderRadius: 4,
-                fontSize: '12px'
-            }}>
-                <Row justify="space-between">
-                    <Col>
-                        <Space>
-                            <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                            <Text type="secondary">
-                                {createDriverAnalysisFooter({
-                                    confidenceInterval: upperPercentile - lowerPercentile,
-                                    variableCount: sensitivityResults.length
-                                }).left}
-                            </Text>
-                        </Space>
+            {/* Footer with methodology - REMOVE UNNECESSARY INFO */}
+            <div style={{ marginTop: 16, padding: 12, background: '#fafafa', borderRadius: 4 }}>
+                <Row gutter={[16, 8]}>
+                    <Col span={12}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            <InfoCircleOutlined style={{ marginRight: 4 }} />
+                            {sensitivityResults.length} variables analyzed
+                        </Text>
                     </Col>
-                    <Col>
-                        <Text type="secondary">
-                            {createDriverAnalysisFooter({
-                                confidenceInterval: upperPercentile - lowerPercentile,
-                                variableCount: sensitivityResults.length
-                            }).right}
+                    <Col span={12} style={{ textAlign: 'right' }}>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            Target: {metricConfig?.label}
                         </Text>
                     </Col>
                 </Row>
             </div>
-
-            {/* Debug info (development only) */}
-            {process.env.NODE_ENV === 'development' && (
-                <div style={{
-                    marginTop: 8,
-                    padding: 8,
-                    background: '#fff1f0',
-                    borderRadius: 4,
-                    fontSize: '11px'
-                }}>
-                    <Text type="secondary">
-                        Debug: {variables.length} variables discovered, {sensitivityResults.length} results calculated,
-                        P{basePercentile} base case, {targetMetric} target metric
-                    </Text>
-                    {variables.length > 0 && (
-                        <div style={{ marginTop: 4 }}>
-                            <Text type="secondary">
-                                Variables: {variables.map(v => v.label || v.id).join(', ')}
-                            </Text>
-                        </div>
-                    )}
-                </div>
-            )}
         </Card>
     );
 };

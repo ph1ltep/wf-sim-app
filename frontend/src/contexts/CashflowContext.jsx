@@ -13,6 +13,9 @@ import {
     isDistributionsComplete,
     isConstructionSourcesComplete
 } from '../utils/dependencies/checkFunctions';
+import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
+import { SENSITIVITY_SOURCE_REGISTRY } from './SensitivityRegistry';
+import { name } from 'plotly.js/lib/scatter';
 
 
 const CashflowContext = createContext();
@@ -58,6 +61,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     costs: [
         {
             id: 'capexDrawdown',
+            name: 'CAPEX Drawdown',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             category: 'construction',
             hasPercentiles: false,
@@ -68,6 +72,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'debtDrawdown',
+            name: 'Debt Drawdown',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -81,6 +86,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'interestDuringConstruction',
+            name: 'CAPEX Interest',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -94,6 +100,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'operationalInterest',
+            name: 'OPEX Interest',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -107,6 +114,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'operationalPrincipal',
+            name: 'OPEX Principal',
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             references: [
                 ['settings', 'modules', 'financing']
@@ -120,6 +128,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'contractFees',
+            name: 'Contract Fees',
             path: ['settings', 'modules', 'contracts', 'oemContracts'],
             category: 'contracts',
             hasPercentiles: false,
@@ -131,6 +140,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'majorRepairs',
+            name: 'Major Repairs',
             path: ['settings', 'modules', 'cost', 'majorRepairEvents'],
             category: 'maintenance',
             hasPercentiles: false,
@@ -142,6 +152,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'insurancePremium',
+            name: 'Insurance Premium',
             path: ['settings', 'modules', 'risk', 'insurancePremium'],
             category: 'insurance',
             hasPercentiles: false,
@@ -153,6 +164,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'reserveFunds',
+            name: 'Reserve Funds',
             path: ['settings', 'modules', 'risk', 'reserveFunds'],
             category: 'reserves',
             hasPercentiles: false,
@@ -165,6 +177,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     revenues: [
         {
             id: 'energyRevenue',
+            name: 'Energy Revenue',
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'],
             category: 'energy',
             hasPercentiles: true,
@@ -203,20 +216,19 @@ const validateRegistry = async () => {
 validateRegistry();
 
 export const CashflowProvider = ({ children }) => {
-    const { getValueByPath, scenarioData, updateByPath } = useScenario();
+    const { scenarioData, getValueByPath, updateByPath } = useScenario();
     const { updateDistributions } = useInputSim();
 
-    // Core state
-    const [loading, setLoading] = useState(false);
+    // State management
     const [cashflowData, setCashflowData] = useState(null);
+    const [sensitivityData, setSensitivityData] = useState(null); // NEW: Sensitivity data state
+    const [loading, setLoading] = useState(false);
     const [transformError, setTransformError] = useState(null);
 
-    // NEW: Sequential refresh state
-    const [refreshStage, setRefreshStage] = useState('idle');
+    // Refresh state management
     const [refreshRequested, setRefreshRequested] = useState(false);
     const [forceRefresh, setForceRefresh] = useState(false);
-
-    // Refs to prevent infinite loops
+    const [refreshStage, setRefreshStage] = useState('idle'); // Add 'sensitivity' to existing stages
     const refreshTimeoutRef = useRef(null);
     const lastScenarioIdRef = useRef(null);
 
@@ -327,12 +339,53 @@ export const CashflowProvider = ({ children }) => {
                         } else {
                             throw new Error('Transform returned no data');
                         }
+                        setRefreshStage('sensitivity'); // NEW: Move to sensitivity stage
+                        break;
+
+                    case 'sensitivity':
+                        // NEW: Compute sensitivity analysis
+                        console.log('🔄 Computing sensitivity analysis...');
+                        try {
+                            const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
+
+                            if (distributionAnalysis && scenarioData) {
+                                // Create simulation config for sensitivity analysis
+                                const simulationConfig = {
+                                    percentiles: availablePercentiles,
+                                    primaryPercentile: primaryPercentile
+                                };
+
+                                const sensitivityResults = calculateSensitivityAnalysis({
+                                    cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
+                                    sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
+                                    targetMetric: 'npv', // Default metric for context computation
+                                    simulationConfig,
+                                    distributionAnalysis,
+                                    getValueByPath
+                                });
+
+                                setSensitivityData({
+                                    baseData: sensitivityResults,
+                                    computedAt: new Date().toISOString(),
+                                    simulationConfig,
+                                    distributionAnalysis
+                                });
+                                console.log('✅ Sensitivity analysis computed:', sensitivityResults.length, 'variables');
+                            } else {
+                                console.warn('⚠️ No distribution analysis available for sensitivity computation');
+                                setSensitivityData(null);
+                            }
+                        } catch (error) {
+                            console.error('❌ Sensitivity computation failed:', error);
+                            setSensitivityData(null);
+                        }
                         setRefreshStage('complete');
                         break;
 
+
                     case 'complete':
                         // Reset and finish
-                        console.log('✅ Cashflow refresh complete');
+                        console.log('✅ Cashflow refresh complete (with sensitivity data)');
                         setRefreshRequested(false);
                         setForceRefresh(false);
                         setRefreshStage('idle');
@@ -343,6 +396,7 @@ export const CashflowProvider = ({ children }) => {
                 console.error('❌ Refresh failed at stage:', refreshStage, error);
                 setTransformError(error.message || 'Failed to refresh cashflow data');
                 setCashflowData(null);
+                setSensitivityData(null);
                 message.error(`Failed at ${refreshStage} stage: ${error.message}`);
 
                 // Reset on error
@@ -354,7 +408,7 @@ export const CashflowProvider = ({ children }) => {
         };
 
         runStage();
-    }, [refreshStage, refreshRequested, forceRefresh, scenarioData, selectedPercentiles, getValueByPath, updateByPath, updateDistributions]);
+    }, [refreshStage, refreshRequested, forceRefresh, scenarioData, selectedPercentiles, getValueByPath, updateByPath, updateDistributions, availablePercentiles, primaryPercentile]);
 
     // NEW: Simple public interface (replaces old refreshCashflowData)
     const refreshCashflowData = useCallback((force = false) => {
@@ -396,6 +450,7 @@ export const CashflowProvider = ({ children }) => {
 
             // Reset state for new scenario
             setCashflowData(null);
+            setSensitivityData(null);
             setTransformError(null);
             setRefreshRequested(false);
             setRefreshStage('idle');
@@ -459,6 +514,7 @@ export const CashflowProvider = ({ children }) => {
     const value = {
         // Data
         cashflowData,
+        sensitivityData,
         loading,
         transformError,
 

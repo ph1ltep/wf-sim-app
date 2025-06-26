@@ -74,16 +74,6 @@ const SensitivityRangeSelector = ({
                 </Col>
             </Row>
 
-            {/* Simple info about confidence level */}
-            <div style={{ marginTop: 8, padding: 8, background: '#f6f8fa', borderRadius: 4 }}>
-                <Space>
-                    <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                        Analysis shows how P{lowerPercentile} to P{upperPercentile} range
-                        ({confidenceLevel}% confidence) affects your target metric.
-                    </Text>
-                </Space>
-            </div>
         </div>
     );
 };

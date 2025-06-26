@@ -101,6 +101,7 @@ const RegistryDataSchema = Yup.object().shape({
 
 const RegistrySourceSchema = Yup.object().shape({
     id: Yup.string().required('Source ID is required'),
+    name: Yup.string().optional(),
     path: Yup.array().of(Yup.string()).required('Primary path is required'),
     references: Yup.array().of(
         Yup.array().of(Yup.string())
@@ -114,7 +115,8 @@ const RegistrySourceSchema = Yup.object().shape({
         baseYear: Yup.number().default(1)
     })).default([]),
     description: Yup.string().required('Description is required'),
-    displayNote: Yup.string().optional()
+    displayNote: Yup.string().optional(),
+    displayUnit: Yup.string().optional()
 });
 
 const CashflowSourceRegistrySchema = Yup.object().shape({
@@ -124,39 +126,43 @@ const CashflowSourceRegistrySchema = Yup.object().shape({
     revenues: Yup.array().of(RegistrySourceSchema).default([])
 });
 
-const SensitivitySourceRegistrySchema = yup.object().shape({
-
-    technical: yup.array().of(RegistrySourceSchema).optional(),
-    financial: yup.array().of(RegistrySourceSchema).optional(),
-    operational: yup.array().of(RegistrySourceSchema).optional(),
-    multipliers: yup.array().of(RegistrySourceSchema).optional() // Support multipliers if needed
+const SensitivitySourceRegistrySchema = Yup.object().shape({
+    technical: Yup.array().of(RegistrySourceSchema).optional(),
+    financial: Yup.array().of(RegistrySourceSchema).optional(),
+    operational: Yup.array().of(RegistrySourceSchema).optional(),
+    multipliers: Yup.array().of(RegistrySourceSchema).optional() // Support multipliers if needed
 });
 
 /**
  * Schema for sensitivity source entries
  * Extends base RegistrySourceSchema with sensitivity-specific properties
  */
-const SensitivitySourceSchema = yup.object().shape({
-    id: yup.string().required('Source ID is required'),
-    description: yup.string().required('Source description is required'),
-    category: yup.string().required('Source category is required'),
-    hasPercentiles: yup.boolean().default(false),
-    path: yup.array().of(yup.string()).required('Source path is required'),
-    affects: yup.array().of(yup.string()).optional(), // Array of CASHFLOW_SOURCE_REGISTRY IDs
-    multipliers: yup.array().of(MultiplierSourceSchema).optional(),
-    data: yup.object().shape({
-        units: yup.string().optional(),
-        impactType: yup.string().oneOf(['multiplicative', 'additive', 'recalculation', 'time_series_modifier']).optional()
+const SensitivitySourceSchema = Yup.object().shape({
+    id: Yup.string().required('Source ID is required'),
+    name: Yup.string().optional(),
+    description: Yup.string().required('Source description is required'),
+    category: Yup.string().required('Source category is required'),
+    hasPercentiles: Yup.boolean().default(false),
+    path: Yup.array().of(Yup.string()).required('Source path is required'),
+    affects: Yup.array().of(Yup.string()).optional(), // Array of CASHFLOW_SOURCE_REGISTRY IDs
+    multipliers: Yup.array().of(Yup.object().shape({
+        id: Yup.string().required('Multiplier ID is required'),
+        operation: Yup.string().oneOf(['multiply', 'compound', 'simple']).required('Operation is required'),
+        baseYear: Yup.number().default(1)
+    })).default([]),
+    data: Yup.object().shape({
+        units: Yup.string().optional(),
+        impactType: Yup.string().oneOf(['multiplicative', 'additive', 'recalculation', 'time_series_modifier']).optional()
     }).optional()
 });
 
 /**
  * Schema for SENSITIVITY_SOURCE_REGISTRY structure
  */
-const SensitivityRegistrySchema = yup.object().shape({
-    technical: yup.array().of(SensitivitySourceSchema).optional(),
-    financial: yup.array().of(SensitivitySourceSchema).optional(),
-    operational: yup.array().of(SensitivitySourceSchema).optional()
+const SensitivityRegistrySchema = Yup.object().shape({
+    technical: Yup.array().of(SensitivitySourceSchema).optional(),
+    financial: Yup.array().of(SensitivitySourceSchema).optional(),
+    operational: Yup.array().of(SensitivitySourceSchema).optional()
 });
 
 /**

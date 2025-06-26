@@ -1,10 +1,13 @@
 // frontend/src/contexts/SensitivityRegistry.js
 // Fixed with proper .id references
 
+import { name } from "plotly.js/lib/scatter";
+
 export const SENSITIVITY_SOURCE_REGISTRY = {
     technical: [
         {
             id: 'availability',
+            name: 'WTG Availability',
             description: 'Wind Turbine Availability Factor',
             category: 'technical',
             hasPercentiles: true,
@@ -18,6 +21,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'windVariability',
+            name: 'Wind Speed',
             description: 'Wind Resource Variability',
             category: 'technical',
             hasPercentiles: true,
@@ -31,6 +35,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'capacityFactor',
+            name: 'Capacity Factor',
             description: 'Net Capacity Factor',
             category: 'technical',
             hasPercentiles: false,
@@ -44,6 +49,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'degradationRate',
+            name: 'Performance Degradation',
             description: 'Annual Performance Degradation Rate',
             category: 'technical',
             hasPercentiles: false,
@@ -60,6 +66,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
     financial: [
         {
             id: 'costOfEquity',
+            name: 'Cost of Equity',
             description: 'Cost of Equity',
             category: 'financing',
             hasPercentiles: false,
@@ -73,6 +80,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'debtRatio',
+            name: 'Debt Ratio',
             description: 'Debt to Total Capital Ratio',
             category: 'financing',
             hasPercentiles: false,
@@ -86,6 +94,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'interestRate',
+            name: 'Debt Interest Rate',
             description: 'Debt Interest Rate',
             category: 'financing',
             hasPercentiles: false,
@@ -99,6 +108,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'taxRate',
+            name: 'Corp Tax Rate',
             description: 'Corporate Tax Rate',
             category: 'financing',
             hasPercentiles: false,
@@ -115,6 +125,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
     operational: [
         {
             id: 'insuranceCost',
+            name: 'Insurance Costs',
             description: 'Annual Insurance Cost',
             category: 'operational',
             hasPercentiles: false,
@@ -134,6 +145,7 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
         },
         {
             id: 'landLeaseCost',
+            name: 'Land Lease Costs',
             description: 'Annual Land Lease Payments',
             category: 'operational',
             hasPercentiles: false,

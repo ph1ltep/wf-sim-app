@@ -358,13 +358,13 @@ export const prepareFinancialTimelineData = (financingData, availablePercentiles
         let percentilesToShow;
         if (selectedPercentile !== null) {
             percentilesToShow = [selectedPercentile];
-            console.log(`Showing only selected percentile: P${selectedPercentile}`);
+            //console.log(`Showing only selected percentile: P${selectedPercentile}`);
         } else if (showAllPercentiles) {
             percentilesToShow = availablePercentiles;
-            console.log(`Showing all percentiles:`, percentilesToShow);
+            //console.log(`Showing all percentiles:`, percentilesToShow);
         } else {
             percentilesToShow = [primaryPercentile];
-            console.log(`Showing only primary percentile: P${primaryPercentile}`);
+            //console.log(`Showing only primary percentile: P${primaryPercentile}`);
         }
 
         percentilesToShow.forEach((percentile, index) => {
