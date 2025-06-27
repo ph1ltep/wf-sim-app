@@ -1,4 +1,5 @@
 // src/utils/finance/calculations.js - Finance-specific calculation utilities
+import { SUPPORTED_METRICS } from './sensitivityMetrics';
 
 /**
  * Calculate Net Present Value using discount rate
@@ -23,6 +24,15 @@ export const calculateNPV = (cashflowData, discountRate) => {
  */
 export const calculateIRR = (cashflowData) => {
     if (!Array.isArray(cashflowData) || cashflowData.length === 0) return 0;
+
+    // Check if we have at least one negative and one positive cash flow
+    const hasNegative = cashflowData.some(cf => cf.value < 0);
+    const hasPositive = cashflowData.some(cf => cf.value > 0);
+
+    if (!hasNegative || !hasPositive) {
+        console.warn('calculateIRR: Need both positive and negative cash flows for IRR calculation');
+        return 0;
+    }
 
     // Initial guess - use average return
     let irr = 0.1; // 10%
@@ -59,6 +69,7 @@ export const calculateIRR = (cashflowData) => {
 
     return irr * 100; // Return as percentage
 };
+
 
 /**
  * Calculate Interest Coverage Ratio (ICR)
@@ -149,16 +160,14 @@ export const calculateLLCR = (netCashflowData, debtServiceData, discountRate = 0
  */
 export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInvestment) => {
     if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) return 0;
+    if (!equityInvestment || equityInvestment <= 0) return 0;
 
     // Create equity cash flows = net project cash flows - debt service
     const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
-
     const equityCashflows = [];
 
     // Add initial equity investment as negative cash flow in year 0
-    if (equityInvestment > 0) {
-        equityCashflows.push({ year: 0, value: -equityInvestment });
-    }
+    equityCashflows.push({ year: 0, value: -equityInvestment });
 
     // Calculate equity cash flows for operational years
     netCashflowData.forEach(cf => {
@@ -173,16 +182,60 @@ export const calculateEquityIRR = (netCashflowData, debtServiceData, equityInves
 };
 
 /**
- * Calculate total equity investment based on CAPEX and debt ratio
+ * Calculate minimum DSCR from time series
+ * @param {Array} dscrTimeSeries - DSCR time series data
+ * @returns {number} Minimum DSCR value
+ */
+export const calculateMinDSCR = (dscrTimeSeries) => {
+    if (!Array.isArray(dscrTimeSeries) || dscrTimeSeries.length === 0) return 0;
+
+    const operationalDSCR = dscrTimeSeries.filter(d => d && d.year > 0 && typeof d.value === 'number');
+    return operationalDSCR.length > 0 ? Math.min(...operationalDSCR.map(d => d.value)) : 0;
+};
+
+/**
+ * Calculate average DSCR from time series
+ * @param {Array} dscrTimeSeries - DSCR time series data
+ * @returns {number} Average DSCR value
+ */
+export const calculateAvgDSCR = (dscrTimeSeries) => {
+    if (!Array.isArray(dscrTimeSeries) || dscrTimeSeries.length === 0) return 0;
+
+    const operationalDSCR = dscrTimeSeries.filter(d => d && d.year > 0 && typeof d.value === 'number');
+    return operationalDSCR.length > 0 ?
+        operationalDSCR.reduce((sum, d) => sum + d.value, 0) / operationalDSCR.length : 0;
+};
+
+/**
+ * Extract cashflow data for a specific percentile
+ * @param {Object} aggregations - Aggregations with percentileData
+ * @param {string} dataType - Type of data ('netCashflow', 'totalCosts', etc.)
+ * @param {number} percentile - Target percentile
+ * @returns {Array} Cashflow data for the percentile
+ */
+export const extractPercentileCashflow = (aggregations, dataType, percentile) => {
+    const dataSource = aggregations[dataType];
+
+    if (!dataSource) return [];
+
+    if (dataSource.percentileData?.has(percentile)) {
+        return dataSource.percentileData.get(percentile);
+    }
+
+    return dataSource.data || [];
+};
+
+/**
+ * Calculate equity investment based on scenario data
  * @param {Object} scenarioData - Scenario data
  * @returns {number} Total equity investment
  */
 export const calculateEquityInvestment = (scenarioData) => {
+    if (!scenarioData) return 0;
+
     const financing = scenarioData?.settings?.modules?.financing || {};
     const debtRatio = (financing.debtFinancingRatio || 70) / 100;
     const equityRatio = 1 - debtRatio;
-
-    // Get total CAPEX from metrics or calculate from cost sources
     const totalCapex = scenarioData?.settings?.metrics?.totalCapex || 0;
 
     return totalCapex * equityRatio;
@@ -363,6 +416,7 @@ export const calculateFinancialMetrics = (financialData, scenarioData) => {
 };
 
 
+
 /**
  * Calculate payback period from cash flow data
  * @param {Array} netCashflows - Array of {year, value} objects
@@ -486,4 +540,124 @@ export const calculateLCOEFromCashflow = (cashflowData, discountRate = 0.08) => 
     });
 
     return calculateLCOE(costTimeSeries, energyTimeSeries, discountRate);
+};
+
+/**
+ * Calculate all SUPPORTED_METRICS for a given percentile
+ * @param {Object} aggregations - Cashflow aggregations
+ * @param {number} percentile - Target percentile  
+ * @param {Object} scenarioData - Scenario data
+ * @param {Array} lineItems - Line items for debt service
+ * @returns {Object} All metrics for this percentile
+ */
+export const calculateMetricsForPercentile = (aggregations, percentile, scenarioData, lineItems = []) => {
+    const metrics = {};
+
+    // Extract cashflow data for this percentile
+    const netCashflowData = extractPercentileCashflow(aggregations, 'netCashflow', percentile);
+    const costData = extractPercentileCashflow(aggregations, 'totalCosts', percentile);
+    const revenueData = extractPercentileCashflow(aggregations, 'totalRevenue', percentile);
+
+    // Get financing parameters
+    const financing = scenarioData?.settings?.modules?.financing || {};
+    const costOfEquity = (financing.costOfEquity || 8) / 100;
+    const minimumDSCR = financing.minimumDSCR || 1.3;
+
+    // Find debt service data
+    const interestLineItem = lineItems.find(item => item.id === 'operationalInterest');
+    const principalLineItem = lineItems.find(item => item.id === 'operationalPrincipal');
+
+    // Extract debt service for this percentile
+    const interestData = interestLineItem?.percentileData?.has(percentile)
+        ? interestLineItem.percentileData.get(percentile)
+        : interestLineItem?.data || [];
+    const principalData = principalLineItem?.percentileData?.has(percentile)
+        ? principalLineItem.percentileData.get(percentile)
+        : principalLineItem?.data || [];
+
+    // Combine debt service (interest + principal)
+    const debtServiceData = combineDebtService(interestData, principalData);
+
+    // Calculate all metrics that are in SUPPORTED_METRICS
+    if (SUPPORTED_METRICS.irr) {
+        metrics.irr = calculateIRR(netCashflowData);
+    }
+
+    if (SUPPORTED_METRICS.npv) {
+        metrics.npv = calculateNPV(netCashflowData, costOfEquity);
+    }
+
+    if (SUPPORTED_METRICS.equityIRR) {
+        const equityInvestment = calculateEquityInvestment(scenarioData);
+        metrics.equityIRR = calculateEquityIRR(netCashflowData, debtServiceData, equityInvestment);
+    }
+
+    if (SUPPORTED_METRICS.dscr) {
+        metrics.dscr = calculateDSCRTimeSeries(netCashflowData, debtServiceData);
+    }
+
+    if (SUPPORTED_METRICS.minDSCR && metrics.dscr) {
+        metrics.minDSCR = calculateMinDSCR(metrics.dscr);
+    }
+
+    if (SUPPORTED_METRICS.avgDSCR && metrics.dscr) {
+        metrics.avgDSCR = calculateAvgDSCR(metrics.dscr);
+    }
+
+    if (SUPPORTED_METRICS.llcr) {
+        const llcrValue = calculateLLCR(netCashflowData, debtServiceData, costOfEquity);
+        // Convert to time series format for consistency
+        const projectLife = scenarioData?.settings?.general?.projectLife || 20;
+        metrics.llcr = Array.from({ length: projectLife }, (_, i) => ({
+            year: i + 1,
+            value: llcrValue
+        }));
+    }
+
+    if (SUPPORTED_METRICS.lcoe) {
+        metrics.lcoe = calculateLCOEFromCashflow({ costs: costData, energy: revenueData }, costOfEquity);
+    }
+
+    return metrics;
+};
+
+// ===== HELPER FUNCTIONS =====
+
+/**
+ * Combine interest and principal into debt service
+ * @param {Array} interestData - Interest payment data
+ * @param {Array} principalData - Principal payment data  
+ * @returns {Array} Combined debt service data
+ */
+export const combineDebtService = (interestData, principalData) => {
+    if (!Array.isArray(interestData) || !Array.isArray(principalData)) return [];
+
+    const allYears = new Set([
+        ...interestData.map(d => d.year),
+        ...principalData.map(d => d.year)
+    ]);
+
+    return Array.from(allYears).map(year => {
+        const interest = interestData.find(d => d.year === year)?.value || 0;
+        const principal = principalData.find(d => d.year === year)?.value || 0;
+        return { year, value: interest + principal };
+    }).sort((a, b) => a.year - b.year);
+};
+
+/**
+ * Calculate DSCR time series
+ * @param {Array} netCashflowData - Net cashflow data
+ * @param {Array} debtServiceData - Debt service data
+ * @returns {Array} DSCR time series
+ */
+export const calculateDSCRTimeSeries = (netCashflowData, debtServiceData) => {
+    if (!Array.isArray(netCashflowData) || !Array.isArray(debtServiceData)) return [];
+
+    const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
+
+    return netCashflowData.map(cf => {
+        const debtService = debtServiceMap.get(cf.year) || 0;
+        const dscr = debtService > 0 ? cf.value / debtService : 0;
+        return { year: cf.year, value: Math.max(0, dscr) };
+    }).sort((a, b) => a.year - b.year);
 };

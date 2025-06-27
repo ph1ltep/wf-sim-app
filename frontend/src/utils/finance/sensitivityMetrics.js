@@ -218,26 +218,73 @@ export const createMetricSelectorOptions = () => {
 };
 
 /**
- * Extract metric value from calculation results
- * @param {Object} results - Calculation results
+ * UNIFIED: Extract metric value from finance metrics using SUPPORTED_METRICS configuration
+ * @param {Object} financeMetrics - Finance metrics with percentile Maps
  * @param {string} targetMetric - Target metric key
+ * @param {number} percentile - Target percentile
  * @returns {number|null} Extracted value
  */
-export const extractMetricValue = (results, targetMetric) => {
+export const extractMetricValue = (financeMetrics, targetMetric, percentile) => {
     const metricConfig = SUPPORTED_METRICS[targetMetric];
-    if (!metricConfig || !results) return null;
-
-    // Navigate the path to get the value
-    let value = results;
-    for (const pathSegment of metricConfig.path) {
-        if (value && typeof value === 'object') {
-            value = value[pathSegment];
-        } else {
-            return null;
-        }
+    if (!metricConfig || !financeMetrics) {
+        console.warn(`Missing metric config or financeMetrics for ${targetMetric}`);
+        return null;
     }
 
-    return typeof value === 'number' ? value : null;
+    // Get the metric data
+    const metricData = financeMetrics[targetMetric];
+
+    if (!metricData) {
+        console.warn(`Metric ${targetMetric} not found in financeMetrics`);
+        return null;
+    }
+
+    // Handle Map objects (percentile data)
+    if (metricData && typeof metricData.get === 'function') {
+        const percentileData = metricData.get(percentile);
+
+        if (percentileData === null || percentileData === undefined) {
+            console.warn(`No data found for ${targetMetric} P${percentile}`);
+            return null;
+        }
+
+        // Handle time series data (arrays)
+        if (Array.isArray(percentileData)) {
+            switch (targetMetric) {
+                case 'dscr':
+                case 'minDSCR':
+                    // Find minimum from operational years (year > 0)
+                    const operationalDSCR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
+                    return operationalDSCR.length > 0 ? Math.min(...operationalDSCR.map(d => d.value)) : null;
+
+                case 'avgDSCR':
+                    // Calculate average from operational years
+                    const avgDSCR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
+                    return avgDSCR.length > 0 ?
+                        avgDSCR.reduce((sum, d) => sum + d.value, 0) / avgDSCR.length : null;
+
+                case 'icr':
+                    // Find minimum from operational years
+                    const operationalICR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
+                    return operationalICR.length > 0 ? Math.min(...operationalICR.map(d => d.value)) : null;
+
+                case 'llcr':
+                    // LLCR is constant across years, take first valid value
+                    const firstValid = percentileData.find(d => d && typeof d.value === 'number');
+                    return firstValid ? firstValid.value : null;
+
+                default:
+                    // For other time series, return first value
+                    return percentileData[0]?.value || null;
+            }
+        }
+
+        // Handle scalar values (most metrics like NPV, IRR, etc.)
+        return typeof percentileData === 'number' ? percentileData : null;
+    }
+
+    // Handle direct values (fallback)
+    return typeof metricData === 'number' ? metricData : null;
 };
 
 /**

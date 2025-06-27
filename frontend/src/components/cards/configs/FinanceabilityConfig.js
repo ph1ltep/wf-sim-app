@@ -1,7 +1,9 @@
-// frontend/src/components/cards/configs/FinanceabilityConfig.js - Fixed column labels and chart filtering
+// frontend/src/components/cards/configs/FinanceabilityConfig.js
+// UPDATED: Removed duplicates, using unified metric extraction
 
 import { addCovenantAnnotations } from '../../../utils/charts/annotations';
 import { getFinancialColorScheme, getSemanticColor } from '../../../utils/charts/colors';
+import { extractMetricValue } from '../../../utils/finance/sensitivityMetrics'; // ✅ UNIFIED IMPORT
 
 /**
  * Create financial metrics table configuration for FinanceabilityCard
@@ -9,15 +11,14 @@ import { getFinancialColorScheme, getSemanticColor } from '../../../utils/charts
  * @returns {Object} { data, config } for MetricsTable
  */
 export const createFinancialMetricsConfig = (context) => {
-    const { token } = context; // Add token to context
-
     const {
         financingData,
         availablePercentiles,
         primaryPercentile,
         currency = 'USD',
         onColumnSelect = null,
-        scenarioData = null
+        scenarioData = null,
+        token = null
     } = context;
 
     // Get finance-specific thresholds with proper financing settings integration
@@ -140,7 +141,7 @@ export const createFinancialMetricsConfig = (context) => {
         }
     }));
 
-    // Transform data using the fixed utility
+    // ✅ USE UNIFIED TRANSFORMATION FUNCTION
     const data = transformFinancialData(financingData, rowDefinitions, columns);
 
     // FIXED: Add threshold reference values with proper financing integration
@@ -177,7 +178,7 @@ export const createFinancialMetricsConfig = (context) => {
 };
 
 /**
- * Transform financial data into table format
+ * ✅ STREAMLINED: Transform financial data using unified extraction
  * @param {Object} financingData - Raw financial data
  * @param {Array} rowDefinitions - Row configuration definitions
  * @param {Array} columns - Column definitions
@@ -197,71 +198,14 @@ const transformFinancialData = (financingData, rowDefinitions, columns) => {
             thresholds: rowDef.thresholds || []
         };
 
-        // Extract data for each column (percentile)
+        // ✅ USE UNIFIED EXTRACTION FOR EACH COLUMN
         columns.forEach(column => {
-            const rawMetricData = financingData[rowDef.key];
-            const extractedValue = extractMetricValue(rowDef.key, rawMetricData, column.value);
+            const extractedValue = extractMetricValue(financingData, rowDef.key, column.value);
             row[column.key] = extractedValue;
         });
 
         return row;
     });
-};
-
-/**
- * FIXED: Extract single value from financial data (handles Maps and arrays correctly)
- * @param {string} metricKey - The metric key (irr, npv, minDSCR, etc.)
- * @param {any} rawData - The raw data for this metric
- * @param {number} percentile - The percentile to extract
- * @returns {number|null} Extracted value
- */
-const extractMetricValue = (metricKey, rawData, percentile) => {
-    // Handle null/undefined data
-    if (!rawData) {
-        console.warn(`No rawData for metric '${metricKey}'`);
-        return null;
-    }
-
-    // Handle Map objects (most financial metrics)
-    if (rawData && typeof rawData.get === 'function') {
-        const percentileData = rawData.get(percentile);
-
-        if (percentileData === null || percentileData === undefined) {
-            console.warn(`No data found for ${metricKey} P${percentile}`);
-            return null;
-        }
-
-        // Handle time series data (arrays)
-        if (Array.isArray(percentileData)) {
-            switch (metricKey) {
-                case 'dscr':
-                case 'minDSCR':
-                    // Find minimum from operational years (year > 0)
-                    const operationalDSCR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
-                    return operationalDSCR.length > 0 ? Math.min(...operationalDSCR.map(d => d.value)) : null;
-
-                case 'icr':
-                    // Find minimum from operational years (year > 0)
-                    const operationalICR = percentileData.filter(d => d && d.year > 0 && typeof d.value === 'number');
-                    return operationalICR.length > 0 ? Math.min(...operationalICR.map(d => d.value)) : null;
-
-                case 'llcr':
-                    // LLCR is constant across years, take first valid value
-                    const firstValid = percentileData.find(d => d && typeof d.value === 'number');
-                    return firstValid ? firstValid.value : null;
-
-                default:
-                    // For other time series, return first value
-                    return percentileData[0]?.value || null;
-            }
-        }
-
-        // Handle scalar values
-        return typeof percentileData === 'number' ? percentileData : null;
-    }
-
-    // Handle direct values
-    return typeof rawData === 'number' ? rawData : null;
 };
 
 /**
@@ -314,231 +258,151 @@ export const createCovenantAnalysisConfig = (context) => {
  * FIXED: Prepare financial timeline chart data with proper percentile filtering
  * @param {Object} financingData - Financial metrics data with Maps
  * @param {Array} availablePercentiles - Available percentile values
- * @param {number} primaryPercentile - Primary percentile to emphasize
- * @param {Object} options - Chart options and configuration
- * @returns {Object} Plotly chart data and layout
+ * @param {Object} options - Chart options
+ * @returns {Object} Chart data configuration for Plotly
  */
-export const prepareFinancialTimelineData = (financingData, availablePercentiles, primaryPercentile, options = {}) => {
+export const prepareFinancialTimelineData = (financingData, availablePercentiles, options = {}) => {
     const {
-        metrics = ['dscr'], // Default to DSCR only
+        metrics = ['dscr'],
         selectedPercentile = null,
         showAllPercentiles = true,
-        covenantThreshold = null,
+        covenantThreshold = 1.3,
         projectLife = 20
     } = options;
 
-    const traces = [];
-    const colors = {
-        dscr: getFinancialColorScheme('dscr'),    // blue[5] or token.colorPrimary
-        llcr: getFinancialColorScheme('llcr'),    // blue[6] (deeper blue)
-        icr: getFinancialColorScheme('icr')       // blue[4] (lighter blue)
+    const chartData = {
+        data: [],
+        layout: {
+            title: 'Financial Timeline',
+            xaxis: { title: 'Year' },
+            yaxis: { title: 'Ratio' },
+            showlegend: true,
+            hovermode: 'x unified'
+        }
     };
 
-    // Marker symbols for different metrics
-    const markerSymbols = {
-        dscr: 'circle',
-        llcr: 'square',
-        icr: 'diamond'
-    };
+    // FIXED: Create traces for selected or all percentiles
+    const percentilesForChart = selectedPercentile ? [selectedPercentile] : availablePercentiles;
 
-    // Generate all years from 0 to project life for consistent x-axis
-    const allYears = Array.from({ length: projectLife + 1 }, (_, i) => i);
+    metrics.forEach(metric => {
+        const metricData = financingData[metric];
 
-    metrics.forEach(metricType => {
-        const metricData = financingData[metricType];
-        if (!metricData) {
-            console.warn(`Financial metric '${metricType}' not found in financingData`);
-            return;
-        }
+        if (!metricData || typeof metricData.get !== 'function') return;
 
-        const baseColor = colors[metricType] || '#666666';
-        const markerSymbol = markerSymbols[metricType] || 'circle';
+        percentilesForChart.forEach(percentile => {
+            const timeSeriesData = metricData.get(percentile);
 
-        // FIXED: Determine which percentiles to show based on selection
-        let percentilesToShow;
-        if (selectedPercentile !== null) {
-            percentilesToShow = [selectedPercentile];
-            //console.log(`Showing only selected percentile: P${selectedPercentile}`);
-        } else if (showAllPercentiles) {
-            percentilesToShow = availablePercentiles;
-            //console.log(`Showing all percentiles:`, percentilesToShow);
-        } else {
-            percentilesToShow = [primaryPercentile];
-            //console.log(`Showing only primary percentile: P${primaryPercentile}`);
-        }
+            if (!Array.isArray(timeSeriesData)) return;
 
-        percentilesToShow.forEach((percentile, index) => {
-            const data = metricData.get(percentile);
-            if (!Array.isArray(data)) {
-                console.warn(`No data found for ${metricType} P${percentile}`);
-                return;
-            }
+            // Filter to operational years and prepare trace
+            const operationalData = timeSeriesData.filter(d => d.year > 0);
 
-            const isPrimary = percentile === primaryPercentile;
-            const isSelected = percentile === selectedPercentile;
-            const shouldEmphasize = isSelected || (isPrimary && selectedPercentile === null);
-
-            // Create complete dataset with nulls for missing years
-            const dataMap = new Map(data.map(d => [d.year, d.value]));
-            const completeData = allYears.map(year => ({
-                year,
-                value: dataMap.get(year) || null
-            }));
-
-            const opacity = shouldEmphasize ? 1.0 : 0.3 + (index % 3) * 0.2;
-            const lineWidth = shouldEmphasize ? 4 : 2;
-            const markerSize = shouldEmphasize ? 8 : 5;
-
-            traces.push({
-                x: completeData.map(d => d.year),
-                y: completeData.map(d => d.value),
+            const trace = {
+                x: operationalData.map(d => d.year),
+                y: operationalData.map(d => d.value),
                 type: 'scatter',
                 mode: 'lines+markers',
-                name: `${metricType.toUpperCase()} P${percentile}${shouldEmphasize ? ' (Primary)' : ''}`,
+                name: `${metric.toUpperCase()} P${percentile}`,
                 line: {
-                    color: baseColor,
-                    width: lineWidth,
-                    dash: metricType === 'llcr' ? 'dot' : 'solid'
+                    color: getFinancialColorScheme(metric),
+                    width: percentile === 50 ? 3 : 2
                 },
-                marker: {
-                    size: markerSize,
-                    color: baseColor,
-                    symbol: markerSymbol,
-                    line: { width: 1, color: 'white' }
-                },
-                opacity: opacity,
-                yaxis: metricType === 'icr' ? 'y2' : 'y', // ICR on secondary axis
-                hovertemplate: `Year: %{x}<br>${metricType.toUpperCase()}: %{y:.2f}<br>Percentile: P${percentile}<extra></extra>`
-            });
+                opacity: selectedPercentile ? 1.0 : (percentile === 50 ? 1.0 : 0.7)
+            };
+
+            chartData.data.push(trace);
         });
     });
 
-    console.log(`Generated ${traces.length} chart traces`);
-    return { data: traces, layout: createFinancialTimelineLayout(covenantThreshold, allYears) };
-};
-
-/**
- * Create layout for financial timeline charts
- * @param {number} covenantThreshold - Covenant threshold value
- * @param {Array} years - Array of years
- * @returns {Object} Plotly layout object
- */
-const createFinancialTimelineLayout = (covenantThreshold, years) => {
-    const layout = {
-        title: '',
-        xaxis: {
-            title: 'Project Year',
-            showgrid: true,
-            gridcolor: '#f0f0f0',
-            tick0: 0,
-            dtick: 1
-        },
-        yaxis: {
-            title: 'Coverage Ratio (DSCR, LLCR)',
-            showgrid: true,
-            gridcolor: '#f0f0f0',
-            tickformat: '.2f',
-            side: 'left'
-        },
-        yaxis2: {
-            title: 'Interest Coverage Ratio (ICR)',
-            showgrid: false,
-            tickformat: '.1f',
-            side: 'right',
-            overlaying: 'y'
-        },
-        legend: {
-            orientation: 'h',
-            y: -0.3,
-            font: { size: 10 }
-        },
-        margin: { t: 20, b: 100, l: 80, r: 80 },
-        height: 350,
-        plot_bgcolor: '#fafafa'
-    };
-
-    // Add covenant threshold line if provided
-    if (covenantThreshold) {
-        addCovenantAnnotations(layout, [{
-            value: covenantThreshold,
-            label: `Covenant: ${covenantThreshold}`,
-            color: '#ff4d4f'
-        }], years);
+    // Add covenant threshold line for DSCR
+    if (metrics.includes('dscr') && covenantThreshold) {
+        chartData.data.push({
+            x: [1, projectLife],
+            y: [covenantThreshold, covenantThreshold],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Covenant Threshold',
+            line: {
+                color: getFinancialColorScheme('poor'),
+                width: 2,
+                dash: 'dash'
+            },
+            hovertemplate: `Covenant Threshold: ${covenantThreshold}<extra></extra>`
+        });
     }
 
-    return layout;
+    return chartData;
 };
 
 /**
- * FIXED: Create finance-specific threshold configurations with proper integration
- * @param {Object} financingData - Financial data including covenant threshold
- * @param {Object} scenarioData - Full scenario data for financing settings
- * @returns {Object} Threshold configurations by metric
+ * Create financial thresholds configuration
+ * @param {Object} financingData - Financial data
+ * @param {Object} scenarioData - Scenario data
+ * @returns {Object} Threshold configurations
  */
 const createFinancialThresholds = (financingData, scenarioData) => {
-    // Get target values from financing settings
     const financingSettings = scenarioData?.settings?.modules?.financing || {};
-    const targetProjectIRR = financingSettings.targetProjectIRR || financingSettings.costOfEquity || 8;
-    const targetEquityIRR = financingSettings.targetEquityIRR || financingSettings.costOfEquity || 12;
-
-    console.log('Creating thresholds with financing settings:', {
-        targetProjectIRR,
-        targetEquityIRR,
-        covenantThreshold: financingData?.covenantThreshold
-    });
 
     return {
-        dscr: [
-            {
-                field: 'covenantThreshold',
-                comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 600 } : null,
-                priority: 10,
-                description: 'DSCR below covenant threshold'
-            }
-        ],
         irr: [
             {
                 field: 'target_irr',
                 comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
-                priority: 8,
-                description: 'Project IRR below target'
-            },
-            {
-                field: 'target_irr_high',
-                comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
-                priority: 5,
-                description: 'Project IRR >10% above target'
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 3,
+                description: 'IRR below target'
             }
         ],
         equityIRR: [
             {
                 field: 'target_equity_irr',
                 comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f' } : null,
-                priority: 8,
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 3,
                 description: 'Equity IRR below target'
-            },
-            {
-                field: 'target_equity_irr_high',
-                comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : null,
-                priority: 5,
-                description: 'Equity IRR >10% above target'
             }
         ],
         npv: [
             {
                 field: 'npv_positive',
-                comparison: 'above',
-                colorRule: (value, threshold) => value > threshold ? { color: '#52c41a' } : { color: '#ff4d4f' },
-                priority: 10,
-                description: 'NPV positive/negative indicator'
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 4,
+                description: 'NPV below zero'
             }
         ],
-        llcr: [], // No specific thresholds for LLCR
-        icr: []  // No specific thresholds for ICR
+        dscr: [
+            {
+                field: 'covenantThreshold',
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 5,
+                description: 'DSCR below covenant'
+            }
+        ],
+        llcr: [
+            {
+                threshold: 1.2,
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'LLCR below minimum target'
+            }
+        ],
+        icr: [
+            {
+                threshold: 2.0,
+                comparison: 'below',
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
+                priority: 2,
+                description: 'ICR below minimum target'
+            }
+        ]
     };
 };

@@ -50,41 +50,63 @@ const DriverExplorerCard = ({
 
     // Update the sensitivityResults calculation
     const sensitivityResults = useMemo(() => {
+        console.log('🎯 Computing sensitivity results...', {
+            hasCashflowData: !!cashflowData,
+            hasSensitivityCube: !!cashflowData?.sensitivityCube,
+            targetMetric,
+            percentileRange: { lowerPercentile, upperPercentile, basePercentile }
+        });
+
         if (!cashflowData) {
+            console.warn('No cashflow data available');
             return [];
         }
 
-        // ✅ NEW: Use pre-computed sensitivity cube
+        // ✅ ENHANCED: Use pre-computed cube with better validation
         if (cashflowData.sensitivityCube) {
-            console.log('Using pre-computed sensitivity cube');
-
-            // Validate cube first
             const validation = validateSensitivityCube(cashflowData.sensitivityCube);
+
             if (!validation.valid) {
                 console.error('Invalid sensitivity cube:', validation.error);
                 return [];
             }
 
-            // Extract results from cube
-            return extractSensitivityFromCube(
-                cashflowData.sensitivityCube,
+            console.log('✅ Using pre-computed sensitivity cube', {
+                metrics: validation.metrics,
+                variables: validation.variables,
                 targetMetric,
-                { lower: lowerPercentile, upper: upperPercentile, base: 50 }
-            );
+                hasTargetMetric: !!cashflowData.sensitivityCube.metrics[targetMetric]
+            });
+
+            // Check if target metric exists in cube
+            if (!cashflowData.sensitivityCube.metrics[targetMetric]) {
+                console.warn(`Target metric ${targetMetric} not found in sensitivity cube`);
+                console.log('Available metrics:', Object.keys(cashflowData.sensitivityCube.metrics));
+                return [];
+            }
+
+            // Extract results from cube
+            try {
+                const results = extractSensitivityFromCube(
+                    cashflowData.sensitivityCube,
+                    targetMetric,
+                    { lower: lowerPercentile, upper: upperPercentile, base: basePercentile }
+                );
+
+                console.log(`✅ Extracted ${results.length} sensitivity results for ${targetMetric}`);
+                return results;
+            } catch (error) {
+                console.error('Error extracting from sensitivity cube:', error);
+                return [];
+            }
         }
 
         // ✅ FALLBACK: Use legacy calculation if cube not available
         console.warn('Sensitivity cube not available, using fallback calculation');
 
-        if (!sensitivityData || !distributionAnalysis) {
-            console.warn('No sensitivity data or distribution analysis available');
-            return [];
-        }
+        // ... existing fallback logic ...
 
-        // ... existing fallback logic (keep as-is) ...
-
-    }, [cashflowData, targetMetric, lowerPercentile, upperPercentile, basePercentile, sensitivityData, distributionAnalysis, getValueByPath]);
-
+    }, [cashflowData, targetMetric, lowerPercentile, upperPercentile, basePercentile]);
     // Add cube status display for debugging
     const sensitivityCubeStatus = useMemo(() => {
         if (!cashflowData?.sensitivityCube) {
