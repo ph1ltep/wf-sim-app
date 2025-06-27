@@ -1,5 +1,5 @@
 // frontend/src/utils/charts/sensitivity/tornado.js
-// Tornado chart implementation for sensitivity analysis
+// Tornado chart implementation for sensitivity analysis - TARGET METRIC VALUES
 
 import { generateSmartColors, generateHighlightOpacity } from './colors';
 import { formatLargeNumber } from '../../../utils/tables/formatting';
@@ -7,7 +7,7 @@ import { formatLargeNumber } from '../../../utils/tables/formatting';
 /**
  * Prepare tornado chart data for sensitivity analysis - TRUE TORNADO FORMAT
  * @param {Object} params - Chart parameters
- * @param {Array} params.sensitivityResults - Results from sensitivity analysis with leftPercent/rightPercent
+ * @param {Array} params.sensitivityResults - Results from sensitivity analysis with target metric values
  * @param {string} params.targetMetric - Target metric (npv, irr, etc.)
  * @param {string} params.highlightedDriver - Driver ID to highlight
  * @param {Object} params.metricConfig - Metric configuration from SUPPORTED_METRICS
@@ -35,200 +35,177 @@ export const prepareTornadoChartData = ({
         customHeight = null
     } = options;
 
-    // Sort by total spread (sum of absolute left and right percentages)
-    const sortedResults = [...sensitivityResults].sort((a, b) => b.totalSpread - a.totalSpread);
+    // Sort by total target metric spread (absolute impact)
+    const sortedResults = [...sensitivityResults].sort((a, b) => b.totalTargetSpread - a.totalTargetSpread);
 
     // Generate smart colors and opacity
     const colors = generateSmartColors(sortedResults, highlightedDriver);
     const opacity = generateHighlightOpacity(sortedResults, highlightedDriver);
 
-    // Create two traces - left (negative) and right (positive) bars
+    // Calculate chart scale based on target metric values
+    const allTargetValues = sortedResults.flatMap(r => [
+        r.lowTargetValue,
+        r.baseTargetValue,
+        r.highTargetValue
+    ]);
+    const minTargetValue = Math.min(...allTargetValues);
+    const maxTargetValue = Math.max(...allTargetValues);
+    const baseTargetValue = sortedResults[0]?.baseTargetValue || 0;
+
+    // Add padding to the range (10% on each side)
+    const valueRange = maxTargetValue - minTargetValue;
+    const paddedMin = minTargetValue - (valueRange * 0.1);
+    const paddedMax = maxTargetValue + (valueRange * 0.1);
+
+    // Create two traces - left (negative impact) and right (positive impact) bars
     const leftData = {
         type: 'bar',
         orientation: 'h',
-        x: sortedResults.map(r => r.leftPercent / 100),
-        y: sortedResults.map(r => r.displayName), // ✅ FIXED: Use displayName
-        name: 'Downside',
+        x: sortedResults.map(r => r.lowTargetValue - baseTargetValue), // Offset from base
+        y: sortedResults.map(r => r.displayName),
+        name: 'Downside Impact',
         marker: {
-            color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.7)')),
+            color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.8)')),
             line: { color: '#fff', width: 1 }
         },
         opacity: opacity,
         customdata: sortedResults,
         hovertemplate:
-            '<b>%{customdata.displayName}</b><br>' + // ✅ FIXED: Use displayName
-            'Δ%: <b>%{customdata.leftPercent:.1f}%</b><br>' +
-            'Δ: <b>%{customdata.leftDelta:.1f}</b><br>' +
-            'Absolute: <b>%{customdata.lowValueFormatted}</b><br>' +
-            'Range: %{customdata.variableRange}<br>' +
+            '<b>%{customdata.displayName}</b><br>' +
+            `<b>${metricConfig.label}:</b> %{customdata.lowTargetValue:.2f}${metricConfig.units || ''}<br>` +
+            `<b>Δ from base:</b> %{customdata.lowTargetDelta:+.2f}${metricConfig.units || ''}<br>` +
+            '<br>' +
+            '<b>Variable:</b> %{customdata.lowVariableValue:.1f}<br>' +
+            '<b>Δ Variable:</b> %{customdata.lowVariableDelta:+.1f}<br>' +
+            '<b>Percentile:</b> P%{customdata.percentileRange.lower}<br>' +
             '<extra></extra>'
     };
 
     const rightData = {
         type: 'bar',
         orientation: 'h',
-        x: sortedResults.map(r => r.rightPercent / 100),
-        y: sortedResults.map(r => r.displayName), // ✅ FIXED: Use displayName
-        name: 'Upside',
+        x: sortedResults.map(r => r.highTargetValue - baseTargetValue), // Offset from base
+        y: sortedResults.map(r => r.displayName),
+        name: 'Upside Impact',
         marker: {
-            color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.7)')),
+            color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.8)')),
             line: { color: '#fff', width: 1 }
         },
         opacity: opacity,
         customdata: sortedResults,
         hovertemplate:
-            '<b>%{customdata.displayName}</b><br>' + // ✅ FIXED: Use displayName
-            'Δ%: <b>+%{customdata.rightPercent:.1f}%</b><br>' +
-            'Δ: <b>+%{customdata.rightDelta:.1f}</b><br>' +
-            'Absolute: <b>%{customdata.highValueFormatted}</b><br>' +
-            'Range: %{customdata.variableRange}<br>' +
+            '<b>%{customdata.displayName}</b><br>' +
+            `<b>${metricConfig.label}:</b> %{customdata.highTargetValue:.2f}${metricConfig.units || ''}<br>` +
+            `<b>Δ from base:</b> %{customdata.highTargetDelta:+.2f}${metricConfig.units || ''}<br>` +
+            '<br>' +
+            '<b>Variable:</b> %{customdata.highVariableValue:.1f}<br>' +
+            '<b>Δ Variable:</b> %{customdata.highVariableDelta:+.1f}<br>' +
+            '<b>Percentile:</b> P%{customdata.percentileRange.upper}<br>' +
             '<extra></extra>'
     };
 
-    // Rest of the function remains the same...
-    const calculatedHeight = customHeight || Math.max(300, sortedResults.length * 30 + 100);
-    const maxPercent = Math.max(
-        ...sortedResults.map(r => Math.max(Math.abs(r.leftPercent), Math.abs(r.rightPercent)))
+    // Calculate the target metric range for the x-axis
+    const maxDelta = Math.max(
+        ...sortedResults.map(r => Math.abs(r.lowTargetDelta)),
+        ...sortedResults.map(r => Math.abs(r.highTargetDelta))
     );
-    const axisRange = (maxPercent * 1.1) / 100;
-    const yAxisTitle = showVariableCount ?
-        `Variables (${sortedResults.length})` : 'Variables';
 
+    // Layout with TARGET METRIC scale
     const layout = {
-        title: '',
+        title: {
+            text: `${metricConfig.label} Sensitivity Analysis${showVariableCount ? ` (${sortedResults.length} variables)` : ''}`,
+            font: { size: 16, weight: 'bold' }
+        },
         xaxis: {
-            title: `${metricConfig.label} Impact (% from baseline)`,
-            range: [-axisRange, axisRange],
+            title: `Δ ${metricConfig.label} from Base Case (${metricConfig.units || ''})`,
             zeroline: true,
             zerolinecolor: '#333',
             zerolinewidth: 2,
-            tickformat: '.1%',
-            showgrid: true,
-            gridcolor: '#f0f0f0'
+            range: [-maxDelta * 1.1, maxDelta * 1.1], // Symmetric around zero
+            tickformat: metricConfig.units === '%' ? '.1f' : '.2f',
+            gridcolor: '#e8e8e8',
+            gridwidth: 1
         },
         yaxis: {
-            title: yAxisTitle,
-            autorange: 'reversed',
-            showgrid: false,
-            tickfont: { size: 10 }
+            title: 'Input Variables',
+            automargin: true,
+            tickfont: { size: 11 }
         },
-        height: calculatedHeight,
-        margin: { t: 10, b: 40, l: 140, r: 60 }, // ✅ REDUCED: bottom margin from 60 to 40
-        font: { size: 11 },
-        barmode: 'overlay',
-        showlegend: false, // ✅ REMOVED: Hide legend
-        hovermode: 'closest',
-        plot_bgcolor: 'white',
-        paper_bgcolor: 'white',
-        bargap: 0.2
+        showlegend: true,
+        legend: {
+            orientation: 'h',
+            x: 0.5,
+            xanchor: 'center',
+            y: -0.1
+        },
+        barmode: 'relative', // This creates the tornado effect
+        bargap: 0.15,
+        height: customHeight || Math.max(400, sortedResults.length * 35 + 150),
+        margin: { l: 150, r: 50, t: 80, b: 100 },
+        plot_bgcolor: '#fafafa',
+        paper_bgcolor: '#ffffff'
     };
 
-    const config = {
-        displayModeBar: false,
-        responsive: true
-    };
+    // Add base case annotation
+    const annotations = [{
+        x: 0,
+        y: -0.15,
+        xref: 'x',
+        yref: 'paper',
+        text: `Base Case: ${baseTargetValue.toFixed(2)}${metricConfig.units || ''}`,
+        showarrow: false,
+        font: { size: 12, color: '#666' },
+        xanchor: 'center'
+    }];
 
     return {
         data: [leftData, rightData],
-        layout,
-        config
+        layout: { ...layout, annotations },
+        config: {
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+            displaylogo: false
+        }
     };
 };
 
 /**
- * Create tornado chart click handler for variable highlighting
- * @param {Function} onVariableSelect - Callback function for variable selection
- * @param {Object} options - Handler options
- * @returns {Function} Plotly click event handler
+ * Create click handler for tornado chart interactions
  */
-export const createTornadoClickHandler = (onVariableSelect, options = {}) => {
-    const { enableToggle = true } = options;
+export const createTornadoClickHandler = (onDriverSelect) => {
+    return (event) => {
+        if (event.points && event.points.length > 0) {
+            const point = event.points[0];
+            const customData = point.customdata;
 
-    return (eventData) => {
-        if (!onVariableSelect) {
-            console.warn('No onVariableSelect handler provided to createTornadoClickHandler');
-            return;
-        }
-
-        if (eventData.points && eventData.points.length > 0) {
-            const point = eventData.points[0];
-            const variableData = point.customdata;
-
-            if (variableData && onVariableSelect) {
-                const variableId = variableData.id; // ✅ FIXED: Use id instead of variableId
-                onVariableSelect(enableToggle ? variableId : variableId, variableData, eventData);
+            if (customData && onDriverSelect) {
+                onDriverSelect(customData.variableId);
             }
         }
     };
 };
 
 /**
- * Update tornado chart colors based on highlighted variable
- * @param {Object} plotlyDiv - Plotly chart div element
- * @param {Array} sensitivityResults - Sensitivity results
- * @param {string} highlightedDriver - Driver ID to highlight
- * @param {Object} options - Update options
- * @returns {void}
+ * Validate tornado chart data
  */
-export const updateTornadoHighlight = (plotlyDiv, sensitivityResults, highlightedDriver, options = {}) => {
-    if (!plotlyDiv || !sensitivityResults) return;
-
-    const { animationDuration = 300 } = options;
-
-    const sortedResults = [...sensitivityResults].sort((a, b) => b.impact - a.impact);
-
-    // Generate new colors and opacity
-    const newColors = generateSmartColors(sortedResults, highlightedDriver);
-    const newOpacity = generateHighlightOpacity(sortedResults, highlightedDriver);
-
-    const update = {
-        'marker.color': [newColors],
-        'marker.opacity': [newOpacity]
-    };
-
-    const animationOptions = {
-        transition: { duration: animationDuration },
-        frame: { duration: animationDuration }
-    };
-
-    if (window.Plotly) {
-        window.Plotly.restyle(plotlyDiv, update, [0]).then(() => {
-            // Optional: trigger any post-update callbacks
-            if (options.onUpdateComplete) {
-                options.onUpdateComplete(highlightedDriver);
-            }
-        });
+export const validateTornadoData = (sensitivityResults, metricConfig) => {
+    if (!sensitivityResults || !Array.isArray(sensitivityResults)) {
+        return { valid: false, error: 'Invalid sensitivity results' };
     }
-};
 
-/**
- * Get tornado chart layout options for different display modes
- * @param {string} mode - Display mode ('compact', 'detailed', 'presentation')
- * @param {number} variableCount - Number of variables
- * @returns {Object} Layout options
- */
-export const getTornadoLayoutOptions = (mode = 'detailed', variableCount = 5) => {
-    const modes = {
-        compact: {
-            height: Math.max(300, variableCount * 35 + 80),
-            margin: { t: 10, b: 60, l: 120, r: 60 },
-            font: { size: 11 },
-            showVariableCount: false
-        },
-        detailed: {
-            height: Math.max(400, variableCount * 45 + 120),
-            margin: { t: 20, b: 80, l: 140, r: 80 },
-            font: { size: 12 },
-            showVariableCount: true
-        },
-        presentation: {
-            height: Math.max(500, variableCount * 50 + 150),
-            margin: { t: 30, b: 100, l: 160, r: 100 },
-            font: { size: 14 },
-            showVariableCount: true,
-            includeConfidenceInTitle: true
-        }
-    };
+    if (!metricConfig) {
+        return { valid: false, error: 'Missing metric configuration' };
+    }
 
-    return modes[mode] || modes.detailed;
+    // Check that results have required target metric fields
+    const requiredFields = ['lowTargetValue', 'baseTargetValue', 'highTargetValue'];
+    const missingFields = sensitivityResults.some(result =>
+        requiredFields.some(field => result[field] === undefined || result[field] === null)
+    );
+
+    if (missingFields) {
+        return { valid: false, error: 'Missing target metric values in sensitivity results' };
+    }
+
+    return { valid: true };
 };

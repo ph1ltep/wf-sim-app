@@ -13,9 +13,7 @@ export {
 // Tornado chart
 export {
     prepareTornadoChartData,
-    createTornadoClickHandler,
-    updateTornadoHighlight,
-    getTornadoLayoutOptions
+    createTornadoClickHandler
 } from './tornado';
 
 // Color utilities

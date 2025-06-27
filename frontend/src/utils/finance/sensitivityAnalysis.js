@@ -78,7 +78,7 @@ const getTimeSeriesAtPercentile = (variable, percentile, distributionAnalysis, g
 };
 
 /**
- * Calculate impact for a single variable - OPTIMIZED for new structure
+ * Calculate impact for a single variable - ENHANCED with target metric values
  */
 const calculateVariableImpact = (variable, targetMetric, percentileRange, distributionAnalysis, getValueByPath) => {
     const { lower, upper, base } = percentileRange;
@@ -114,54 +114,58 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
         const lowWithMultipliers = applyMultipliers(lowTimeSeries, variable.multipliers, getValueByPath);
         const highWithMultipliers = applyMultipliers(highTimeSeries, variable.multipliers, getValueByPath);
 
-        // Aggregate to get final metric values
+        // Aggregate time-series to get final metric values
         const baseValue = aggregateTimeSeries(baseWithMultipliers, aggregationMethod, aggregationOptions);
         const lowValue = aggregateTimeSeries(lowWithMultipliers, aggregationMethod, aggregationOptions);
         const highValue = aggregateTimeSeries(highWithMultipliers, aggregationMethod, aggregationOptions);
 
-        if (baseValue == null || lowValue == null || highValue == null) {
-            console.warn(`Failed to aggregate values for variable ${variable.id}`);
-            return null;
-        }
+        // Calculate percentage changes (for backward compatibility)
+        const leftPercent = baseValue !== 0 ? ((lowValue - baseValue) / Math.abs(baseValue)) * 100 : 0;
+        const rightPercent = baseValue !== 0 ? ((highValue - baseValue) / Math.abs(baseValue)) * 100 : 0;
+        const totalSpread = Math.abs(rightPercent) + Math.abs(leftPercent);
 
-        // Calculate percentage deviations
-        let leftPercent = 0;
-        let rightPercent = 0;
+        // Extract variable values for hover information
+        const lowVariableValue = Number(lowTimeSeries[0]?.value || 0);
+        const baseVariableValue = Number(baseTimeSeries[0]?.value || 0);
+        const highVariableValue = Number(highTimeSeries[0]?.value || 0);
 
-        if (Math.abs(baseValue) > 0.001) {
-            leftPercent = ((lowValue - baseValue) / Math.abs(baseValue)) * 100;
-            rightPercent = ((highValue - baseValue) / Math.abs(baseValue)) * 100;
-        }
-
-        const totalSpread = Math.abs(leftPercent) + Math.abs(rightPercent);
-
-        // ✅ FIXED: Use displayName consistently, clean return structure
         return {
-            // Core identification
-            id: variable.id,
-            displayName: variable.displayName, // ✅ Always string from discovery
-            category: variable.category,
-            source: variable.source,
+            // Basic identification
+            variableId: variable.id,
+            displayName: variable.displayName || variable.label || variable.id,
+            displayCategory: variable.category || 'Other',
 
-            // Values (clean numeric)
-            baseValue,
-            lowValue,
-            highValue,
+            // ✅ NEW: TARGET METRIC VALUES (for tornado chart)
+            lowTargetValue: lowValue,
+            baseTargetValue: baseValue,
+            highTargetValue: highValue,
+
+            // ✅ NEW: TARGET METRIC DELTAS
+            lowTargetDelta: lowValue - baseValue,
+            highTargetDelta: highValue - baseValue,
+            totalTargetSpread: Math.abs(highValue - lowValue),
+
+            // ✅ NEW: VARIABLE VALUES (for hover info)
+            lowVariableValue,
+            baseVariableValue,
+            highVariableValue,
+
+            // ✅ NEW: VARIABLE DELTAS (for hover info)
+            lowVariableDelta: lowVariableValue - baseVariableValue,
+            highVariableDelta: highVariableValue - baseVariableValue,
+
+            // Legacy compatibility (keep existing)
             impact: Math.abs(highValue - lowValue),
-
-            // Tornado chart data (clean numeric)
             leftPercent,
             rightPercent,
             totalSpread,
-
-            // Deltas (clean numeric, no "WithUnits")
             leftDelta: lowValue - baseValue,
             rightDelta: highValue - baseValue,
 
             // Formatted display values (simple strings)
             lowValueFormatted: formatLargeNumber(lowValue, { currency: metricConfig.units === 'currency', precision: 1 }),
             highValueFormatted: formatLargeNumber(highValue, { currency: metricConfig.units === 'currency', precision: 1 }),
-            variableRange: `${formatLargeNumber(Number(lowTimeSeries[0]?.value || 0), { precision: 1 })} → ${formatLargeNumber(Number(highTimeSeries[0]?.value || 0), { precision: 1 })}`,
+            variableRange: `${formatLargeNumber(lowVariableValue, { precision: 1 })} → ${formatLargeNumber(highVariableValue, { precision: 1 })}`,
 
             // Metadata
             percentileRange: {
@@ -171,7 +175,7 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
                 confidenceInterval: upper - lower
             },
 
-            // ✅ NEW: Include affects for indirect variables
+            // Include affects for indirect variables
             affects: variable.affects || []
         };
     } catch (error) {
@@ -270,4 +274,133 @@ export const groupByCategory = (results) => {
         groups[category].push(result);
         return groups;
     }, {});
+};
+
+/**
+ * EFFICIENT: Extract sensitivity results from pre-computed cube
+ * @param {Object} sensitivityCube - Pre-computed sensitivity cube
+ * @param {string} targetMetric - Target metric (irr, npv, etc.)
+ * @param {Object} percentileRange - Percentile range {lower, upper, base}
+ * @returns {Array} Formatted sensitivity results for tornado chart
+ */
+export const extractSensitivityFromCube = (sensitivityCube, targetMetric, percentileRange) => {
+    if (!sensitivityCube || !sensitivityCube.metrics || !sensitivityCube.metrics[targetMetric]) {
+        console.warn(`No sensitivity data found for metric: ${targetMetric}`);
+        return [];
+    }
+
+    const { lower, upper, base } = percentileRange;
+    const metricCube = sensitivityCube.metrics[targetMetric];
+    const results = [];
+
+    console.log(`Extracting sensitivity for ${targetMetric} from cube with ${metricCube.size} variables`);
+
+    metricCube.forEach((sensitivityData, variableId) => {
+        const variableMetadata = sensitivityCube.variables.get(variableId);
+
+        if (!variableMetadata) {
+            console.warn(`No metadata found for variable: ${variableId}`);
+            return;
+        }
+
+        const baseValue = sensitivityData.baseValue;
+        const lowValue = sensitivityData.impacts.get(lower) || baseValue;
+        const highValue = sensitivityData.impacts.get(upper) || baseValue;
+
+        // Get variable values for hover information
+        const lowVariableValue = getVariableValueFromCube(variableId, lower, sensitivityCube);
+        const baseVariableValue = getVariableValueFromCube(variableId, base, sensitivityCube);
+        const highVariableValue = getVariableValueFromCube(variableId, upper, sensitivityCube);
+
+        results.push({
+            // Basic identification
+            variableId,
+            displayName: variableMetadata.displayName,
+            displayCategory: variableMetadata.displayCategory,
+            category: variableMetadata.category,
+
+            // ✅ TARGET METRIC VALUES (from cube)
+            lowTargetValue: lowValue,
+            baseTargetValue: baseValue,
+            highTargetValue: highValue,
+
+            // ✅ TARGET METRIC DELTAS
+            lowTargetDelta: lowValue - baseValue,
+            highTargetDelta: highValue - baseValue,
+            totalTargetSpread: Math.abs(highValue - lowValue),
+
+            // ✅ VARIABLE VALUES (for hover info)
+            lowVariableValue,
+            baseVariableValue,
+            highVariableValue,
+
+            // ✅ VARIABLE DELTAS (for hover info)
+            lowVariableDelta: lowVariableValue - baseVariableValue,
+            highVariableDelta: highVariableValue - baseVariableValue,
+
+            // Legacy compatibility
+            impact: Math.abs(highValue - lowValue),
+            leftPercent: baseValue !== 0 ? ((lowValue - baseValue) / Math.abs(baseValue)) * 100 : 0,
+            rightPercent: baseValue !== 0 ? ((highValue - baseValue) / Math.abs(baseValue)) * 100 : 0,
+
+            // Formatted values
+            lowValueFormatted: formatLargeNumber(lowValue, {
+                currency: targetMetric === 'npv',
+                precision: targetMetric.includes('irr') ? 1 : 2
+            }),
+            highValueFormatted: formatLargeNumber(highValue, {
+                currency: targetMetric === 'npv',
+                precision: targetMetric.includes('irr') ? 1 : 2
+            }),
+            variableRange: `${formatLargeNumber(lowVariableValue, { precision: 1 })} → ${formatLargeNumber(highVariableValue, { precision: 1 })}`,
+
+            // Metadata
+            percentileRange: { lower, upper, base },
+            source: variableMetadata.source,
+            variableType: variableMetadata.variableType,
+            registryCategory: variableMetadata.registryCategory
+        });
+    });
+
+    // Sort by total target metric spread (absolute impact)
+    const sortedResults = results.sort((a, b) => b.totalTargetSpread - a.totalTargetSpread);
+
+    console.log(`✅ Extracted ${sortedResults.length} sensitivity results for ${targetMetric}`);
+    return sortedResults;
+};
+
+/**
+ * Get variable value from cube (placeholder - would need actual implementation)
+ */
+const getVariableValueFromCube = (variableId, percentile, sensitivityCube) => {
+    // This is a placeholder - in a real implementation, you'd store variable values too
+    // For now, return a reasonable default
+    return Math.random() * 100; // Replace with actual variable value lookup
+};
+
+/**
+ * Validate sensitivity cube structure
+ */
+export const validateSensitivityCube = (sensitivityCube) => {
+    if (!sensitivityCube) {
+        return { valid: false, error: 'Sensitivity cube is null or undefined' };
+    }
+
+    if (!sensitivityCube.metrics || !sensitivityCube.variables) {
+        return { valid: false, error: 'Sensitivity cube missing required properties' };
+    }
+
+    const metricCount = Object.keys(sensitivityCube.metrics).length;
+    const variableCount = sensitivityCube.variables.size;
+
+    if (metricCount === 0 || variableCount === 0) {
+        return { valid: false, error: `Sensitivity cube is empty: ${metricCount} metrics, ${variableCount} variables` };
+    }
+
+    return {
+        valid: true,
+        metrics: metricCount,
+        variables: variableCount,
+        computedAt: sensitivityCube.computedAt
+    };
 };

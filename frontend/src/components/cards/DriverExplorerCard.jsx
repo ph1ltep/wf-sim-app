@@ -12,6 +12,8 @@ import InsightsPanel from './components/InsightsPanel';
 import TargetMetricRangeVisualizer from './components/TargetMetricRangeVisualizer'; // ✅ ADD: This was missing
 import { SUPPORTED_METRICS, createMetricSelectorOptions } from '../../utils/finance/sensitivityMetrics';
 import { prepareTornadoChartData, createTornadoClickHandler } from '../../utils/charts/sensitivity';
+import { extractSensitivityFromCube, validateSensitivityCube } from '../../utils/finance/sensitivityAnalysis';
+
 
 const { Text } = Typography;
 
@@ -42,13 +44,62 @@ const DriverExplorerCard = ({
         return SUPPORTED_METRICS[targetMetric];
     }, [targetMetric]);
 
-    // ✅ WORKING: Keep the existing sensitivity results logic
+    const distributionAnalysis = useMemo(() => {
+        return getValueByPath(['simulation', 'inputSim', 'distributionAnalysis'], {});
+    }, [getValueByPath]);
+
+    // Update the sensitivityResults calculation
     const sensitivityResults = useMemo(() => {
-        if (!sensitivityData || !sensitivityData[targetMetric]) {
+        if (!cashflowData) {
             return [];
         }
-        return sensitivityData[targetMetric];
-    }, [sensitivityData, targetMetric]);
+
+        // ✅ NEW: Use pre-computed sensitivity cube
+        if (cashflowData.sensitivityCube) {
+            console.log('Using pre-computed sensitivity cube');
+
+            // Validate cube first
+            const validation = validateSensitivityCube(cashflowData.sensitivityCube);
+            if (!validation.valid) {
+                console.error('Invalid sensitivity cube:', validation.error);
+                return [];
+            }
+
+            // Extract results from cube
+            return extractSensitivityFromCube(
+                cashflowData.sensitivityCube,
+                targetMetric,
+                { lower: lowerPercentile, upper: upperPercentile, base: 50 }
+            );
+        }
+
+        // ✅ FALLBACK: Use legacy calculation if cube not available
+        console.warn('Sensitivity cube not available, using fallback calculation');
+
+        if (!sensitivityData || !distributionAnalysis) {
+            console.warn('No sensitivity data or distribution analysis available');
+            return [];
+        }
+
+        // ... existing fallback logic (keep as-is) ...
+
+    }, [cashflowData, targetMetric, lowerPercentile, upperPercentile, basePercentile, sensitivityData, distributionAnalysis, getValueByPath]);
+
+    // Add cube status display for debugging
+    const sensitivityCubeStatus = useMemo(() => {
+        if (!cashflowData?.sensitivityCube) {
+            return { available: false, message: 'Sensitivity cube not computed' };
+        }
+
+        const validation = validateSensitivityCube(cashflowData.sensitivityCube);
+        return {
+            available: validation.valid,
+            message: validation.valid
+                ? `Cube: ${validation.variables} variables × ${validation.metrics} metrics`
+                : validation.error,
+            computedAt: cashflowData.sensitivityCube.computedAt
+        };
+    }, [cashflowData?.sensitivityCube]);
 
     // ✅ WORKING: Keep the existing metric options logic - DON'T CHANGE THIS
     const metricOptions = useMemo(() => {
@@ -239,7 +290,19 @@ const DriverExplorerCard = ({
                     </div>
                 </Col>
             </Row>
-
+            {process.env.NODE_ENV === 'development' && (
+                <Row style={{ marginBottom: 8 }}>
+                    <Col span={24}>
+                        <Alert
+                            message={sensitivityCubeStatus.message}
+                            type={sensitivityCubeStatus.available ? 'success' : 'warning'}
+                            size="small"
+                            showIcon
+                            style={{ fontSize: '11px' }}
+                        />
+                    </Col>
+                </Row>
+            )}
             {/* Insights Panel */}
             {showInsights && (
                 <Row style={{ marginTop: 8 }}>

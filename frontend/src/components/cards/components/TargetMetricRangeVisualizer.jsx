@@ -18,50 +18,57 @@ const TargetMetricRangeVisualizer = ({
         const percentileData = discoverPercentiles(getValueByPath);
         const availablePercentiles = percentileData.availableValues || [10, 25, 50, 75, 90];
 
-        // Get actual metric values from sensitivity results for the selected range
-        // Find the actual low and high values from the sensitivity analysis
-        const selectedLowValue = sensitivityResults.find(r => r.percentile === selectedRange.lower)?.lowValue;
-        const selectedHighValue = sensitivityResults.find(r => r.percentile === selectedRange.upper)?.highValue;
+        // ✅ NEW: Get target metric values from sensitivity results
+        // Find the min/max target metric values across all variables for scale
+        const allTargetValues = sensitivityResults.flatMap(r => [
+            r.lowTargetValue,
+            r.baseTargetValue,
+            r.highTargetValue
+        ]);
+        const minTargetValue = Math.min(...allTargetValues);
+        const maxTargetValue = Math.max(...allTargetValues);
+        const targetValueRange = maxTargetValue - minTargetValue;
 
-        // If we can't find the exact values, approximate from all available values
-        const allValues = sensitivityResults.flatMap(r => [r.lowValue, r.baseValue, r.highValue]);
-        const minValue = selectedLowValue || Math.min(...allValues);
-        const maxValue = selectedHighValue || Math.max(...allValues);
-        const valueRange = maxValue - minValue;
-
-        // Create markers for each percentile
+        // Create markers for each percentile using TARGET METRIC VALUES
         const markers = availablePercentiles.map(percentile => {
-            // Get the actual value for this percentile from sensitivity results
-            let value;
-            const exactResult = sensitivityResults.find(r => r.percentile === percentile);
+            // ✅ NEW: Get target metric value for this percentile
+            // We'll approximate based on the range - in a real implementation,
+            // you'd want to run the sensitivity analysis for each percentile
+            let targetValue;
 
-            if (exactResult) {
-                // Use the base value if we have exact data for this percentile
-                value = exactResult.baseValue;
+            if (percentile === selectedRange.lower) {
+                // Use the average low target value across all variables
+                targetValue = sensitivityResults.reduce((sum, r) => sum + r.lowTargetValue, 0) / sensitivityResults.length;
+            } else if (percentile === selectedRange.upper) {
+                // Use the average high target value across all variables
+                targetValue = sensitivityResults.reduce((sum, r) => sum + r.highTargetValue, 0) / sensitivityResults.length;
+            } else if (percentile === 50) {
+                // Use the average base target value across all variables
+                targetValue = sensitivityResults.reduce((sum, r) => sum + r.baseTargetValue, 0) / sensitivityResults.length;
             } else {
-                // Interpolate based on available data
-                // This is a simplified approach - in reality, you'd want more sophisticated interpolation
-                if (percentile <= selectedRange.lower) {
-                    value = minValue;
-                } else if (percentile >= selectedRange.upper) {
-                    value = maxValue;
+                // Linear interpolation for other percentiles
+                const baseValue = sensitivityResults.reduce((sum, r) => sum + r.baseTargetValue, 0) / sensitivityResults.length;
+                if (percentile < 50) {
+                    const lowValue = sensitivityResults.reduce((sum, r) => sum + r.lowTargetValue, 0) / sensitivityResults.length;
+                    const ratio = (50 - percentile) / (50 - selectedRange.lower);
+                    targetValue = baseValue - ((baseValue - lowValue) * ratio);
                 } else {
-                    // Linear interpolation between the selected range
-                    const ratio = (percentile - selectedRange.lower) / (selectedRange.upper - selectedRange.lower);
-                    value = minValue + (valueRange * ratio);
+                    const highValue = sensitivityResults.reduce((sum, r) => sum + r.highTargetValue, 0) / sensitivityResults.length;
+                    const ratio = (percentile - 50) / (selectedRange.upper - 50);
+                    targetValue = baseValue + ((highValue - baseValue) * ratio);
                 }
             }
 
-            // Position based on actual value relative to our display range
-            const position = valueRange > 0 ? ((value - minValue) / valueRange) * 100 : 50;
+            // Position based on target metric value relative to our display range
+            const position = targetValueRange > 0 ? ((targetValue - minTargetValue) / targetValueRange) * 100 : 50;
 
             const isSelected = percentile === selectedRange.lower || percentile === selectedRange.upper;
             const isBaseline = percentile === 50;
 
             return {
                 percentile,
-                value,
-                position: Math.max(0, Math.min(100, position)), // Clamp between 0-100
+                value: targetValue, // ✅ NOW: This is the target metric value
+                position: Math.max(0, Math.min(100, position)),
                 isSelected,
                 isBaseline
             };
@@ -77,15 +84,15 @@ const TargetMetricRangeVisualizer = ({
             upperMarker,
             isCurrency: metricConfig.units === 'currency',
             metricLabel: metricConfig.label,
-            minValue,
-            maxValue,
-            valueRange
+            minTargetValue,
+            maxTargetValue,
+            targetValueRange
         };
     }, [sensitivityResults, metricConfig, selectedRange, getValueByPath]);
 
     if (!visualData) return null;
 
-    const { markers, lowerMarker, upperMarker, isCurrency, metricLabel, minValue, maxValue } = visualData;
+    const { markers, lowerMarker, upperMarker, isCurrency, metricLabel, minTargetValue, maxTargetValue } = visualData;
 
     // Container padding to ensure labels fit
     const containerPadding = 40;
@@ -117,10 +124,10 @@ const TargetMetricRangeVisualizer = ({
                 marginBottom: 8
             }}>
                 <Text style={{ fontSize: '10px', color: '#8c8c8c' }}>
-                    {formatLargeNumber(minValue, { currency: isCurrency, precision: 0 })}
+                    {formatLargeNumber(minTargetValue, { currency: isCurrency, precision: 1 })}
                 </Text>
                 <Text style={{ fontSize: '10px', color: '#8c8c8c' }}>
-                    {formatLargeNumber(maxValue, { currency: isCurrency, precision: 0 })}
+                    {formatLargeNumber(maxTargetValue, { currency: isCurrency, precision: 1 })}
                 </Text>
             </div>
 
@@ -131,7 +138,7 @@ const TargetMetricRangeVisualizer = ({
                 padding: `0 ${containerPadding}px`,
                 marginTop: 8
             }}>
-                {/* Main range bar - thicker and more prominent */}
+                {/* Main range bar */}
                 <div style={{
                     position: 'absolute',
                     top: 35,
@@ -181,7 +188,7 @@ const TargetMetricRangeVisualizer = ({
                                 P{percentile}
                             </Text>
 
-                            {/* Marker dot - positioned within the bar */}
+                            {/* Marker dot */}
                             <div style={{
                                 width: markerSize,
                                 height: markerSize,
@@ -202,7 +209,7 @@ const TargetMetricRangeVisualizer = ({
                                 transition: 'all 0.2s ease'
                             }} />
 
-                            {/* Value label below */}
+                            {/* Target metric value label below */}
                             <Text style={{
                                 fontSize: '9px',
                                 color: '#595959',
@@ -214,7 +221,7 @@ const TargetMetricRangeVisualizer = ({
                                 borderRadius: 2,
                                 border: '1px solid #f0f0f0'
                             }}>
-                                {formatLargeNumber(value, { currency: isCurrency, precision: 0 })}
+                                {formatLargeNumber(value, { currency: isCurrency, precision: 1 })}
                             </Text>
                         </div>
                     );
@@ -236,7 +243,7 @@ const TargetMetricRangeVisualizer = ({
                         <Text style={{ fontWeight: 600, color: '#1890ff', marginLeft: 4 }}>
                             {formatLargeNumber(Math.abs(upperMarker.value - lowerMarker.value), {
                                 currency: isCurrency,
-                                precision: 0
+                                precision: 1
                             })} spread
                         </Text>
                     </Text>

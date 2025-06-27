@@ -16,6 +16,7 @@ import {
 import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
 import { SENSITIVITY_SOURCE_REGISTRY, discoverAllSensitivityVariables } from './SensitivityRegistry';
 import { SUPPORTED_METRICS } from '../utils/finance/sensitivityMetrics';
+import { validateSensitivityCube } from '../utils/finance/sensitivityAnalysis';
 
 
 const CashflowContext = createContext();
@@ -337,11 +338,18 @@ export const CashflowProvider = ({ children }) => {
                         );
                         if (transformedData) {
                             setCashflowData(transformedData);
+
+                            // Log sensitivity cube status
+                            if (transformedData.sensitivityCube) {
+                                const validation = validateSensitivityCube(transformedData.sensitivityCube);
+                                console.log('✅ Sensitivity cube status:', validation);
+                            }
+
                             message.success('Cashflow data refreshed successfully');
                         } else {
                             throw new Error('Transform returned no data');
                         }
-                        setRefreshStage('sensitivity'); // NEW: Move to sensitivity stage
+                        setRefreshStage('complete'); // Skip old sensitivity stage
                         break;
 
                     case 'sensitivity':

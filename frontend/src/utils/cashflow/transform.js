@@ -2,6 +2,7 @@
 import { applyTransformer } from './transformers';
 import { applyMultipliers } from './multipliers';
 import { enhancedFinanceMetrics } from '../financingMetrics';
+import { computeSensitivityCube } from './sensitivityCube';
 
 /**
  * Get the selected percentile for a source based on strategy
@@ -478,9 +479,32 @@ export const transformScenarioToCashflow = async (
     const freshScenarioData = getFreshScenarioData();
     const financeMetrics = enhancedFinanceMetrics(aggregations, availablePercentiles, freshScenarioData, lineItems);
 
-    const result = { metadata, lineItems, aggregations, financeMetrics };
+    // ✅ NEW: Compute sensitivity cube
+    console.log('🧮 Computing sensitivity cube...');
+    let sensitivityCube = null;
+    try {
+        sensitivityCube = await computeSensitivityCube({
+            aggregations,
+            financeMetrics,
+            availablePercentiles,
+            scenarioData: freshScenarioData,
+            getValueByPath
+        });
+        console.log('✅ Sensitivity cube computed successfully');
+    } catch (error) {
+        console.error('❌ Failed to compute sensitivity cube:', error);
+        // Continue without sensitivity cube - graceful degradation
+    }
 
-    console.log(`✅ Enhanced transformation complete: ${lineItems.length} items, multi-percentile support enabled`);
+    const result = {
+        metadata,
+        lineItems,
+        aggregations,
+        financeMetrics,
+        sensitivityCube // ✅ NEW: Add sensitivity cube to result
+    };
+
+    console.log(`✅ Enhanced transformation complete: ${lineItems.length} items, multi-percentile support enabled, sensitivity cube: ${sensitivityCube ? 'computed' : 'failed'}`);
 
     return result;
 };
