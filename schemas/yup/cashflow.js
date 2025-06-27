@@ -126,40 +126,31 @@ const CashflowSourceRegistrySchema = Yup.object().shape({
     revenues: Yup.array().of(RegistrySourceSchema).default([])
 });
 
-const SensitivitySourceRegistrySchema = Yup.object().shape({
-    technical: Yup.array().of(RegistrySourceSchema).optional(),
-    financial: Yup.array().of(RegistrySourceSchema).optional(),
-    operational: Yup.array().of(RegistrySourceSchema).optional(),
-    multipliers: Yup.array().of(RegistrySourceSchema).optional() // Support multipliers if needed
+/**
+ * Schema for sensitivity dependency relationships
+ */
+const SensitivityDependencySchema = Yup.object().shape({
+    sourceId: Yup.string().required('Affected source ID is required'),
+    impactType: Yup.string()
+        .oneOf(['multiplicative', 'additive', 'recalculation', 'time_series_modifier'])
+        .default('multiplicative')
 });
 
 /**
- * Schema for sensitivity source entries
- * Extends base RegistrySourceSchema with sensitivity-specific properties
+ * Enhanced sensitivity source schema - extends RegistrySourceSchema
+ * Adds dependencies for indirect variable relationships
  */
-const SensitivitySourceSchema = Yup.object().shape({
-    id: Yup.string().required('Source ID is required'),
-    displayName: Yup.string().optional(),
-    description: Yup.string().required('Source description is required'),
-    category: Yup.string().required('Source category is required'),
-    hasPercentiles: Yup.boolean().default(false),
-    path: Yup.array().of(Yup.string()).required('Source path is required'),
-    affects: Yup.array().of(Yup.string()).optional(), // Array of CASHFLOW_SOURCE_REGISTRY IDs
-    multipliers: Yup.array().of(Yup.object().shape({
-        id: Yup.string().required('Multiplier ID is required'),
-        operation: Yup.string().oneOf(['multiply', 'compound', 'simple']).required('Operation is required'),
-        baseYear: Yup.number().default(1)
-    })).default([]),
-    data: Yup.object().shape({
-        units: Yup.string().optional(),
-        impactType: Yup.string().oneOf(['multiplicative', 'additive', 'recalculation', 'time_series_modifier']).optional()
+const SensitivitySourceSchema = RegistrySourceSchema.clone().shape({
+    dependencies: Yup.object().shape({
+        affects: Yup.array().of(SensitivityDependencySchema).optional()
     }).optional()
 });
 
 /**
- * Schema for SENSITIVITY_SOURCE_REGISTRY structure
+ * Updated sensitivity registry schema
  */
 const SensitivityRegistrySchema = Yup.object().shape({
+    data: RegistryDataSchema.optional(),
     technical: Yup.array().of(SensitivitySourceSchema).optional(),
     financial: Yup.array().of(SensitivitySourceSchema).optional(),
     operational: Yup.array().of(SensitivitySourceSchema).optional()
@@ -179,6 +170,8 @@ const validateSensitivityRegistry = async (registry) => {
     }
 };
 
+
+
 module.exports = {
     SimplifiedCashflowDataSourceSchema,
     SimplifiedLineItemSchema,
@@ -189,7 +182,8 @@ module.exports = {
     CashflowSourceRegistrySchema,
     RegistrySourceSchema,
     RegistryDataSchema,
-    SensitivitySourceSchema,
-    SensitivityRegistrySchema,
+    SensitivityDependencySchema,        // ✅ NEW
+    SensitivitySourceSchema,            // ✅ NEW
+    SensitivityRegistrySchema,          // ✅ UPDATED
     validateSensitivityRegistry
 };

@@ -14,7 +14,7 @@ const InsightsPanel = ({
     targetMetric,
     highlightedDriver,
     confidenceLevel,
-    onDriverSelect // Add this prop for handling driver clicks
+    onDriverSelect
 }) => {
     // Generate insights from sensitivity results
     const insights = useMemo(() => {
@@ -28,7 +28,7 @@ const InsightsPanel = ({
 
         // Categorize by variable type
         const byType = sortedResults.reduce((acc, result) => {
-            const type = result.variableType || 'unknown';
+            const type = result.category || 'unknown'; // ✅ FIXED: Use category
             if (!acc[type]) acc[type] = [];
             acc[type].push(result);
             return acc;
@@ -42,10 +42,10 @@ const InsightsPanel = ({
 
         return {
             topDrivers: topDrivers.map(driver => ({
-                name: driver.variable,
-                impact: `${driver.totalSpread.toFixed(1)}%`, // Use percentage spread
-                type: driver.variableType || driver.category,
-                variableId: driver.variableId
+                id: driver.id, // ✅ FIXED: Use id
+                displayName: driver.displayName, // ✅ FIXED: Use displayName
+                impact: `${driver.totalSpread.toFixed(1)}%`,
+                type: driver.category || 'unknown' // ✅ FIXED: Use category
             })),
             summary: {
                 totalVariables: sensitivityResults.length,
@@ -65,7 +65,6 @@ const InsightsPanel = ({
     }
 
     const { topDrivers, summary } = insights;
-    const colors = ['#ff4d4f', '#faad14', '#52c41a']; // Red, Orange, Green for top 3
 
     return (
         <Card size="small" title="Key Insights" style={{ marginTop: 0 }}>
@@ -82,7 +81,7 @@ const InsightsPanel = ({
 
                             return (
                                 <div
-                                    key={driver.variableId}
+                                    key={driver.id} // ✅ FIXED: Use id as key
                                     style={{
                                         padding: '6px 8px',
                                         background: '#fafafa',
@@ -91,8 +90,10 @@ const InsightsPanel = ({
                                         borderLeft: `4px solid ${driverColor}`,
                                         display: 'flex',
                                         justifyContent: 'space-between',
-                                        alignItems: 'center'
+                                        alignItems: 'center',
+                                        cursor: 'pointer'
                                     }}
+                                    onClick={() => onDriverSelect && onDriverSelect(driver.id)}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                                         <Text style={{
@@ -104,7 +105,7 @@ const InsightsPanel = ({
                                             #{index + 1}
                                         </Text>
                                         <Text style={{ fontSize: '12px' }}>
-                                            {driver.name}
+                                            {driver.displayName} {/* ✅ FIXED: Use displayName */}
                                         </Text>
                                     </div>
                                     <Text strong style={{ fontSize: '12px', color: driverColor }}>
@@ -132,8 +133,8 @@ const InsightsPanel = ({
                                             background: categoryColor,
                                             borderRadius: 2
                                         }} />
-                                        <Text style={{ fontSize: '10px', color: '#595959' }}>
-                                            {count} {type}
+                                        <Text style={{ fontSize: '10px', color: '#8c8c8c' }}>
+                                            {type} ({count})
                                         </Text>
                                     </div>
                                 );
@@ -142,39 +143,38 @@ const InsightsPanel = ({
                     </div>
                 </Col>
 
-                {/* Right side - Summary KPIs unchanged */}
+                {/* Right side - Summary Statistics */}
                 <Col span={10}>
                     <Text strong style={{ fontSize: '13px', marginBottom: 8, display: 'block' }}>
                         Analysis Summary
                     </Text>
-                    <Row gutter={[12, 8]}>
+                    <Row gutter={[8, 8]}>
                         <Col span={12}>
                             <Statistic
                                 title="Variables"
                                 value={summary.totalVariables}
-                                valueStyle={{ fontSize: 16, fontWeight: 600 }}
-                            />
-                        </Col>
-                        <Col span={12}>
-                            <Statistic
-                                title="Confidence"
-                                value={confidenceLevel}
-                                suffix="%"
-                                valueStyle={{ fontSize: 16, fontWeight: 600 }}
+                                valueStyle={{ fontSize: '16px', color: '#1890ff' }}
                             />
                         </Col>
                         <Col span={12}>
                             <Statistic
                                 title="Max Impact"
                                 value={summary.maxSpread}
-                                valueStyle={{ fontSize: 14, color: '#ff4d4f' }}
+                                valueStyle={{ fontSize: '16px', color: '#ff4d4f' }}
                             />
                         </Col>
                         <Col span={12}>
                             <Statistic
                                 title="Avg Impact"
                                 value={summary.avgSpread}
-                                valueStyle={{ fontSize: 14, color: '#1890ff' }}
+                                valueStyle={{ fontSize: '16px', color: '#52c41a' }}
+                            />
+                        </Col>
+                        <Col span={12}>
+                            <Statistic
+                                title="Confidence"
+                                value={`${confidenceLevel}%`}
+                                valueStyle={{ fontSize: '16px', color: '#722ed1' }}
                             />
                         </Col>
                     </Row>

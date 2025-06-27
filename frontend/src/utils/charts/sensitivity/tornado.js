@@ -46,8 +46,8 @@ export const prepareTornadoChartData = ({
     const leftData = {
         type: 'bar',
         orientation: 'h',
-        x: sortedResults.map(r => r.leftPercent / 100), // Convert to decimal for proper percentage display
-        y: sortedResults.map(r => r.variable),
+        x: sortedResults.map(r => r.leftPercent / 100),
+        y: sortedResults.map(r => r.displayName), // ✅ FIXED: Use displayName
         name: 'Downside',
         marker: {
             color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.7)')),
@@ -56,46 +56,43 @@ export const prepareTornadoChartData = ({
         opacity: opacity,
         customdata: sortedResults,
         hovertemplate:
-            '<b>%{customdata.variable}</b><br>' +
+            '<b>%{customdata.displayName}</b><br>' + // ✅ FIXED: Use displayName
             'Δ%: <b>%{customdata.leftPercent:.1f}%</b><br>' +
-            'Δ: <b>%{customdata.leftDeltaWithUnits}</b><br>' +
-            'Absolute: <b>%{customdata.lowValueWithUnits}</b><br>' +
-            '%{customdata.variable}: %{customdata.variableRangeWithUnits}<br>' +
+            'Δ: <b>%{customdata.leftDelta:.1f}</b><br>' +
+            'Absolute: <b>%{customdata.lowValueFormatted}</b><br>' +
+            'Range: %{customdata.variableRange}<br>' +
             '<extra></extra>'
     };
 
     const rightData = {
         type: 'bar',
         orientation: 'h',
-        x: sortedResults.map(r => r.rightPercent / 100), // Convert to decimal for proper percentage display
-        y: sortedResults.map(r => r.variable),
+        x: sortedResults.map(r => r.rightPercent / 100),
+        y: sortedResults.map(r => r.displayName), // ✅ FIXED: Use displayName
         name: 'Upside',
         marker: {
-            color: colors,
+            color: colors.map(color => color.replace('rgb', 'rgba').replace(')', ', 0.7)')),
             line: { color: '#fff', width: 1 }
         },
         opacity: opacity,
         customdata: sortedResults,
         hovertemplate:
-            '<b>%{customdata.variable}</b><br>' +
+            '<b>%{customdata.displayName}</b><br>' + // ✅ FIXED: Use displayName
             'Δ%: <b>+%{customdata.rightPercent:.1f}%</b><br>' +
-            'Δ: <b>+%{customdata.rightDeltaWithUnits}</b><br>' +
-            'Absolute: <b>%{customdata.highValueWithUnits}</b><br>' +
-            '%{customdata.variable}: %{customdata.variableRangeWithUnits}<br>' +
+            'Δ: <b>+%{customdata.rightDelta:.1f}</b><br>' +
+            'Absolute: <b>%{customdata.highValueFormatted}</b><br>' +
+            'Range: %{customdata.variableRange}<br>' +
             '<extra></extra>'
     };
 
-    // Calculate dynamic height - more compact
+    // Rest of the function remains the same...
     const calculatedHeight = customHeight || Math.max(300, sortedResults.length * 30 + 100);
-
-    // Find the maximum absolute percentage for symmetric axis
     const maxPercent = Math.max(
         ...sortedResults.map(r => Math.max(Math.abs(r.leftPercent), Math.abs(r.rightPercent)))
     );
-    const axisRange = (maxPercent * 1.1) / 100; // Convert to decimal and add 10% padding
-
-    // Build axis titles
-    const yAxisTitle = showVariableCount ? `Variables (${sortedResults.length})` : 'Variables';
+    const axisRange = (maxPercent * 1.1) / 100;
+    const yAxisTitle = showVariableCount ?
+        `Variables (${sortedResults.length})` : 'Variables';
 
     const layout = {
         title: '',
@@ -116,25 +113,18 @@ export const prepareTornadoChartData = ({
             tickfont: { size: 10 }
         },
         height: calculatedHeight,
-        margin: { t: 10, b: 60, l: 140, r: 60 }, // More compact margins
+        margin: { t: 10, b: 40, l: 140, r: 60 }, // ✅ REDUCED: bottom margin from 60 to 40
         font: { size: 11 },
         barmode: 'overlay',
-        showlegend: true,
-        legend: {
-            orientation: 'h',
-            yanchor: 'bottom',
-            y: -0.15,
-            xanchor: 'center',
-            x: 0.5
-        },
+        showlegend: false, // ✅ REMOVED: Hide legend
         hovermode: 'closest',
         plot_bgcolor: 'white',
         paper_bgcolor: 'white',
-        bargap: 0.2 // Reduce spacing between bars
+        bargap: 0.2
     };
 
     const config = {
-        displayModeBar: false, // Remove plotly controls
+        displayModeBar: false,
         responsive: true
     };
 
@@ -144,7 +134,6 @@ export const prepareTornadoChartData = ({
         config
     };
 };
-
 
 /**
  * Create tornado chart click handler for variable highlighting
@@ -166,7 +155,7 @@ export const createTornadoClickHandler = (onVariableSelect, options = {}) => {
             const variableData = point.customdata;
 
             if (variableData && onVariableSelect) {
-                const variableId = variableData.variableId;
+                const variableId = variableData.id; // ✅ FIXED: Use id instead of variableId
                 onVariableSelect(enableToggle ? variableId : variableId, variableData, eventData);
             }
         }

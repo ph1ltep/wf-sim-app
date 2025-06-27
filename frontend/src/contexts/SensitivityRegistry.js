@@ -2,6 +2,13 @@
 // Fixed with proper .id references
 
 export const SENSITIVITY_SOURCE_REGISTRY = {
+    // ✅ ADD: Global data structure alignment with CashflowSourceRegistrySchema
+    data: {
+        projectLife: ['settings', 'general', 'projectLife'],
+        numWTGs: ['settings', 'project', 'windFarm', 'numWTGs'],
+        currency: ['settings', 'project', 'currency', 'local']
+    },
+
     technical: [
         {
             id: 'availability',
@@ -10,11 +17,13 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
             category: 'technical',
             hasPercentiles: true,
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'availability'],
-            affects: ['energyRevenue'], // References specific .id from CASHFLOW_SOURCE_REGISTRY
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'multiplicative'
+            transformer: null,
+            displayUnit: '%',
+            dependencies: {
+                affects: [
+                    { sourceId: 'energyRevenue', impactType: 'multiplicative' }
+                ]
             }
         },
         {
@@ -24,11 +33,13 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
             category: 'technical',
             hasPercentiles: true,
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability'],
-            affects: ['energyRevenue'], // References specific .id
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'multiplicative'
+            transformer: null,
+            displayUnit: '%',
+            dependencies: {
+                affects: [
+                    { sourceId: 'energyRevenue', impactType: 'multiplicative' }
+                ]
             }
         },
         {
@@ -38,11 +49,13 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
             category: 'technical',
             hasPercentiles: false,
             path: ['settings', 'project', 'windFarm', 'capacityFactor'],
-            affects: ['energyRevenue'],
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'multiplicative'
+            transformer: null,
+            displayUnit: '%',
+            dependencies: {
+                affects: [
+                    { sourceId: 'energyRevenue', impactType: 'multiplicative' }
+                ]
             }
         },
         {
@@ -52,70 +65,64 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
             category: 'technical',
             hasPercentiles: false,
             path: ['settings', 'project', 'windFarm', 'degradationRate'],
-            affects: ['energyRevenue'],
             multipliers: [],
-            data: {
-                units: '%/year',
-                impactType: 'time_series_modifier'
+            transformer: null,
+            displayUnit: '%/year',
+            dependencies: {
+                affects: [
+                    { sourceId: 'energyRevenue', impactType: 'multiplicative' }
+                ]
             }
         }
     ],
 
     financial: [
         {
-            id: 'costOfEquity',
-            displayName: 'Cost of Equity',
-            description: 'Cost of Equity',
-            category: 'financing',
+            id: 'debtTerm',
+            displayName: 'Debt Term',
+            description: 'Debt facility term length',
+            category: 'financial',
             hasPercentiles: false,
-            path: ['settings', 'modules', 'financing', 'costOfEquity'],
-            affects: ['equityReturns'], // Specific financing calculation IDs
+            path: ['settings', 'modules', 'financing', 'debt', 'term'],
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'recalculation'
-            }
-        },
-        {
-            id: 'debtRatio',
-            displayName: 'Debt Ratio',
-            description: 'Debt to Total Capital Ratio',
-            category: 'financing',
-            hasPercentiles: false,
-            path: ['settings', 'modules', 'financing', 'debtRatio'],
-            affects: ['debtService'],
-            multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'recalculation'
+            transformer: null,
+            displayUnit: 'years',
+            dependencies: {
+                affects: [
+                    { sourceId: 'debtService', impactType: 'recalculation' }
+                ]
             }
         },
         {
             id: 'interestRate',
-            displayName: 'Debt Interest Rate',
-            description: 'Debt Interest Rate',
-            category: 'financing',
-            hasPercentiles: false,
-            path: ['settings', 'modules', 'financing', 'interestRate'],
-            affects: ['debtService'],
+            displayName: 'Interest Rate',
+            description: 'Debt facility interest rate',
+            category: 'financial',
+            hasPercentiles: true,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'interestRate'],
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'recalculation'
+            transformer: null,
+            displayUnit: '%',
+            dependencies: {
+                affects: [
+                    { sourceId: 'debtService', impactType: 'multiplicative' }
+                ]
             }
         },
         {
-            id: 'taxRate',
-            displayName: 'Corp Tax Rate',
-            description: 'Corporate Tax Rate',
-            category: 'financing',
+            id: 'equityReturn',
+            displayName: 'Required Equity Return',
+            description: 'Target equity return threshold',
+            category: 'financial',
             hasPercentiles: false,
-            path: ['settings', 'modules', 'financing', 'taxRate'],
-            affects: ['taxShield'],
+            path: ['settings', 'modules', 'financing', 'equity', 'targetReturn'],
             multipliers: [],
-            data: {
-                units: '%',
-                impactType: 'recalculation'
+            transformer: null,
+            displayUnit: '%',
+            dependencies: {
+                affects: [
+                    { sourceId: 'discountRate', impactType: 'additive' }
+                ]
             }
         }
     ],
@@ -123,22 +130,24 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
     operational: [
         {
             id: 'insuranceCost',
-            displayName: 'Insurance Costs',
+            displayName: 'Insurance Cost',
             description: 'Annual Insurance Cost',
             category: 'operational',
             hasPercentiles: false,
             path: ['settings', 'project', 'costs', 'insurance'],
-            affects: ['insuranceCosts'], // Specific cost entry ID
             multipliers: [
                 {
                     id: 'insurance_escalation',
                     operation: 'compound',
-                    path: ['settings', 'modules', 'cost', 'insuranceEscalation']
+                    baseYear: 1
                 }
             ],
-            data: {
-                units: '$/year',
-                impactType: 'additive'
+            transformer: null,
+            displayUnit: '$/year',
+            dependencies: {
+                affects: [
+                    { sourceId: 'insuranceCosts', impactType: 'additive' }
+                ]
             }
         },
         {
@@ -148,29 +157,81 @@ export const SENSITIVITY_SOURCE_REGISTRY = {
             category: 'operational',
             hasPercentiles: false,
             path: ['settings', 'project', 'costs', 'landLease'],
-            affects: ['landLeaseCosts'],
             multipliers: [
                 {
                     id: 'lease_escalation',
                     operation: 'compound',
-                    path: ['settings', 'modules', 'cost', 'leaseEscalation']
+                    baseYear: 1
                 }
             ],
-            data: {
-                units: '$/year',
-                impactType: 'additive'
+            transformer: null,
+            displayUnit: '$/year',
+            dependencies: {
+                affects: [
+                    { sourceId: 'landLeaseCosts', impactType: 'additive' }
+                ]
+            }
+        },
+        {
+            id: 'oemServiceFees',
+            displayName: 'OEM Service Fees',
+            description: 'Original Equipment Manufacturer Service Contract Fees',
+            category: 'operational',
+            hasPercentiles: true,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'oemServiceCosts'],
+            multipliers: [
+                {
+                    id: 'escalationRate',
+                    operation: 'compound',
+                    baseYear: 1
+                }
+            ],
+            transformer: null,
+            displayUnit: '$/MW/year',
+            dependencies: {
+                affects: [
+                    { sourceId: 'contractFees', impactType: 'multiplicative' }
+                ]
+            }
+        },
+        {
+            id: 'majorRepairFrequency',
+            displayName: 'Major Repair Frequency',
+            description: 'Frequency of major component replacement events',
+            category: 'operational',
+            hasPercentiles: true,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'majorRepairEvents'],
+            multipliers: [],
+            transformer: null,
+            displayUnit: 'events/year',
+            dependencies: {
+                affects: [
+                    { sourceId: 'majorRepairs', impactType: 'multiplicative' }
+                ]
             }
         }
     ]
 };
 
+// frontend/src/contexts/SensitivityRegistry.js
+
 /**
- * Discover all variables with separate registry parameters
+ * Enhanced discovery function with debug tracing and simplified structure
  * @param {Object} cashflowRegistry - CASHFLOW_SOURCE_REGISTRY
- * @param {Object} sensitivityRegistry - SENSITIVITY_SOURCE_REGISTRY
+ * @param {Object} sensitivityRegistry - SENSITIVITY_SOURCE_REGISTRY  
  * @returns {Array} Combined array of all sensitivity variables
  */
 export const discoverAllSensitivityVariables = (cashflowRegistry, sensitivityRegistry) => {
+    // ✅ DEBUG: Add call tracing
+    const callId = Math.random().toString(36).substr(2, 9);
+    const startTime = performance.now();
+
+    console.log(`🔍 [${callId}] discoverAllSensitivityVariables() START`, {
+        cashflowRegistry: !!cashflowRegistry,
+        sensitivityRegistry: !!sensitivityRegistry,
+        caller: new Error().stack.split('\n')[2]?.trim()
+    });
+
     const variables = [];
 
     // Extract direct variables from CASHFLOW_SOURCE_REGISTRY
@@ -179,18 +240,16 @@ export const discoverAllSensitivityVariables = (cashflowRegistry, sensitivityReg
             if (cashflowRegistry[section]) {
                 cashflowRegistry[section].forEach(source => {
                     if (source.hasPercentiles) {
+                        // ✅ FIXED: Use displayName as primary, id as backup
                         variables.push({
                             id: source.id,
-                            label: source.displayName || source.description || source.id, // ✅ Use displayName
+                            displayName: source.displayName || source.id, // ✅ Always string
                             category: source.category,
                             path: source.path,
-                            hasPercentiles: true,
-                            variableType: section.slice(0, -1),
                             source: 'direct',
-                            registryCategory: section,
                             multipliers: source.multipliers || [],
-                            units: source.data?.units || '',
-                            displayCategory: source.category || section.slice(0, -1)
+                            displayUnit: source.displayUnit || '',
+                            transformer: source.transformer
                         });
                     }
                 });
@@ -204,20 +263,22 @@ export const discoverAllSensitivityVariables = (cashflowRegistry, sensitivityReg
             if (sensitivityRegistry[section]) {
                 sensitivityRegistry[section].forEach(source => {
                     if (source.hasPercentiles) {
+                        // ✅ NEW STRUCTURE: Use dependencies.affects
+                        const affects = source.dependencies?.affects || [];
+
                         variables.push({
                             id: source.id,
-                            label: source.displayName || source.description || source.id, // ✅ Use displayName
+                            displayName: source.displayName || source.id, // ✅ Always string
                             category: source.category,
                             path: source.path,
-                            hasPercentiles: true,
-                            variableType: source.category,
                             source: 'indirect',
-                            registryCategory: section,
-                            affects: source.affects || [],
                             multipliers: source.multipliers || [],
-                            units: source.data?.units || '',
-                            impactType: source.data?.impactType || 'multiplicative',
-                            displayCategory: source.category || section
+                            affects: affects.map(dep => ({
+                                sourceId: dep.sourceId,
+                                impactType: dep.impactType
+                            })),
+                            displayUnit: source.displayUnit || '',
+                            transformer: source.transformer
                         });
                     }
                 });
@@ -225,7 +286,24 @@ export const discoverAllSensitivityVariables = (cashflowRegistry, sensitivityReg
         });
     }
 
+    const endTime = performance.now();
+
+    // ✅ DEBUG: Show actual displayName values
+    console.log('🔍 Variable names debug:', variables.map(v => ({
+        id: v.id,
+        displayName: v.displayName,
+        nameType: typeof v.displayName,
+        isObject: typeof v.displayName === 'object' ? JSON.stringify(v.displayName) : 'not object',
+        path: v.path // ✅ ADD: Show the path being used
+    })));
+
+    console.log(`✅ [${callId}] discoverAllSensitivityVariables() END`, {
+        duration: `${(endTime - startTime).toFixed(2)}ms`,
+        totalVariables: variables.length,
+        directCount: variables.filter(v => v.source === 'direct').length,
+        indirectCount: variables.filter(v => v.source === 'indirect').length,
+        variableNames: variables.map(v => v.displayName) // ✅ Show displayNames
+    });
+
     return variables;
 };
-
-// Rest of utility functions remain the same...

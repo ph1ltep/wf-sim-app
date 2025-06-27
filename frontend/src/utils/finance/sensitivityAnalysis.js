@@ -54,7 +54,7 @@ const getTimeSeriesAtPercentile = (variable, percentile, distributionAnalysis, g
         // No distribution exists - check for fixed value
         const fixedValue = getValueByPath(variable.path);
         if (fixedValue == null) {
-            console.log(`Skipping variable ${variableName}: no distribution and no fixed value found`);
+            //console.log(`Skipping variable ${variableName}: no distribution and no fixed value found`);
             return null;
         }
 
@@ -78,8 +78,7 @@ const getTimeSeriesAtPercentile = (variable, percentile, distributionAnalysis, g
 };
 
 /**
- * Calculate impact for a single variable
- * SIMPLIFIED - Clean logic with proper fixed value handling
+ * Calculate impact for a single variable - OPTIMIZED for new structure
  */
 const calculateVariableImpact = (variable, targetMetric, percentileRange, distributionAnalysis, getValueByPath) => {
     const { lower, upper, base } = percentileRange;
@@ -104,9 +103,9 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
             return null;
         }
 
-        // Skip if dealing with fixed values - sensitivity analysis not applicable
+        // Skip if dealing with fixed values
         if (baseTimeSeries.isFixed || lowTimeSeries.isFixed || highTimeSeries.isFixed) {
-            console.log(`Skipping variable ${variable.id}: contains fixed values, sensitivity analysis not applicable`);
+            console.log(`Skipping variable ${variable.id}: contains fixed values`);
             return null;
         }
 
@@ -115,7 +114,7 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
         const lowWithMultipliers = applyMultipliers(lowTimeSeries, variable.multipliers, getValueByPath);
         const highWithMultipliers = applyMultipliers(highTimeSeries, variable.multipliers, getValueByPath);
 
-        // Then aggregate to get final metric values
+        // Aggregate to get final metric values
         const baseValue = aggregateTimeSeries(baseWithMultipliers, aggregationMethod, aggregationOptions);
         const lowValue = aggregateTimeSeries(lowWithMultipliers, aggregationMethod, aggregationOptions);
         const highValue = aggregateTimeSeries(highWithMultipliers, aggregationMethod, aggregationOptions);
@@ -125,62 +124,44 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
             return null;
         }
 
-        // Calculate percentage deviations from baseline (tornado chart data)
+        // Calculate percentage deviations
         let leftPercent = 0;
         let rightPercent = 0;
 
-        if (Math.abs(baseValue) > 0.001) { // Avoid division by near-zero
+        if (Math.abs(baseValue) > 0.001) {
             leftPercent = ((lowValue - baseValue) / Math.abs(baseValue)) * 100;
             rightPercent = ((highValue - baseValue) / Math.abs(baseValue)) * 100;
         }
 
-        // Total spread for impact ranking
         const totalSpread = Math.abs(leftPercent) + Math.abs(rightPercent);
 
-        // Get variable display name and units
-        const variableName = variable.id; // ✅ Just use the ID, simple and clean
-        const variableUnits = variable.displayUnit || variable.data?.units || '';
-        const metricUnits = metricConfig.units === 'currency' ? '$' : '';
-
-        // Format with proper units
-        const formatWithVariableUnits = (value) => {
-            const formatted = formatLargeNumber(value, { precision: 1 });
-            return variableUnits ? `${formatted} ${variableUnits}` : formatted;
-        };
-
-        const formatWithMetricUnits = (value) => {
-            const formatted = formatLargeNumber(value, { currency: metricConfig.units === 'currency', precision: 1 });
-            return formatted;
-        };
-
-        const leftDelta = lowValue - baseValue;
-        const rightDelta = highValue - baseValue;
-
+        // ✅ FIXED: Use displayName consistently, clean return structure
         return {
-            variableId: variable.id,
-            variable: variableName,
+            // Core identification
+            id: variable.id,
+            displayName: variable.displayName, // ✅ Always string from discovery
             category: variable.category,
-            displayCategory: variable.displayCategory || variable.category,
             source: variable.source,
-            variableType: variable.variableType,
 
-            // Values
+            // Values (clean numeric)
             baseValue,
             lowValue,
             highValue,
             impact: Math.abs(highValue - lowValue),
 
-            // Tornado chart data
+            // Tornado chart data (clean numeric)
             leftPercent,
             rightPercent,
             totalSpread,
 
-            // NEW METHOD ONLY - Formatted values with proper units for hover
-            leftDeltaWithUnits: formatWithMetricUnits(leftDelta),
-            rightDeltaWithUnits: formatWithMetricUnits(rightDelta),
-            lowValueWithUnits: formatWithMetricUnits(lowValue),
-            highValueWithUnits: formatWithMetricUnits(highValue),
-            variableRangeWithUnits: `${formatWithVariableUnits(Number(lowTimeSeries[0]?.value || 0))} → ${formatWithVariableUnits(Number(highTimeSeries[0]?.value || 0))}`,
+            // Deltas (clean numeric, no "WithUnits")
+            leftDelta: lowValue - baseValue,
+            rightDelta: highValue - baseValue,
+
+            // Formatted display values (simple strings)
+            lowValueFormatted: formatLargeNumber(lowValue, { currency: metricConfig.units === 'currency', precision: 1 }),
+            highValueFormatted: formatLargeNumber(highValue, { currency: metricConfig.units === 'currency', precision: 1 }),
+            variableRange: `${formatLargeNumber(Number(lowTimeSeries[0]?.value || 0), { precision: 1 })} → ${formatLargeNumber(Number(highTimeSeries[0]?.value || 0), { precision: 1 })}`,
 
             // Metadata
             percentileRange: {
@@ -188,7 +169,10 @@ const calculateVariableImpact = (variable, targetMetric, percentileRange, distri
                 base,
                 upper,
                 confidenceInterval: upper - lower
-            }
+            },
+
+            // ✅ NEW: Include affects for indirect variables
+            affects: variable.affects || []
         };
     } catch (error) {
         console.error(`Error calculating impact for ${variable.id}:`, error);

@@ -15,22 +15,21 @@ export const generateSmartColors = (sensitivityResults, highlightedDriver) => {
     const variableCount = sensitivityResults.length;
 
     return sensitivityResults.map(result => {
-        // Highlighted variable gets primary color
-        if (result.variableId === highlightedDriver) {
+        // ✅ FIXED: Use result.id instead of result.variableId
+        if (result.id === highlightedDriver) {
             return getSemanticColor('primary', 7);
         }
 
         // For 8 or fewer variables, use category-based colors
         if (variableCount <= 8) {
-            if (result.variableType === 'multiplier') {
-                return getCategoryColorScheme(result.category);
-            }
-            return getCategoryColorScheme(result.variableType);
+            // ✅ FIXED: Use result.category instead of result.variableType
+            return getCategoryColorScheme(result.category);
         }
 
         // For more than 8 variables, use generated palette
         const palette = generateChartColorPalette(sensitivityResults.length);
-        const index = sensitivityResults.findIndex(r => r.variableId === result.variableId);
+        // ✅ FIXED: Use result.id instead of result.variableId
+        const index = sensitivityResults.findIndex(r => r.id === result.id);
         return palette[index] || getSemanticColor('neutral', 6);
     });
 };
@@ -65,7 +64,8 @@ export const generateHighlightOpacity = (sensitivityResults, highlightedDriver, 
     const { highlightOpacity = 1.0, defaultOpacity = 0.8 } = options;
 
     return sensitivityResults.map(result =>
-        result.variableId === highlightedDriver ? highlightOpacity : defaultOpacity
+        // ✅ FIXED: Use result.id instead of result.variableId
+        result.id === highlightedDriver ? highlightOpacity : defaultOpacity
     );
 };
 

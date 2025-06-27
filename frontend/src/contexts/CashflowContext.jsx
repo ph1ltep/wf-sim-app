@@ -14,7 +14,8 @@ import {
     isConstructionSourcesComplete
 } from '../utils/dependencies/checkFunctions';
 import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
-import { SENSITIVITY_SOURCE_REGISTRY } from './SensitivityRegistry';
+import { SENSITIVITY_SOURCE_REGISTRY, discoverAllSensitivityVariables } from './SensitivityRegistry';
+import { SUPPORTED_METRICS } from '../utils/finance/sensitivityMetrics';
 
 
 const CashflowContext = createContext();
@@ -42,6 +43,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     multipliers: [
         {
             id: 'escalationRate',
+            displayName: 'Escalation Rate',
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate'],
             category: 'escalation',
             hasPercentiles: true,
@@ -50,6 +52,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
         {
             id: 'electricityPrice',
+            displayName: 'Electricity Price',
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice'],
             category: 'pricing',
             hasPercentiles: true,
@@ -220,7 +223,7 @@ export const CashflowProvider = ({ children }) => {
 
     // State management
     const [cashflowData, setCashflowData] = useState(null);
-    const [sensitivityData, setSensitivityData] = useState(null); // NEW: Sensitivity data state
+    const [sensitivityData, setSensitivityData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [transformError, setTransformError] = useState(null);
 
@@ -342,34 +345,50 @@ export const CashflowProvider = ({ children }) => {
                         break;
 
                     case 'sensitivity':
-                        // NEW: Compute sensitivity analysis
                         console.log('🔄 Computing sensitivity analysis...');
                         try {
                             const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
 
                             if (distributionAnalysis && scenarioData) {
-                                // Create simulation config for sensitivity analysis
                                 const simulationConfig = {
-                                    percentiles: availablePercentiles,
+                                    percentiles: getValueByPath(['settings', 'simulation', 'percentiles']) || [],
                                     primaryPercentile: primaryPercentile
                                 };
 
-                                const sensitivityResults = calculateSensitivityAnalysis({
-                                    cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
-                                    sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
-                                    targetMetric: 'npv', // Default metric for context computation
-                                    simulationConfig,
-                                    distributionAnalysis,
-                                    getValueByPath
-                                });
+                                // ✅ ONLY FIX: Use SUPPORTED_METRICS instead of hardcoded array
+                                const sensitivityResults = {};
+                                const supportedMetrics = Object.keys(SUPPORTED_METRICS);
+
+                                for (const metric of supportedMetrics) {
+                                    try {
+                                        const results = calculateSensitivityAnalysis({
+                                            cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
+                                            sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
+                                            targetMetric: metric,
+                                            simulationConfig,
+                                            distributionAnalysis,
+                                            getValueByPath
+                                        });
+
+                                        sensitivityResults[metric] = results;
+                                        console.log(`✅ ${metric.toUpperCase()} sensitivity: ${results.length} variables`);
+                                    } catch (error) {
+                                        console.error(`❌ Error calculating sensitivity for ${metric}:`, error);
+                                        sensitivityResults[metric] = [];
+                                    }
+                                }
 
                                 setSensitivityData({
-                                    baseData: sensitivityResults,
-                                    computedAt: new Date().toISOString(),
-                                    simulationConfig,
-                                    distributionAnalysis
+                                    ...sensitivityResults,
+                                    metadata: {
+                                        computedAt: new Date().toISOString(),
+                                        simulationConfig,
+                                        totalVariables: Object.values(sensitivityResults).reduce((sum, results) => sum + results.length, 0),
+                                        metrics: supportedMetrics
+                                    }
                                 });
-                                console.log('✅ Sensitivity analysis computed:', sensitivityResults.length, 'variables');
+
+                                console.log('✅ Sensitivity analysis computed for metrics:', supportedMetrics.join(', '));
                             } else {
                                 console.warn('⚠️ No distribution analysis available for sensitivity computation');
                                 setSensitivityData(null);
@@ -380,7 +399,126 @@ export const CashflowProvider = ({ children }) => {
                         }
                         setRefreshStage('complete');
                         break;
+                        // ✅ FIXED: Compute sensitivity analysis following established pattern
+                        console.log('🔄 Computing sensitivity analysis...');
+                        try {
+                            const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
 
+                            if (distributionAnalysis && scenarioData) {
+                                // ✅ FIXED: Use proper percentile objects from scenario
+                                const simulationConfig = {
+                                    percentiles: getValueByPath(['settings', 'simulation', 'percentiles']) || [],
+                                    primaryPercentile: primaryPercentile
+                                };
+
+                                // ✅ DEBUG: Verify the fix
+                                console.log('🔍 Simulation config debug:', {
+                                    percentiles: simulationConfig.percentiles.map(p => ({ value: p.value, hasValue: !!p.value })),
+                                    primaryPercentile: simulationConfig.primaryPercentile
+                                });
+
+                                // ✅ COMPUTE: Multiple metrics for comprehensive analysis
+                                const sensitivityResults = {};
+                                const targetMetrics = ['npv', 'irr', 'lcoe']; // Can be expanded
+
+                                for (const metric of targetMetrics) {
+                                    try {
+                                        const results = calculateSensitivityAnalysis({
+                                            cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
+                                            sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
+                                            targetMetric: metric,
+                                            simulationConfig,
+                                            distributionAnalysis,
+                                            getValueByPath
+                                        });
+
+                                        sensitivityResults[metric] = results;
+                                        console.log(`✅ ${metric.toUpperCase()} sensitivity: ${results.length} variables`);
+                                    } catch (error) {
+                                        console.error(`❌ Error calculating sensitivity for ${metric}:`, error);
+                                        sensitivityResults[metric] = [];
+                                    }
+                                }
+
+                                // ✅ STORE: Set sensitivity data with metadata
+                                setSensitivityData({
+                                    ...sensitivityResults, // npv: [...], irr: [...], lcoe: [...]
+                                    metadata: {
+                                        computedAt: new Date().toISOString(),
+                                        simulationConfig,
+                                        totalVariables: Object.values(sensitivityResults).reduce((sum, results) => sum + results.length, 0),
+                                        metrics: targetMetrics
+                                    }
+                                });
+
+                                console.log('✅ Sensitivity analysis computed for metrics:', targetMetrics.join(', '));
+                            } else {
+                                console.warn('⚠️ No distribution analysis available for sensitivity computation');
+                                setSensitivityData(null);
+                            }
+                        } catch (error) {
+                            console.error('❌ Sensitivity computation failed:', error);
+                            setSensitivityData(null);
+                        }
+                        setRefreshStage('complete');
+                        break;
+                        // ✅ FIXED: Compute sensitivity analysis following established pattern
+                        console.log('🔄 Computing sensitivity analysis...');
+                        try {
+                            const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
+
+                            if (distributionAnalysis && scenarioData) {
+                                // Create simulation config for sensitivity analysis
+                                const simulationConfig = {
+                                    percentiles: getValueByPath(['settings', 'simulation', 'percentiles']) || [],
+                                    primaryPercentile: primaryPercentile
+                                };
+
+                                // ✅ COMPUTE: Multiple metrics for comprehensive analysis
+                                const sensitivityResults = {};
+                                const targetMetrics = ['npv', 'irr', 'lcoe']; // Can be expanded
+
+                                for (const metric of targetMetrics) {
+                                    try {
+                                        const results = calculateSensitivityAnalysis({
+                                            cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
+                                            sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
+                                            targetMetric: metric,
+                                            simulationConfig,
+                                            distributionAnalysis,
+                                            getValueByPath
+                                        });
+
+                                        sensitivityResults[metric] = results;
+                                        console.log(`✅ ${metric.toUpperCase()} sensitivity: ${results.length} variables`);
+                                    } catch (error) {
+                                        console.error(`❌ Error calculating sensitivity for ${metric}:`, error);
+                                        sensitivityResults[metric] = [];
+                                    }
+                                }
+
+                                // ✅ STORE: Set sensitivity data with metadata
+                                setSensitivityData({
+                                    ...sensitivityResults, // npv: [...], irr: [...], lcoe: [...]
+                                    metadata: {
+                                        computedAt: new Date().toISOString(),
+                                        simulationConfig,
+                                        totalVariables: Object.values(sensitivityResults).reduce((sum, results) => sum + results.length, 0),
+                                        metrics: targetMetrics
+                                    }
+                                });
+
+                                console.log('✅ Sensitivity analysis computed for metrics:', targetMetrics.join(', '));
+                            } else {
+                                console.warn('⚠️ No distribution analysis available for sensitivity computation');
+                                setSensitivityData(null);
+                            }
+                        } catch (error) {
+                            console.error('❌ Sensitivity computation failed:', error);
+                            setSensitivityData(null);
+                        }
+                        setRefreshStage('complete');
+                        break;
 
                     case 'complete':
                         // Reset and finish
@@ -514,6 +652,7 @@ export const CashflowProvider = ({ children }) => {
         // Data
         cashflowData,
         sensitivityData,
+        setSensitivityData,
         loading,
         transformError,
 
