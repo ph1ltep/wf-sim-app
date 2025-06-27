@@ -197,7 +197,6 @@ const DriverExplorerCard = ({
                 </Col>
                 <Col span={16}>
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                        <Text strong>Sensitivity Range</Text>
                         <SensitivityRangeSelector
                             getValueByPath={getValueByPath}
                             lowerPercentile={lowerPercentile}
@@ -210,7 +209,7 @@ const DriverExplorerCard = ({
                 </Col>
             </Row>
 
-            ✅ ADD: TargetMetricRangeVisualizer
+            {/* ✅ ADD: TargetMetricRangeVisualizer */}
             <Row style={{ marginBottom: 16 }}>
                 <Col span={24}>
                     <TargetMetricRangeVisualizer

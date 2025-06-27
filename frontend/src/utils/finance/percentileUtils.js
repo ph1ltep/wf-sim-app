@@ -16,7 +16,11 @@ export const discoverPercentiles = (getValueByPath) => {
         availableValues,
         getPercentileLabel: (value) => {
             const percentile = percentiles.find(p => p.value === value);
-            return percentile ? `P${value} (${percentile.description.replace('_', ' ')})` : `P${value}`;
+            if (percentile && percentile.description) {
+                const description = String(percentile.description).replace(/_/g, ' ');
+                return `P${value} (${description})`;
+            }
+            return `P${value}`;
         }
     };
 };
