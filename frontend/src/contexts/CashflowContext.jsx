@@ -16,6 +16,8 @@ import {
 import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
 import { SENSITIVITY_SOURCE_REGISTRY, discoverAllSensitivityVariables } from './SensitivityRegistry';
 import { SUPPORTED_METRICS } from '../utils/finance/sensitivityMetrics';
+import { computeAllMetrics } from '../utils/cashflow/metrics/processor';
+import { getMetricsByUsage, getMetricConfig } from '../utils/cashflow/metrics/registry';
 
 
 const CashflowContext = createContext();
@@ -234,6 +236,11 @@ export const CashflowProvider = ({ children }) => {
     const refreshTimeoutRef = useRef(null);
     const lastScenarioIdRef = useRef(null);
 
+    // ADD: Unified metrics state
+    const [computedMetrics, setComputedMetrics] = useState(null);
+    const [metricsLoading, setMetricsLoading] = useState(false);
+    const [metricsError, setMetricsError] = useState(null);
+
     // Basic percentile info with error handling
     const availablePercentiles = useMemo(() => {
         try {
@@ -277,6 +284,34 @@ export const CashflowProvider = ({ children }) => {
         perSource: {}
     }));
 
+    const getMetricsByUsageWithResults = useCallback((usageType) => {
+        if (!computedMetrics) return {};
+
+        const eligibleMetrics = getMetricsByUsage(usageType);
+        const result = {};
+
+        for (const [key, config] of Object.entries(eligibleMetrics)) {
+            result[key] = {
+                ...config,
+                result: computedMetrics.get(key) || {
+                    value: null,
+                    error: 'Not computed',
+                    metadata: { calculationMethod: key }
+                }
+            };
+        }
+
+        return result;
+    }, [computedMetrics]);
+
+    const getMetricResult = useCallback((metricKey) => {
+        return computedMetrics?.get(metricKey) || {
+            value: null,
+            error: 'Not available',
+            metadata: { calculationMethod: metricKey }
+        };
+    }, [computedMetrics]);
+
     // NEW: Sequential refresh effect
     useEffect(() => {
         if (!refreshRequested || !scenarioData) return;
@@ -317,13 +352,40 @@ export const CashflowProvider = ({ children }) => {
                         break;
 
                     case 'metrics':
-                        console.log('🔄 Refreshing metrics...');
-                        const metricUpdates = await refreshAllMetrics(scenarioData, updateByPath);
-                        if (Object.keys(metricUpdates).length === 0) {
-                            console.warn('⚠️ No metrics were updated - this may indicate missing data');
-                        } else {
-                            console.log('✅ Metrics refreshed');
+                        console.log('🔄 Computing unified metrics...');
+                        setMetricsLoading(true);
+                        setMetricsError(null);
+
+                        try {
+                            // NEW: Use unified metrics system instead of old refreshAllMetrics
+                            if (cashflowData && scenarioData) {
+                                const allMetrics = await computeAllMetrics(cashflowData, scenarioData);
+                                setComputedMetrics(allMetrics);
+                                console.log(`✅ Computed ${allMetrics.size} unified metrics successfully`);
+                            } else {
+                                setComputedMetrics(null);
+                                console.log('⚠️ No cashflow data available for metrics computation');
+                            }
+                        } catch (error) {
+                            console.error('❌ Unified metrics computation failed:', error);
+                            setMetricsError(error.message);
+                            setComputedMetrics(null);
+                        } finally {
+                            setMetricsLoading(false);
                         }
+
+                        // TEMPORARY: Keep old metrics system running in parallel for comparison
+                        try {
+                            const metricUpdates = await refreshAllMetrics(scenarioData, updateByPath);
+                            if (Object.keys(metricUpdates).length === 0) {
+                                console.warn('⚠️ Old metrics system: No metrics were updated');
+                            } else {
+                                console.log('✅ Old metrics system: Metrics refreshed');
+                            }
+                        } catch (error) {
+                            console.warn('⚠️ Old metrics system failed:', error);
+                        }
+
                         setRefreshStage('transform');
                         break;
 
@@ -666,6 +728,16 @@ export const CashflowProvider = ({ children }) => {
         percentileSources,
         selectedPercentiles,
         updatePercentileSelection,
+
+        // ADD: Unified metrics data
+        computedMetrics,
+        metricsLoading,
+        metricsError,
+
+        // ADD: Metric utility functions for cards
+        getMetricsByUsage: getMetricsByUsageWithResults,
+        getMetricResult,
+        getMetricConfig,
 
         // Actions - single refresh method
         refreshCashflowData,
