@@ -169,8 +169,6 @@ thresholds: [
 - Complete cube compatibility
 - Consistent theming integration
 
----
-
 
 
 
