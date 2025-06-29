@@ -305,7 +305,7 @@ interface MetricScenarios {
 }
 
 // cashflowData becomes computed property
-const cashflowData = getCurrentScenarioData(computedMetrics, selectedPercentiles);
+const cashflowData = getSelectedPercentileData(computedMetrics, selectedPercentiles);
 ```
 
 ### 5.2 Two-Tier Metrics Architecture
@@ -505,7 +505,7 @@ export const CashflowProvider = ({ children }) => {
   const cashflowData = useMemo(() => {
     if (!computedMetrics) return null;
     
-    return getCurrentScenarioData(computedMetrics, selectedPercentiles);
+    return getSelectedPercentileData(computedMetrics, selectedPercentiles);
   }, [computedMetrics, selectedPercentiles]);
   
   // Enhanced refresh function
@@ -602,7 +602,7 @@ export const computeAllMetrics = async (scenarioData, selectedPercentiles) => {
       scenarioKeys.push('perSource');
     }
     
-    for (const scenarioKey of scenarioKeys) {
+    for (const percentileKey of scenarioKeys) {
       // Get foundational metrics for this scenario
       const foundationalMetrics = {};
       for (const depKey of metricConfig.dependsOn) {
@@ -685,11 +685,11 @@ computedMetrics = new Map([
 const cashflowData = useMemo(() => {
   if (!computedMetrics) return null;
   
-  const scenarioKey = selectedPercentiles.strategy === 'unified' 
+  const percentileKey = selectedPercentiles.strategy === 'unified' 
     ? `p${selectedPercentiles.unified}`
     : 'perSource';
     
-  return getCurrentScenarioData(computedMetrics, scenarioKey);
+  return getSelectedPercentileData(computedMetrics, scenarioKey);
 }, [computedMetrics, selectedPercentiles]);
 
 // Instant percentile switching - no recomputation needed
@@ -806,7 +806,7 @@ try {
     value: null,
     formatted: 'Error',
     error: error.message,
-    metadata: { calculationMethod: metricKey, scenarioKey }
+    metadata: { calculationMethod: metricKey, percentileKey }
   };
 }
 ```
@@ -1100,7 +1100,7 @@ The `totals` section contains the same aggregations that `transformScenarioToCas
 **A:** `extractRawScenarioData()` is a wrapper around the existing `transformScenarioToCashflow` function:
 
 ```javascript
-export const extractRawScenarioData = async (scenarioData, mode, percentileSpec) => {
+export const extractRawSelectedPercentileData = async (scenarioData, mode, percentileSpec) => {
   let selectedPercentiles;
   
   if (mode === 'unified') {
@@ -1161,10 +1161,10 @@ When per-source is inactive, only unified percentiles are computed. When active,
 
 ```javascript
 // Get current scenario data based on percentile selection
-export const getCurrentScenarioData = (computedMetrics, selectedPercentiles) => {
+export const getSelectedPercentileData = (computedMetrics, selectedPercentiles) => {
   if (!computedMetrics) return null;
   
-  const scenarioKey = getScenarioKey(selectedPercentiles);
+  const percentileKey = getScenarioKey(selectedPercentiles);
   
   // Extract foundational metrics for current scenario
   const foundationalData = {};
@@ -1309,7 +1309,7 @@ try {
     value: null,
     formatted: 'Error',
     error: error.message,
-    metadata: { calculationMethod: metricKey, scenarioKey }
+    metadata: { calculationMethod: metricKey, percentileKey }
   };
 }
 
@@ -1400,8 +1400,8 @@ interface ExpectedCashflowData {
   };
 }
 
-// How getCurrentScenarioData() provides this
-const cashflowData = getCurrentScenarioData(computedMetrics, selectedPercentiles);
+// How getSelectedPercentileData() provides this
+const cashflowData = getSelectedPercentileData(computedMetrics, selectedPercentiles);
 
 // Cards use it exactly as before
 const FinanceabilityCard = () => {
@@ -1433,7 +1433,7 @@ const updatePercentileSelection = useCallback((newSelection) => {
 // The useMemo dependency triggers immediate recalculation of the reference
 const cashflowData = useMemo(() => {
   if (!computedMetrics) return null;
-  return getCurrentScenarioData(computedMetrics, selectedPercentiles);
+  return getSelectedPercentileData(computedMetrics, selectedPercentiles);
 }, [computedMetrics, selectedPercentiles]); // Changes when selection changes
 ```
 
@@ -1555,3 +1555,373 @@ const FinanceabilityCard = () => {
 This ensures zero downtime during migration while allowing incremental adoption of the new system.
 
 
+# PRD Addendum - Schema Naming & Function Mapping
+
+## Schema Name Changes & Clarifications
+
+### Old vs New Schema Names
+
+| Old Name | New Name | Reason for Change |
+|----------|----------|-------------------|
+| `MetricScenariosSchema` | `MetricPercentileCollectionSchema` | "Scenarios" conflicts with ScenarioContext; this is about percentile collections |
+| `MetricPercentileSchema` | `MetricPercentileEntrySchema` | Clearer that it's a single entry in a collection |
+| `ComputedMetricsSchema` | `AllMetricsDataSchema` | "Computed" is vague; this is the complete data structure |
+| `SelectedPercentileDataSchema` | `PercentileSliceDataSchema` | "Slice" better describes extracting one percentile across metrics |
+
+### Function Name Changes with Signatures
+
+| Old Name | New Name | Signature |
+|----------|----------|-----------|
+| `getCurrentScenarioData()` | `getSelectedPercentileData()` | `(allMetricsData: Map, percentileKey: string) => PercentileSliceDataSchema` |
+| `extractRawScenarioData()` | `extractRawPercentileData()` | `(scenarioData: Object, mode: string, percentileSpec: number\|Object) => Promise<Object>` |
+
+---
+
+## Updated Data Flow Map
+
+```
+User Action (Percentile Change/Data Refresh)
+    ↓
+CashflowContext.refreshCashflowData()
+    │ Validates: PercentileSelectionSchema
+    ↓
+computeAllMetrics(scenarioData, selectedPercentiles)
+    │ Input: PercentileSelectionSchema
+    │ Output: Map → AllMetricsDataSchema
+    ↓
+PHASE 1: Foundational Metrics (Tier 1)
+    │ Registry: FoundationalMetricsRegistrySchema
+    │ Entries: FoundationalMetricEntrySchema
+    │ Output: Aggregated data sources (netCashflow, debtService, etc.)
+    ↓
+PHASE 2: Analytical Metrics (Tier 2)
+    │ Registry: AnalyticalMetricsRegistrySchema  
+    │ Entries: AnalyticalMetricEntrySchema
+    │ Input: Foundational results + raw data
+    │ Output: Any transformations (financial, risk, operational, custom)
+    ↓
+AllMetricsDataSchema stored in CashflowContext
+    ↓
+Cards access via:
+    ├── getSelectedPercentileData(allMetrics, percentileKey)
+    │   │ Input: AllMetricsDataSchema + percentileKey
+    │   │ Output: PercentileSliceDataSchema
+    │   └── Card receives current percentile data
+    │
+    └── getMetricsByUsage(usageType)
+        │ Input: UnifiedMetricsRegistrySchema
+        │ Output: Filtered metrics with current results
+        └── Card receives specific metric types
+```
+
+---
+
+## Detailed Schema Usage Guide
+
+### 1. MetricResultSchema
+**Purpose**: Individual computed metric value with metadata
+**Used by**: All metric `calculate()` functions, final metric results
+**Structure**:
+```javascript
+{
+    value: any,           // Computed value (number, array, null)
+    formatted: string,    // Display-ready text (e.g., "1.42x", "$2.5M")
+    error: string|null,   // Error message if calculation failed
+    metadata: {
+        calculationMethod: string,    // Metric key (e.g., "dscr")
+        percentile: number,          // Which percentile this represents
+        inputSources: string[],      // Dependencies used
+        computationTime: number,     // Performance tracking
+        lineItems: any[]            // Detailed calculation breakdown
+    }
+}
+```
+
+### 2. MetricPercentileEntrySchema  
+**Purpose**: Single percentile result for one metric
+**Used by**: Building collections of percentile results
+**Structure**: `[percentileKey, MetricResult]`
+**Examples**:
+```javascript
+['p50', dscrResult]      // 50th percentile DSCR
+['p25', npvResult]       // 25th percentile NPV  
+['perSource', irrResult] // Per-source percentile IRR
+['p67', lcoeResult]      // 67th percentile LCOE (dynamic percentiles)
+```
+
+### 3. MetricPercentileCollectionSchema
+**Purpose**: All percentile results for a single metric
+**Used by**: Storage within `AllMetricsDataSchema`, individual metric access
+**Structure**: Array of `MetricPercentileEntrySchema`
+**Example**:
+```javascript
+// All percentiles for DSCR metric
+[
+    ['p10', dscrP10Result],
+    ['p25', dscrP25Result], 
+    ['p50', dscrP50Result],
+    ['p75', dscrP75Result],
+    ['p90', dscrP90Result],
+    ['perSource', dscrPerSourceResult]  // Only when per-source active
+]
+```
+
+### 4. AllMetricsDataSchema  
+**Purpose**: Complete computed metrics storage - the main data structure
+**Used by**: CashflowContext `computedMetrics` state, primary storage
+**Structure**: Array of `[metricKey, MetricPercentileCollectionSchema]` pairs
+**Example**:
+```javascript
+// Complete computed metrics (stored as Map, validated as array)
+[
+    ['dscr', [
+        ['p10', dscrP10], ['p25', dscrP25], ['p50', dscrP50], 
+        ['p75', dscrP75], ['p90', dscrP90], ['perSource', dscrPerSource]
+    ]],
+    ['npv', [
+        ['p10', npvP10], ['p25', npvP25], ['p50', npvP50],
+        ['p75', npvP75], ['p90', npvP90], ['perSource', npvPerSource]
+    ]],
+    ['netCashflow', [
+        ['p10', netCFP10], ['p25', netCFP25], // ... etc
+    ]]
+]
+```
+
+### 5. PercentileSliceDataSchema
+**Purpose**: Single percentile's results across all metrics
+**Used by**: `getSelectedPercentileData()` output, percentile-specific card views
+**Structure**: Array of `[metricKey, MetricResult]` pairs for one percentile
+**Example**:
+```javascript
+// All metrics for P50 percentile
+[
+    ['dscr', dscrP50Result],
+    ['npv', npvP50Result], 
+    ['netCashflow', netCashflowP50Result],
+    ['debtService', debtServiceP50Result]
+]
+```
+
+---
+
+## Two-Tier Registry System Schemas
+
+### Registry Schema Names & Purpose
+
+| Schema Name | Purpose | Tier | Usage |
+|-------------|---------|------|-------|
+| `FoundationalMetricEntrySchema` | Single foundational metric entry | Tier 1 | Registry entries for cashflow table components |
+| `AnalyticalMetricEntrySchema` | Single analytical metric entry | Tier 2 | Registry entries for any transformations |
+| `FoundationalMetricsRegistrySchema` | Complete foundational registry | Tier 1 | Phase 1 computation source |
+| `AnalyticalMetricsRegistrySchema` | Complete analytical registry | Tier 2 | Phase 2 computation source |
+| `UnifiedMetricsRegistrySchema` | Combined registry access | Both | Metric discovery and card access |
+
+### 6. MetricConfigSchema
+**Purpose**: Individual metric configuration with all properties
+**Used by**: Registry entries, metric validation, discovery functions
+**Structure**:
+```javascript
+{
+    // Core functions (validated at runtime)
+    calculate: Function,     // (input) => MetricResult
+    format: Function,        // (value) => string
+    formatImpact: Function,  // (impact) => string
+    
+    // Configuration arrays
+    thresholds: ThresholdDefinition[],
+    dependsOn: string[],     // Other metric keys this depends on
+    
+    // Descriptive metadata
+    metadata: {
+        name: string,                    // "Net Present Value"
+        shortName: string,               // "NPV"
+        description: string,             // Full description
+        units: string,                   // "currency", "ratio", "timeSeries"
+        displayUnits: string,            // "$M", "x", "Time Series"
+        windIndustryStandard: boolean,
+        calculationComplexity: string   // "low", "medium", "high"
+    },
+    
+    // System properties
+    category: string,        // "foundational", "financial", "risk", "operational"
+    usage: string[],         // ["financeability", "sensitivity", "internal"]
+    priority: number,        // Computation order within tier
+    
+    // Advanced configuration
+    inputStrategy: string,   // "aggregation" | "raw" (foundational only)
+    cubeConfig: {
+        aggregation: {method, options},
+        timeSeriesRequired: boolean,
+        percentileDependent: boolean,
+        aggregatesTo: string
+    }
+}
+```
+
+### 7. FoundationalMetricEntrySchema
+**Purpose**: Single entry in foundational metrics registry
+**Used by**: Building `FoundationalMetricsRegistrySchema`
+**Structure**: `[metricKey, MetricConfig]` where `MetricConfig.category === 'foundational'`
+**Examples**:
+```javascript
+['netCashflow', {
+    calculate: (input) => { /* aggregation calculation */ },
+    category: 'foundational',
+    dependsOn: ['totalRevenue', 'totalCosts'],
+    inputStrategy: 'aggregation',
+    // ... other MetricConfig properties
+}]
+
+['debtService', {
+    calculate: (input) => { /* debt calculation */ },
+    category: 'foundational', 
+    dependsOn: [],
+    inputStrategy: 'raw',
+    // ... other MetricConfig properties
+}]
+```
+
+### 8. AnalyticalMetricEntrySchema  
+**Purpose**: Single entry in analytical metrics registry
+**Used by**: Building `AnalyticalMetricsRegistrySchema`
+**Structure**: `[metricKey, MetricConfig]` where `MetricConfig.category !== 'foundational'`
+**Examples**:
+```javascript
+['dscr', {
+    calculate: (input) => { /* financial calculation */ },
+    category: 'financial',
+    dependsOn: ['netCashflow', 'debtService'],
+    cubeConfig: {
+        aggregation: {method: 'min', options: {filter: 'operational'}}
+    },
+    // ... other MetricConfig properties
+}]
+
+['riskAssessment', {
+    calculate: (input) => { /* risk calculation */ },
+    category: 'risk',
+    dependsOn: ['npv', 'dscr'],
+    // ... other MetricConfig properties
+}]
+```
+
+---
+
+## Function Signatures & Usage
+**THIS SECTION SUPERSEDES THE REST OF THE PRD and progress.md DOCUMENTS. Schema and functions should be referenced with the ones provided here for their final name, intent, and usage pattern.**
+
+### Core Computation Functions
+
+#### computeAllMetrics()
+```javascript
+/**
+ * Compute all metrics for all percentiles using two-tier system
+ * @param {Object} scenarioData - Raw scenario data
+ * @param {PercentileSelectionSchema} selectedPercentiles - Percentile configuration
+ * @returns {Promise<Map>} Map structure matching AllMetricsDataSchema
+ */
+export const computeAllMetrics = async (scenarioData, selectedPercentiles) => {
+    // Phase 1: Foundational metrics (cashflow table components)
+    // Phase 2: Analytical metrics (any transformations)
+    // Returns Map that validates against AllMetricsDataSchema when converted to array
+};
+```
+
+#### getSelectedPercentileData()
+```javascript
+/**
+ * Extract single percentile data across all metrics
+ * @param {Map} allMetricsData - Complete computed metrics (AllMetricsDataSchema)
+ * @param {string} percentileKey - Target percentile ('p50', 'perSource', etc.)
+ * @returns {Array} PercentileSliceDataSchema - One percentile across all metrics
+ */
+export const getSelectedPercentileData = (allMetricsData, percentileKey) => {
+    // Returns array matching PercentileSliceDataSchema
+    // Example: [['dscr', dscrP50], ['npv', npvP50], ...]
+};
+```
+
+#### extractRawPercentileData()
+```javascript
+/**
+ * Extract raw scenario data for specific percentile configuration
+ * @param {Object} scenarioData - Raw scenario data
+ * @param {string} mode - 'unified' or 'perSource'
+ * @param {number|Object} percentileSpec - Percentile number or per-source config
+ * @returns {Promise<Object>} Raw data for specified percentile configuration
+ */
+export const extractRawPercentileData = async (scenarioData, mode, percentileSpec) => {
+    // Calls transformScenarioToCashflow with constructed percentile selection
+    // Returns processed raw data for metric calculations
+};
+```
+
+---
+
+## Simplified File Organization
+
+### Clean Two-Tier Structure
+```
+frontend/src/utils/cashflow/metrics/
+├── foundational/                  # Tier 1 - Cashflow table components
+│   ├── index.js                  # Exports FoundationalMetricsRegistrySchema
+│   ├── netCashflow.js           # Foundational metric: aggregated net cashflow
+│   ├── debtService.js           # Foundational metric: aggregated debt service
+│   ├── totalRevenue.js          # Foundational metric: aggregated revenue
+│   ├── totalCosts.js            # Foundational metric: aggregated costs
+│   └── ...                      # Additional foundational metrics as needed
+├── analytical/                   # Tier 2 - Any transformations
+│   ├── index.js                 # Exports AnalyticalMetricsRegistrySchema
+│   ├── dscr.js                  # Financial metric example
+│   ├── npv.js                   # Financial metric example
+│   ├── irr.js                   # Financial metric example
+│   ├── lcoe.js                  # Financial metric example
+│   ├── riskAssessment.js        # Risk metric example
+│   ├── availability.js          # Operational metric example
+│   ├── customBusinessMetric.js  # Custom transformation example
+│   └── ...                     # Any additional metrics/transformations
+└── registry.js                  # Exports UnifiedMetricsRegistrySchema
+```
+
+**Note**: No complex sub-categorization - just two simple folders for the two-tier system. The `analytical/` folder can contain any type of transformation (financial, risk, operational, custom business logic) without further organization.
+
+---
+
+## Corrected Two-Tier System Understanding
+
+### Tier 1: Foundational Metrics (Cashflow Table Components)
+- **Input**: Raw scenario data (various formats)
+- **Processing**: Pre-calculations for commonly needed data sources
+- **Output**: **Aggregated figures** representing cashflow table items
+- **Examples**: Net cashflow amount, debt service amount, total revenue, total costs
+- **Purpose**: Provide reusable data sources that multiple Tier 2 metrics need
+
+### Tier 2: Analytical Metrics (Any Transformations)
+- **Input**: Foundational metric results + raw scenario data as needed
+- **Processing**: Any business logic, financial calculations, transformations
+- **Output**: **Aggregated figures** for specific business needs
+- **Examples**: Financial ratios, risk assessments, performance metrics, custom business calculations
+- **Purpose**: Flexible calculation layer for any business requirements
+
+Both tiers produce aggregated output values, with Tier 1 focused on reusable foundation data and Tier 2 handling any type of business calculation or transformation needs.
+
+---
+
+## Schema Validation Points
+
+### Input Validation
+- **`computeAllMetrics()`**: Validates `PercentileSelectionSchema` input
+- **`getSelectedPercentileData()`**: Validates `AllMetricsDataSchema` input
+- **Metric `calculate()` functions**: Validate `MetricInputSchema`
+
+### Output Validation  
+- **`computeAllMetrics()`**: Output validates as `AllMetricsDataSchema`
+- **`getSelectedPercentileData()`**: Output validates as `PercentileSliceDataSchema`
+- **Individual metrics**: Each result validates as `MetricResultSchema`
+
+### Storage Validation
+- **CashflowContext `computedMetrics`**: Validates as `AllMetricsDataSchema` when converted to array
+- **Individual metric access**: Validates as `MetricPercentileCollectionSchema`
+
+This comprehensive schema system provides clear structure validation while supporting dynamic percentiles and the flexible two-tier metrics architecture.
