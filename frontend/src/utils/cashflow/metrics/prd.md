@@ -1556,6 +1556,8 @@ This ensures zero downtime during migration while allowing incremental adoption 
 
 
 # PRD Addendum - Schema Naming & Function Mapping
+**THIS SECTION SUPERSEDES THE REST OF THE PRD and progress.md DOCUMENTS. Schema and functions should be referenced with the ones provided here for their final name, intent, and usage pattern.**
+
 
 ## Schema Name Changes & Clarifications
 
@@ -1809,7 +1811,6 @@ Cards access via:
 ---
 
 ## Function Signatures & Usage
-**THIS SECTION SUPERSEDES THE REST OF THE PRD and progress.md DOCUMENTS. Schema and functions should be referenced with the ones provided here for their final name, intent, and usage pattern.**
 
 ### Core Computation Functions
 
