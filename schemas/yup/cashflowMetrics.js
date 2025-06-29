@@ -2,280 +2,283 @@
 const Yup = require('yup');
 
 /**
- * Schema for metric calculation results
+ * Individual metric calculation result
+ * Used by: All metric calculate() functions, final metric values
+ * Contains: Single computed value with formatting and calculation metadata
  */
 const MetricResultSchema = Yup.object().shape({
-    value: Yup.mixed().nullable().required('Value is required (can be null)'),
-    error: Yup.string().nullable().optional(),
+    value: Yup.mixed().nullable(),
+    formatted: Yup.string().required(),
+    error: Yup.string().nullable(),
     metadata: Yup.object().shape({
-        calculationMethod: Yup.string().required('Calculation method is required'),
-        aggregationMethod: Yup.string().optional(),
+        calculationMethod: Yup.string().required(),
+        percentile: Yup.number().optional(),
         inputSources: Yup.array().of(Yup.string()).optional(),
         computationTime: Yup.number().optional(),
-        hasData: Yup.boolean().optional(),
-        fallbackUsed: Yup.boolean().optional(),
-        fallbackReason: Yup.string().optional(),
-        errorCode: Yup.string().optional(),
-        timestamp: Yup.string().optional()
-    }).required('Metadata is required')
+        lineItems: Yup.array().optional()
+    }).required()
 });
 
 /**
- * Schema for aggregation strategy configuration
+ * Single entry in metric's percentile collection: [percentileKey, MetricResult]
+ * Used by: MetricPercentileCollectionSchema entries
+ * Contains: One percentile result for one metric (e.g., ['p50', dscrResult] or ['perSource', dscrResult])
+ * Structure: [string, MetricResult] where string can be 'p25', 'p67', 'perSource', etc.
+ */
+const MetricPercentileEntrySchema = Yup.array().of(Yup.mixed()).length(2).test(
+    'valid-percentile-entry',
+    'Must be [percentileKey, MetricResult] format',
+    function (value) {
+        if (!Array.isArray(value) || value.length !== 2) return false;
+        const [key, result] = value;
+        return typeof key === 'string' && MetricResultSchema.isValidSync(result);
+    }
+);
+
+/**
+ * All percentile results for a single metric (dynamic percentiles + perSource)
+ * Used by: Single metric storage in AllMetricsDataSchema
+ * Contains: Collection of all computed percentiles for one metric
+ * Structure: [['p10', result], ['p25', result], ['p50', result], ['perSource', result], ...]
+ */
+const MetricPercentileCollectionSchema = Yup.array().of(MetricPercentileEntrySchema);
+
+/**
+ * Complete metrics data - all metrics with all their percentile collections
+ * Used by: CashflowContext storage, main computed metrics state
+ * Contains: Map structure as array of [metricKey, MetricPercentileCollectionSchema] pairs
+ * Structure: [['dscr', [[percentiles]]], ['npv', [[percentiles]]], ['netCashflow', [[percentiles]]], ...]
+ */
+const AllMetricsDataSchema = Yup.array().of(
+    Yup.array().of(Yup.mixed()).length(2).test(
+        'valid-metric-entry',
+        'Must be [metricKey, MetricPercentileCollectionSchema] format',
+        function (value) {
+            if (!Array.isArray(value) || value.length !== 2) return false;
+            const [key, collection] = value;
+            return typeof key === 'string' && MetricPercentileCollectionSchema.isValidSync(collection);
+        }
+    )
+);
+
+/**
+ * Single percentile slice across all metrics
+ * Used by: getSelectedPercentileData() output, percentile-specific views
+ * Contains: One percentile's results across all available metrics
+ * Structure: [['dscr', MetricResult], ['npv', MetricResult], ['netCashflow', MetricResult], ...]
+ */
+const PercentileSliceDataSchema = Yup.array().of(
+    Yup.array().of(Yup.mixed()).length(2).test(
+        'valid-metric-result-pair',
+        'Must be [metricKey, MetricResult] format',
+        function (value) {
+            if (!Array.isArray(value) || value.length !== 2) return false;
+            const [key, result] = value;
+            return typeof key === 'string' && MetricResultSchema.isValidSync(result);
+        }
+    )
+);
+
+/**
+ * Threshold definition for metric evaluation
+ * Used by: MetricConfigSchema, threshold evaluation functions
+ * Contains: Dynamic threshold rules with priority and styling
+ */
+const ThresholdDefinitionSchema = Yup.object().shape({
+    field: Yup.string().optional(),
+    comparison: Yup.string().required(),
+    value: Yup.number().optional(),
+    colorRule: Yup.mixed().required(), // Function
+    priority: Yup.number().required(),
+    description: Yup.string().required()
+});
+
+/**
+ * Aggregation strategy configuration for metrics
+ * Used by: MetricConfigSchema, cubeConfig definitions
+ * Contains: Method and flexible options for time-series aggregation
  */
 const AggregationStrategySchema = Yup.object().shape({
-    method: Yup.string()
-        .oneOf(['sum', 'npv', 'mean', 'min', 'max', 'first', 'last', 'weighted_mean'])
-        .required('Aggregation method is required'),
-    options: Yup.object().shape({
-        filter: Yup.string()
-            .oneOf(['all', 'operational', 'construction', 'early', 'late'])
-            .optional(),
-        discountRate: Yup.mixed().optional(), // Can be number, 'auto', or 'irr_solve'
-        weights: Yup.array().of(Yup.number()).optional(),
-        precision: Yup.number().min(0).max(6).optional()
-    }).optional()
+    method: Yup.string().required(),
+    options: Yup.object().optional()
 });
 
 /**
- * Schema for cube metadata (future implementation)
- */
-const CubeMetadataSchema = Yup.object().shape({
-    timeSeriesRequired: Yup.boolean().required('Time series flag is required'),
-    percentileDependent: Yup.boolean().required('Percentile dependent flag is required'),
-    aggregatesTo: Yup.string()
-        .oneOf(['single_value', 'time_series', 'complex_object'])
-        .required('Aggregation target is required')
-});
-
-/**
- * Schema for threshold configuration
- */
-const ThresholdSchema = Yup.object().shape({
-    excellent: Yup.number().required('Excellent threshold is required'),
-    good: Yup.number().required('Good threshold is required'),
-    acceptable: Yup.number().required('Acceptable threshold is required'),
-    poor: Yup.number().required('Poor threshold is required')
-}).test(
-    'threshold-order',
-    'Thresholds must be in logical order',
-    function (value) {
-        if (!value) return false;
-
-        // For metrics where lower is better (like LCOE, payback period)
-        // we'll validate based on context in actual usage
-        return true;
-    }
-);
-
-/**
- * Schema for metric metadata
- */
-const MetricMetadataSchema = Yup.object().shape({
-    displayName: Yup.string().required('Display name is required'),
-    displayUnits: Yup.string().required('Display units are required'),
-    description: Yup.string().required('Description is required'),
-    calculationMethod: Yup.string().required('Calculation method is required')
-});
-
-/**
- * Schema for individual metric configuration
+ * Complete metric configuration in registry
+ * Used by: Registry validation, metric discovery functions
+ * Contains: All metric definition including functions, metadata, dependencies
  */
 const MetricConfigSchema = Yup.object().shape({
-    calculate: Yup.mixed().required('Calculate function is required'),
-    format: Yup.mixed().required('Format function is required'),
-    formatImpact: Yup.mixed().required('Format impact function is required'),
-    thresholds: ThresholdSchema.required('Thresholds are required'),
-    evaluateThreshold: Yup.mixed().required('Evaluate threshold function is required'),
-    metadata: MetricMetadataSchema.required('Metadata is required'),
-    category: Yup.string()
-        .oneOf(['financial', 'risk', 'operational'])
-        .required('Category is required'),
-    usage: Yup.array()
-        .of(Yup.string().oneOf(['financeability', 'sensitivity', 'comparative']))
-        .min(1, 'At least one usage type is required')
-        .required('Usage types are required'),
-    priority: Yup.number().min(1).required('Priority is required'),
+    // Functions - validated at runtime, not by Yup
+    calculate: Yup.mixed().required(),
+    format: Yup.mixed().required(),
+    formatImpact: Yup.mixed().required(),
+
+    // Arrays and objects
+    thresholds: Yup.array().of(ThresholdDefinitionSchema).default([]),
+    dependsOn: Yup.array().of(Yup.string()).default([]),
+
+    // Metadata
+    metadata: Yup.object().shape({
+        name: Yup.string().required(),
+        shortName: Yup.string().required(),
+        description: Yup.string().required(),
+        units: Yup.string().required(),
+        displayUnits: Yup.string().required(),
+        windIndustryStandard: Yup.boolean().default(true),
+        calculationComplexity: Yup.string().default('medium')
+    }).required(),
+
+    // Categorization
+    category: Yup.string().required(),
+    usage: Yup.array().of(Yup.string()).min(1).required(),
+    priority: Yup.number().required(),
+
+    // Strategy configuration
+    inputStrategy: Yup.string().optional(),
     cubeConfig: Yup.object().shape({
         aggregation: AggregationStrategySchema.optional(),
-        dependsOn: Yup.array().of(Yup.string()).required('Dependencies are required'),
-        preCompute: Yup.boolean().required('Pre-compute flag is required'),
-        sensitivityRelevant: Yup.boolean().required('Sensitivity relevance flag is required'),
-        cubeMetadata: CubeMetadataSchema.required('Cube metadata is required')
-    }).required('Cube configuration is required')
+        timeSeriesRequired: Yup.boolean().optional(),
+        percentileDependent: Yup.boolean().optional(),
+        aggregatesTo: Yup.string().optional()
+    }).optional()
 });
 
 /**
- * Schema for the complete cashflow metrics registry
+ * Single metric entry in foundational registry: [metricKey, MetricConfig]
+ * Used by: FoundationalMetricsRegistrySchema entries
+ * Contains: One foundational metric configuration pair
+ * Structure: [string, MetricConfig] where MetricConfig.category === 'foundational'
  */
-const CashflowMetricsRegistrySchema = Yup.object().test(
-    'metrics-registry',
-    'Must be a valid metrics registry',
+const FoundationalMetricEntrySchema = Yup.array().of(Yup.mixed()).length(2).test(
+    'valid-foundational-entry',
+    'Must be [metricKey, foundational MetricConfig] format',
     function (value) {
-        if (!value || typeof value !== 'object') {
-            return this.createError({
-                message: 'Registry must be an object'
-            });
-        }
-
-        const entries = Object.entries(value);
-        if (entries.length === 0) {
-            return this.createError({
-                message: 'Registry cannot be empty'
-            });
-        }
-
-        // Validate each metric configuration
-        for (const [key, config] of entries) {
-            if (typeof key !== 'string' || key.length === 0) {
-                return this.createError({
-                    message: `Invalid metric key: ${key}`
-                });
-            }
-
-            try {
-                MetricConfigSchema.validateSync(config);
-            } catch (error) {
-                return this.createError({
-                    message: `Invalid configuration for metric '${key}': ${error.message}`
-                });
-            }
-        }
-
-        return true;
+        if (!Array.isArray(value) || value.length !== 2) return false;
+        const [key, config] = value;
+        return typeof key === 'string' &&
+            MetricConfigSchema.isValidSync(config) &&
+            config.category === 'foundational';
     }
 );
 
 /**
- * Schema for metric computation input
+ * Single metric entry in analytical registry: [metricKey, MetricConfig]  
+ * Used by: AnalyticalMetricsRegistrySchema entries
+ * Contains: One analytical metric configuration pair
+ * Structure: [string, MetricConfig] where MetricConfig.category !== 'foundational'
+ */
+const AnalyticalMetricEntrySchema = Yup.array().of(Yup.mixed()).length(2).test(
+    'valid-analytical-entry',
+    'Must be [metricKey, analytical MetricConfig] format',
+    function (value) {
+        if (!Array.isArray(value) || value.length !== 2) return false;
+        const [key, config] = value;
+        return typeof key === 'string' &&
+            MetricConfigSchema.isValidSync(config) &&
+            config.category !== 'foundational';
+    }
+);
+
+/**
+ * Foundational metrics registry - Tier 1 cashflow table components
+ * Used by: Registry loading, foundational metrics computation (Phase 1)
+ * Contains: All foundational metrics that produce reusable data sources
+ * Structure: Array of FoundationalMetricEntrySchema pairs
+ */
+const FoundationalMetricsRegistrySchema = Yup.array().of(FoundationalMetricEntrySchema);
+
+/**
+ * Analytical metrics registry - Tier 2 any transformations
+ * Used by: Registry loading, analytical metrics computation (Phase 2)
+ * Contains: All analytical metrics that consume foundational metrics or raw data
+ * Structure: Array of AnalyticalMetricEntrySchema pairs
+ */
+const AnalyticalMetricsRegistrySchema = Yup.array().of(AnalyticalMetricEntrySchema);
+
+/**
+ * Complete unified metrics registry - both tiers combined
+ * Used by: getMetricsByUsage(), metric discovery, complete system access
+ * Contains: All metrics from both foundational and analytical registries
+ * Structure: Array of [metricKey, MetricConfig] pairs from both tiers
+ */
+const UnifiedMetricsRegistrySchema = Yup.array().of(
+    Yup.array().of(Yup.mixed()).length(2).test(
+        'valid-unified-entry',
+        'Must be [metricKey, MetricConfig] format',
+        function (value) {
+            if (!Array.isArray(value) || value.length !== 2) return false;
+            const [key, config] = value;
+            return typeof key === 'string' && MetricConfigSchema.isValidSync(config);
+        }
+    )
+);
+
+/**
+ * Percentile selection from PercentileSelector component
+ * Used by: CashflowContext, percentile processing functions
+ * Contains: Current percentile selection strategy and values
+ */
+const PercentileSelectionSchema = Yup.object().shape({
+    strategy: Yup.string().required(),
+    unified: Yup.number().required(),
+    perSource: Yup.object().default({})
+});
+
+/**
+ * Backward-compatible cashflow data structure for cards
+ * Used by: Card components input, legacy compatibility layer
+ * Contains: Transformed percentile data in structure existing cards expect
+ */
+const CashflowDataSchema = Yup.object().shape({
+    sources: Yup.object().optional(),
+    totals: Yup.array().of(
+        Yup.array().of(Yup.mixed()).length(2)
+    ).optional(),
+    metadata: Yup.object().shape({
+        selectedPercentiles: PercentileSelectionSchema.optional(),
+        percentileKey: Yup.string().required(), // e.g., 'p50' or 'perSource'
+        availablePercentiles: Yup.array().of(Yup.number()).default([10, 25, 50, 75, 90]),
+        isPerSource: Yup.boolean().default(false)
+    }).required()
+});
+
+/**
+ * Input structure for metric calculate() functions
+ * Used by: All metric calculate() functions, metric computation pipeline
+ * Contains: Data and context needed for metric calculations
  */
 const MetricInputSchema = Yup.object().shape({
-    cashflowData: Yup.object().optional(),
-    aggregations: Yup.object().optional(),
+    rawData: Yup.object().shape({
+        sources: Yup.object().optional(),
+        totals: Yup.object().optional()
+    }).optional(),
+    foundationalMetrics: Yup.object().optional(),
     scenarioData: Yup.object().optional(),
-    options: Yup.object().shape({
-        discountRate: Yup.number().optional(),
-        precision: Yup.number().min(0).max(6).optional(),
-        currency: Yup.string().optional()
-    }).optional()
-}).test(
-    'has-data-source',
-    'Either cashflowData or aggregations must be provided',
-    function (value) {
-        if (!value) return false;
-        return !!(value.cashflowData || value.aggregations);
-    }
-);
-
-/**
- * Schema for computed metrics map (used in CashflowContext)
- */
-const ComputedMetricsSchema = Yup.mixed().test(
-    'computed-metrics-map',
-    'Must be a Map with metric results',
-    function (value) {
-        if (!(value instanceof Map)) {
-            return this.createError({
-                message: 'Computed metrics must be a Map'
-            });
-        }
-
-        // Validate each metric result in the map
-        for (const [key, result] of value.entries()) {
-            if (typeof key !== 'string') {
-                return this.createError({
-                    message: `Metric key must be string, got: ${typeof key}`
-                });
-            }
-
-            try {
-                MetricResultSchema.validateSync(result);
-            } catch (error) {
-                return this.createError({
-                    message: `Invalid result for metric '${key}': ${error.message}`
-                });
-            }
-        }
-
-        return true;
-    }
-);
-
-/**
- * Validation helper functions
- */
-
-/**
- * Validate metric result structure
- * @param {Object} result - Metric result to validate
- * @param {string} metricKey - Metric key for context
- * @returns {Promise<Object>} Validation result
- */
-const validateMetricResult = async (result, metricKey = 'unknown') => {
-    try {
-        const validated = await MetricResultSchema.validate(result);
-        return { isValid: true, result: validated };
-    } catch (error) {
-        console.warn(`Metric result validation failed for ${metricKey}:`, error.message);
-        return {
-            isValid: false,
-            error: error.message,
-            errors: error.errors || [error.message]
-        };
-    }
-};
-
-/**
- * Validate entire metrics registry
- * @param {Object} registry - Registry to validate
- * @returns {Promise<Object>} Validation result
- */
-const validateCashflowMetricsRegistry = async (registry) => {
-    try {
-        const validated = await CashflowMetricsRegistrySchema.validate(registry);
-        return { isValid: true, registry: validated };
-    } catch (error) {
-        console.error('Cashflow metrics registry validation failed:', error.message);
-        return {
-            isValid: false,
-            error: error.message,
-            errors: error.errors || [error.message]
-        };
-    }
-};
-
-/**
- * Validate metric input
- * @param {Object} input - Input to validate
- * @returns {Promise<Object>} Validation result
- */
-const validateMetricInput = async (input) => {
-    try {
-        const validated = await MetricInputSchema.validate(input);
-        return { isValid: true, input: validated };
-    } catch (error) {
-        return {
-            isValid: false,
-            error: error.message,
-            errors: error.errors || [error.message]
-        };
-    }
-};
+    percentile: Yup.number().optional(),
+    options: Yup.object().optional()
+});
 
 module.exports = {
-    // Schemas
+    // Core metric data structures
     MetricResultSchema,
-    AggregationStrategySchema,
-    CubeMetadataSchema,
-    ThresholdSchema,
-    MetricMetadataSchema,
-    MetricConfigSchema,
-    CashflowMetricsRegistrySchema,
-    MetricInputSchema,
-    ComputedMetricsSchema,
+    MetricPercentileEntrySchema,
+    MetricPercentileCollectionSchema,
+    AllMetricsDataSchema,
+    PercentileSliceDataSchema,
 
-    // Validation functions
-    validateMetricResult,
-    validateCashflowMetricsRegistry,
-    validateMetricInput
+    // Registry structures (2-tier system)
+    MetricConfigSchema,
+    FoundationalMetricEntrySchema,
+    AnalyticalMetricEntrySchema,
+    FoundationalMetricsRegistrySchema,
+    AnalyticalMetricsRegistrySchema,
+    UnifiedMetricsRegistrySchema,
+
+    // Supporting schemas
+    ThresholdDefinitionSchema,
+    AggregationStrategySchema,
+    PercentileSelectionSchema,
+    CashflowDataSchema,
+    MetricInputSchema
 };

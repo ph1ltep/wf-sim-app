@@ -1,6 +1,4 @@
 // frontend/src/utils/cashflow/metrics/foundational/index.js
-// Foundational Metrics Registry - Tier 1 metrics that replace .aggregations/.totals
-
 import * as totalRevenue from './totalRevenue.js';
 import * as totalCosts from './totalCosts.js';
 import * as totalCapex from './totalCapex.js';
@@ -9,57 +7,91 @@ import * as debtService from './debtService.js';
 
 /**
  * Foundational Metrics Registry (Tier 1)
- * These metrics replace the .aggregations/.totals system from transformScenarioToCashflow
  * Priority 1-9: Computed first, provide time-series data for analytical metrics
  */
 export const FOUNDATIONAL_METRICS_REGISTRY = {
-    // Revenue aggregation - Priority 1 (no dependencies)
     totalRevenue: {
         ...totalRevenue,
-        priority: 1,
+        thresholds: [],
+        dependsOn: [],
+        metadata: totalRevenue.metadata,
         category: 'foundational',
-        usage: ['internal'], // Not displayed in UI cards
-        dependsOn: [], // Aggregates from raw sources
-        inputStrategy: 'aggregation' // Uses CASHFLOW_SOURCE_REGISTRY data
+        usage: ['internal'],
+        priority: 1,
+        inputStrategy: 'raw',
+        cubeConfig: {
+            aggregation: { method: 'sum', options: { filter: 'all' } },
+            timeSeriesRequired: true,
+            percentileDependent: true,
+            aggregatesTo: 'time_series'
+        }
     },
 
-    // Cost aggregation - Priority 1 (no dependencies, can run parallel to totalRevenue)
     totalCosts: {
         ...totalCosts,
-        priority: 1,
+        thresholds: [],
+        dependsOn: [],
+        metadata: totalCosts.metadata,
         category: 'foundational',
         usage: ['internal'],
-        dependsOn: [],
-        inputStrategy: 'aggregation'
+        priority: 1,
+        inputStrategy: 'raw',
+        cubeConfig: {
+            aggregation: { method: 'sum', options: { filter: 'all' } },
+            timeSeriesRequired: true,
+            percentileDependent: true,
+            aggregatesTo: 'time_series'
+        }
     },
 
-    // Capex aggregation - Priority 1 (no dependencies)
     totalCapex: {
         ...totalCapex,
-        priority: 1,
+        thresholds: [],
+        dependsOn: [],
+        metadata: totalCapex.metadata,
         category: 'foundational',
         usage: ['internal'],
-        dependsOn: [],
-        inputStrategy: 'aggregation'
+        priority: 1,
+        inputStrategy: 'raw',
+        cubeConfig: {
+            aggregation: { method: 'sum', options: { filter: 'construction' } },
+            timeSeriesRequired: true,
+            percentileDependent: true,
+            aggregatesTo: 'time_series'
+        }
     },
 
-    // Debt service schedule - Priority 2 (no foundational dependencies, but uses raw scenario data)
     debtService: {
         ...debtService,
-        priority: 2,
+        thresholds: [],
+        dependsOn: [],
+        metadata: debtService.metadata,
         category: 'foundational',
         usage: ['internal'],
-        dependsOn: [], // Calculated from raw debt parameters
-        inputStrategy: 'raw' // Processes raw scenario data directly
+        priority: 2,
+        inputStrategy: 'raw',
+        cubeConfig: {
+            aggregation: { method: 'sum', options: { filter: 'operational' } },
+            timeSeriesRequired: true,
+            percentileDependent: false, // Debt service typically doesn't vary by percentile
+            aggregatesTo: 'time_series'
+        }
     },
 
-    // Net cashflow - Priority 3 (depends on totalRevenue, totalCosts)
     netCashflow: {
         ...netCashflow,
-        priority: 3,
+        thresholds: [],
+        dependsOn: ['totalRevenue', 'totalCosts'],
+        metadata: netCashflow.metadata,
         category: 'foundational',
         usage: ['internal'],
-        dependsOn: ['totalRevenue', 'totalCosts'], // Uses foundational metrics as inputs
-        inputStrategy: 'foundational' // New strategy: receives foundational metrics
+        priority: 3,
+        inputStrategy: 'foundational', // Uses foundational metrics as inputs
+        cubeConfig: {
+            aggregation: { method: 'sum', options: { filter: 'all' } },
+            timeSeriesRequired: true,
+            percentileDependent: true,
+            aggregatesTo: 'time_series'
+        }
     }
 };

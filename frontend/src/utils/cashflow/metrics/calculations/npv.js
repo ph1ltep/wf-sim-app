@@ -1,34 +1,37 @@
-// frontend/src/utils/cashflow/metrics/calculations/npv.js
-import { applyAggregationStrategy } from '../processor.js';
-
+// frontend/src/utils/cashflow/metrics/calculations/npv.js - Updated for two-tier architecture
 /**
- * Calculate Net Present Value using discount rate
- * @param {Object} input - MetricInput object  
+ * Calculate Net Present Value using foundational net cashflow metric
+ * @param {Object} input - MetricInput object with foundationalMetrics
  * @returns {Object} MetricResult
  */
 export const calculateNPV = (input) => {
-    const { cashflowData, aggregations, scenarioData, options = {} } = input;
+    const { foundationalMetrics, scenarioData, options = {} } = input;
 
     try {
-        // Get net cashflow data
-        let cashflowTimeSeries;
-        if (aggregations?.netCashflow) {
-            cashflowTimeSeries = aggregations.netCashflow;
-        } else if (cashflowData?.aggregations?.netCashflow) {
-            cashflowTimeSeries = cashflowData.aggregations.netCashflow.data;
-        } else {
+        // Get net cashflow from foundational metrics (new two-tier approach)
+        const netCashflowMetric = foundationalMetrics?.netCashflow;
+        if (!netCashflowMetric?.value) {
             return {
                 value: null,
-                error: 'No net cashflow data available for NPV calculation',
-                metadata: { hasData: false }
+                formatted: "No Data",
+                error: 'No net cashflow data available from foundational metrics',
+                metadata: {
+                    calculationMethod: 'npv',
+                    hasData: false
+                }
             };
         }
 
+        const cashflowTimeSeries = netCashflowMetric.value;
         if (!Array.isArray(cashflowTimeSeries) || cashflowTimeSeries.length === 0) {
             return {
                 value: null,
-                error: 'Invalid cashflow data for NPV calculation',
-                metadata: { hasData: false }
+                formatted: "No Data",
+                error: 'Invalid net cashflow data for NPV calculation',
+                metadata: {
+                    calculationMethod: 'npv',
+                    hasData: false
+                }
             };
         }
 
@@ -40,7 +43,7 @@ export const calculateNPV = (input) => {
             discountRate = (financing?.costOfEquity || 8) / 100;
         }
 
-        // Calculate NPV
+        // Calculate NPV using foundational net cashflow
         const npv = cashflowTimeSeries.reduce((accumulator, dataPoint) => {
             const { year, value } = dataPoint;
             const presentValue = value / Math.pow(1 + discountRate, year);
@@ -49,19 +52,26 @@ export const calculateNPV = (input) => {
 
         return {
             value: npv,
+            formatted: formatNPV(npv),
             error: null,
             metadata: {
+                calculationMethod: 'npv',
                 hasData: true,
                 discountRate: discountRate * 100,
-                cashflowPeriods: cashflowTimeSeries.length
+                cashflowPeriods: cashflowTimeSeries.length,
+                inputSources: ['netCashflow'] // Uses foundational metric
             }
         };
 
     } catch (error) {
         return {
             value: null,
+            formatted: "Error",
             error: `NPV calculation failed: ${error.message}`,
-            metadata: { hasData: false }
+            metadata: {
+                calculationMethod: 'npv',
+                hasData: false
+            }
         };
     }
 };
@@ -119,4 +129,3 @@ export const formatNPVImpact = (impact, options = {}) => {
 
     return formatted;
 };
-

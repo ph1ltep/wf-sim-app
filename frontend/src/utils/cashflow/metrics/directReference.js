@@ -1,127 +1,73 @@
 // frontend/src/utils/cashflow/metrics/directReference.js
-// Direct reference helper functions for instant percentile switching
+/**
+ * Direct Reference Architecture Helper Functions
+ * Simple functions that work directly with the AllMetricsDataSchema structure
+ */
 
 /**
- * Get data for the currently selected percentile/strategy from computed metrics
- * @param {Map} computedMetrics - Map of all computed metrics across all scenarios
- * @param {Object} selectedPercentiles - Current percentile selection from PercentileSelector
- * @returns {Object|null} CashflowDataSource-compatible structure for current selection
+ * Get selected percentile key from selectedPercentiles object
+ * @param {Object} selectedPercentiles - PercentileSelectionSchema
+ * @returns {string} Percentile key (e.g., 'p50', 'perSource')
+ */
+export const getSelectedPercentileKey = (selectedPercentiles) => {
+    if (!selectedPercentiles) return 'p50';
+    return selectedPercentiles.strategy === 'unified' ?
+        `p${selectedPercentiles.unified}` : 'perSource';
+};
+
+/**
+ * Get current metric result for specified percentile
+ * @param {Map} computedMetrics - AllMetricsDataSchema as Map
+ * @param {string} metricKey - Metric identifier
+ * @param {Object} selectedPercentiles - PercentileSelectionSchema
+ * @returns {Object|null} MetricResult or null if not found
+ */
+export const getCurrentMetricResult = (computedMetrics, metricKey, selectedPercentiles) => {
+    if (!computedMetrics?.has(metricKey)) return null;
+
+    const percentileKey = getSelectedPercentileKey(selectedPercentiles);
+    const metricPercentileCollection = computedMetrics.get(metricKey);
+    const percentileEntry = metricPercentileCollection.find(([key]) => key === percentileKey);
+
+    return percentileEntry ? percentileEntry[1] : null;
+};
+
+/**
+ * Get selected percentile data across all metrics
+ * @param {Map} computedMetrics - AllMetricsDataSchema as Map
+ * @param {Object} selectedPercentiles - PercentileSelectionSchema  
+ * @returns {Object} PercentileSliceDataSchema structure
  */
 export const getSelectedPercentileData = (computedMetrics, selectedPercentiles) => {
-    if (!computedMetrics) return null;
+    if (!computedMetrics || computedMetrics.size === 0) return null;
 
-    const selectedKey = getSelectedPercentileKey(selectedPercentiles);
+    const percentileKey = getSelectedPercentileKey(selectedPercentiles);
+    const percentileSliceData = [];
 
-    // Extract foundational metrics for current scenario
-    const foundationalData = {};
-    const foundationalMetrics = ['netCashflow', 'debtService', 'totalRevenue', 'totalCosts', 'totalCapex'];
-
-    foundationalMetrics.forEach(metricKey => {
-        const metricData = computedMetrics.get(metricKey);
-        if (metricData && metricData[selectedKey]) {
-            foundationalData[metricKey] = metricData[selectedKey];
+    // Extract all metrics for the selected percentile - this creates PercentileSliceDataSchema
+    computedMetrics.forEach((metricPercentileCollection, metricKey) => {
+        const percentileEntry = metricPercentileCollection.find(([key]) => key === percentileKey);
+        if (percentileEntry) {
+            percentileSliceData.push([metricKey, percentileEntry[1]]);
         }
     });
 
-    return {
-        // Recreate structure that existing cards expect
-        sources: extractSourcesFromFoundational(foundationalData),
-        totals: extractTotalsFromFoundational(foundationalData),
-        metadata: {
-            selectedPercentiles,
-            selectedKey,
-            availablePercentiles: [10, 25, 50, 75, 90],
-            isPerSource: selectedPercentiles.strategy === 'perSource',
-            computedAt: new Date().toISOString()
+    return percentileSliceData;
+};
+
+/**
+ * Extract any metrics by keys (works for foundational, analytical, or mixed)
+ * @param {Array} percentileSliceData - PercentileSliceDataSchema
+ * @param {Array} metricKeys - Array of metric keys to extract
+ * @returns {Object} Object with extracted metrics
+ */
+export const extractMetricsByKeys = (percentileSliceData, metricKeys) => {
+    const extracted = {};
+    metricKeys.forEach(key => {
+        const entry = percentileSliceData.find(([metricKey]) => metricKey === key);
+        if (entry) {
+            extracted[key] = entry[1];
         }
-    };
-};
-
-/**
- * Determine the key for the currently selected percentile scenario
- * @param {Object} selectedPercentiles - Current percentile selection
- * @returns {string} Key for accessing computed metrics (e.g., 'p50', 'perSource')
- */
-export const getSelectedPercentileKey = (selectedPercentiles) => {
-    return selectedPercentiles.strategy === 'unified'
-        ? `p${selectedPercentiles.unified}`
-        : 'perSource';
-};
-
-/**
- * Transform foundational metrics back to totals format expected by existing cards
- * @param {Object} foundationalData - Foundational metric results for current scenario
- * @returns {Object} Totals structure compatible with existing card interfaces
- */
-export const extractTotalsFromFoundational = (foundationalData) => {
-    const totals = {};
-
-    // Map foundational metrics to expected totals structure
-    if (foundationalData.netCashflow) {
-        totals.netCashflow = {
-            data: foundationalData.netCashflow.value, // Time series array
-            metadata: foundationalData.netCashflow.metadata
-        };
-    }
-
-    if (foundationalData.totalRevenue) {
-        totals.totalRevenue = {
-            data: foundationalData.totalRevenue.value,
-            metadata: foundationalData.totalRevenue.metadata
-        };
-    }
-
-    if (foundationalData.totalCosts) {
-        totals.totalCosts = {
-            data: foundationalData.totalCosts.value,
-            metadata: foundationalData.totalCosts.metadata
-        };
-    }
-
-    if (foundationalData.totalCapex) {
-        totals.totalCapex = {
-            data: foundationalData.totalCapex.value,
-            metadata: foundationalData.totalCapex.metadata
-        };
-    }
-
-    if (foundationalData.debtService) {
-        totals.debtService = {
-            data: foundationalData.debtService.value,
-            metadata: foundationalData.debtService.metadata
-        };
-    }
-
-    return totals;
-};
-
-/**
- * Extract sources structure from foundational data (placeholder - can be enhanced)
- * @param {Object} foundationalData - Foundational metric results
- * @returns {Object} Sources structure compatible with existing cards
- */
-export const extractSourcesFromFoundational = (foundationalData) => {
-    // For now, return empty sources since cards primarily use totals
-    // This can be enhanced later if cards need detailed source breakdowns
-    return {};
-};
-
-/**
- * Get metric result for current scenario from computedMetrics
- * @param {Map} computedMetrics - All computed metrics
- * @param {string} metricKey - Key of the metric to retrieve
- * @param {Object} selectedPercentiles - Current percentile selection
- * @returns {Object|null} Current metric result with value, formatted, error, metadata
- */
-export const getCurrentMetricResult = (computedMetrics, metricKey, selectedPercentiles) => {
-    if (!computedMetrics || !metricKey) return null;
-
-    const selectedKey = getSelectedPercentileKey(selectedPercentiles);
-    const metricData = computedMetrics.get(metricKey);
-
-    if (metricData && metricData[selectedKey]) {
-        return metricData[selectedKey];
-    }
-
-    return null;
+    });
+    return extracted;
 };
