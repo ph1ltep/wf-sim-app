@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/npv.js - Updated for two-tier architecture
+// frontend/src/utils/cashflow/metrics/analytical/npv.js - Updated for two-tier architecture
 /**
  * Calculate Net Present Value using foundational net cashflow metric
  * @param {Object} input - MetricInput object with foundationalMetrics

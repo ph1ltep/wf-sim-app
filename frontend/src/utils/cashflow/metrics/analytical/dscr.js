@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/dscr.js
+// frontend/src/utils/cashflow/metrics//dscr.js
 import { applyAggregationStrategy } from '../processor.js';
 
 /**

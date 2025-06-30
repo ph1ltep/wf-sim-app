@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/lcoe.js
+// frontend/src/utils/cashflow/metrics/analytical/lcoe.js
 import { applyAggregationStrategy } from '../processor.js';
 
 /**

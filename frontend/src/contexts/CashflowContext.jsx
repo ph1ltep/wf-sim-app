@@ -19,8 +19,8 @@ import { SUPPORTED_METRICS } from '../utils/finance/sensitivityMetrics';
 import { computeAllMetrics } from '../utils/cashflow/metrics/processor';
 import { getMetricsByUsage, getMetricConfig } from '../utils/cashflow/metrics/registry';
 // PHASE 2: Add direct reference helper and percentile discovery
-import { getSelectedPercentileData } from '../utils/cashflow/metrics/directReference';
 import { discoverPercentiles } from '../utils/finance/percentileUtils';
+import { getSelectedPercentileData } from '../utils/cashflow/metrics/directReference';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);

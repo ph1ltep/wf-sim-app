@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/index.js
+// frontend/src/utils/cashflow/metrics/analytical/index.js
 export * from './irr.js';
 export * from './npv.js';
 export * from './dscr.js';

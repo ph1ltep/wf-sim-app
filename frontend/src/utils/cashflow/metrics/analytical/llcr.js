@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/llcr.js
+// frontend/src/utils/cashflow/metrics/analytical/llcr.js
 import { applyAggregationStrategy } from '../processor.js';
 
 /**

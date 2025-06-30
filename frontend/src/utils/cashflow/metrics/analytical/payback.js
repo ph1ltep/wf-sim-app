@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/payback.js
+// frontend/src/utils/cashflow/metrics/analytical/payback.js
 import { applyAggregationStrategy } from '../processor.js';
 
 /**

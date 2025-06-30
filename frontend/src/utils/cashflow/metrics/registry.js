@@ -1,12 +1,12 @@
 // frontend/src/utils/cashflow/metrics/registry.js
-import * as irrCalculations from './calculations/irr.js';
-import * as npvCalculations from './calculations/npv.js';
-import * as dscrCalculations from './calculations/dscr.js';
-import * as lcoeCalculations from './calculations/lcoe.js';
-import * as equityIrrCalculations from './calculations/equityIrr.js';
-import * as llcrCalculations from './calculations/llcr.js';
-import * as icrCalculations from './calculations/icr.js';
-import * as paybackCalculations from './calculations/payback.js';
+import * as irrCalculations from './analytical/irr.js';
+import * as npvCalculations from './analytical/npv.js';
+import * as dscrCalculations from './analytical/dscr.js';
+import * as lcoeCalculations from './analytical/lcoe.js';
+import * as equityIrrCalculations from './analytical/equityIrr.js';
+import * as llcrCalculations from './analytical/llcr.js';
+import * as icrCalculations from './analytical/icr.js';
+import * as paybackCalculations from './analytical/payback.js';
 import { getFinancialColorScheme } from '../../charts/colors.js';
 import { FOUNDATIONAL_METRICS_REGISTRY } from './foundational/index.js';
 
@@ -45,18 +45,19 @@ export const ANALYTICAL_METRICS_REGISTRY = {
         thresholds: [{
             field: 'target_irr', comparison: 'below', value: 8,
             colorRule: (value, threshold) => value < threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 8, description: 'Project IRR below target'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 5, description: 'IRR vs target return threshold'
         }],
         metadata: {
             name: 'Internal Rate of Return', shortName: 'IRR',
-            description: 'Internal rate of return on project investment',
+            description: 'Discount rate that makes NPV equal to zero',
             units: 'percentage', displayUnits: '%',
-            windIndustryStandard: true, calculationComplexity: 'medium'
+            windIndustryStandard: true, calculationComplexity: 'high'
         },
         category: 'financial',
         usage: ['financeability', 'sensitivity', 'comparative'],
-        priority: 12,
+        priority: 10,
         dependsOn: ['netCashflow'],
         inputStrategy: 'foundational',
         cubeConfig: {
@@ -67,21 +68,31 @@ export const ANALYTICAL_METRICS_REGISTRY = {
 
     dscr: {
         ...dscrCalculations,
-        thresholds: [{
-            field: 'dscr_covenant', comparison: 'below', value: 1.2,
-            colorRule: (value, threshold) => value < threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 9, description: 'DSCR below covenant level'
-        }],
+        thresholds: [
+            {
+                field: 'minimum_dscr', comparison: 'below', value: 1.3,
+                colorRule: (value, threshold) => value < threshold ?
+                    { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                    { color: getFinancialColorScheme('good') },
+                priority: 1, description: 'DSCR covenant threshold'
+            },
+            {
+                field: 'strong_dscr', comparison: 'above', value: 1.5,
+                colorRule: (value, threshold) => value > threshold ?
+                    { color: getFinancialColorScheme('excellent') } :
+                    { color: getFinancialColorScheme('good') },
+                priority: 2, description: 'Strong DSCR indicator'
+            }
+        ],
         metadata: {
             name: 'Debt Service Coverage Ratio', shortName: 'DSCR',
-            description: 'Ability to service debt payments from operating cash flows',
+            description: 'Operational cash flow divided by debt service',
             units: 'ratio', displayUnits: 'x',
             windIndustryStandard: true, calculationComplexity: 'medium'
         },
         category: 'financial',
         usage: ['financeability', 'sensitivity', 'comparative'],
-        priority: 13,
+        priority: 12,
         dependsOn: ['netCashflow', 'debtService'],
         inputStrategy: 'foundational',
         cubeConfig: {
@@ -93,24 +104,25 @@ export const ANALYTICAL_METRICS_REGISTRY = {
     lcoe: {
         ...lcoeCalculations,
         thresholds: [{
-            field: 'market_lcoe', comparison: 'above', value: 80,
+            field: 'competitive_lcoe', comparison: 'above', value: 60,
             colorRule: (value, threshold) => value > threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 7, description: 'LCOE above market benchmark'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 1, description: 'Competitive LCOE threshold'
         }],
         metadata: {
             name: 'Levelized Cost of Energy', shortName: 'LCOE',
-            description: 'Levelized cost of energy production over project lifetime',
+            description: 'Total lifecycle costs divided by total energy production',
             units: 'currency_per_mwh', displayUnits: '$/MWh',
-            windIndustryStandard: true, calculationComplexity: 'medium'
+            windIndustryStandard: true, calculationComplexity: 'high'
         },
         category: 'financial',
         usage: ['financeability', 'sensitivity', 'comparative'],
-        priority: 14,
+        priority: 13,
         dependsOn: ['netCashflow', 'totalRevenue'],
         inputStrategy: 'foundational',
         cubeConfig: {
-            aggregation: { method: 'lcoe', options: { filter: 'operational' } },
+            aggregation: { method: 'lcoe', options: { filter: 'all' } },
             timeSeriesRequired: true, percentileDependent: true, aggregatesTo: 'single_value'
         }
     },
@@ -120,22 +132,23 @@ export const ANALYTICAL_METRICS_REGISTRY = {
         thresholds: [{
             field: 'target_equity_irr', comparison: 'below', value: 12,
             colorRule: (value, threshold) => value < threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 6, description: 'Equity IRR below target'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 5, description: 'Equity IRR vs target threshold'
         }],
         metadata: {
             name: 'Equity Internal Rate of Return', shortName: 'Equity IRR',
-            description: 'Internal rate of return on equity investment after debt service',
+            description: 'IRR calculated on equity cash flows after debt service',
             units: 'percentage', displayUnits: '%',
             windIndustryStandard: true, calculationComplexity: 'high'
         },
         category: 'financial',
-        usage: ['financeability', 'sensitivity'],
-        priority: 15,
+        usage: ['financeability', 'sensitivity', 'comparative'],
+        priority: 14,
         dependsOn: ['netCashflow', 'debtService'],
         inputStrategy: 'foundational',
         cubeConfig: {
-            aggregation: { method: 'equity_irr', options: { filter: 'operational' } },
+            aggregation: { method: 'irr', options: { filter: 'equity' } },
             timeSeriesRequired: true, percentileDependent: true, aggregatesTo: 'single_value'
         }
     },
@@ -143,20 +156,21 @@ export const ANALYTICAL_METRICS_REGISTRY = {
     llcr: {
         ...llcrCalculations,
         thresholds: [{
-            field: 'llcr_covenant', comparison: 'below', value: 1.15,
+            field: 'minimum_llcr', comparison: 'below', value: 1.2,
             colorRule: (value, threshold) => value < threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 8, description: 'LLCR below covenant level'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 1, description: 'LLCR covenant threshold'
         }],
         metadata: {
             name: 'Loan Life Coverage Ratio', shortName: 'LLCR',
-            description: 'Present value of cash flows relative to outstanding debt',
+            description: 'NPV of cash flows over remaining loan life divided by outstanding debt',
             units: 'ratio', displayUnits: 'x',
             windIndustryStandard: true, calculationComplexity: 'high'
         },
         category: 'financial',
-        usage: ['financeability'],
-        priority: 16,
+        usage: ['financeability', 'sensitivity', 'comparative'],
+        priority: 15,
         dependsOn: ['netCashflow', 'debtService'],
         inputStrategy: 'foundational',
         cubeConfig: {
@@ -168,21 +182,22 @@ export const ANALYTICAL_METRICS_REGISTRY = {
     icr: {
         ...icrCalculations,
         thresholds: [{
-            field: 'icr_covenant', comparison: 'below', value: 2.0,
+            field: 'minimum_icr', comparison: 'below', value: 2.0,
             colorRule: (value, threshold) => value < threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 7, description: 'ICR below covenant level'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 1, description: 'Interest Coverage Ratio minimum'
         }],
         metadata: {
             name: 'Interest Coverage Ratio', shortName: 'ICR',
-            description: 'Coverage of interest payments from operating cash flows',
+            description: 'EBITDA divided by interest payments',
             units: 'ratio', displayUnits: 'x',
             windIndustryStandard: true, calculationComplexity: 'medium'
         },
         category: 'financial',
-        usage: ['financeability'],
-        priority: 17,
-        dependsOn: ['netCashflow'],
+        usage: ['financeability', 'sensitivity', 'comparative'],
+        priority: 16,
+        dependsOn: ['netCashflow', 'interestPayments'],
         inputStrategy: 'foundational',
         cubeConfig: {
             aggregation: { method: 'min', options: { filter: 'operational' } },
@@ -193,20 +208,21 @@ export const ANALYTICAL_METRICS_REGISTRY = {
     payback: {
         ...paybackCalculations,
         thresholds: [{
-            field: 'max_payback', comparison: 'above', value: 10,
+            field: 'acceptable_payback', comparison: 'above', value: 15,
             colorRule: (value, threshold) => value > threshold ?
-                { color: getFinancialColorScheme('poor'), fontWeight: 600 } : null,
-            priority: 5, description: 'Payback period too long'
+                { color: getFinancialColorScheme('poor'), fontWeight: 600 } :
+                { color: getFinancialColorScheme('good') },
+            priority: 1, description: 'Acceptable payback period threshold'
         }],
         metadata: {
             name: 'Payback Period', shortName: 'Payback',
-            description: 'Time to recover initial investment from cash flows',
+            description: 'Time required for cumulative cash flows to become positive',
             units: 'years', displayUnits: 'years',
-            windIndustryStandard: true, calculationComplexity: 'simple'
+            windIndustryStandard: true, calculationComplexity: 'low'
         },
         category: 'financial',
-        usage: ['comparative'],
-        priority: 18,
+        usage: ['financeability', 'sensitivity', 'comparative'],
+        priority: 17,
         dependsOn: ['netCashflow'],
         inputStrategy: 'foundational',
         cubeConfig: {
@@ -217,104 +233,38 @@ export const ANALYTICAL_METRICS_REGISTRY = {
 };
 
 /**
- * Unified Cashflow Metrics Registry - Two-Tier Architecture
- * Foundational (1-9) → Analytical (10+)
+ * Unified Metrics Registry - Combines foundational and analytical metrics
  */
 export const CASHFLOW_METRICS_REGISTRY = {
+    // Foundational metrics (priority 1-9) - PRD §5.2
     ...FOUNDATIONAL_METRICS_REGISTRY,
+
+    // Analytical metrics (priority 10+) - PRD §5.2 
     ...ANALYTICAL_METRICS_REGISTRY
 };
 
-// Export utility functions (keeping the same as before)
-export const getMetricConfig = (metricKey) => CASHFLOW_METRICS_REGISTRY[metricKey] || null;
-
+/**
+ * Get metrics by usage type for card filtering
+ * @param {string} usageType - Usage type ('financeability', 'sensitivity', 'comparative', 'internal')
+ * @returns {Object} Filtered metrics registry
+ */
 export const getMetricsByUsage = (usageType) => {
-    const filtered = {};
+    const filteredMetrics = {};
+
     Object.entries(CASHFLOW_METRICS_REGISTRY).forEach(([key, config]) => {
         if (config.usage && config.usage.includes(usageType)) {
-            filtered[key] = config;
-        }
-    });
-    return filtered;
-};
-
-export const getMetricsByCategory = (category) => {
-    const filtered = {};
-    Object.entries(CASHFLOW_METRICS_REGISTRY).forEach(([key, config]) => {
-        if (config.category === category) {
-            filtered[key] = config;
-        }
-    });
-    return filtered;
-};
-
-export const getMetricsByPriority = () => {
-    return Object.entries(CASHFLOW_METRICS_REGISTRY)
-        .sort(([, a], [, b]) => a.priority - b.priority);
-};
-
-export const resolveDependencies = (metricKeys = null) => {
-    const keysToResolve = metricKeys || Object.keys(CASHFLOW_METRICS_REGISTRY);
-    const resolved = [];
-    const visited = new Set();
-    const visiting = new Set();
-
-    const visit = (metricKey) => {
-        if (visited.has(metricKey)) return;
-        if (visiting.has(metricKey)) {
-            throw new Error(`Circular dependency detected involving ${metricKey}`);
-        }
-
-        visiting.add(metricKey);
-        const metric = CASHFLOW_METRICS_REGISTRY[metricKey];
-        if (metric && metric.dependsOn) {
-            metric.dependsOn.forEach(depKey => {
-                if (CASHFLOW_METRICS_REGISTRY[depKey]) visit(depKey);
-            });
-        }
-        visiting.delete(metricKey);
-        visited.add(metricKey);
-        resolved.push(metricKey);
-    };
-
-    keysToResolve.forEach(visit);
-    return resolved;
-};
-
-export const validateRegistry = () => {
-    const errors = [];
-    Object.entries(CASHFLOW_METRICS_REGISTRY).forEach(([key, config]) => {
-        if (!config.calculate || typeof config.calculate !== 'function') {
-            errors.push(`${key}: Missing or invalid calculate function`);
-        }
-        if (!config.format || typeof config.format !== 'function') {
-            errors.push(`${key}: Missing or invalid format function`);
-        }
-        if (!config.formatImpact || typeof config.formatImpact !== 'function') {
-            errors.push(`${key}: Missing or invalid formatImpact function`);
-        }
-        if (!config.metadata || !config.metadata.name) {
-            errors.push(`${key}: Missing metadata.name`);
-        }
-        if (config.dependsOn) {
-            config.dependsOn.forEach(depKey => {
-                if (!CASHFLOW_METRICS_REGISTRY[depKey]) {
-                    errors.push(`${key}: Dependency '${depKey}' not found in registry`);
-                }
-            });
-        }
-        if (typeof config.priority !== 'number') {
-            errors.push(`${key}: Missing or invalid priority number`);
+            filteredMetrics[key] = config;
         }
     });
 
-    try {
-        resolveDependencies();
-    } catch (error) {
-        errors.push(`Circular dependency detected: ${error.message}`);
-    }
-
-    return { isValid: errors.length === 0, errors };
+    return filteredMetrics;
 };
 
-export { FOUNDATIONAL_METRICS_REGISTRY, ANALYTICAL_METRICS_REGISTRY };
+/**
+ * Get metric configuration
+ * @param {string} metricKey - Metric key to lookup
+ * @returns {Object|null} Metric configuration or null if not found
+ */
+export const getMetricConfig = (metricKey) => {
+    return CASHFLOW_METRICS_REGISTRY[metricKey] || null;
+};

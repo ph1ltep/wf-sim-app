@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/irr.js
+// frontend/src/utils/cashflow/metrics/analytical/irr.js
 import { applyAggregationStrategy } from '../processor.js';
 import { evaluateMetricThresholds } from '../registry.js';
 

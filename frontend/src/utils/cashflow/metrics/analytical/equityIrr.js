@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/equityIrr.js
+// frontend/src/utils/cashflow/metrics/analytical/equityIrr.js
 import { calculateIRR } from './irr.js';
 
 /**

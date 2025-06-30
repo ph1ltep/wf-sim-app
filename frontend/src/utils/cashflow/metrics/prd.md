@@ -1810,6 +1810,7 @@ Cards access via:
 
 ---
 
+
 ## Function Signatures & Usage
 
 ### Core Computation Functions
@@ -1817,24 +1818,42 @@ Cards access via:
 #### computeAllMetrics()
 ```javascript
 /**
- * Compute all metrics for all percentiles using two-tier system
- * @param {Object} scenarioData - Raw scenario data
- * @param {PercentileSelectionSchema} selectedPercentiles - Percentile configuration
- * @returns {Promise<Map>} Map structure matching AllMetricsDataSchema
+ * Compute all metrics for all available percentiles using registry-based data extraction
+ * @param {Array} availablePercentiles - Array of PercentileSchema objects: [{value: 10, description: 'extreme_lower'}, ...]
+ * @param {Object} perSourcePercentiles - Object mapping sourceId to percentile value: {electricityPrice: 75, escalationRate: 25, ...}
+ * @param {Function} getValueByPath - Data extraction function: (path: string[]) => any
+ * @returns {Promise<Map>} AllMetricsDataSchema as Map<metricKey, Array<[percentileKey, MetricResult]>>
  */
-export const computeAllMetrics = async (scenarioData, selectedPercentiles) => {
-    // Phase 1: Foundational metrics (cashflow table components)
-    // Phase 2: Analytical metrics (any transformations)
-    // Returns Map that validates against AllMetricsDataSchema when converted to array
+export const computeAllMetrics = async (availablePercentiles, perSourcePercentiles, getValueByPath) => {
+    // Internally iterates through all percentileKeys and calls computePercentileScenario for each
+    // Builds complete AllMetricsDataSchema by aggregating results from all percentile scenarios
 };
 ```
+
+#### computePercentileScenario()
+```javascript
+/**
+ * Compute all metrics for a single percentile scenario
+ * @param {string} percentileKey - Target percentile key ('p50', 'p75', 'perSource', etc.)
+ * @param {Object} scenarioConfig - Scenario configuration: {type: 'perSource'|'unified', percentile?: number, sourcePercentiles?: Object}
+ * @param {Function} getValueByPath - Data extraction function: (path: string[]) => any
+ * @returns {Promise<Map>} Map<metricKey, MetricResult> - All metrics for this single percentile
+ */
+export const computePercentileScenario = async (percentileKey, scenarioConfig, getValueByPath) => {
+    // Computes ALL metrics for ONE percentile scenario using two-tier dependency resolution
+    // Used by computeAllMetrics() for each percentile and by context for selective updates
+    // Returns: Map with metricKey -> MetricResult (not the full percentile collection structure)
+};
+```
+
+### Direct Reference Helper Functions
 
 #### getSelectedPercentileData()
 ```javascript
 /**
  * Extract single percentile data across all metrics
  * @param {Map} allMetricsData - Complete computed metrics (AllMetricsDataSchema)
- * @param {string} percentileKey - Target percentile ('p50', 'perSource', etc.)
+ * @param {string} percentileKey - Target percentile ('p50', 'p75', 'perSource', etc.)
  * @returns {Array} PercentileSliceDataSchema - One percentile across all metrics
  */
 export const getSelectedPercentileData = (allMetricsData, percentileKey) => {
@@ -1843,22 +1862,157 @@ export const getSelectedPercentileData = (allMetricsData, percentileKey) => {
 };
 ```
 
-#### extractRawPercentileData()
+#### getSelectedPercentileKey()
 ```javascript
 /**
- * Extract raw scenario data for specific percentile configuration
- * @param {Object} scenarioData - Raw scenario data
- * @param {string} mode - 'unified' or 'perSource'
- * @param {number|Object} percentileSpec - Percentile number or per-source config
- * @returns {Promise<Object>} Raw data for specified percentile configuration
+ * Convert selectedPercentiles object to direct lookup key
+ * @param {Object} selectedPercentiles - Current percentile selection from UI
+ * @returns {string} Percentile key for data lookup ('p50', 'p75', 'perSource', etc.)
  */
-export const extractRawPercentileData = async (scenarioData, mode, percentileSpec) => {
-    // Calls transformScenarioToCashflow with constructed percentile selection
-    // Returns processed raw data for metric calculations
+export const getSelectedPercentileKey = (selectedPercentiles) => {
+    // Converts UI state to direct percentile key for optimized lookups
+    // Strategy 'perSource' -> 'perSource'
+    // Strategy 'unified' with unified: 75 -> 'p75'
 };
 ```
 
+#### getCurrentMetricResult()
+```javascript
+/**
+ * Get specific metric result for target percentile (OPTIMIZED)
+ * @param {Map} computedMetrics - All computed metrics
+ * @param {string} metricKey - Target metric ('dscr', 'npv', etc.)
+ * @param {string} percentileKey - Direct percentile key ('p50', 'p75', 'perSource', etc.)
+ * @returns {Object|null} MetricResult or null if not found
+ */
+export const getCurrentMetricResult = (computedMetrics, metricKey, percentileKey) => {
+    // Optimized: uses direct percentile key instead of selectedPercentiles object
+    // Faster lookups, no object parsing overhead
+};
+```
+
+#### getMetricAcrossPercentiles()
+```javascript
+/**
+ * Get single metric across all available percentiles
+ * @param {Map} allMetricsData - Complete computed metrics
+ * @param {string} metricKey - Target metric ('dscr', 'npv', etc.)
+ * @returns {Array} Array of [percentileKey, MetricResult] for all percentiles of one metric
+ */
+export const getMetricAcrossPercentiles = (allMetricsData, metricKey) => {
+    // Essential for tornado charts and sensitivity analysis
+    // Returns: [['p10', dscrP10], ['p25', dscrP25], ['p50', dscrP50], ['perSource', dscrPerSource]]
+};
+```
+
+#### getAllAvailableMetrics()
+```javascript
+/**
+ * Get all available metrics from computed data
+ * @param {Map} computedMetrics - Complete computed metrics
+ * @returns {Array<string>} Array of available metric keys
+ */
+export const getAllAvailableMetrics = (computedMetrics) => {
+    // For dynamic UI components that need to discover available metrics
+    // Returns: ['dscr', 'npv', 'irr', 'lcoe', 'netCashflow', 'debtService', ...]
+};
+```
+
+#### getMultipleMetrics()
+```javascript
+/**
+ * Get multiple specific metrics for one percentile (PERFORMANCE OPTIMIZED)
+ * @param {Map} allMetricsData - Complete computed metrics
+ * @param {Array<string>} metricKeys - Target metrics ['dscr', 'npv', 'irr']
+ * @param {string} percentileKey - Target percentile ('p50', 'p75', 'perSource', etc.)
+ * @returns {Array} Array of [metricKey, MetricResult] for selected metrics
+ */
+export const getMultipleMetrics = (allMetricsData, metricKeys, percentileKey) => {
+    // Performance optimization for selective data loading
+    // Avoids processing unneeded metrics for card-specific views
+};
+```
+
+### Percentile Key System
+
+#### Valid Percentile Keys
+- **Unified percentiles**: `'p10'`, `'p25'`, `'p50'`, `'p75'`, `'p90'` (from ScenarioContext configuration)
+- **Per-source mode**: `'perSource'` (when selectedPercentiles.strategy === 'perSource')
+
+#### Optimization Pattern
+```javascript
+// ✅ RECOMMENDED: Convert once, use many times
+const currentKey = getSelectedPercentileKey(selectedPercentiles);
+const dscr = getCurrentMetricResult(computedMetrics, 'dscr', currentKey);
+const npv = getCurrentMetricResult(computedMetrics, 'npv', currentKey);
+const allDscrData = getMetricAcrossPercentiles(computedMetrics, 'dscr');
+
+// ❌ INEFFICIENT: Object parsing on every lookup
+const dscr = getCurrentMetricResult(computedMetrics, 'dscr', selectedPercentiles);
+```
+
+### Key Usage Patterns
+
+| Function | Primary Use Case | Performance | Card Usage |
+|----------|------------------|-------------|------------|
+| `getSelectedPercentileData()` | **Cross-metric card views** | O(n) metrics | Dashboard, summary cards |
+| `getCurrentMetricResult()` | **Individual metric lookups** | O(1) constant | Conditional logic, thresholds |
+| `getMetricAcrossPercentiles()` | **Tornado charts, sensitivity** | O(1) constant | DriverExplorerCard, risk analysis |
+| `getAllAvailableMetrics()` | **Dynamic UI discovery** | O(1) constant | Metric selectors, validation |
+| `getMultipleMetrics()` | **Selective card loading** | O(k) selected | Performance-critical cards |
+| `getSelectedPercentileKey()` | **State conversion helper** | O(1) constant | Component-level optimization |
+
 ---
+
+## CashflowContext Integration Functions
+
+### Context Storage Pattern
+```javascript
+// In CashflowContext.jsx - allMetricsData storage
+const [allMetricsData, setAllMetricsData] = useState(new Map());
+
+// Initial computation and storage
+const refreshCashflowData = useCallback(async () => {
+    const computedMetrics = await computeAllMetrics(
+        availablePercentiles, 
+        perSourcePercentiles, 
+        getValueByPath
+    );
+    setAllMetricsData(computedMetrics); // Store complete computed metrics
+}, [availablePercentiles, perSourcePercentiles, getValueByPath]);
+
+// Update any specific percentile scenario (flexible for any percentile)
+const updatePercentileData = useCallback(async (percentileKey, scenarioConfig) => {
+    // Compute new data for this percentile
+    const newPercentileResults = await computePercentileScenario(
+        percentileKey,
+        scenarioConfig,
+        getValueByPath
+    );
+    
+    // Update existing allMetricsData with new percentile results
+    const updatedMetrics = new Map(allMetricsData);
+    newPercentileResults.forEach((metricResult, metricKey) => {
+        const existingCollection = updatedMetrics.get(metricKey) || [];
+        const updatedCollection = existingCollection.filter(([pKey]) => pKey !== percentileKey);
+        updatedCollection.push([percentileKey, metricResult]);
+        updatedMetrics.set(metricKey, updatedCollection);
+    });
+    
+    setAllMetricsData(updatedMetrics);
+}, [allMetricsData, getValueByPath]);
+```
+
+### Context Data Access Pattern
+```javascript
+// Cards access data through context
+const { allMetricsData, selectedPercentiles } = useCashflow();
+
+// Convert to current percentile slice
+const currentPercentileKey = getSelectedPercentileKey(selectedPercentiles);
+const cardData = getSelectedPercentileData(allMetricsData, currentPercentileKey);
+```
+
 
 ## Simplified File Organization
 

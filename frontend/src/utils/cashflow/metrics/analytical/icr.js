@@ -1,4 +1,4 @@
-// frontend/src/utils/cashflow/metrics/calculations/icr.js
+// frontend/src/utils/cashflow/metrics/analytical/icr.js
 import { applyAggregationStrategy } from '../processor.js';
 
 /**
