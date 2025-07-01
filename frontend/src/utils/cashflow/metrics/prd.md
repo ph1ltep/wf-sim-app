@@ -1789,734 +1789,411 @@ Cards access via:
 ```
 
 ---
+# Final PRD Addendum - Schema & Development Requirements
 
-# Unified Metrics System + Sensitivity Cube - Complete Function Signatures
-**Version:** 1.0 | **Date:** 2025-06-30  
-**Integration:** Complete system with bolt-on sensitivity analysis
-
----
-
-# Final Function Signatures - Metrics System + Sensitivity Cube
-**Version:** 1.0 | **Date:** 2025-06-30  
-**Architecture:** Simplified and optimized implementation
+**THIS SUPERSEDES ALL PREVIOUS PRD SECTIONS**  
+**Date:** 2025-07-01  
+**Version:** 3.0 - Final Architecture
 
 ---
 
-## Complete Function Reference Table
+## Executive Summary
 
-### `processor.js` - Computation & Data Generation
-| Function | Input | Output | Description | Usage |
-|----------|--------|--------|-------------|--------|
-| `computeAllMetrics()` | `availablePercentiles`, `perSourcePercentiles`, `getValueByPath`, `cube` | `Map<metricKey, PercentileCollection>` | Compute all metrics for all percentiles, optionally populate cube | **Primary computation** - Called from CashflowContext |
-| `computePercentileScenario()` | `percentileKey`, `scenarioConfig`, `getValueByPath`, `cube` | `Map<metricKey, MetricResult>` | Compute all metrics for single percentile, optionally update cube | **Selective updates** - Called for perSource changes |
-| `initializeSensitivityCube()` | `cube`, `percentileValues`, `getValueByPath` | `void` | Initialize cube structure with dynamic dimensions in-place | **Internal** - Called by computeAllMetrics when cube provided |
-| `setCubeTimeSeries()` | `cube`, `metricKey`, `percentile`, `timeSeriesData` | `void` | Store time-series data in cube during computation | **Internal** - Called during foundational metric calculation |
+The metrics system **completely replaces `transformScenarioToCashflow`** with a two-tier processing model:
 
-### `directReference.js` - Metrics Data Access  
-| Function | Input | Output | Description | Usage |
-|----------|--------|--------|-------------|--------|
-| `getSelectedPercentileData()` | `allMetricsData: Map`, `percentileKey: string` | `Array<[metricKey, MetricResult]>` | Get one percentile across all metrics | **Card data loading** - Primary data source for cards |
-| `getCurrentMetricResult()` | `computedMetrics: Map`, `metricKey: string`, `percentileKey: string` | `MetricResult\|null` | Get specific metric result for percentile | **Individual lookups** - Single metric access |
-| `getMetricAcrossPercentiles()` | `allMetricsData: Map`, `metricKey: string` | `Array<[percentileKey, MetricResult]>` | Get single metric across all percentiles | **Tornado charts** - Essential for sensitivity analysis |
-| `getAllAvailableMetrics()` | `computedMetrics: Map` | `Array<string>` | Get all available metric keys | **Dynamic UI** - Metric selectors, validation |
-| `getSelectedPercentileKey()` | `selectedPercentiles: Object` | `string` | Convert UI state to lookup key | **State conversion** - Component-level optimization |
+1. **Foundational Metrics** (type: 'foundational') - Output time-series data, replace old aggregations section
+2. **Analytical Metrics** (type: 'analytical') - Output aggregated business values using foundational + raw data
 
-### `cubeReference.js` - Simplified Cube Access & Sensitivity Analysis
-| Function | Input | Output | Description | Usage |
-|----------|--------|--------|-------------|--------|
-| `calculateAllMetricSensitivity()` | `cube`, `lowerPercentile`, `upperPercentile`, `options` | `Map<string, ComprehensiveSensitivityResult>` | **SIMPLIFIED** Bulk sensitivity using single metric function | **Tornado charts** - All sensitivity data with % impact, direction, ranges |
-| `calculateSingleMetricSensitivity()` | `cube`, `metricKey`, `lowerPercentile`, `upperPercentile`, `options` | `ComprehensiveSensitivityResult` | **ENHANCED** Complete sensitivity analysis for specific metric | **Individual analysis** - Detailed single metric sensitivity |
-| `getCubeTimeSeriesAsDataPoints()` | `cube`, `metricKey`, `percentile` | `Array<{year, value}>` | **OPTIMIZED** Combined slice access + format conversion | **Primary** - Direct DataPointSchema access for aggregation |
-| `getMetricTimeSeriesForAllPercentiles()` | `cube`, `metricKey`, `options` | `Map<percentile, Array\|Float64Array>` | Get one metric across all percentiles (time-series) | **Advanced analysis** - Percentile comparison charts |
-| `getCubeInfo()` | `cube` | `Object` | Get cube dimensions and memory usage | **Diagnostics** - Monitoring and debugging |
+**Key Storage Pattern**: All metrics stored in `AllMetricsDataSchema` as `[metricKey, percentileCollection]` pairs. Foundational metrics provide time-series sources, analytical metrics provide business results.
 
 ---
 
-## Detailed Function Signatures
+## Core Schema Definitions
 
-### Core Computation Functions
-
-#### computeAllMetrics()
+### 1. MetricResultSchema
 ```javascript
-/**
- * Compute all metrics for all available percentiles using registry-based data extraction
- * @param {Array} availablePercentiles - Array of PercentileSchema objects: [{value: 10, description: 'extreme_lower'}, ...]
- * @param {Object} perSourcePercentiles - Object mapping sourceId to percentile value: {electricityPrice: 75, escalationRate: 25, ...}
- * @param {Function} getValueByPath - Data extraction function: (path: string[]) => any
- * @param {Object|null} cube - Optional SensitivityCube for bolt-on time-series storage
- * @returns {Promise<Map>} AllMetricsDataSchema as Map<metricKey, Array<[percentileKey, MetricResult]>>
- */
-export const computeAllMetrics = async (availablePercentiles, perSourcePercentiles, getValueByPath, cube = null);
-```
-
-#### computePercentileScenario()
-```javascript
-/**
- * Compute all metrics for a single percentile scenario
- * @param {string} percentileKey - Target percentile key ('p50', 'p75', 'perSource', etc.)
- * @param {Object} scenarioConfig - Scenario configuration: {type: 'perSource'|'unified', percentile?: number, sourcePercentiles?: Object}
- * @param {Function} getValueByPath - Data extraction function: (path: string[]) => any
- * @param {Object|null} cube - Optional SensitivityCube for bolt-on time-series storage
- * @returns {Promise<Map>} Map<metricKey, MetricResult> - All metrics for this single percentile
- */
-export const computePercentileScenario = async (percentileKey, scenarioConfig, getValueByPath, cube = null);
-```
-
-### Simplified Sensitivity Analysis Functions
-
-#### calculateAllMetricSensitivity()
-```javascript
-/**
- * Calculate sensitivity impact across ALL metrics for given percentile range
- * SIMPLIFIED: Leverages calculateSingleMetricSensitivity for each metric
- * @param {Object} cube - Populated SensitivityCube instance
- * @param {number} lowerPercentile - Lower bound percentile (e.g., 25)
- * @param {number} upperPercentile - Upper bound percentile (e.g., 75)
- * @param {Object} options - Analysis options: {sortBy?: 'impact'|'metric', includeTimeSeries?: boolean}
- * @returns {Map<string, Object>} Complete sensitivity results for all metrics
- */
-export const calculateAllMetricSensitivity = (cube, lowerPercentile, upperPercentile, options = {});
-```
-
-#### calculateSingleMetricSensitivity()
-```javascript
-/**
- * Calculate sensitivity impact for specific metric across percentile range
- * ENHANCED: Returns comprehensive sensitivity analysis for single metric
- * @param {Object} cube - Populated SensitivityCube instance
- * @param {string} metricKey - Target metric identifier
- * @param {number} lowerPercentile - Lower bound percentile
- * @param {number} upperPercentile - Upper bound percentile
- * @param {Object} options - Options: {includeTimeSeries?: boolean}
- * @returns {Object} Complete sensitivity analysis for single metric
- */
-export const calculateSingleMetricSensitivity = (cube, metricKey, lowerPercentile, upperPercentile, options = {});
-```
-
-#### getCubeTimeSeriesAsDataPoints()
-```javascript
-/**
- * Get time-series data from cube in DataPointSchema format for aggregation
- * OPTIMIZED: Single function that handles both slice access and format conversion
- * @param {Object} cube - SensitivityCube instance
- * @param {string} metricKey - Target metric identifier
- * @param {number} percentile - Target percentile value
- * @returns {Array<{year: number, value: number}>} DataPointSchema array ready for aggregateTimeSeries()
- */
-export const getCubeTimeSeriesAsDataPoints = (cube, metricKey, percentile);
-```
-
----
-
-## Optimization Benefits
-
-### ✅ **Simplified Architecture**
-1. **`calculateAllMetricSensitivity()`** now leverages `calculateSingleMetricSensitivity()` for each metric
-2. **Eliminated `getTimeSeriesSlice()`** - functionality absorbed into `getCubeTimeSeriesAsDataPoints()`
-3. **Single data access pattern** - `getCubeTimeSeriesAsDataPoints()` handles both slice access and format conversion
-
-### ✅ **Function Consolidation**
-```javascript
-// Before: Two separate functions
-const slice = getTimeSeriesSlice(cube, metric, percentile);        // Get raw data
-const dataPoints = getCubeTimeSeriesAsDataPoints(cube, ...);       // Convert format
-
-// After: Single optimized function
-const dataPoints = getCubeTimeSeriesAsDataPoints(cube, metric, percentile);  // Get + convert
-```
-
-### ✅ **Code Reuse**
-```javascript
-// calculateAllMetricSensitivity() implementation:
-for (const metricKey of cube.metrics) {
-    const singleResult = calculateSingleMetricSensitivity(cube, metricKey, lowerPercentile, upperPercentile);
-    results.set(metricKey, singleResult);
-}
-// No code duplication - leverages single metric function
-```
-
----
-
-## Enhanced Sensitivity Result Structure
-
-### ComprehensiveSensitivityResult Object
-```javascript
+// Output from all metric calculate() functions
 {
-  // Core values
-  lowerValue: 1.15,           // Aggregated value at lower percentile
-  upperValue: 1.67,           // Aggregated value at upper percentile  
-  baseValue: 1.41,            // Midpoint value
-  
-  // Impact metrics
-  absoluteImpact: 0.52,       // Absolute difference
-  percentageImpact: 36.9,     // Percentage impact from base
-  impactDirection: 0.52,      // Signed impact (+ = upper higher)
-  direction: 'positive',      // 'positive' | 'negative'
-  
-  // Range analysis
-  range: {
-    min: 1.15,                // Minimum value
-    max: 1.67,                // Maximum value
-    spread: 0.52,             // Total spread
-    midpoint: 1.41            // Midpoint
+    value: any,                    // Raw computed value (time-series array, number, object)
+    displayValue: string,          // Pre-computed formatted display value
+    error: string | null,          // Error message if calculation failed
+    metadata: {
+        calculationMethod: string,  // Metric key
+        percentile: number,        // Which percentile this represents
+        inputSources: string[],    // Dependencies used
+        computationTime: number,   // Performance tracking
+        lineItems: any[]          // Detailed calculation breakdown
+    }
+}
+```
+
+### 2. AllMetricsDataSchema  
+```javascript
+// Main storage structure - By percentile first, all metrics within each percentile
+{
+  p10: {
+    totalRevenue: MetricResult,    // Foundational metric (time-series)
+    netCashflow: MetricResult,     // Foundational metric (time-series) 
+    npv: MetricResult,             // Analytical metric (single value)
+    irr: MetricResult              // Analytical metric (single value)
   },
-  
-  // Percentile info
-  percentiles: {
-    lower: 25,                // Lower percentile used
-    upper: 75,                // Upper percentile used
-    range: 50                 // Percentile range (75-25=50)
+  p50: {
+    totalRevenue: MetricResult,    // Same structure for each percentile
+    netCashflow: MetricResult,
+    npv: MetricResult,
+    irr: MetricResult
   },
-  
-  // Metadata
-  metric: 'dscr',             // Metric key
-  aggregationMethod: 'min',   // How time-series was aggregated
-  units: 'x',                 // Display units
-  
-  // Formatted values (always included)
-  formatted: {
-    lowerValue: '1.15x',
-    upperValue: '1.67x', 
-    baseValue: '1.41x',
-    absoluteImpact: '0.52x',
-    percentageImpact: '36.9%',
-    impactDirection: '+0.52x'
-  },
-  
-  // Time-series analysis (optional - if includeTimeSeries: true)
-  timeSeries: {
-    lower: [{year: 1, value: 1.15}, ...],     // Lower percentile time-series
-    upper: [{year: 1, value: 1.67}, ...],     // Upper percentile time-series
-    yearByYearImpact: [{                       // Year-by-year impact analysis
-      year: 1,
-      lowerValue: 1.15,
-      upperValue: 1.67,
-      impact: 0.52
-    }, ...]
+  p90: { /* ... same metrics ... */ },
+  perSource: {                     // Additional scenario when per-source active
+    totalRevenue: MetricResult,
+    netCashflow: MetricResult,
+    npv: MetricResult,
+    irr: MetricResult
   }
 }
 ```
 
----
-
-## Usage Examples
-
-### Basic Sensitivity Analysis
+### 3. MetricConfigSchema
 ```javascript
-// Get sensitivity for all metrics (tornado chart data)
-const sensitivity = calculateAllMetricSensitivity(cube, 25, 75, {
-  sortBy: 'impact',           // Sort by impact magnitude
-  includeTimeSeries: false    // Skip time-series for performance
-});
-
-// Results ready for tornado chart
-sensitivity.get('dscr') = {
-  absoluteImpact: 0.52,
-  percentageImpact: 36.9,
-  formatted: { absoluteImpact: '0.52x', percentageImpact: '36.9%' }
+// Unified registry entry for both foundational and analytical metrics
+{
+    calculate: Function,           // Core calculation function
+    format: Function,             // Formatting function (value, options?) => string
+    
+    thresholds: ThresholdDefinition[],
+    dependsOn: string[],          // Metric dependencies
+    metadata: Object,             // Metric information
+    category: string,             // UI grouping: revenue, cost, financing, financial, risk, etc.
+    usage: string[],              // Usage flags: financeability, sensitivity, etc.
+    priority: number,             // Computation order (1-9 foundational, 10+ analytical)
+    type: 'foundational' | 'analytical',  // Processing type
+    
+    cubeConfig: {},                   // Cube-specific configuration
+    
+    // Aggregation strategy for time-series processing  
+    aggregation: {
+        method: string,               // sum, npv, min, max, mean, etc.
+        options: {                    // { filter?: 'all'|'operational'|'construction', precision?: number, discountRate?: number }
+            filter?: string,
+            precision?: number,
+            discountRate?: number
+        }
+    }
 }
 ```
 
-### Detailed Single Metric Analysis
-```javascript
-// Get detailed analysis for specific metric
-const dscrAnalysis = calculateSingleMetricSensitivity(cube, 'dscr', 25, 75, {
-  includeTimeSeries: true     // Include year-by-year analysis
-});
+### 4. Cube Schemas
 
-// Rich data available:
-dscrAnalysis.timeSeries.yearByYearImpact; // Year-by-year impact breakdown
-dscrAnalysis.range;                       // Min/max/spread analysis  
-dscrAnalysis.formatted;                   // All values formatted for display
+#### CubeMetadataSchema
+```javascript
+// Complete cube information at parent level
+{
+    dimensions: {
+        percentiles: number[],     // [10, 25, 50, 75, 90]
+        metrics: string[],         // ['totalRevenue', 'netCashflow', ...]
+        yearRange: {
+            first: number,         // -2 (construction)
+            last: number,          // 20 (end of project)
+            count: number          // 23 total years
+        }
+    },
+    computationTime: number,       // Total cube computation time
+    memoryUsage: number,          // Memory usage in bytes
+    lastUpdated: Date             // Last computation timestamp
+}
 ```
 
-### Optimized Data Access
+#### CubeSensitivityResultSchema
 ```javascript
-// Single function for time-series access
-const netCashflowP50 = getCubeTimeSeriesAsDataPoints(cube, 'netCashflow', 50);
-// Returns: [{year: 1, value: 2200000}, {year: 2, value: 2350000}, ...]
-
-// Ready for aggregation
-const npv = aggregateTimeSeries(netCashflowP50, 'npv', { discountRate: 0.1 });
+// Complete sensitivity analysis for DriverExplorerCard tornado charts
+{
+    metricKey: string,            // 'npv', 'irr', etc.
+    impact: {
+        absolute: number,         // Absolute difference (upper - lower)
+        percentage: number,       // Percentage change ((upper - lower) / lower * 100)
+        normalized: number        // Normalized impact for comparison across metrics
+    },
+    values: {
+        lower: number,           // Value at lower percentile (e.g., p25)
+        upper: number,           // Value at upper percentile (e.g., p75)
+        baseline: number         // Baseline value (typically p50)
+    },
+    percentileRange: {
+        lower: number,           // Lower percentile used (25)
+        upper: number            // Upper percentile used (75)
+    },
+    displayValues: {
+        lower: string,           // Formatted lower value "$1.2M"
+        upper: string,           // Formatted upper value "$1.8M"
+        impact: string           // Formatted impact value "+$600K"
+    }
+}
 ```
 
 ---
 
-## Performance Characteristics
+## Data Flow Architecture
 
-### System Performance  
-| Operation | Time Complexity | Typical Speed | Notes |
-|-----------|----------------|---------------|--------|
-| `calculateAllMetricSensitivity()` | O(m×y) | 1-2ms | Leverages single metric function |
-| `calculateSingleMetricSensitivity()` | O(y) | <0.5ms | Optimized data access |
-| `getCubeTimeSeriesAsDataPoints()` | O(y) | <0.1ms | Combined slice + conversion |
-| `computeAllMetrics()` | O(m×p×y) | 10-50ms | Single pass computation + cube |
-
-### Memory Efficiency
-```javascript
-// Example: 6 foundational metrics × 6 percentiles × 30 years
-// Cube storage: 6 × 6 × 30 × 8 bytes = 8.6KB total
-// Total system: ~83KB for complete financial analysis + sensitivity
-
-const cubeInfo = getCubeInfo(cube);
-console.log(`Cube: ${cubeInfo.memorySizeKB}KB for ${cubeInfo.totalValues} data points`);
-// Output: "Cube: 8.6KB for 1080 data points"
+### Complete Processing Flow
+```
+ScenarioData + CASHFLOW_SOURCE_REGISTRY + getValueByPath
+    ↓
+computeAllMetrics(availablePercentiles, perSourcePercentiles, getValueByPath, cube)
+    ↓
+FOR EACH PERCENTILE (p10, p25, p50, p75, p90, perSource):
+    computePercentileScenario(percentileKey, scenarioConfig, getValueByPath, cube)
+        ↓
+    Phase 1: Extract Raw Sources (existing registry logic)
+        sources: { electricityRevenue: timeSeries, omCosts: timeSeries, ... }
+        ↓
+    Phase 2: Foundational Metrics (priority 1-9, can depend on each other)
+        Process in priority order: totalRevenue → totalCosts → netCashflow
+        Output: time-series data stored as MetricResult.value
+        ↓
+    Phase 3: Analytical Metrics (priority 10+, use foundational + raw data)
+        Process: npv, irr, dscr using foundational time-series + raw parameters
+        Output: aggregated values stored as MetricResult.value
+        ↓
+    Phase 4: Cube Population (optional)
+        Store foundational time-series in cube for sensitivity analysis
+    ↓
+AllMetricsDataSchema: [['metric', [['p10', result], ['p50', result]]], ...]
+    ↓
+Storage in CashflowContext as metricsData + cubeData
+    ↓
+Access via getSelectedPercentileData(metricsData, percentileKey)
 ```
 
-This simplified architecture provides the same comprehensive sensitivity analysis capabilities with cleaner code, better performance, and easier maintenance.
+### Foundational vs Analytical Metrics - Critical Distinction
 
-## Sensitivity Cube System (Bolt-On)
+#### Foundational Metrics (Priority 1-9) - TIME-SERIES SOURCES
+- **Purpose**: Generate time-series data that becomes available as a SOURCE for other metrics
+- **Input**: Raw registry sources + previously computed foundational metrics (by priority order)
+- **Output**: Time-series data (DataPointSchema[]) 
+- **Storage**: Added to the sources pool as they are computed
+- **Processing**: Processed in priority order (1, 2, 3...) so later foundational metrics can depend on earlier ones
+- **Examples**: totalRevenue, totalCosts, netCashflow, debtService
+- **Key Point**: These become DATA SOURCES that other metrics can use
 
-### Core Cube Management
-
-#### initializeSensitivityCube()
 ```javascript
-/**
- * Initialize dynamic sensitivity cube with discovered dimensions
- * @param {Array<string>} metricsArray - Foundational metric keys from registry (time-series only)
- * @param {Array<number>} percentilesArray - Available percentile values from ScenarioContext
- * @param {number} yearCount - Project timeline length
- * @param {Array<[string, Object]>} metricConfigs - Metric configuration entries with aggregation methods
- * @returns {Object} Initialized SensitivityCube instance with dynamic typed array
- */
-export const initializeSensitivityCube = (metricsArray, percentilesArray, yearCount, metricConfigs) => {
-    // Creates dynamic Float64Array: metrics.length × percentiles.length × years
-    // Memory allocation: totalSize * 8 bytes (e.g., 6 metrics × 5 percentiles × 25 years = 6KB)
-    // Called from CashflowContext when sensitivity analysis is enabled
-};
-```
-
-#### setCubeTimeSeries()
-```javascript
-/**
- * Set time-series data in cube during metric computation (BOLT-ON CALL)
- * @param {Object} cube - Initialized SensitivityCube instance
- * @param {string} metricKey - Target metric identifier
- * @param {number} percentile - Target percentile value
- * @param {Array<{year: number, value: number}>} timeSeriesData - DataPointSchema array from foundational metrics
- * @returns {void} Data stored directly in cube's typed array
- */
-export const setCubeTimeSeries = (cube, metricKey, percentile, timeSeriesData) => {
-    // INTEGRATION POINT: Called from computePercentileScenario during foundational metric calculation
-    // Only called if cube is provided as parameter (bolt-on architecture)
-    // Validates dimensions and stores data in columnar format for zero-copy access
-};
-```
-
-### Real-Time Sensitivity Analysis
-
-#### calculateAllMetricSensitivity()
-```javascript
-/**
- * Calculate sensitivity impact across ALL metrics for given percentile range
- * @param {Object} cube - Populated SensitivityCube instance
- * @param {number} lowerPercentile - Lower bound percentile (e.g., 25)
- * @param {number} upperPercentile - Upper bound percentile (e.g., 75)
- * @param {Object} options - Analysis options: {sortBy?: 'impact'|'metric', includeFormatted?: boolean}
- * @returns {Map<string, Object>} Sensitivity results for all metrics: {lowerValue, upperValue, impact, formatted*}
- */
-export const calculateAllMetricSensitivity = (cube, lowerPercentile, upperPercentile, options = {}) => {
-    // BULK OPERATION: Processes all metrics in single pass (~1-2ms)
-    // Uses aggregateTimeSeries() from aggregation.js with registry-configured methods
-    // Returns formatted results ready for tornado charts and sensitivity displays
+// Example: netCashflow foundational metric (priority 3)
+export const calculate = (input) => {
+    const { sources } = input; // Access to all previously computed sources
     
-    const results = new Map();
+    // Use earlier foundational metrics as sources (priority 1 & 2)
+    const revenueData = sources.totalRevenue.value;  // Time-series from priority 1
+    const costsData = sources.totalCosts.value;      // Time-series from priority 2
     
-    for (const metricKey of cube.metrics) {
-        const metricConfig = CASHFLOW_METRICS_REGISTRY[metricKey];
-        if (!metricConfig) continue;
-        
-        // Get time-series data as DataPointSchema
-        const lowerDataPoints = getCubeTimeSeriesAsDataPoints(cube, metricKey, lowerPercentile);
-        const upperDataPoints = getCubeTimeSeriesAsDataPoints(cube, metricKey, upperPercentile);
-        
-        // Apply registry-configured aggregation using existing aggregation.js
-        const aggregationMethod = metricConfig.cubeConfig?.aggregation?.method || 'min';
-        const aggregationOptions = metricConfig.cubeConfig?.aggregation?.options || {};
-        
-        const lowerValue = aggregateTimeSeries(lowerDataPoints, aggregationMethod, aggregationOptions);
-        const upperValue = aggregateTimeSeries(upperDataPoints, aggregationMethod, aggregationOptions);
-        
-        const impact = Math.abs(upperValue - lowerValue);
-        
-        results.set(metricKey, {
-            lowerValue, upperValue, impact,
-            formattedLower: metricConfig.format ? metricConfig.format(lowerValue) : lowerValue,
-            formattedUpper: metricConfig.format ? metricConfig.format(upperValue) : upperValue,
-            formattedImpact: metricConfig.format ? metricConfig.format(impact) : impact
-        });
-    }
-    
-    return results;
-};
-```
-
-#### getCubeTimeSeriesAsDataPoints()
-```javascript
-/**
- * Get time-series data from cube in DataPointSchema format for aggregation
- * @param {Object} cube - SensitivityCube instance
- * @param {string} metricKey - Target metric identifier
- * @param {number} percentile - Target percentile value
- * @param {number} startYear - Starting year for DataPointSchema conversion (default: 0)
- * @returns {Array<{year: number, value: number}>} DataPointSchema array ready for aggregateTimeSeries()
- */
-export const getCubeTimeSeriesAsDataPoints = (cube, metricKey, percentile, startYear = 0) => {
-    // Get zero-copy slice from cube typed array
-    const timeSeriesSlice = getTimeSeriesSlice(cube, metricKey, percentile);
-    
-    // Convert to DataPointSchema format for aggregateTimeSeries() compatibility
-    return Array.from(timeSeriesSlice).map((value, index) => ({
-        year: startYear + index,
-        value
+    // Generate NEW time-series that will become a source for others
+    const netCashflowData = revenueData.map((point, index) => ({
+        year: point.year,
+        value: point.value - (costsData[index]?.value || 0)
     }));
+    
+    return { value: netCashflowData }; // Time-series output
 };
 ```
 
-#### getTimeSeriesSlice()
+#### Analytical Metrics (Priority 10+) - AGGREGATED RESULTS
+- **Purpose**: Calculate final business metrics using all available sources (raw + foundational)
+- **Input**: All sources (raw + foundational) + raw scenario data access for parameters
+- **Output**: Aggregated values (number, object) - NOT time-series
+- **Storage**: Final results, NOT added to sources pool
+- **Processing**: Processed after all foundational metrics are complete
+- **Examples**: npv, irr, dscr, lcoe
+- **Key Point**: These are END RESULTS, not data sources for other calculations
+
+```javascript
+// Example: npv analytical metric (priority 10)
+export const calculate = (input) => {
+    const { sources, rawData } = input;
+    
+    // Use foundational metric as source
+    const netCashflowData = sources.netCashflow.value;  // Time-series from foundational
+    
+    // Get additional parameters from raw data
+    const discountRate = rawData.getValueByPath(['settings', 'finance', 'costOfEquity']);
+    
+    // Calculate AGGREGATED result (single value, not time-series)
+    const npv = netCashflowData.reduce((pv, point) => {
+        return pv + (point.value / Math.pow(1 + discountRate, point.year));
+    }, 0);
+    
+    return { value: npv }; // Single aggregated value
+};
+```
+
+---
+
+## Function Signatures
+
+### Core Processor Functions
 ```javascript
 /**
- * Extract time-series data for specific metric and percentile (zero-copy)
- * @param {Object} cube - SensitivityCube instance
- * @param {string} metricKey - Target metric identifier
- * @param {number} percentile - Target percentile value
- * @param {Object} options - Slice options: {operationalOnly?: boolean, yearRange?: [start, end]}
- * @returns {Float64Array} Zero-copy time-series slice (subarray of main data)
+ * Main computation - replaces transformScenarioToCashflow entirely
  */
-export const getTimeSeriesSlice = (cube, metricKey, percentile, options = {}) => {
-    // Ultra-fast data access using columnar storage indexing
-    // Returns typed array subview (no memory copying)
-    // Used internally by getCubeTimeSeriesAsDataPoints()
-};
+export const computeAllMetrics = async (
+    availablePercentiles: PercentileSchema[],
+    perSourcePercentiles: Record<string, number>, 
+    getValueByPath: Function,
+    cube?: MetricsCube | null
+) => Promise<AllMetricsDataSchema>  // Returns object with percentile keys
+
+/**
+ * Single percentile computation - core processing logic
+ */
+export const computePercentileScenario = async (
+    percentileKey: string,
+    scenarioConfig: { type: 'unified' | 'perSource', percentile?: number, sourcePercentiles?: Object },
+    getValueByPath: Function,
+    cube?: MetricsCube | null
+) => Promise<Map<string, MetricResult>>
+```
+
+### Direct Reference Functions
+```javascript
+/**
+ * Extract current percentile data for card consumption
+ */
+export const getSelectedPercentileData = (
+    allMetricsData: AllMetricsDataSchema,
+    percentileKey: string
+) => PercentileSliceDataSchema
+
+/**
+ * Determine current percentile key from selection
+ */
+export const getSelectedPercentileKey = (
+    selectedPercentiles: PercentileSelectionSchema
+) => string
+```
+
+### Cube Functions
+```javascript
+/**
+ * Initialize cube with foundational time-series data
+ */
+export const initializeSensitivityCube = (
+    cube: MetricsCube,
+    allMetricsData: AllMetricsDataSchema
+) => void
+
+/**
+ * Calculate sensitivity across all metrics (calls calculateSingleMetricSensitivity)
+ */
+export const calculateAllMetricSensitivity = (
+    cube: MetricsCube,
+    lowerPercentile: number,
+    upperPercentile: number,
+    options?: Object
+) => Map<string, CubeSensitivityResult>
+
+/**
+ * Calculate sensitivity for single metric
+ */
+export const calculateSingleMetricSensitivity = (
+    cube: MetricsCube,
+    metricKey: string,
+    lowerPercentile: number,
+    upperPercentile: number,
+    options?: Object
+) => CubeSensitivityResult
 ```
 
 ---
 
-## Integration with Existing aggregation.js
-
-### Standardized Aggregation Integration
-
-The sensitivity cube leverages the existing `aggregateTimeSeries` function from `frontend/src/utils/timeSeries/aggregation.js`:
-
-```javascript
-// From aggregation.js - Used by cube system
-export const aggregateTimeSeries = (data, method, options = {}) => {
-    // Supports all existing methods: 'min', 'max', 'mean', 'sum', 'npv', 'first', 'last'
-    // Supports all existing filters: 'operational', 'construction', 'early', 'late', 'all'
-    // Supports all existing options: discountRate, precision, weights
-};
-```
-
-### Registry Configuration Example
-
-```javascript
-// In registry.js - Metric with cube-specific aggregation
-export const FOUNDATIONAL_METRICS_REGISTRY = {
-    netCashflow: {
-        // ... existing config ...
-        cubeConfig: {
-            aggregation: {
-                method: 'sum',              // Uses aggregateTimeSeries('sum')
-                options: { 
-                    filter: 'all',         // All years for NPV calculation
-                    precision: 0 
-                }
-            },
-            timeSeriesRequired: true,       // Include in sensitivity cube
-            percentileDependent: true
-        }
-    }
-};
-
-export const ANALYTICAL_METRICS_REGISTRY = {
-    dscr: {
-        // ... existing config ...
-        cubeConfig: {
-            aggregation: {
-                method: 'min',              // Uses aggregateTimeSeries('min')
-                options: { 
-                    filter: 'operational',  // Years > 0 only for DSCR
-                    precision: 2 
-                }
-            },
-            timeSeriesRequired: false,      // Exclude from cube (calculated from foundational)
-            percentileDependent: true
-        }
-    }
-};
-```
-
----
-
-## CashflowContext Integration Patterns
-
-### Complete Context Storage Pattern
-
-```javascript
-// In CashflowContext.jsx - Dual storage for metrics and sensitivity cube
-const [allMetricsData, setAllMetricsData] = useState(new Map());
-const [sensitivityCube, setSensitivityCube] = useState(null);
-
-// Initialize cube alongside metrics (optional bolt-on)
-const initializeCube = useCallback((enable = false) => {
-    if (!enable) return null;
-    
-    // Filter to foundational metrics with time-series data
-    const foundationalMetrics = Object.keys(FOUNDATIONAL_METRICS_REGISTRY)
-        .filter(key => {
-            const config = FOUNDATIONAL_METRICS_REGISTRY[key];
-            return config.metadata?.units === 'timeSeries' && 
-                   config.cubeConfig?.timeSeriesRequired;
-        });
-    
-    const cube = initializeSensitivityCube(
-        foundationalMetrics,
-        availablePercentiles.map(p => p.value),
-        getValueByPath(['settings', 'general', 'projectLife']),
-        foundationalMetrics.map(key => [key, FOUNDATIONAL_METRICS_REGISTRY[key]])
-    );
-    
-    return cube;
-}, [availablePercentiles]);
-
-// Integrated computation with optional cube (BOLT-ON PATTERN)
-const refreshCashflowData = useCallback(async (enableCube = false) => {
-    // Initialize cube if requested
-    const cube = enableCube ? (sensitivityCube || initializeCube(true)) : null;
-    
-    // Compute metrics with cube as bolt-on parameter
-    const computedMetrics = await computeAllMetrics(
-        availablePercentiles,
-        perSourcePercentiles,
-        getValueByPath,
-        cube // Optional bolt-on: null disables cube population
-    );
-    
-    setAllMetricsData(computedMetrics);
-    if (cube) setSensitivityCube(cube);
-}, [availablePercentiles, perSourcePercentiles, getValueByPath, sensitivityCube]);
-
-// Update specific percentile (cube updated as side effect)
-const updatePercentileData = useCallback(async (percentileKey, scenarioConfig) => {
-    // Compute new data for this percentile
-    const newPercentileResults = await computePercentileScenario(
-        percentileKey,
-        scenarioConfig,
-        getValueByPath,
-        sensitivityCube // Cube updated as side effect if present
-    );
-    
-    // Update existing allMetricsData with new percentile results
-    const updatedMetrics = new Map(allMetricsData);
-    newPercentileResults.forEach((metricResult, metricKey) => {
-        const existingCollection = updatedMetrics.get(metricKey) || [];
-        const updatedCollection = existingCollection.filter(([pKey]) => pKey !== percentileKey);
-        updatedCollection.push([percentileKey, metricResult]);
-        updatedMetrics.set(metricKey, updatedCollection);
-    });
-    
-    setAllMetricsData(updatedMetrics);
-    // Note: sensitivityCube already updated by computePercentileScenario
-}, [allMetricsData, sensitivityCube, getValueByPath]);
-```
-
-### Card Usage Patterns
-
-```javascript
-// Standard metrics usage (existing functionality)
-const { allMetricsData, selectedPercentiles } = useCashflow();
-const currentKey = getSelectedPercentileKey(selectedPercentiles);
-const cardData = getSelectedPercentileData(allMetricsData, currentKey);
-
-// Sensitivity analysis usage (new functionality - optional)
-const { sensitivityCube } = useCashflow();
-const [lowerBound, setLowerBound] = useState(25);
-const [upperBound, setUpperBound] = useState(75);
-
-const sensitivityResults = useMemo(() => {
-    if (!sensitivityCube) return new Map();
-    
-    return calculateAllMetricSensitivity(
-        sensitivityCube,
-        lowerBound,
-        upperBound,
-        { sortBy: 'impact', includeFormatted: true }
-    );
-}, [sensitivityCube, lowerBound, upperBound]);
-
-// Tornado chart data ready for immediate use
-const tornadoData = Array.from(sensitivityResults.entries())
-    .map(([metric, data]) => ({
-        variable: metric,
-        impact: data.impact,
-        lowerFormatted: data.formattedLower,
-        upperFormatted: data.formattedUpper
-    }))
-    .sort((a, b) => b.impact - a.impact);
-```
-
----
-
-## Function Call Locations & Integration Points
-
-### Where Cube Functions Are Called
-
-| Function | Called From | Purpose | Required |
-|----------|-------------|---------|----------|
-| `initializeSensitivityCube()` | **CashflowContext** initialization | Create cube structure | Optional |
-| `setCubeTimeSeries()` | **computePercentileScenario()** | Store foundational time-series | Bolt-on |
-| `calculateAllMetricSensitivity()` | **Sensitivity cards** (DriverExplorerCard) | Real-time analysis | Optional |
-| `getCubeTimeSeriesAsDataPoints()` | **calculateAllMetricSensitivity()** | Data format conversion | Internal |
-| `getTimeSeriesSlice()` | **getCubeTimeSeriesAsDataPoints()** | Zero-copy data access | Internal |
-
-### Bolt-On Architecture Benefits
-
-1. **Zero Impact**: Metrics system works identically with `sensitivityCube = null`
-2. **Optional Feature**: Enable/disable cube per use case or user preference  
-3. **Consistent Aggregation**: Uses same `aggregateTimeSeries()` as main system
-4. **Memory Efficient**: 6KB for complete sensitivity analysis capability
-5. **Real-Time Analysis**: Sub-millisecond sensitivity recalculation for tornado charts
-
----
-
-## Performance Characteristics
-
-### System Performance
-| Operation | Time Complexity | Typical Speed | Memory Usage |
-|-----------|----------------|---------------|--------------|
-| `computeAllMetrics()` | O(m×p×y) | 10-50ms | Single pass |
-| `getSelectedPercentileData()` | O(m) | <1ms | Zero allocation |
-| `calculateAllMetricSensitivity()` | O(m×y) | 1-2ms | Minimal allocation |
-| `getCubeTimeSeriesAsDataPoints()` | O(y) | <0.1ms | Array allocation |
-| `getTimeSeriesSlice()` | O(1) | <0.1ms | Zero-copy subarray |
-
-### Memory Efficiency
-```javascript
-// Example: 6 foundational metrics × 5 percentiles × 25 years
-// Cube storage: 6 × 5 × 25 × 8 bytes = 6KB total
-// Metrics storage: ~50-100KB (aggregated results + metadata)
-// Total system: ~56-106KB for complete financial analysis + sensitivity
-
-const cubeInfo = getCubeInfo(sensitivityCube);
-console.log(`Total memory: ${cubeInfo.memorySizeKB}KB cube + ~75KB metrics = ~81KB total`);
-```
-
-This unified system provides enterprise-grade financial analysis with optional bolt-on sensitivity analysis, all while maintaining backward compatibility and leveraging existing aggregation infrastructure.
-
-
-## CashflowContext Integration Functions
+## Development Implementation Requirements
 
 ### Context Storage Pattern
 ```javascript
-// In CashflowContext.jsx - allMetricsData storage
-const [allMetricsData, setAllMetricsData] = useState(new Map());
+// CashflowContext storage
+const [metricsData, setMetricsData] = useState(null);      // AllMetricsDataSchema
+const [cubeData, setCubeData] = useState(null);            // MetricsCube
 
-// Initial computation and storage
-const refreshCashflowData = useCallback(async () => {
-    const computedMetrics = await computeAllMetrics(
-        availablePercentiles, 
-        perSourcePercentiles, 
-        getValueByPath
+// Main computation
+const refreshMetricsData = useCallback(async () => {
+    const cube = enableCube ? new MetricsCube() : null;
+    
+    const allMetrics = await computeAllMetrics(
+        availablePercentiles,
+        perSourcePercentiles,
+        getValueByPath,
+        cube
     );
-    setAllMetricsData(computedMetrics); // Store complete computed metrics
+    
+    setMetricsData(allMetrics);
+    if (cube) setCubeData(cube);
 }, [availablePercentiles, perSourcePercentiles, getValueByPath]);
-
-// Update any specific percentile scenario (flexible for any percentile)
-const updatePercentileData = useCallback(async (percentileKey, scenarioConfig) => {
-    // Compute new data for this percentile
-    const newPercentileResults = await computePercentileScenario(
-        percentileKey,
-        scenarioConfig,
-        getValueByPath
-    );
-    
-    // Update existing allMetricsData with new percentile results
-    const updatedMetrics = new Map(allMetricsData);
-    newPercentileResults.forEach((metricResult, metricKey) => {
-        const existingCollection = updatedMetrics.get(metricKey) || [];
-        const updatedCollection = existingCollection.filter(([pKey]) => pKey !== percentileKey);
-        updatedCollection.push([percentileKey, metricResult]);
-        updatedMetrics.set(metricKey, updatedCollection);
-    });
-    
-    setAllMetricsData(updatedMetrics);
-}, [allMetricsData, getValueByPath]);
 ```
 
-### Context Data Access Pattern
+### Metric Implementation Pattern
 ```javascript
-// Cards access data through context
-const { allMetricsData, selectedPercentiles } = useCashflow();
+// Standard metric file structure
+export const calculate = (input) => {
+    // Computation logic
+    return { value: computedValue };
+};
 
-// Convert to current percentile slice
-const currentPercentileKey = getSelectedPercentileKey(selectedPercentiles);
-const cardData = getSelectedPercentileData(allMetricsData, currentPercentileKey);
+export const format = (value, options = {}) => {
+    // Formatting logic - examples:
+    // currency: (value, precision = 1) => `$${(value / 1000000).toFixed(precision)}M`
+    // percentage: (value, precision = 1) => `${(value * 100).toFixed(precision)}%`
+    // ratio: (value, precision = 2) => `${value.toFixed(precision)}x`
+    // lcoe: (value, precision = 0) => `$${value.toFixed(precision)}/MWh`
+    // irr: (value, precision = 1) => `${(value * 100).toFixed(precision)}%`
+    // years: (value, precision = 1) => `${value.toFixed(precision)} years`
+};
+
+export const metadata = {
+    name: 'Display Name',
+    shortName: 'Short',
+    description: 'Detailed description',
+    units: 'currency|percentage|ratio|timeSeries',
+    windIndustryStandard: true
+};
 ```
 
-
-## Simplified File Organization
-
-### Clean Two-Tier Structure
+### Registry Integration
+```javascript
+// Registry entry pattern
+export const METRICS_REGISTRY = {
+    totalRevenue: {
+        ...totalRevenue,
+        category: 'revenue',           // UI grouping
+        type: 'foundational',          // Processing type
+        priority: 1,                   // Computation order
+        dependsOn: [],                 // No dependencies
+        usage: ['internal'],           // Usage flags
+        thresholds: [],               // Threshold definitions
+        cubeConfig: {},               // Cube-specific configuration
+        aggregation: { method: 'sum', options: { filter: 'all' } }  // Time-series aggregation strategy
+    },
+    
+    npv: {
+        ...npv,
+        category: 'financial',         // UI grouping
+        type: 'analytical',            // Processing type
+        priority: 10,                  // After foundational
+        dependsOn: ['netCashflow'],    // Foundational dependency
+        usage: ['financeability', 'sensitivity'],
+        thresholds: [/* threshold definitions */],
+        cubeConfig: {},               // Cube-specific configuration
+        aggregation: { method: 'npv', options: { filter: 'all' } }  // Aggregation for business calculation
+    }
+};
 ```
-frontend/src/utils/cashflow/metrics/
-├── foundational/                  # Tier 1 - Cashflow table components
-│   ├── index.js                  # Exports FoundationalMetricsRegistrySchema
-│   ├── netCashflow.js           # Foundational metric: aggregated net cashflow
-│   ├── debtService.js           # Foundational metric: aggregated debt service
-│   ├── totalRevenue.js          # Foundational metric: aggregated revenue
-│   ├── totalCosts.js            # Foundational metric: aggregated costs
-│   └── ...                      # Additional foundational metrics as needed
-├── analytical/                   # Tier 2 - Any transformations
-│   ├── index.js                 # Exports AnalyticalMetricsRegistrySchema
-│   ├── dscr.js                  # Financial metric example
-│   ├── npv.js                   # Financial metric example
-│   ├── irr.js                   # Financial metric example
-│   ├── lcoe.js                  # Financial metric example
-│   ├── riskAssessment.js        # Risk metric example
-│   ├── availability.js          # Operational metric example
-│   ├── customBusinessMetric.js  # Custom transformation example
-│   └── ...                     # Any additional metrics/transformations
-└── registry.js                  # Exports UnifiedMetricsRegistrySchema
-```
-
-**Note**: No complex sub-categorization - just two simple folders for the two-tier system. The `analytical/` folder can contain any type of transformation (financial, risk, operational, custom business logic) without further organization.
 
 ---
 
-## Corrected Two-Tier System Understanding
+## Key Implementation Notes
 
-### Tier 1: Foundational Metrics (Cashflow Table Components)
-- **Input**: Raw scenario data (various formats)
-- **Processing**: Pre-calculations for commonly needed data sources
-- **Output**: **Aggregated figures** representing cashflow table items
-- **Examples**: Net cashflow amount, debt service amount, total revenue, total costs
-- **Purpose**: Provide reusable data sources that multiple Tier 2 metrics need
+1. **No backward compatibility needed** - Clean implementation without legacy support
+2. **Cube integration built-in** - Foundational time-series automatically populate cube
+3. **Display values pre-computed** - Call `format()` during computation, store in `displayValue`
+4. **Registry-driven processing** - All behavior defined in registry configuration
+5. **Priority-based dependencies** - Foundational metrics can depend on each other
+6. **Type-based processing** - `type` field determines whether output is time-series or aggregated
+7. **Unified storage** - Both foundational and analytical results in same `AllMetricsDataSchema`
+8. **Cube for sensitivity only** - Time-series data and percentile-dependent by design
 
-### Tier 2: Analytical Metrics (Any Transformations)
-- **Input**: Foundational metric results + raw scenario data as needed
-- **Processing**: Any business logic, financial calculations, transformations
-- **Output**: **Aggregated figures** for specific business needs
-- **Examples**: Financial ratios, risk assessments, performance metrics, custom business calculations
-- **Purpose**: Flexible calculation layer for any business requirements
-
-Both tiers produce aggregated output values, with Tier 1 focused on reusable foundation data and Tier 2 handling any type of business calculation or transformation needs.
-
----
-
-## Schema Validation Points
-
-### Input Validation
-- **`computeAllMetrics()`**: Validates `PercentileSelectionSchema` input
-- **`getSelectedPercentileData()`**: Validates `AllMetricsDataSchema` input
-- **Metric `calculate()` functions**: Validate `MetricInputSchema`
-
-### Output Validation  
-- **`computeAllMetrics()`**: Output validates as `AllMetricsDataSchema`
-- **`getSelectedPercentileData()`**: Output validates as `PercentileSliceDataSchema`
-- **Individual metrics**: Each result validates as `MetricResultSchema`
-
-### Storage Validation
-- **CashflowContext `computedMetrics`**: Validates as `AllMetricsDataSchema` when converted to array
-- **Individual metric access**: Validates as `MetricPercentileCollectionSchema`
-
-This comprehensive schema system provides clear structure validation while supporting dynamic percentiles and the flexible two-tier metrics architecture.
+This architecture provides complete replacement of `transformScenarioToCashflow` with enhanced capabilities for business analytics and sensitivity analysis.
