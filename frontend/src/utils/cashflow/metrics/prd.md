@@ -1789,11 +1789,64 @@ Cards access via:
 ```
 
 ---
+
 # Final PRD Addendum - Schema & Development Requirements
 
 **THIS SUPERSEDES ALL PREVIOUS PRD SECTIONS**  
 **Date:** 2025-07-01  
 **Version:** 3.0 - Final Architecture
+
+---
+
+## Complete Function Reference Table
+
+| Function | File | Input | Output | Primary Purpose | Key Implementation Notes |
+|----------|------|-------|--------|-----------------|-------------------------|
+| **computeAllMetrics** | processor.js | `availablePercentiles`, `perSourcePercentiles`, `getValueByPath`, `cube?` | `AllMetricsDataSchema` | Main computation replacing transformScenarioToCashflow | Orchestrates all percentile scenarios, calls computePercentileScenario recursively |
+| **computePercentileScenario** | processor.js | `percentileKey`, `scenarioConfig`, `getValueByPath`, `cube?` | `Record<string, MetricResult>` | Core processing logic for single percentile | Three-phase processing: raw sources → foundational → analytical |
+| **createMetricInput** | processor.js | `metricKey`, `config`, `sources`, `getValueByPath`, `percentileContext` | `MetricInputSchema` | Build standardized input for metric calculations | Handles dependency resolution and input structure differences |
+| **resolveDependencies** | processor.js | `registry` | `string[]` | Resolve computation order for metrics | Topological sort with priority ordering, detects circular dependencies |
+| **getSelectedPercentileData** | directReference.js | `allMetricsData`, `percentileKey` | `Record<string, MetricResult>` | Extract all metrics for current percentile | Direct access to percentile slice, used by cards for data consumption |
+| **getSelectedPercentileKey** | directReference.js | `selectedPercentiles` | `string` | Determine current percentile key | Converts percentile selection to key format ('p50', 'perSource') |
+| **getCurrentMetricResult** | directReference.js | `allMetricsData`, `metricKey`, `selectedPercentiles` | `MetricResult\|null` | Get single metric for current percentile | Convenience function combining percentile resolution + metric extraction |
+| **initializeSensitivityCube** | cubeReference.js | `cube`, `allMetricsData` | `void` | Populate cube with foundational time-series | Extracts foundational metrics only, builds [percentile][metric][year] structure |
+| **calculateAllMetricSensitivity** | cubeReference.js | `cube`, `lowerPercentile`, `upperPercentile`, `options?` | `Map<string, CubeSensitivityResult>` | Calculate sensitivity across all metrics | Calls calculateSingleMetricSensitivity recursively, sorts by impact |
+| **calculateSingleMetricSensitivity** | cubeReference.js | `cube`, `metricKey`, `lowerPercentile`, `upperPercentile`, `options?` | `CubeSensitivityResult` | Calculate sensitivity for one metric | Core sensitivity analysis with absolute/percentage/normalized impact |
+| **getCubeTimeSeriesAsDataPoints** | cubeReference.js | `cube`, `metricKey`, `percentile` | `Array<{year, value}>` | Extract time-series in DataPointSchema format | Converts cube data to standard format for aggregation functions |
+| **getCubeInfo** | cubeReference.js | `cube` | `CubeMetadataSchema` | Get cube diagnostics and metadata | Returns dimensions, memory usage, computation statistics |
+
+### Function Dependencies & Call Patterns
+
+```
+computeAllMetrics()
+├── resolveDependencies() → get computation order
+├── computePercentileScenario() → for each percentile
+│   ├── createMetricInput() → for each metric
+│   └── [metric].calculate() → individual calculations
+└── initializeSensitivityCube() → if cube provided
+
+calculateAllMetricSensitivity()
+└── calculateSingleMetricSensitivity() → for each metric
+
+getSelectedPercentileData()
+├── getSelectedPercentileKey() → determine current percentile
+└── direct access to allMetricsData[percentileKey]
+
+getCurrentMetricResult()
+├── getSelectedPercentileKey() → determine current percentile  
+└── getSelectedPercentileData() → extract percentile data
+```
+
+### Critical Implementation Requirements
+
+| Function | Must Handle | Cannot Fail On | Performance Target |
+|----------|-------------|-----------------|-------------------|
+| **computeAllMetrics** | Missing percentiles, empty perSource | Invalid percentile values | < 2 seconds for 6 percentiles |
+| **computePercentileScenario** | Missing dependencies, registry errors | Individual metric failures | < 300ms per percentile |
+| **resolveDependencies** | Circular dependencies, missing metrics | Registry structure changes | < 10ms (cached) |
+| **getSelectedPercentileData** | Missing percentiles | Invalid percentile keys | < 1ms (direct access) |
+| **calculateSingleMetricSensitivity** | Missing data points, zero values | Time-series inconsistencies | < 50ms per metric |
+| **initializeSensitivityCube** | Non-foundational metrics, empty data | Missing time-series | < 100ms total |
 
 ---
 
