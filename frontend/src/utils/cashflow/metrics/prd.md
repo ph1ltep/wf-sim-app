@@ -1789,7 +1789,6 @@ Cards access via:
 ```
 
 ---
-
 # Final PRD Addendum - Schema & Development Requirements
 
 **THIS SUPERSEDES ALL PREVIOUS PRD SECTIONS**  
