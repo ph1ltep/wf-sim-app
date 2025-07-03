@@ -89,7 +89,8 @@ const CubeSourceDataSchema = Yup.object().shape({
     percentileSource: Yup.array().of(SimResultsSchema).default([]),
     metadata: CubeSourceMetadataSchema.required('Metadata is required'), //can be copied from CubeSourceRegistryItemSchema.metadata and applies equally to all percentiles.
     audit: Yup.object().shape({
-        appliedMultipliers: Yup.array().of(AppliedMultiplierSchema).default([])
+        appliedMultipliers: Yup.array().of(AppliedMultiplierSchema).default([]),
+        dependencyChain: Yup.array().of(Yup.string()).default([])
     }).required('Metadata is required')
 })
 
