@@ -48,7 +48,8 @@ const CubeSourceMetadataSchema = Yup.object().shape({
     cashflowGroup: Yup.string().oneOf(['cost', 'revenue', 'asset', 'liability', 'risk', 'opportunity', 'none']).default('none'), //will be used to group how variables affect cashflow table.
     category: Yup.string().required('Category is required'),
     description: Yup.string().required('Description is required'),
-    formatter: Yup.mixed().optional() //function to format number/precision/unit and return string.
+    formatter: Yup.mixed().optional(), //function to format number/precision/unit and return string.
+    customPercentile: Yup.string().default(50),
 });
 
 // each source item in CASHFLOW_SOURCE_REGISTRY.
@@ -83,7 +84,6 @@ const AppliedMultiplierSchema = Yup.object().shape({
 });
 
 // represents each line item of data. One per processed CubeSourceRegistryItemSchema
-// cube stores metrics, maybe not data sources.
 const CubeSourceDataSchema = Yup.object().shape({
     id: Yup.string().required('sourceID is required'),
     percentileSource: Yup.array().of(SimResultsSchema).default([]),
@@ -98,3 +98,4 @@ const CubeReferenceDataSchema = Yup.array().of(Yup.object().shape({ // global re
     key: Yup.string().required('reference key is required'),
     value: Yup.mixed().required('reference value is required')
 })).default([]);
+

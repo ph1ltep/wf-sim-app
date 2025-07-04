@@ -1,6 +1,7 @@
 // frontend/src/utils/cube/processor.js
 import { CubeSourceDataSchema } from '../../../schemas/yup/cube';
 import { SimResultsSchema, DataPointSchema } from '../../../schemas/yup/distribution';
+import { validate } from '../validate';
 import Yup from 'yup';
 
 /**
@@ -8,11 +9,17 @@ import Yup from 'yup';
  * @param {Object} sourceRegistry - CubeSourceRegistrySchema with references and sources
  * @param {Array} availablePercentiles - Array of available percentiles [10, 25, 50, 75, 90]
  * @param {Function} getValueByPath - Function to extract data from scenario: (path: string[]) => any
+ * @param {Object|null} customPercentile - Custom percentile configuration {sourceId: percentileValue} or null
  * @returns {Array} Array of CubeSourceDataSchema objects (processedData)
  */
-export const computeSourceData = (sourceRegistry, availablePercentiles, getValueByPath) => {
+export const computeSourceData = (sourceRegistry, availablePercentiles, getValueByPath, customPercentile = null) => {
     console.log('🔄 Starting PHASE 1 cube data processing...');
     const startTime = performance.now();
+    
+    // Modify availablePercentiles if customPercentile is enabled
+    const effectivePercentiles = customPercentile 
+        ? [...availablePercentiles, 0]
+        : availablePercentiles;
     
     // Step 1: Load global references
     console.log('📚 Loading global references...');
@@ -84,6 +91,12 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             if (source.path) {
                 try {
                     sourceData = getValueByPath(source.path);
+                    
+                    // Handle custom percentile for sources with percentiles
+                    if (customPercentile && source.hasPercentiles && sourceData) {
+                        sourceData = addCustomPercentileData(sourceData, source.id, customPercentile);
+                    }
+                    
                     console.log(`📥 Source data extracted for '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Failed to extract source data for '${source.id}':`, error.message);
@@ -96,7 +109,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             let transformedData;
             if (source.transformer) {
                 try {
-                    transformedData = applyTransformer(sourceData, source, availablePercentiles, allReferences, processedData);
+                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile);
                     console.log(`🔄 Transformer applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Transformer failed for '${source.id}':`, error.message);
@@ -105,7 +118,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
                 }
             } else {
                 // Convert sourceData to SimResultsSchema array if no transformer
-                transformedData = validateSourceDataStructure(sourceData, source.hasPercentiles, availablePercentiles);
+                transformedData = validateSourceDataStructure(sourceData, source.hasPercentiles, effectivePercentiles);
             }
             
             // Step 3f: Apply multipliers
@@ -114,7 +127,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             
             if (source.multipliers && source.multipliers.length > 0) {
                 try {
-                    const multiplierResult = applyMultipliers(transformedData, source.multipliers, allReferences, processedData);
+                    const multiplierResult = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile);
                     multipliedData = multiplierResult.data;
                     appliedMultipliers = multiplierResult.appliedMultipliers;
                     console.log(`🔢 ${source.multipliers.length} multipliers applied to '${source.id}'`);
@@ -185,6 +198,42 @@ const validateSourceType = (source) => {
 };
 
 /**
+ * Add custom percentile data by copying from specified percentile
+ * @param {Array} sourceData - Original source data array
+ * @param {string} sourceId - Source ID to lookup in customPercentile
+ * @param {Object} customPercentile - Custom percentile configuration
+ * @returns {Array} Source data with added custom percentile (0) entry
+ */
+const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
+    if (!Array.isArray(sourceData)) return sourceData;
+    
+    const targetPercentile = customPercentile[sourceId];
+    if (!targetPercentile) return sourceData;
+    
+    // Find the item with the target percentile value
+    const sourceItem = sourceData.find(item => 
+        item.percentile && item.percentile.value === targetPercentile
+    );
+    
+    if (!sourceItem) {
+        console.warn(`⚠️ Custom percentile ${targetPercentile} not found for source '${sourceId}'`);
+        return sourceData;
+    }
+    
+    // Create a copy with percentile 0 but metadata showing original percentile
+    const customItem = {
+        ...sourceItem,
+        percentile: { value: 0 },
+        metadata: {
+            ...sourceItem.metadata,
+            customPercentile: targetPercentile
+        }
+    };
+    
+    return [...sourceData, customItem];
+};
+
+/**
  * Validate and normalize source data to SimResultsSchema array
  * @param {any} sourceData - Raw source data
  * @param {boolean} hasPercentiles - Whether source has percentile data
@@ -245,9 +294,10 @@ const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercen
  * @param {Array} availablePercentiles - Available percentiles
  * @param {Object} allReferences - Combined references
  * @param {Array} processedData - Previously processed data
+ * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Array} Array of SimResultsSchema objects
  */
-const applyTransformer = (sourceData, source, availablePercentiles, allReferences, processedData) => {
+const applyTransformer = (sourceData, source, availablePercentiles, allReferences, processedData, customPercentile) => {
     const context = {
         hasPercentiles: source.hasPercentiles,
         availablePercentiles,
@@ -255,7 +305,8 @@ const applyTransformer = (sourceData, source, availablePercentiles, allReference
         processedData,
         options: {},
         id: source.id,
-        metadata: source.metadata
+        metadata: source.metadata,
+        customPercentile
     };
     
     const transformerResult = source.transformer(sourceData, context);
@@ -270,9 +321,10 @@ const applyTransformer = (sourceData, source, availablePercentiles, allReference
  * @param {Array} multipliers - Array of multiplier configurations
  * @param {Object} allReferences - Combined references
  * @param {Array} processedData - Previously processed data
+ * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Object} { data: Array<SimResultsSchema>, appliedMultipliers: Array<AppliedMultiplierSchema> }
  */
-const applyMultipliers = (transformedData, multipliers, allReferences, processedData) => {
+const applyMultipliers = (transformedData, multipliers, allReferences, processedData, customPercentile) => {
     const appliedMultipliers = [];
     let resultData = [...transformedData];
     
@@ -282,7 +334,7 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
         
         if (multiplierValues) {
             // Create optimized value lookup function
-            const getMultiplierValue = createValueLookup(multiplierValues);
+            const getMultiplierValue = createValueLookup(multiplierValues, customPercentile, multiplier.id);
             
             // Apply multiplier operation
             resultData = resultData.map(dataPoint => {
@@ -321,12 +373,19 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
                 };
             });
             
+            // Determine actual percentile for audit trail
+            let auditPercentile = null;
+            if (customPercentile && customPercentile[multiplier.id]) {
+                auditPercentile = customPercentile[multiplier.id];
+            }
+            
             appliedMultipliers.push({
                 id: multiplier.id,
                 operation: multiplier.operation,
                 values: multiplierValues,
                 baseYear: multiplier.baseYear || 1,
-                cumulative: false
+                cumulative: false,
+                actualPercentile: auditPercentile // Log actual percentile used for custom percentile
             });
         }
     });
@@ -340,9 +399,11 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
 /**
  * Create optimized value lookup function based on multiplier format
  * @param {any} multiplierValues - Scalar, DataPointSchema array, or SimResultsSchema array
+ * @param {Object|null} customPercentile - Custom percentile configuration
+ * @param {string} multiplierId - Multiplier ID for custom percentile lookup
  * @returns {Function} (year, percentile) => multiplier value or null
  */
-const createValueLookup = (multiplierValues) => {
+const createValueLookup = (multiplierValues, customPercentile, multiplierId) => {
     // Direct Yup validation for type checking
     if (typeof multiplierValues === 'number') {
         return (year, percentile) => multiplierValues;
@@ -359,7 +420,13 @@ const createValueLookup = (multiplierValues) => {
             });
             
             return (year, percentile) => {
-                const key = `${year}-${percentile}`;
+                // Handle custom percentile (0) lookup
+                let actualPercentile = percentile;
+                if (percentile === 0 && customPercentile && customPercentile[multiplierId]) {
+                    actualPercentile = customPercentile[multiplierId];
+                }
+                
+                const key = `${year}-${actualPercentile}`;
                 return lookupMap.get(key) || null;
             };
         } catch (error) {
