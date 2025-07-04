@@ -34,7 +34,7 @@ const { DataPointSchema, SimResultsSchema } = require('./distribution');
 
 //transformer should get processedData so it can do summations. 
 
-
+// need to pass selectedPercentiles to computeSourceData
 
 // adds data references that can be used in multipliers, transformers, formatters. takes path string array.
 const CubeReferenceRegistryItemSchema = Yup.object().shape({ // global references. available to all item's transformers/multipliers
