@@ -2,6 +2,7 @@
 import { CubeSourceDataSchema } from '../../../schemas/yup/cube';
 import { SimResultsSchema, DataPointSchema } from '../../../schemas/yup/distribution';
 import { validate } from '../validate';
+import { createAuditTrail } from '../audit';
 import Yup from 'yup';
 
 /**
@@ -15,101 +16,108 @@ import Yup from 'yup';
 export const computeSourceData = (sourceRegistry, availablePercentiles, getValueByPath, customPercentile = null) => {
     console.log('🔄 Starting PHASE 1 cube data processing...');
     const startTime = performance.now();
-    
+
     // Modify availablePercentiles if customPercentile is enabled
-    const effectivePercentiles = customPercentile 
-        ? [...availablePercentiles, 0]
+    const effectivePercentiles = customPercentile
+        ? [...availablePercentiles, ...Object.values(customPercentile)]
         : availablePercentiles;
-    
+
     // Step 1: Load global references
-    console.log('📚 Loading global references...');
     const globalReferences = {};
     let referenceErrors = 0;
-    
-    sourceRegistry.references?.forEach(ref => {
+
+    sourceRegistry.references.forEach(ref => {
         try {
-            const value = getValueByPath(ref.path);
-            globalReferences[ref.id] = value;
-            console.log(`✅ Global reference '${ref.id}' loaded`);
+            const refValue = getValueByPath(ref.path);
+            globalReferences[ref.id] = refValue;
         } catch (error) {
             console.error(`❌ Failed to load global reference '${ref.id}':`, error.message);
             referenceErrors++;
         }
     });
-    
-    // Step 2: Initialize processedData array
+
+    console.log(`📚 Global references loaded: ${Object.keys(globalReferences).length}, errors: ${referenceErrors}`);
+
+    // Step 2: Initialize processedData
     const processedData = [];
-    
-    // Step 3: Sort sources by type and priority
-    console.log('🔀 Sorting sources by type and priority...');
-    const sortedSources = [...sourceRegistry.sources]
-        .sort((a, b) => {
-            // Sort by type first (direct -> indirect -> virtual)
-            const typeOrder = { direct: 1, indirect: 2, virtual: 3 };
-            if (a.metadata.type !== b.metadata.type) {
-                return typeOrder[a.metadata.type] - typeOrder[b.metadata.type];
-            }
-            
-            // Then by priority within type grouping
-            return a.priority - b.priority;
-        });
-    
-    console.log(`📊 Processing ${sortedSources.length} sources in priority order...`);
-    
-    // Main processing loop
+
+    // Step 3: Process sources by priority (direct, indirect, virtual)
+    const sortedSources = [...sourceRegistry.sources].sort((a, b) => {
+        const priorityOrder = { 'direct': 1, 'indirect': 2, 'virtual': 3 };
+        const typePriority = priorityOrder[a.metadata.type] - priorityOrder[b.metadata.type];
+        return typePriority !== 0 ? typePriority : a.priority - b.priority;
+    });
+
     let processedCount = 0;
     let errorCount = 0;
-    
+
     for (const source of sortedSources) {
         try {
-            console.log(`🔍 Processing source '${source.id}' (${source.metadata.type}, priority: ${source.priority})`);
-            
+            // Initialize audit trail for this source
+            const auditTrail = createAuditTrail(source.id, 50, true);
+            const { addAuditEntry, getTrail } = auditTrail;
+
             // Step 3a: Validate source type
-            const isValidSource = validateSourceType(source);
-            if (!isValidSource) {
-                console.error(`❌ Source '${source.id}' failed validation`);
+            if (!validateSourceType(source)) {
+                console.error(`❌ Invalid source type configuration for '${source.id}'`);
                 errorCount++;
                 continue;
             }
-            
-            // Step 3b: Process local references
+
+            // Step 3b: Load local references
             const localReferences = {};
-            source.references?.forEach(ref => {
+            source.references.forEach(ref => {
                 try {
-                    const value = getValueByPath(ref.path);
-                    localReferences[ref.id] = value;
+                    const refValue = getValueByPath(ref.path);
+                    localReferences[ref.id] = refValue;
                 } catch (error) {
                     console.error(`❌ Failed to load local reference '${ref.id}' for source '${source.id}':`, error.message);
                 }
             });
-            
+
             // Step 3c: Combine global + local references (local overrides global)
             const allReferences = { ...globalReferences, ...localReferences };
-            
+
+            // Add audit entry for reference loading
+            addAuditEntry(
+                'apply_reference_loading',
+                `loaded ${Object.keys(allReferences).length} references`,
+                Object.keys(allReferences)
+            );
+
             // Step 3d: Extract source data
             let sourceData = null;
             if (source.path) {
                 try {
                     sourceData = getValueByPath(source.path);
-                    
+
                     // Handle custom percentile for sources with percentiles
                     if (customPercentile && source.hasPercentiles && sourceData) {
                         sourceData = addCustomPercentileData(sourceData, source.id, customPercentile);
                     }
-                    
+
                     console.log(`📥 Source data extracted for '${source.id}'`);
+
+                    // Add audit entry for processing start with input data sample
+                    addAuditEntry(
+                        'apply_processing_start',
+                        `extracted data from path: ${source.path.join('.')}`,
+                        [], // No dependencies here
+                        sourceData // Single data sample
+                    );
+
                 } catch (error) {
                     console.error(`❌ Failed to extract source data for '${source.id}':`, error.message);
                     errorCount++;
                     continue;
                 }
             }
-            
+
             // Step 3e: Apply transformer
             let transformedData;
             if (source.transformer) {
                 try {
-                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile);
+                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile, addAuditEntry);
                     console.log(`🔄 Transformer applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Transformer failed for '${source.id}':`, error.message);
@@ -120,16 +128,12 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
                 // Convert sourceData to SimResultsSchema array if no transformer
                 transformedData = validateSourceDataStructure(sourceData, source.hasPercentiles, effectivePercentiles);
             }
-            
+
             // Step 3f: Apply multipliers
             let multipliedData;
-            let appliedMultipliers = [];
-            
             if (source.multipliers && source.multipliers.length > 0) {
                 try {
-                    const multiplierResult = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile);
-                    multipliedData = multiplierResult.data;
-                    appliedMultipliers = multiplierResult.appliedMultipliers;
+                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile, addAuditEntry);
                     console.log(`🔢 ${source.multipliers.length} multipliers applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Multipliers failed for '${source.id}':`, error.message);
@@ -139,41 +143,48 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             } else {
                 multipliedData = transformedData;
             }
-            
+
+            // Add audit entry for processing end with final output sample
+            addAuditEntry(
+                'apply_processing_end',
+                `processing complete`,
+                [], // No dependencies here
+                multipliedData // Single data sample of final result
+            );
             // Step 3g: Build CubeSourceDataSchema
             const cubeSourceData = {
                 id: source.id,
                 percentileSource: multipliedData,
                 metadata: source.metadata,
                 audit: {
-                    appliedMultipliers
+                    trail: getTrail()
                 }
             };
-            
+
             // Ultra-fast validation
             if (!cubeSourceData.id || !Array.isArray(cubeSourceData.percentileSource) || !cubeSourceData.metadata) {
                 console.error(`❌ Invalid CubeSourceDataSchema for '${source.id}'`);
                 errorCount++;
                 continue;
             }
-            
+
             // Add to processedData
             processedData.push(cubeSourceData);
             processedCount++;
             console.log(`✅ Source '${source.id}' processed successfully`);
-            
+
         } catch (error) {
             console.error(`❌ Unexpected error processing source '${source.id}':`, error.message);
             errorCount++;
         }
     }
-    
+
     const endTime = performance.now();
     const duration = (endTime - startTime).toFixed(2);
-    
+
     console.log(`🎉 PHASE 1 processing complete: ${processedCount} sources processed, ${errorCount} errors, ${referenceErrors} reference errors`);
     console.log(`⏱️ Total processing time: ${duration}ms`);
-    
+
     return processedData;
 };
 
@@ -184,7 +195,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
  */
 const validateSourceType = (source) => {
     const { type } = source.metadata;
-    
+
     switch (type) {
         case 'direct':
             return source.path && (!source.multipliers || source.multipliers.length === 0);
@@ -206,20 +217,20 @@ const validateSourceType = (source) => {
  */
 const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
     if (!Array.isArray(sourceData)) return sourceData;
-    
+
     const targetPercentile = customPercentile[sourceId];
     if (!targetPercentile) return sourceData;
-    
+
     // Find the item with the target percentile value
-    const sourceItem = sourceData.find(item => 
+    const sourceItem = sourceData.find(item =>
         item.percentile && item.percentile.value === targetPercentile
     );
-    
+
     if (!sourceItem) {
         console.warn(`⚠️ Custom percentile ${targetPercentile} not found for source '${sourceId}'`);
         return sourceData;
     }
-    
+
     // Create a copy with percentile 0 but metadata showing original percentile
     const customItem = {
         ...sourceItem,
@@ -229,7 +240,7 @@ const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
             customPercentile: targetPercentile
         }
     };
-    
+
     return [...sourceData, customItem];
 };
 
@@ -247,7 +258,7 @@ const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
  */
 const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercentiles) => {
     if (!sourceData) return [];
-    
+
     // Check if already compliant SimResultsSchema array
     if (Array.isArray(sourceData)) {
         try {
@@ -258,9 +269,9 @@ const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercen
             try {
                 // Try DataPointSchema array validation
                 Yup.array().of(DataPointSchema).validateSync(sourceData);
-                
+
                 // Convert DataPointSchema array to SimResultsSchema array
-                return sourceData.flatMap(dataPoint => 
+                return sourceData.flatMap(dataPoint =>
                     availablePercentiles.map(percentile => ({
                         year: dataPoint.year,
                         value: dataPoint.value,
@@ -272,7 +283,7 @@ const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercen
             }
         }
     }
-    
+
     // Handle single SimResultsSchema object
     try {
         SimResultsSchema.validateSync(sourceData);
@@ -297,20 +308,20 @@ const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercen
  * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Array} Array of SimResultsSchema objects
  */
-const applyTransformer = (sourceData, source, availablePercentiles, allReferences, processedData, customPercentile) => {
+const applyTransformer = (sourceData, source, availablePercentiles, allReferences, processedData, customPercentile, addAuditEntry) => {
     const context = {
-        hasPercentiles: source.hasPercentiles,
         availablePercentiles,
         allReferences,
         processedData,
-        options: {},
-        id: source.id,
+        hasPercentiles: source.hasPercentiles,
         metadata: source.metadata,
-        customPercentile
+        customPercentile,
+        addAuditEntry // Pass audit function to transformer
     };
-    
+
+    // Transformer will handle its own audit entries with dependencies
     const transformerResult = source.transformer(sourceData, context);
-    
+
     // Validate and normalize transformer output
     return validateSourceDataStructure(transformerResult, source.hasPercentiles, availablePercentiles);
 };
@@ -325,31 +336,42 @@ const applyTransformer = (sourceData, source, availablePercentiles, allReference
  * @returns {Object} { data: Array<SimResultsSchema>, appliedMultipliers: Array<AppliedMultiplierSchema> }
  */
 const applyMultipliers = (transformedData, multipliers, allReferences, processedData, customPercentile) => {
-    const appliedMultipliers = [];
     let resultData = [...transformedData];
-    
+
     // Process each multiplier in array order
     multipliers.forEach(multiplier => {
         const multiplierValues = findMultiplierValues(multiplier.id, processedData, allReferences);
-        
+
         if (multiplierValues) {
+            // Determine multiplier value type for audit
+            const valueType = typeof multiplierValues === 'number' ? 'scalar' :
+                Array.isArray(multiplierValues) ? 'timeSeries' : 'processed';
+
+            // Add audit entry for multiplier with actual dependency and sample data
+            addAuditEntry(
+                'apply_multiplier',
+                `${multiplier.id} (${multiplier.operation}, ${valueType})`,
+                [multiplier.id], // This is the actual dependency - the multiplier source
+                multiplierValues // Single sample of the multiplier data
+            );
+
             // Create optimized value lookup function
             const getMultiplierValue = createValueLookup(multiplierValues, customPercentile, multiplier.id);
-            
+
             // Apply multiplier operation
             resultData = resultData.map(dataPoint => {
                 // Apply filter if exists - filter operates on source data (year, value, percentile)
                 if (multiplier.filter && !multiplier.filter(dataPoint.year, dataPoint.value, dataPoint.percentile.value)) {
                     return dataPoint;
                 }
-                
+
                 // Get multiplier value for this data point
                 const multiplierValue = getMultiplierValue(dataPoint.year, dataPoint.percentile.value);
                 if (multiplierValue === null) return dataPoint;
-                
+
                 let newValue;
                 const baseYear = multiplier.baseYear || 1;
-                
+
                 switch (multiplier.operation) {
                     case 'multiply':
                         newValue = dataPoint.value * multiplierValue;
@@ -366,19 +388,19 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
                     default:
                         throw new Error(`Unknown multiplier operation: ${multiplier.operation}`);
                 }
-                
+
                 return {
                     ...dataPoint,
                     value: newValue
                 };
             });
-            
+
             // Determine actual percentile for audit trail
             let auditPercentile = null;
             if (customPercentile && customPercentile[multiplier.id]) {
                 auditPercentile = customPercentile[multiplier.id];
             }
-            
+
             appliedMultipliers.push({
                 id: multiplier.id,
                 operation: multiplier.operation,
@@ -389,7 +411,7 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
             });
         }
     });
-    
+
     return {
         data: resultData,
         appliedMultipliers
@@ -408,7 +430,7 @@ const createValueLookup = (multiplierValues, customPercentile, multiplierId) => 
     if (typeof multiplierValues === 'number') {
         return (year, percentile) => multiplierValues;
     }
-    
+
     if (Array.isArray(multiplierValues)) {
         try {
             // Check if SimResultsSchema array
@@ -418,14 +440,14 @@ const createValueLookup = (multiplierValues, customPercentile, multiplierId) => 
                 const key = `${item.year}-${item.percentile.value}`;
                 lookupMap.set(key, item.value);
             });
-            
+
             return (year, percentile) => {
                 // Handle custom percentile (0) lookup
                 let actualPercentile = percentile;
                 if (percentile === 0 && customPercentile && customPercentile[multiplierId]) {
                     actualPercentile = customPercentile[multiplierId];
                 }
-                
+
                 const key = `${year}-${actualPercentile}`;
                 return lookupMap.get(key) || null;
             };
@@ -437,14 +459,14 @@ const createValueLookup = (multiplierValues, customPercentile, multiplierId) => 
                 multiplierValues.forEach(item => {
                     lookupMap.set(item.year, item.value);
                 });
-                
+
                 return (year, percentile) => lookupMap.get(year) || null;
             } catch (error2) {
                 throw new Error(`Invalid multiplier values format: ${error2.message}`);
             }
         }
     }
-    
+
     throw new Error('Multiplier values must be scalar, DataPointSchema array, or SimResultsSchema array');
 };
 
@@ -461,11 +483,11 @@ const findMultiplierValues = (multiplierId, processedData, allReferences) => {
     if (processedSource) {
         return processedSource.percentileSource;
     }
-    
+
     // Look in allReferences second
     if (allReferences[multiplierId]) {
         return allReferences[multiplierId];
     }
-    
+
     return null;
 };

@@ -75,12 +75,17 @@ const CubeSourceRegistrySchema = Yup.object().shape({
     sources: Yup.array().of(CubeSourceRegistryItemSchema).default([]), //all the sources from CASHFLOW_SOURCE_REGISTRY.
 });
 
-const AppliedMultiplierSchema = Yup.object().shape({
-    id: Yup.string().required('Multiplier ID is required'),
-    operation: Yup.string().oneOf(['multiply', 'compound', 'simple']).required('Operation is required'),
-    values: Yup.array().of(DataPointSchema).required('Operation values are required'),
-    baseYear: Yup.number().default(1),
-    cumulative: Yup.boolean().default(false)
+// Add after existing schemas, before CubeSourceDataSchema
+const AuditTrailEntrySchema = Yup.object().shape({
+    timestamp: Yup.number().required('Timestamp is required'),
+    step: Yup.string().required('Step name is required'),
+    details: Yup.mixed().optional(),
+    dependencies: Yup.array().of(Yup.string()).default([]),
+    dataSample: Yup.object().shape({
+        percentile: Yup.number().required('Percentile is required'),
+        data: Yup.mixed().required('Sample data is required')
+    }).optional(),
+    duration: Yup.number().optional()
 });
 
 // represents each line item of data. One per processed CubeSourceRegistryItemSchema
@@ -89,9 +94,8 @@ const CubeSourceDataSchema = Yup.object().shape({
     percentileSource: Yup.array().of(SimResultsSchema).default([]),
     metadata: CubeSourceMetadataSchema.required('Metadata is required'), //can be copied from CubeSourceRegistryItemSchema.metadata and applies equally to all percentiles.
     audit: Yup.object().shape({
-        appliedMultipliers: Yup.array().of(AppliedMultiplierSchema).default([]),
-        dependencyChain: Yup.array().of(Yup.string()).default([])
-    }).required('Metadata is required')
+        trail: Yup.array().of(AuditTrailEntrySchema).default([])
+    }).required('Audit trail is required')
 })
 
 const CubeReferenceDataSchema = Yup.array().of(Yup.object().shape({ // global references. available to all item's transformers/multipliers

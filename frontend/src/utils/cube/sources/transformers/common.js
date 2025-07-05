@@ -79,13 +79,26 @@ export const filterCubeSourceData = (processedData, filters = {}) => {
  * @param {Object} options - Aggregation options
  * @param {string} [options.operation='sum'] - Aggregation operation ('sum', 'subtract', 'multiply')
  * @param {Object|null} [options.customPercentile] - Custom percentile configuration {sourceId: percentileValue}
+ * @param {Function|null} [addAuditEntry] - Optional audit trail function
  * @returns {Array} Array of SimResultsSchema objects with aggregated values
  */
-export const aggregateCubeSourceData = (sources, availablePercentiles, options = {}) => {
+export const aggregateCubeSourceData = (sources, availablePercentiles, options = {}, addAuditEntry = null) => {
     const { operation = 'sum', customPercentile } = options;
 
     if (!Array.isArray(sources) || sources.length === 0) {
         return [];
+    }
+
+    // Track dependencies for audit trail
+    const dependencies = sources.map(source => source.id);
+
+    // Add audit entry if function provided
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_aggregation',
+            `aggregating ${sources.length} sources (${operation})`,
+            dependencies
+        );
     }
 
     // Determine effective percentiles
