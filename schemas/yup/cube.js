@@ -99,3 +99,14 @@ const CubeReferenceDataSchema = Yup.array().of(Yup.object().shape({ // global re
     value: Yup.mixed().required('reference value is required')
 })).default([]);
 
+const CubeSourceDataResponseSchema = Yup.object().shape({
+    // Dynamic keys with data and metadata
+    // Mode 1: key = percentile (10, 25, 50, etc.)
+    // Mode 2: key = sourceId ("energyRevenue", "escalationRate", etc.)
+    // Mode 3: key = sourceId (single entry)
+}).test('dynamic-keys', 'Invalid response structure', function (value) {
+    // Simple validation - each key should have data array and metadata object
+    return Object.values(value).every(item =>
+        Array.isArray(item.data) && typeof item.metadata === 'object'
+    );
+});
