@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ScenarioProvider } from './contexts/ScenarioContext';
 import { CashflowProvider } from './contexts/CashflowContext'; // Add this import
+import { CubeProvider } from './contexts/CubeContext'; // Add CubeProvider import
 import { ConfigProvider, theme } from 'antd';
 import MainLayout from './layouts/MainLayout';
 
@@ -54,7 +55,7 @@ function App() {
       }}
     >
       <ScenarioProvider>
-        <CashflowProvider>
+        <CubeProvider>
           <Router basename={basename}>
             <Routes>
               <Route path="/" element={<MainLayout />}>
@@ -107,7 +108,7 @@ function App() {
               </Route>
             </Routes>
           </Router>
-        </CashflowProvider>
+        </CubeProvider>
       </ScenarioProvider>
     </ConfigProvider>
   );

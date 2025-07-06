@@ -2,40 +2,59 @@
 import React, { useState } from 'react';
 import { Select, Button, Modal, Form, Row, Col, Typography, Space, Tag, Alert } from 'antd';
 import { SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { useCashflow } from '../../../../contexts/CashflowContext';
+//import { useCashflow } from '../../../../contexts/CashflowContext';
+import { useScenario } from '../../../../contexts/ScenarioContext';
+import { useCube } from '../../../../contexts/CubeContext';
 
 const { Option } = Select;
 const { Text } = Typography;
 
 const PercentileSelector = () => {
+    const { scenarioData, getValueByPath, updateByPath } = useScenario();
+    const availablePercentiles = scenarioData?.settings?.simulation?.percentiles?.map(p => p.value) || [10, 25, 50, 75, 90]
+    const primaryPercentile = scenarioData?.settings?.simulation?.primaryPercentile || 50;
     const {
-        availablePercentiles,
-        primaryPercentile,
-        percentileSources,
-        selectedPercentiles,
-        updatePercentileSelection
-    } = useCashflow();
+        //availablePercentiles,
+        //primaryPercentile,
+        getCustomPercentiles,
+        selectedPercentile,
+        //updatePercentileSelection
+    } = useCube();
+    const customPercentiles = getCustomPercentiles();
+
+    const updatePercentileSelection = (newSelection) => {
+        console.log('🎯 Percentile selection changed:', {
+            from: selectedPercentile.strategy,
+            to: newSelection.strategy,
+            unified: newSelection.value,
+            perSourceCount: Object.keys(newSelection.customPercentile || {}).length
+        });
+
+        const result = updateByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile'], newSelection);
+        console.log('⚡ Instant percentile switch - no recomputation needed');
+    };
+
 
     const [modalVisible, setModalVisible] = useState(false);
     const [form] = Form.useForm();
 
     const handleUnifiedChange = (value) => {
         updatePercentileSelection({
-            ...selectedPercentiles,
+            ...selectedPercentile,
             strategy: 'unified',
-            unified: value
+            value: value
         });
     };
 
     const handleAdvancedSubmit = async () => {
         try {
             const values = await form.validateFields();
-            const { strategy, unified, ...perSourceValues } = values;
+            const { strategy, value, ...perSourceValues } = values;
 
             const newSelection = {
                 strategy,
-                unified: unified || primaryPercentile,
-                perSource: perSourceValues
+                value: value || primaryPercentile,
+                customPercentile: perSourceValues
             };
 
             if (updatePercentileSelection(newSelection)) {
@@ -62,9 +81,9 @@ const PercentileSelector = () => {
 
             <Space>
                 <Select
-                    value={selectedPercentiles?.unified || primaryPercentile}
+                    value={selectedPercentile?.value || primaryPercentile}
                     onChange={handleUnifiedChange}
-                    disabled={selectedPercentiles?.strategy !== 'unified'}
+                    disabled={selectedPercentile?.strategy !== 'unified'}
                     style={{ minWidth: 120 }}
                 >
                     {availablePercentiles.map(percentile => (
@@ -79,23 +98,23 @@ const PercentileSelector = () => {
                     icon={<SettingOutlined />}
                     onClick={() => {
                         form.setFieldsValue({
-                            strategy: selectedPercentiles?.strategy || 'unified',
-                            unified: selectedPercentiles?.unified || primaryPercentile,
-                            ...selectedPercentiles?.perSource
+                            strategy: selectedPercentile?.strategy || 'unified',
+                            unified: selectedPercentile?.value || primaryPercentile,
+                            ...selectedPercentile?.customPercentile
                         });
                         setModalVisible(true);
                     }}
                     size="small"
-                    type={selectedPercentiles?.strategy === 'perSource' ? 'primary' : 'default'}
+                    type={selectedPercentile?.strategy === 'perSource' ? 'unified' : 'unified'}
                 >
                     Per-Source
                 </Button>
             </Space>
 
             <Text type="secondary" style={{ fontSize: '12px' }}>
-                {selectedPercentiles?.strategy === 'unified'
-                    ? `Unified: P${selectedPercentiles.unified}`
-                    : `Per-Source: ${Object.keys(selectedPercentiles?.perSource || {}).length} configured`
+                {selectedPercentile?.strategy === 'unified'
+                    ? `Unified: P${selectedPercentile.value}`
+                    : `Per-Source: ${Object.keys(selectedPercentile?.customPercentile || {}).length} configured`
                 }
             </Text>
 
@@ -136,7 +155,7 @@ const PercentileSelector = () => {
 
                             return (
                                 <Row gutter={[16, 16]}>
-                                    {percentileSources.map(source => (
+                                    {customPercentiles.map(source => (
                                         <Col key={source.id} span={12}>
                                             <Form.Item
                                                 name={source.id}

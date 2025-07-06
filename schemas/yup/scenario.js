@@ -315,6 +315,15 @@ const InputSimSchema = Yup.object().shape({
         escalationRate: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
+        selectedPercentile: Yup.object().shape({
+            strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
+            value: Yup.number().min(0).max(100).default(50),
+            customPercentile: Yup.mixed().default({}), // Custom percentiles per source, empty by default
+            // customPercentile: Yup.array().of(Yup.object().shape({
+            //     key: Yup.string().required('Source key is required'),
+            //     value: Yup.mixed().required('Custom percentile value is required')
+            // })).default([]),
+        }),
         annualCosts: Yup.object().shape({
             components: Yup.object().shape({
                 baseOM: PercentileSchema.default(() => ({})),

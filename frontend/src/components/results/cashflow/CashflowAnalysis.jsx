@@ -137,19 +137,24 @@ const PlaceholderCard = ({ cardConfig, ...props }) => {
 
 const CashflowAnalysis = () => {
     const { scenarioData } = useScenario();
-    const {
-        cashflowData,
-        //loading,
-        //transformError,
-        availablePercentiles,
-        selectedPercentiles,
-        //refreshCashflowData,
-        // NEW: Stage tracking
-        //refreshStage,
-        //isRefreshing
-    } = useCashflow();
+    // const {
+    //     //cashflowData,
+    //     //loading,
+    //     //transformError,
+    //     availablePercentiles,
+    //     //selectedPercentiles,
+    //     //refreshCashflowData,
+    //     // NEW: Stage tracking
+    //     //refreshStage,
+    //     //isRefreshing
+    // } = useCashflow();
 
-    const { getData, sourceData, isLoading, isRefreshing, refreshStage, refreshCubeData } = useCube();
+    const { getData,
+        selectedPercentile,
+        availablePercentiles,
+        sourceData, isLoading,
+        isRefreshing, refreshStage,
+        refreshCubeData } = useCube();
 
     // // Auto-initialize on first access if not already initialized
     // useEffect(() => {
@@ -324,7 +329,7 @@ const CashflowAnalysis = () => {
                                 <span style={{ color: '#52c41a' }}>✅ Previous stages complete</span>
                             )}
                         </Space>
-                    ) : cashflowData ? (
+                    ) : sourceData ? (
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                             ✅ Data ready - last refreshed: {new Date().toLocaleTimeString()}
                         </Text>
@@ -352,7 +357,7 @@ const CashflowAnalysis = () => {
                                 }
                             </Text>
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                                Strategy: {selectedPercentiles?.strategy || 'unified'}
+                                Strategy: {selectedPercentile?.strategy || 'unified'}
                             </Text>
                         </Space>
                     </div>
@@ -362,31 +367,31 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cashflow Data Summary */}
-            {cashflowData && (
+            {sourceData && (
                 <FormSection title="Data Summary" level={4}>
                     <ResponsiveFieldRow layout="fourColumn">
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Line Items</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.lineItems?.length || 0}
+                                {sourceData.length || 0}
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Project Life</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.projectLife || 0} years
+                                {scenarioData.settings?.general?.projectLife || 0} years
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Currency</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.currency || 'USD'}
+                                {scenarioData.settings?.project?.currency.local || 'USD'}
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">WTGs</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.numWTGs || 0}
+                                {scenarioData.settings?.project?.windFarm.numWTGs || 0}
                             </Title>
                         </Card>
                     </ResponsiveFieldRow>
@@ -405,7 +410,7 @@ const CashflowAnalysis = () => {
                         minHeight: '400px'
                     }} />
                 </Card>
-            ) : !cashflowData ? (
+            ) : !sourceData ? (
                 <Card>
                     <Alert
                         message="No Cashflow Data"
@@ -429,8 +434,8 @@ const CashflowAnalysis = () => {
                                 <CardErrorBoundary cardName={cardConfig.name} gridProps={cardConfig.gridProps}>
                                     {CardComponent ? (
                                         <CardComponent
-                                            cashflowData={cashflowData}
-                                            selectedPercentiles={selectedPercentiles}
+                                            cashflowData={sourceData}
+                                            selectedPercentiles={selectedPercentile}
                                             cardConfig={cardConfig}
                                         />
                                     ) : (

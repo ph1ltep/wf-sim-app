@@ -40,6 +40,7 @@ export const CubeProvider = ({ children }) => {
         [] // ✅ No dependencies - static once computed
     );
 
+    const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
     const percentileSources = useMemo(() =>
         getPercentileSourcesFromCubeRegistry(CASHFLOW_SOURCE_REGISTRY),
         [] // ✅ Static registry - never changes
@@ -181,35 +182,164 @@ export const CubeProvider = ({ children }) => {
      * Initialization will happen in CashflowAnalysis.jsx like CashflowContext
      */
 
+    /**
+         * Get filtered cube data with flexible filtering options
+         * @param {Object} filters - Filter parameters
+         * @param {number} [filters.percentile] - Filter by percentile value
+         * @param {string} [filters.sourceId] - Filter by source ID
+         * @param {Object} [filters.metadata] - Filter by metadata fields (exact matches)
+         * @returns {Object} CubeSourceDataResponseSchema - Filtered data with dynamic keys
+         * @throws {Error} If neither sourceId nor percentile is provided
+         * ✅ Valid calls
+         * const energyData = getData({ sourceId: 'energyRevenue' });
+         * const medianData = getData({ percentile: 50 });
+         * const specificData = getData({ sourceId: 'energyRevenue', percentile: 50 });
+         * const costSources = getData({ percentile: 50, metadata: { cashflowGroup: 'cost' } });
+         * // ❌ Invalid calls - will throw error
+         * const invalidData = getData({}); // Error: requires either sourceId or percentile
+         * const invalidData2 = getData({ metadata: { category: 'energy' } }); // Error: requires either sourceId or percentile 
+        */
     const getData = useCallback((filters = {}) => {
         const { percentile, sourceId, metadata: metadataFilters } = filters;
 
+        // Validate required parameters
         if (!sourceId && percentile === undefined) {
             throw new Error('getData requires either sourceId or percentile parameter');
         }
 
         if (!sourceData || !Array.isArray(sourceData)) {
-            console.log('⏸️ CubeContext: No source data available for getData');
             return {};
         }
 
-        // ... existing getData implementation
-        // (keeping same logic, just removing for brevity)
+        // Optimized filtering - apply most selective filters first
+        let filteredSources = sourceData;
 
-        return {}; // Placeholder - use existing implementation
+        // Apply sourceId filter first (most selective)
+        if (sourceId) {
+            filteredSources = filteredSources.filter(source => source.id === sourceId);
+            // Early return if no source found
+            if (filteredSources.length === 0) return {};
+        }
+
+        // Apply metadata filters second (moderately selective)
+        if (metadataFilters && typeof metadataFilters === 'object') {
+            const filterEntries = Object.entries(metadataFilters);
+            if (filterEntries.length > 0) {
+                filteredSources = filteredSources.filter(source => {
+                    return filterEntries.every(([key, value]) =>
+                        source.metadata[key] === value
+                    );
+                });
+                // Early return if no sources match metadata filters
+                if (filteredSources.length === 0) return {};
+            }
+        }
+
+        const result = {};
+
+        // Mode 1: Only sourceId set (group by percentile)
+        if (sourceId && percentile === undefined) {
+            const source = filteredSources[0]; // Already filtered to single source
+
+            // Group by percentile for efficiency
+            const percentileGroups = new Map();
+            source.percentileSource.forEach(item => {
+                const percentileKey = item.percentile.value;
+                if (!percentileGroups.has(percentileKey)) {
+                    percentileGroups.set(percentileKey, []);
+                }
+                percentileGroups.get(percentileKey).push({
+                    year: item.year,
+                    value: item.value
+                });
+            });
+
+            // Build result with percentile keys
+            percentileGroups.forEach((dataPoints, percentileKey) => {
+                result[percentileKey] = {
+                    data: dataPoints,
+                    metadata: source.metadata
+                };
+            });
+        }
+        // Mode 2 & 3: Percentile set (group by sourceId)
+        else if (percentile !== undefined) {
+            filteredSources.forEach(source => {
+                // Pre-filter to specific percentile for efficiency
+                const dataPoints = [];
+                source.percentileSource.forEach(item => {
+                    if (item.percentile.value === percentile) {
+                        dataPoints.push({
+                            year: item.year,
+                            value: item.value
+                        });
+                    }
+                });
+
+                // Only add to result if we found data for this percentile
+                if (dataPoints.length > 0) {
+                    result[source.id] = {
+                        data: dataPoints,
+                        metadata: source.metadata
+                    };
+                }
+            });
+        }
+
+        return result;
     }, [sourceData]);
+
+    const getCustomPercentiles = useCallback(() => {
+        if (!sourceData || !scenarioData) {
+            console.log('⏸️ CubeContext: No sourceData or scenarioData available for getCustomPercentiles');
+            return [];
+        }
+
+        // Get all sources with hasPercentiles: true
+        const percentileSources = sourceData.filter(source => source.hasPercentiles === true);
+
+        // Get selectedPercentile data from scenarioData
+        const selectedPercentile = scenarioData?.settings?.simulation?.inputSim?.selectedPercentile;
+
+        if (!selectedPercentile) {
+            console.log('⏸️ CubeContext: No selectedPercentile found in scenarioData');
+            return [];
+        }
+
+        const defaultValue = selectedPercentile.value;
+        const customPercentileArray = selectedPercentile.customPercentile || [];
+
+        // Create the result array
+        const result = percentileSources.map(source => {
+            // Look for matching customPercentile entry
+            const customEntry = customPercentileArray.find(entry => entry.sourceId === source.id);
+
+            // Use custom percentile if found, otherwise use default
+            const percentileValue = customEntry ? customEntry.percentile : defaultValue;
+
+            return {
+                sourceId: source.id,
+                percentile: percentileValue
+            };
+        });
+
+        console.log('✅ CubeContext: getCustomPercentiles result:', result);
+        return result;
+    }, [sourceData, scenarioData]);
 
     const contextValue = {
         // Data
         sourceData,
         metricsData,
         availablePercentiles,
+        selectedPercentile,
         percentileSources,
 
         // Custom percentile management
         customPercentile,
         setCustomPercentile,
         updateCustomPercentile,
+        getCustomPercentiles,
 
         // State - ✅ Same interface as CashflowContext
         isLoading,
@@ -227,7 +357,7 @@ export const CubeProvider = ({ children }) => {
         getData,
 
         // Utilities
-        getValueByPath
+        //getValueByPath
     };
 
     return (
@@ -236,3 +366,5 @@ export const CubeProvider = ({ children }) => {
         </CubeContext.Provider>
     );
 };
+
+export default CubeProvider;
