@@ -100,3 +100,31 @@ export const totalCapex = (sourceData, context) => {
         customPercentile
     }, addAuditEntry);
 };
+
+/**
+ * Calculate total revenue by aggregating all revenue sources
+ * @param {null} sourceData - Not used for virtual sources
+ * @param {Object} context - Transformer context
+ * @returns {Array} Array of SimResultsSchema objects
+ */
+export const totalRevenue = (sourceData, context) => {
+    const { processedData, availablePercentiles, customPercentile } = context;
+
+    // Filter to revenue sources only
+    const revenueSources = filterCubeSourceData(processedData, {
+        cashflowGroup: 'revenue'
+    });
+
+    if (revenueSources.length === 0) {
+        console.warn('⚠️ No revenue sources found for totalRevenue calculation');
+        return [];
+    }
+
+    console.log(`📊 Aggregating ${revenueSources.length} revenue sources for totalRevenue`);
+
+    // Aggregate all revenue sources
+    return aggregateCubeSourceData(revenueSources, availablePercentiles, {
+        operation: 'sum',
+        customPercentile
+    });
+};

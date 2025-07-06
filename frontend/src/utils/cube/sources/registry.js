@@ -1,3 +1,15 @@
+// frontend/src/utils/cube/sources/registry.js
+import { totalCost, totalDebt, totalCapex, totalRevenue } from './sources/transformers/totals.js';
+import { netCashflow } from './sources/transformers/cashflow.js';
+import {
+    capexDrawdown,
+    debtDrawdown,
+    interestDuringConstruction,
+    operationalInterest,
+    operationalPrincipal,
+    debtService
+} from './sources/transformers/financing.js';
+
 export const CASHFLOW_SOURCE_REGISTRY = {
     // Global references available to all transformers and multipliers
     references: [
@@ -183,17 +195,112 @@ export const CASHFLOW_SOURCE_REGISTRY = {
 
         // VIRTUAL SOURCES - Aggregated/calculated sources (type: 'virtual', priority: 999)
         {
+            id: 'capexDrawdown',
+            priority: 200, // First - needed by debtDrawdown
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            hasPercentiles: false,
+            references: [],
+            transformer: capexDrawdown,
+            multipliers: [],
+            metadata: {
+                name: 'CAPEX Drawdown',
+                type: 'virtual',
+                cashflowGroup: 'cost',
+                category: 'construction',
+                description: 'Construction phase CAPEX drawdown schedule',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'debtDrawdown',
+            priority: 210, // After capexDrawdown
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: debtDrawdown,
+            multipliers: [],
+            metadata: {
+                name: 'Debt Drawdown',
+                type: 'virtual',
+                cashflowGroup: 'liability',
+                category: 'financing',
+                description: 'Debt drawdown schedule during construction',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'interestDuringConstruction',
+            priority: 220, // After debtDrawdown
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: interestDuringConstruction,
+            multipliers: [],
+            metadata: {
+                name: 'Interest During Construction',
+                type: 'virtual',
+                cashflowGroup: 'cost',
+                category: 'financing',
+                description: 'Capitalized interest costs during construction phase',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'operationalInterest',
+            priority: 230, // After IDC
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] },
+                { id: 'projectLife', path: ['settings', 'general', 'projectLife'] }
+            ],
+            transformer: operationalInterest,
+            multipliers: [],
+            metadata: {
+                name: 'Operational Interest',
+                type: 'virtual',
+                cashflowGroup: 'liability',
+                category: 'financing',
+                description: 'Annual interest payments during operational period',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'operationalPrincipal',
+            priority: 240, // After operationalInterest
+            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] },
+                { id: 'projectLife', path: ['settings', 'general', 'projectLife'] }
+            ],
+            transformer: operationalPrincipal,
+            multipliers: [],
+            metadata: {
+                name: 'Operational Principal',
+                type: 'virtual',
+                cashflowGroup: 'liability',
+                category: 'financing',
+                description: 'Annual principal repayments during operational period',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
             id: 'totalCapex',
-            priority: 999,
+            priority: 700, // After all construction sources processed
             path: null,
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for totalCapex calculation
-                // TODO: Aggregate all CAPEX sources from context.processedData
-                // Filter processedData for sources with metadata.category === 'construction'
-                return []; // Return empty array for now
-            },
+            transformer: totalCapex,
             multipliers: [],
             metadata: {
                 name: 'Total CAPEX',
@@ -201,21 +308,17 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 cashflowGroup: 'cost',
                 category: 'aggregation',
                 description: 'Total capital expenditure across all construction phases',
+                customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         },
         {
             id: 'totalCost',
-            priority: 999,
+            priority: 800, // After all individual cost sources
             path: null,
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for totalCost calculation
-                // TODO: Aggregate all cost sources from context.processedData
-                // Filter processedData for sources with metadata.cashflowGroup === 'cost'
-                return []; // Return empty array for now
-            },
+            transformer: totalCost,
             multipliers: [],
             metadata: {
                 name: 'Total Cost',
@@ -223,21 +326,17 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 cashflowGroup: 'cost',
                 category: 'aggregation',
                 description: 'Total project costs including CAPEX and OPEX',
+                customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         },
         {
             id: 'totalRevenue',
-            priority: 999,
+            priority: 810, // After all revenue sources
             path: null,
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for totalRevenue calculation
-                // TODO: Aggregate all revenue sources from context.processedData
-                // Filter processedData for sources with metadata.cashflowGroup === 'revenue'
-                return []; // Return empty array for now
-            },
+            transformer: totalRevenue,
             multipliers: [],
             metadata: {
                 name: 'Total Revenue',
@@ -245,24 +344,17 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 cashflowGroup: 'revenue',
                 category: 'aggregation',
                 description: 'Total project revenue from all sources',
+                customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         },
         {
             id: 'debtService',
-            priority: 999,
+            priority: 850, // After operationalInterest and operationalPrincipal
             path: null,
             hasPercentiles: false,
-            references: [
-                { id: 'financing', path: ['settings', 'modules', 'financing'] }
-            ],
-            transformer: (sourceData, context) => {
-                // Placeholder for debtService calculation
-                // TODO: Calculate debt service schedule from financing parameters
-                // Access financing data via context.allReferences.financing
-                // Can use context.options for custom calculation parameters (e.g., amortization method)
-                return []; // Return empty array for now
-            },
+            references: [],
+            transformer: debtService,
             multipliers: [],
             metadata: {
                 name: 'Debt Service',
@@ -270,29 +362,25 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 cashflowGroup: 'liability',
                 category: 'financing',
                 description: 'Annual debt service payments (principal + interest)',
+                customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         },
         {
             id: 'netCashflow',
-            priority: 1000, // Process after all other aggregations
+            priority: 900, // After totalRevenue, totalCost, and debtService
             path: null,
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for netCashflow calculation
-                // TODO: Calculate net cashflow = totalRevenue - totalCost - debtService
-                // Access aggregated data from context.processedData
-                // Look for sources with ids: 'totalRevenue', 'totalCost', 'debtService'
-                return []; // Return empty array for now
-            },
+            transformer: netCashflow,
             multipliers: [],
             metadata: {
                 name: 'Net Cashflow',
                 type: 'virtual',
                 cashflowGroup: 'none',
                 category: 'aggregation',
-                description: 'Net project cashflow (revenues - costs - debt service)',
+                description: 'Net project cashflow (revenues - costs)',
+                customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         }
