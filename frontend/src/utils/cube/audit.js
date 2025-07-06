@@ -1,5 +1,5 @@
 // frontend/src/utils/cube/audit.js
-import { DataPointSchema, SimResultsSchema } from '../../schemas/yup/distribution';
+import { DataPointSchema, SimResultsSchema } from 'schemas/yup/distribution';
 
 /**
  * Extract data sample for audit trail

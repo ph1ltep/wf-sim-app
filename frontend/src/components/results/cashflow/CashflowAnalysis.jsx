@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useScenario } from '../../../contexts/ScenarioContext';
 import { useCashflow } from '../../../contexts/CashflowContext';
+import { useCube } from '../../../contexts/CubeContext';
 import { FormSection, ResponsiveFieldRow } from '../../contextFields/layouts';
 import PercentileSelector from './components/PercentileSelector';
 
@@ -138,23 +139,33 @@ const CashflowAnalysis = () => {
     const { scenarioData } = useScenario();
     const {
         cashflowData,
-        loading,
-        transformError,
+        //loading,
+        //transformError,
         availablePercentiles,
         selectedPercentiles,
-        refreshCashflowData,
+        //refreshCashflowData,
         // NEW: Stage tracking
-        refreshStage,
-        isRefreshing
+        //refreshStage,
+        //isRefreshing
     } = useCashflow();
 
-    // Auto-initialize on first access if not already initialized
+    const { getData, sourceData, isLoading, isRefreshing, refreshStage, refreshCubeData } = useCube();
+
+    // // Auto-initialize on first access if not already initialized
+    // useEffect(() => {
+    //     if (!cashflowData && !loading && scenarioData) {
+    //         console.log('💹 Cash Flows accessed for first time, initializing...');
+    //         refreshCashflowData(false); // Auto-initialize with dependency checking
+    //     }
+    // }, [cashflowData, loading, scenarioData, refreshCashflowData]);
+
+    // ✅ ADDED: Auto-initialize like CashflowAnalysis pattern
     useEffect(() => {
-        if (!cashflowData && !loading && scenarioData) {
-            console.log('💹 Cash Flows accessed for first time, initializing...');
-            refreshCashflowData(false); // Auto-initialize with dependency checking
+        if (!sourceData && !isLoading && scenarioData) {
+            console.log('🧊 Cube data accessed for first time, initializing...');
+            refreshCubeData(false); // Auto-initialize with dependency checking
         }
-    }, [cashflowData, loading, scenarioData, refreshCashflowData]);
+    }, [sourceData, isLoading, scenarioData, refreshCubeData]);
 
     // Local state for card visibility
     const [cardVisibility, setCardVisibility] = useState(() => {
@@ -175,17 +186,19 @@ const CashflowAnalysis = () => {
 
     // Single refresh handler
     const handleRefresh = () => {
-        refreshCashflowData(true);
+        //refreshCashflowData(true);
+        refreshCubeData(true); // Force refresh of cube data
     };
 
     // NEW: Get stage display info
     const getStageDisplay = (stage) => {
         const stageInfo = {
             idle: { text: 'Ready', icon: '✅', color: '#52c41a' },
-            distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
-            construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
+            // distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
+            // construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
+            sources: { text: 'Computing sources', icon: '📊', color: '#1890ff' },
             metrics: { text: 'Calculating metrics', icon: '🧮', color: '#722ed1' },
-            transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
+            // transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
             complete: { text: 'Complete', icon: '✅', color: '#52c41a' }
         };
         return stageInfo[stage] || stageInfo.idle;
@@ -210,42 +223,42 @@ const CashflowAnalysis = () => {
         );
     }
 
-    // Handle transformation errors
-    if (transformError) {
-        return (
-            <div style={{ padding: '20px' }}>
-                <Row justify="space-between" align="middle">
-                    <Col>
-                        <Title level={2}>Cashflow Analysis</Title>
-                    </Col>
-                    <Col>
-                        <Button
-                            type="primary"
-                            icon={<ReloadOutlined />}
-                            onClick={handleRefresh}
-                            loading={loading}
-                        >
-                            Retry
-                        </Button>
-                    </Col>
-                </Row>
+    // // Handle transformation errors
+    // if (transformError) {
+    //     return (
+    //         <div style={{ padding: '20px' }}>
+    //             <Row justify="space-between" align="middle">
+    //                 <Col>
+    //                     <Title level={2}>Cashflow Analysis</Title>
+    //                 </Col>
+    //                 <Col>
+    //                     <Button
+    //                         type="primary"
+    //                         icon={<ReloadOutlined />}
+    //                         onClick={handleRefresh}
+    //                         loading={loading}
+    //                     >
+    //                         Retry
+    //                     </Button>
+    //                 </Col>
+    //             </Row>
 
-                <Card>
-                    <Alert
-                        message="Data Transformation Error"
-                        description={transformError}
-                        type="error"
-                        showIcon
-                        action={
-                            <Button size="small" onClick={handleRefresh} loading={loading}>
-                                Retry
-                            </Button>
-                        }
-                    />
-                </Card>
-            </div>
-        );
-    }
+    //             <Card>
+    //                 <Alert
+    //                     message="Data Transformation Error"
+    //                     description={transformError}
+    //                     type="error"
+    //                     showIcon
+    //                     action={
+    //                         <Button size="small" onClick={handleRefresh} loading={loading}>
+    //                             Retry
+    //                         </Button>
+    //                     }
+    //                 />
+    //             </Card>
+    //         </div>
+    //     );
+    // }
 
     // Get enabled cards sorted by order
     const enabledCards = Object.entries(CASHFLOW_CARD_REGISTRY)
@@ -383,7 +396,7 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cards Section */}
-            {loading ? (
+            {isLoading ? (
                 <Card>
                     <Spin tip="Refreshing cashflow analysis..." style={{
                         display: 'flex',
@@ -400,7 +413,7 @@ const CashflowAnalysis = () => {
                         type="info"
                         showIcon
                         action={
-                            <Button onClick={handleRefresh} loading={loading}>
+                            <Button onClick={handleRefresh} loading={isLoading}>
                                 Refresh Data
                             </Button>
                         }

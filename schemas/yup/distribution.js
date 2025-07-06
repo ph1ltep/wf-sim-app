@@ -129,6 +129,7 @@ module.exports = {
     SimulationInfoSchema,
     SimRequestSchema,
     SimResponseSchema,
+    SimResultsSchema,
     FitDistributionSchema,
     SimulationInfoSchema
 };

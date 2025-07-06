@@ -1,78 +1,158 @@
-// src/components/cards/CashflowTimelineCard.jsx - Enhanced with dual-axis support
-import React, { useMemo, useState } from 'react';
+// frontend/src/components/cards/CashflowTimelineCard.jsx - Modernized for CubeContext
+import React, { useMemo, useState, useEffect, useScenario } from 'react';
 import { Card, Empty, Alert, Space, Typography, Tag, Button, Switch } from 'antd';
 import { LineChartOutlined, InfoCircleOutlined, AuditOutlined, SettingOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
+import { useCube } from '../../contexts/CubeContext';
+import { useCashflow } from '../../contexts/CashflowContext'; // Still need for selectedPercentiles
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import {
     createTimelineChartConfig,
-    createMultiplierSummary,
     createChartControlsConfig,
     createMetadataFooterConfig,
     validateChartData
-} from './configs'; // UPDATED
+} from './configs';
 
 const { Text } = Typography;
 
-const CashflowTimelineCard = ({ cashflowData, selectedPercentiles }) => {
+const CashflowTimelineCard = () => {
     const [auditTrailVisible, setAuditTrailVisible] = useState(false);
     const [showDebtService, setShowDebtService] = useState(true);
     const [showEquityCashflow, setShowEquityCashflow] = useState(true);
 
-    // Prepare enhanced chart data with dual axes
+    // Get cube data and percentile selection
+    const { getData, sourceData, isLoading, error } = useCube();
+    const { selectedPercentiles } = useCashflow();
+
+    // Get cube data for current percentile
+    const cubeData = useMemo(() => {
+        if (!sourceData || !selectedPercentiles?.unified) {
+            console.log('⏸️ CashflowTimelineCard: No cube sourceData or selectedPercentiles');
+            return null;
+        }
+
+        try {
+            console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentiles.unified}`);
+            return getData({ percentile: selectedPercentiles.unified });
+        } catch (error) {
+            console.error('❌ CashflowTimelineCard: Cube data transformation failed:', error);
+            return null;
+        }
+    }, [sourceData, selectedPercentiles, getData]);
+
+    // Prepare chart data using cube sources directly
     const chartData = useMemo(() => {
-        const validation = validateChartData(cashflowData);
+        if (!cubeData) {
+            return { data: [], layout: {}, error: null };
+        }
+
+        // Validate required cube sources
+        const validation = validateChartData(cubeData);
         if (!validation.isValid) {
+            console.error('❌ CashflowTimelineCard: Chart data validation failed:', validation.error);
             return { data: [], layout: {}, error: validation.error };
         }
 
-        return createTimelineChartConfig({
-            cashflowData,
-            selectedPercentiles,
-            showDebtService,
-            showEquityCashflow,
-            lineItems: cashflowData.lineItems
-        });
-    }, [cashflowData, selectedPercentiles, showDebtService, showEquityCashflow]);
+        // Check if debt service is available (may be empty from transformer)
+        const hasValidDebtService = cubeData.debtService?.data && cubeData.debtService.data.length > 0;
+        if (!hasValidDebtService) {
+            console.log('ℹ️ CashflowTimelineCard: Debt service data not available, disabling debt service features');
+        }
 
-    // Get multiplier info for display
-    const multiplierInfo = useMemo(() => {
-        return createMultiplierSummary(cashflowData?.lineItems);
-    }, [cashflowData]);
+        try {
+            return createTimelineChartConfig({
+                totalRevenue: cubeData.totalRevenue,
+                totalCosts: cubeData.totalCosts,
+                netCashflow: cubeData.netCashflow,
+                debtService: hasValidDebtService ? cubeData.debtService : null,
+                selectedPercentiles,
+                showDebtService: showDebtService && hasValidDebtService,
+                showEquityCashflow: showEquityCashflow && hasValidDebtService
+            });
+        } catch (error) {
+            console.error('❌ CashflowTimelineCard: Chart configuration failed:', error);
+            return {
+                data: [],
+                layout: {},
+                error: `Chart configuration failed: ${error.message}`
+            };
+        }
+    }, [cubeData, selectedPercentiles, showDebtService, showEquityCashflow]);
 
-    // FIXED: Update controls configuration to check for both debt service components
+    // Controls configuration
     const controlsConfig = useMemo(() => {
-        // Check for either operationalInterest or operationalPrincipal
-        const interestLineItem = cashflowData?.lineItems?.find(item => item.id === 'operationalInterest');
-        const principalLineItem = cashflowData?.lineItems?.find(item => item.id === 'operationalPrincipal');
-        const hasDebtService = !!(interestLineItem || principalLineItem);
+        const hasValidDebtService = cubeData?.debtService?.data && cubeData.debtService.data.length > 0;
 
         return createChartControlsConfig({
             showDebtService,
             showEquityCashflow,
             onToggleDebtService: setShowDebtService,
             onToggleEquityCashflow: setShowEquityCashflow,
-            hasDebtService,
-            hasEquityCashflow: hasDebtService // Equity cashflow depends on debt service
+            hasDebtService: hasValidDebtService,
+            hasEquityCashflow: hasValidDebtService // Equity cashflow depends on debt service
         });
-    }, [showDebtService, showEquityCashflow, cashflowData]);
+    }, [showDebtService, showEquityCashflow, cubeData]);
 
+    // Footer configuration
     const footerConfig = useMemo(() => {
-        if (!cashflowData) return null;
+        if (!cubeData) return null;
 
         return createMetadataFooterConfig({
-            cashflowData,
             selectedPercentiles,
             showDebtService,
-            showEquityCashflow
+            showEquityCashflow,
+            // Create metadata from cube data
+            metadata: {
+                currency: 'USD', // TODO: Get from cube references
+                projectLife: 25, // TODO: Get from cube references
+                percentileStrategy: { strategy: 'unified' }
+            }
         });
-    }, [cashflowData, selectedPercentiles, showDebtService, showEquityCashflow]);
+    }, [cubeData, selectedPercentiles, showDebtService, showEquityCashflow]);
 
-    // Error states
-    if (!cashflowData) {
+    // Error states - fail explicitly
+    if (!sourceData && !isLoading) {
+        console.error('❌ CubeContext sourceData unavailable for CashflowTimelineCard');
         return (
             <Card title="Cash Flow Timeline" variant="outlined">
-                <Empty description="No cashflow data available" />
+                <Alert
+                    type="error"
+                    message="Cube Data Source Not Available"
+                    description="CubeContext is not providing source data. Please check cube initialization."
+                    showIcon
+                />
+            </Card>
+        );
+    }
+
+    if (error) {
+        console.error('❌ CubeContext error for CashflowTimelineCard:', error);
+        return (
+            <Card title="Cash Flow Timeline" variant="outlined">
+                <Alert
+                    type="error"
+                    message="Cube Data Error"
+                    description={error.message || 'Unknown cube data error'}
+                    showIcon
+                />
+            </Card>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Card title="Cash Flow Timeline" variant="outlined">
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <Text>Loading cube data...</Text>
+                </div>
+            </Card>
+        );
+    }
+
+    if (!cubeData) {
+        return (
+            <Card title="Cash Flow Timeline" variant="outlined">
+                <Empty description="No cube data available for selected percentile" />
             </Card>
         );
     }
@@ -84,19 +164,6 @@ const CashflowTimelineCard = ({ cashflowData, selectedPercentiles }) => {
                     message="Chart Configuration Error"
                     description={chartData.error}
                     type="error"
-                    showIcon
-                />
-            </Card>
-        );
-    }
-
-    if (!cashflowData.aggregations || cashflowData.lineItems.length === 0) {
-        return (
-            <Card title="Cash Flow Timeline" variant="outlined">
-                <Alert
-                    message="No Data"
-                    description="No line items available for timeline display."
-                    type="info"
                     showIcon
                 />
             </Card>
@@ -116,17 +183,13 @@ const CashflowTimelineCard = ({ cashflowData, selectedPercentiles }) => {
                 extra={
                     <Space>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                            {cashflowData.lineItems.length} line items
+                            Cube Data • P{selectedPercentiles?.unified || 50}
                         </Text>
-                        {multiplierInfo.length > 0 && (
-                            <Tag icon={<InfoCircleOutlined />} color="blue" size="small">
-                                {multiplierInfo.length} multipliers
-                            </Tag>
-                        )}
                         <Button
                             icon={<AuditOutlined />}
                             size="small"
                             onClick={() => setAuditTrailVisible(true)}
+                            disabled={!cubeData}
                         >
                             Audit Trail
                         </Button>
@@ -176,12 +239,14 @@ const CashflowTimelineCard = ({ cashflowData, selectedPercentiles }) => {
                 )}
             </Card>
 
-            {/* Audit Trail Viewer */}
-            <AuditTrailViewer
-                cashflowData={cashflowData}
-                visible={auditTrailVisible}
-                onClose={() => setAuditTrailVisible(false)}
-            />
+            {/* Audit Trail Viewer - Updated for cube data */}
+            {cubeData && (
+                <AuditTrailViewer
+                    cubeData={cubeData}
+                    visible={auditTrailVisible}
+                    onClose={() => setAuditTrailVisible(false)}
+                />
+            )}
         </>
     );
 };

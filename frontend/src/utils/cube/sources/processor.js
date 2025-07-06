@@ -1,9 +1,9 @@
 // frontend/src/utils/cube/processor.js
-import { CubeSourceDataSchema } from '../../../schemas/yup/cube';
-import { SimResultsSchema, DataPointSchema } from '../../../schemas/yup/distribution';
-import { validate } from '../validate';
+import { CubeSourceDataSchema } from 'schemas/yup/cube';
+import { SimResultsSchema, DataPointSchema } from 'schemas/yup/distribution';
 import { createAuditTrail } from '../audit';
-import Yup from 'yup';
+
+const Yup = require('yup');
 
 /**
  * Process source registry data following PHASE 1 cube processing flow
@@ -79,7 +79,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             const allReferences = { ...globalReferences, ...localReferences };
 
             // Add audit entry for reference loading
-            addAuditEntry(
+            auditTrail.addAuditEntry(
                 'apply_reference_loading',
                 `loaded ${Object.keys(allReferences).length} references`,
                 Object.keys(allReferences)
@@ -99,7 +99,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
                     console.log(`📥 Source data extracted for '${source.id}'`);
 
                     // Add audit entry for processing start with input data sample
-                    addAuditEntry(
+                    auditTrail.addAuditEntry(
                         'apply_processing_start',
                         `extracted data from path: ${source.path.join('.')}`,
                         [], // No dependencies here
@@ -117,7 +117,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             let transformedData;
             if (source.transformer) {
                 try {
-                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile, addAuditEntry);
+                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile, auditTrail.addAuditEntry);
                     console.log(`🔄 Transformer applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Transformer failed for '${source.id}':`, error.message);
@@ -133,7 +133,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             let multipliedData;
             if (source.multipliers && source.multipliers.length > 0) {
                 try {
-                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile, addAuditEntry);
+                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile, auditTrail.addAuditEntry);
                     console.log(`🔢 ${source.multipliers.length} multipliers applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Multipliers failed for '${source.id}':`, error.message);
@@ -145,7 +145,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             }
 
             // Add audit entry for processing end with final output sample
-            addAuditEntry(
+            auditTrail.addAuditEntry(
                 'apply_processing_end',
                 `processing complete`,
                 [], // No dependencies here
@@ -335,7 +335,7 @@ const applyTransformer = (sourceData, source, availablePercentiles, allReference
  * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Object} { data: Array<SimResultsSchema>, appliedMultipliers: Array<AppliedMultiplierSchema> }
  */
-const applyMultipliers = (transformedData, multipliers, allReferences, processedData, customPercentile) => {
+const applyMultipliers = (transformedData, multipliers, allReferences, processedData, customPercentile, addAuditEntry) => {
     let resultData = [...transformedData];
 
     // Process each multiplier in array order
@@ -401,21 +401,10 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
                 auditPercentile = customPercentile[multiplier.id];
             }
 
-            appliedMultipliers.push({
-                id: multiplier.id,
-                operation: multiplier.operation,
-                values: multiplierValues,
-                baseYear: multiplier.baseYear || 1,
-                cumulative: false,
-                actualPercentile: auditPercentile // Log actual percentile used for custom percentile
-            });
         }
     });
 
-    return {
-        data: resultData,
-        appliedMultipliers
-    };
+    return resultData;
 };
 
 /**

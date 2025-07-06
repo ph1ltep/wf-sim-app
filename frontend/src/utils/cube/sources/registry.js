@@ -1,14 +1,17 @@
 // frontend/src/utils/cube/sources/registry.js
-import { totalCost, totalDebt, totalCapex, totalRevenue } from './sources/transformers/totals.js';
-import { netCashflow } from './sources/transformers/cashflow.js';
 import {
+    totalCost,
+    totalDebt,
+    totalCapex,
+    totalRevenue,
+    netCashflow,
     capexDrawdown,
     debtDrawdown,
     interestDuringConstruction,
     operationalInterest,
     operationalPrincipal,
     debtService
-} from './sources/transformers/financing.js';
+} from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
     // Global references available to all transformers and multipliers
