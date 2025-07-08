@@ -73,7 +73,7 @@ export const filterCubeSourceData = (processedData, filters = {}) => {
 };
 
 /**
- * Aggregate CubeSourceDataSchema arrays into a single time series
+ * Aggregate multiple CubeSourceDataSchema objects into a single time-series
  * @param {Array} sources - Array of CubeSourceDataSchema objects to aggregate
  * @param {Array} availablePercentiles - Available percentiles for output structure
  * @param {Object} options - Aggregation options
@@ -115,8 +115,9 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
             return;
         }
 
-        source.percentileSource.forEach(item => {
-            let targetPercentile = item.percentile.value;
+        source.percentileSource.forEach(simResult => {
+            // ✅ FIXED: simResult is SimResultsSchema with .name, .data, .percentile
+            let targetPercentile = simResult.percentile.value;
 
             // Handle custom percentile for percentile 0
             if (targetPercentile === 0 && customPercentile) {
@@ -125,51 +126,55 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
                 if (customPercentileValue !== undefined) {
                     // Find the corresponding data with the custom percentile value
                     const customData = source.percentileSource.find(dataItem =>
-                        dataItem.year === item.year &&
                         dataItem.percentile.value === customPercentileValue
                     );
 
                     if (customData) {
-                        // Use the custom percentile data but maintain output percentile as 0
-                        const key = `${item.year}-0`;
-                        const currentValue = aggregationMap.get(key) || 0;
+                        // ✅ FIXED: Iterate through customData.data array
+                        customData.data.forEach(dataPoint => {
+                            // Use the custom percentile data but maintain output percentile as 0
+                            const key = `${dataPoint.year}-0`;
+                            const currentValue = aggregationMap.get(key) || 0;
 
-                        switch (operation) {
-                            case 'sum':
-                                aggregationMap.set(key, currentValue + customData.value);
-                                break;
-                            case 'subtract':
-                                aggregationMap.set(key, currentValue - customData.value);
-                                break;
-                            case 'multiply':
-                                aggregationMap.set(key, currentValue === 0 ? customData.value : currentValue * customData.value);
-                                break;
-                            default:
-                                aggregationMap.set(key, currentValue + customData.value);
-                        }
-                        return; // Skip normal processing for this item
+                            switch (operation) {
+                                case 'sum':
+                                    aggregationMap.set(key, currentValue + dataPoint.value);
+                                    break;
+                                case 'subtract':
+                                    aggregationMap.set(key, currentValue - dataPoint.value);
+                                    break;
+                                case 'multiply':
+                                    aggregationMap.set(key, currentValue === 0 ? dataPoint.value : currentValue * dataPoint.value);
+                                    break;
+                                default:
+                                    aggregationMap.set(key, currentValue + dataPoint.value);
+                            }
+                        });
+                        return; // Skip normal processing for this simResult
                     }
                 }
                 // If no custom percentile found, fall back to default (percentile 0)
             }
 
-            // Normal aggregation for non-custom percentiles
-            const key = `${item.year}-${targetPercentile}`;
-            const currentValue = aggregationMap.get(key) || 0;
+            // ✅ FIXED: Normal aggregation - iterate through simResult.data array
+            simResult.data.forEach(dataPoint => {
+                const key = `${dataPoint.year}-${targetPercentile}`;
+                const currentValue = aggregationMap.get(key) || 0;
 
-            switch (operation) {
-                case 'sum':
-                    aggregationMap.set(key, currentValue + item.value);
-                    break;
-                case 'subtract':
-                    aggregationMap.set(key, currentValue - item.value);
-                    break;
-                case 'multiply':
-                    aggregationMap.set(key, currentValue === 0 ? item.value : currentValue * item.value);
-                    break;
-                default:
-                    aggregationMap.set(key, currentValue + item.value);
-            }
+                switch (operation) {
+                    case 'sum':
+                        aggregationMap.set(key, currentValue + dataPoint.value);
+                        break;
+                    case 'subtract':
+                        aggregationMap.set(key, currentValue - dataPoint.value);
+                        break;
+                    case 'multiply':
+                        aggregationMap.set(key, currentValue === 0 ? dataPoint.value : currentValue * dataPoint.value);
+                        break;
+                    default:
+                        aggregationMap.set(key, currentValue + dataPoint.value);
+                }
+            });
         });
     });
 
@@ -288,4 +293,40 @@ export const adjustSourceDataValues = (sourceData, adjustFunction) => {
 
     // Return in same format as input (array or single object)
     return isArray ? result : result[0];
+};
+
+/**
+ * Transform DataPointSchema array into SimResultsSchema array
+ * @param {Array} dataPoints - Array of DataPointSchema objects {year, value}
+ * @param {Array} availablePercentiles - Available percentiles to create entries for
+ * @param {string} name - Name for the SimResultsSchema entries
+ * @param {Object|null} customPercentile - Custom percentile configuration
+ * @returns {Array} Array of SimResultsSchema objects {name, data, percentile}
+ */
+export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, customPercentile = null) => {
+    if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
+        return [];
+    }
+
+    const result = [];
+
+    // Create one SimResultsSchema entry per available percentile
+    availablePercentiles.forEach(percentile => {
+        result.push({
+            name,
+            data: [...dataPoints], // Same data array for each percentile
+            percentile: { value: percentile }
+        });
+    });
+
+    // Add custom percentile entry if configured
+    if (customPercentile) {
+        result.push({
+            name,
+            data: [...dataPoints], // Same data array
+            percentile: { value: 0 }
+        });
+    }
+
+    return result;
 };

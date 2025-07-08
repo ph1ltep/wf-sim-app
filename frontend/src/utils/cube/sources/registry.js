@@ -10,7 +10,8 @@ import {
     interestDuringConstruction,
     operationalInterest,
     operationalPrincipal,
-    debtService
+    debtService,
+    contractFees
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -26,7 +27,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         {
             id: 'escalationRate',
             priority: 9,
-            path: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate'],
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate', 'results'],
             hasPercentiles: true,
             references: [],
             transformer: null,
@@ -43,7 +44,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         {
             id: 'electricityPrice',
             priority: 9,
-            path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice'],
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'electricityPrice', 'results'],
             hasPercentiles: true,
             references: [],
             transformer: null,
@@ -65,12 +66,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for capexDrawdownToAnnualCosts transformer
-                // TODO: Implement conversion from drawdown schedule to annual costs
-                // Access context: hasPercentiles, availablePercentiles, allReferences, processedData, options
-                return sourceData || []; // Return as-is for now
-            },
+            transformer: capexDrawdown,
             multipliers: [],
             metadata: {
                 name: 'CAPEX Drawdown',
@@ -89,12 +85,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             references: [
                 { id: 'financing', path: ['settings', 'modules', 'financing'] }
             ],
-            transformer: (sourceData, context) => {
-                // Placeholder for debtDrawdownToAnnualCosts transformer
-                // TODO: Implement conversion from debt drawdown to annual costs
-                // Can access financing data via context.allReferences.financing
-                return sourceData || []; // Return as-is for now
-            },
+            transformer: debtDrawdown,
             multipliers: [],
             metadata: {
                 name: 'Debt Drawdown',
@@ -111,12 +102,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             path: ['settings', 'modules', 'contracts', 'oemContracts'],
             hasPercentiles: false,
             references: [],
-            transformer: (sourceData, context) => {
-                // Placeholder for contractsToAnnualCosts transformer
-                // TODO: Implement conversion from contracts to annual costs
-                // Can use context.options for custom transformation parameters
-                return sourceData || []; // Return as-is for now
-            },
+            transformer: contractFees,
             multipliers: [
                 { id: 'escalationRate', operation: 'compound', baseYear: 1 }
             ],
@@ -178,7 +164,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         {
             id: 'energyRevenue',
             priority: 99,
-            path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'],
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction', 'results'],
             hasPercentiles: true,
             references: [],
             transformer: null,
@@ -197,24 +183,24 @@ export const CASHFLOW_SOURCE_REGISTRY = {
         },
 
         // VIRTUAL SOURCES - Aggregated/calculated sources (type: 'virtual', priority: 999)
-        {
-            id: 'capexDrawdown',
-            priority: 200, // First - needed by debtDrawdown
-            path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
-            hasPercentiles: false,
-            references: [],
-            transformer: capexDrawdown,
-            multipliers: [],
-            metadata: {
-                name: 'CAPEX Drawdown',
-                type: 'virtual',
-                cashflowGroup: 'cost',
-                category: 'construction',
-                description: 'Construction phase CAPEX drawdown schedule',
-                customPercentile: 50,
-                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
-            }
-        },
+        // {
+        //     id: 'capexDrawdown',
+        //     priority: 200, // First - needed by debtDrawdown
+        //     path: ['settings', 'modules', 'cost', 'constructionPhase', 'costSources'],
+        //     hasPercentiles: false,
+        //     references: [],
+        //     transformer: capexDrawdown,
+        //     multipliers: [],
+        //     metadata: {
+        //         name: 'CAPEX Drawdown',
+        //         type: 'virtual',
+        //         cashflowGroup: 'cost',
+        //         category: 'construction',
+        //         description: 'Construction phase CAPEX drawdown schedule',
+        //         customPercentile: 50,
+        //         formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+        //     }
+        // },
         {
             id: 'debtDrawdown',
             priority: 210, // After capexDrawdown

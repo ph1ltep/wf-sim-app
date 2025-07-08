@@ -99,6 +99,12 @@ const FailureModelSchema = Yup.object().shape({
         })).default([]),
     }),
 });
+const CostSourcesSchema = Yup.object().shape({
+    id: Yup.string().required('ID is required'),
+    name: Yup.string().required('Name is required'),
+    totalAmount: Yup.number().default(0),
+    drawdownSchedule: Yup.array().of(DataPointSchema).default([])
+});
 
 // Settings Schema
 const SettingsSchema = Yup.object().shape({
@@ -190,12 +196,7 @@ const SettingsSchema = Yup.object().shape({
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
             failureModels: Yup.array().of(FailureModelSchema).default([]),
             constructionPhase: Yup.object().shape({
-                costSources: Yup.array().of(Yup.object().shape({
-                    id: Yup.string().required('ID is required'),
-                    name: Yup.string().required('Name is required'),
-                    totalAmount: Yup.number().default(0),
-                    drawdownSchedule: Yup.array().of(DataPointSchema).default([])
-                })).default([]) // Empty default, will be populated dynamically
+                costSources: Yup.array().of(CostSourcesSchema).default([])
             }),
         }),
         revenue: Yup.object().shape({
@@ -400,5 +401,6 @@ module.exports = {
     YearlyResponsibilitySchema,
     AdjustmentSchema,
     FailureModelSchema,
-    ScenarioListingSchema
+    ScenarioListingSchema,
+    CostSourcesSchema
 };

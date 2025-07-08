@@ -1,6 +1,6 @@
 // frontend/src/utils/cube/processor.js
 import { CubeSourceDataSchema } from 'schemas/yup/cube';
-import { SimResultsSchema, DataPointSchema } from 'schemas/yup/distribution';
+import { SimResultsSchema, DataPointSchema, SimulationInfoSchema } from 'schemas/yup/distribution';
 import { createAuditTrail } from '../audit';
 
 const Yup = require('yup');
@@ -90,6 +90,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             if (source.path) {
                 try {
                     sourceData = getValueByPath(source.path);
+                    //sourceData = sourceData.results;
 
                     // Handle custom percentile for sources with percentiles
                     if (customPercentile && source.hasPercentiles && sourceData) {
@@ -174,7 +175,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             console.log(`✅ Source '${source.id}' processed successfully`);
 
         } catch (error) {
-            console.error(`❌ Unexpected error processing source '${source.id}':`, error.message);
+            console.error(`❌ Unexpected error processing source '${source.id}':`, error.message, source);
             errorCount++;
         }
     }

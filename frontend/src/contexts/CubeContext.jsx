@@ -4,6 +4,11 @@ import { message } from 'antd';
 import { useScenario } from './ScenarioContext';
 import { computeSourceData } from '../utils/cube/sources/processor';
 import { CASHFLOW_SOURCE_REGISTRY } from '../utils/cube/sources/registry';
+import {
+    isDistributionsComplete,
+    isConstructionSourcesComplete
+} from '../utils/dependencies/checkFunctions';
+import { generateConstructionCostSources } from '../utils/drawdownUtils';
 
 const CubeContext = createContext();
 export const useCube = () => useContext(CubeContext);
@@ -22,7 +27,7 @@ const getPercentileSourcesFromCubeRegistry = (registry) => {
 };
 
 export const CubeProvider = ({ children }) => {
-    const { scenarioData, getValueByPath } = useScenario();
+    const { scenarioData, getValueByPath, updateByPath } = useScenario();
 
     // ✅ FIXED: Sequential refresh state management
     const [sourceData, setSourceData] = useState(null);
@@ -93,7 +98,7 @@ export const CubeProvider = ({ children }) => {
             setRefreshRequested(false);
             setRefreshStage('idle');
         }
-    }, []); // ✅ FIXED: No dependencies - same as CashflowContext
+    }, [refreshRequested, scenarioData, getValueByPath]); // ✅ FIXED: No dependencies - same as CashflowContext
 
     /**
      * ✅ FIXED: MINIMAL dependencies - only control flow
@@ -109,6 +114,26 @@ export const CubeProvider = ({ children }) => {
                         console.log('🔄 CubeContext: Stage 1 - Initialization...');
                         setSourceData(null);
                         setMetricsData(null);
+                        setRefreshStage('dependencies');
+                        break;
+
+                    case 'dependencies':
+                        console.log('🔍 Checking dependencies...');
+
+                        // ✅ FIXED: Call with only getValueByPath
+                        if (!isDistributionsComplete(getValueByPath)) {
+                            throw new Error('Distributions not complete - missing required distribution data');
+                        }
+
+                        // ✅ FIXED: Call with only getValueByPath
+                        if (!isConstructionSourcesComplete(getValueByPath)) {
+                            console.log('🏗️ Generating construction sources...');
+                            const constructionSources = generateConstructionCostSources(scenarioData, getValueByPath);
+                            await updateByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], constructionSources);
+                            console.log('✅ Construction sources generated');
+                        }
+
+                        console.log('✅ Dependencies validated');
                         setRefreshStage('sources');
                         break;
 
