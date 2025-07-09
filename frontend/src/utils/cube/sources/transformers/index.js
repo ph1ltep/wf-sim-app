@@ -5,6 +5,8 @@ import * as common from './common.js';
 import * as financing from './financing.js';
 import * as totals from './totals.js';
 import * as cashflow from './cashflow.js';
+import * as cost from './cost.js';
+import * as drawdown from './drawdown.js';
 
 /**
  * Registry of all available transformer functions
@@ -49,3 +51,5 @@ export * from './common.js';
 export * from './financing.js';
 export * from './totals.js';
 export * from './cashflow.js';
+export * from './cost.js';
+export * from './drawdown.js';

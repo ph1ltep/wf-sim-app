@@ -42,7 +42,7 @@ const CubeReferenceRegistryItemSchema = Yup.object().shape({ // global reference
     path: Yup.array().of(Yup.string()).required('reference path is required')
 });
 
-const CubeSourceMetadataSchema = Yup.object().shape({
+const xCubeSourceMetadataSchema = Yup.object().shape({
     name: Yup.string().optional(),
     type: Yup.string().oneOf(['direct', 'indirect', 'virtual']).default('direct'),
     cashflowGroup: Yup.string().oneOf(['cost', 'revenue', 'asset', 'liability', 'risk', 'opportunity', 'none']).default('none'), //will be used to group how variables affect cashflow table.
@@ -50,6 +50,28 @@ const CubeSourceMetadataSchema = Yup.object().shape({
     description: Yup.string().required('Description is required'),
     formatter: Yup.mixed().optional(), //function to format number/precision/unit and return string.
     customPercentile: Yup.string().default(50),
+});
+
+
+const CubeSourceMetadataSchema = Yup.object().shape({
+    name: Yup.string().optional(),
+    type: Yup.string().oneOf(['direct', 'indirect', 'virtual']).default('direct'),
+    visualGroup: Yup.string().default('other').required('Visual group is required'),
+    cashflowType: Yup.string()
+        .oneOf(['inflow', 'outflow', 'none'])
+        .default('none')
+        .required('Cash flow type is required'),
+    accountingClass: Yup.string()
+        .oneOf(['devex', 'capex', 'opex', 'financing_cost', 'decommissioning', 'revenue', 'tax', 'liability', 'none'])
+        .default('none')
+        .required('Accounting class is required'),
+    projectPhase: Yup.string()
+        .oneOf(['pre_development', 'development', 'construction', 'operations', 'decommissioning', 'other'])
+        .default('construction')
+        .required('Project phase is required'),
+    description: Yup.string().required('Description is required'),
+    formatter: Yup.mixed().optional(),
+    customPercentile: Yup.string().default('50'),
 });
 
 // each source item in CASHFLOW_SOURCE_REGISTRY.
