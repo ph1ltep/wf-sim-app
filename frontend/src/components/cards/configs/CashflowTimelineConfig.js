@@ -9,23 +9,23 @@ import { addRefinancingAnnotations, getFinancialColorScheme, getSemanticColor } 
 export const createTimelineChartConfig = (context) => {
     const {
         totalRevenue,
-        totalCosts,
+        totalCost,
         netCashflow,
         debtService,
-        selectedPercentiles,
+        selectedPercentile,
         showDebtService = true,
         showEquityCashflow = true,
         token
     } = context;
 
     // Validate required cube sources
-    if (!totalRevenue?.data || !totalCosts?.data || !netCashflow?.data) {
+    if (!totalRevenue?.data || !totalCost?.data || !netCashflow?.data) {
         console.error('❌ createTimelineChartConfig: Missing required cube sources');
         return { data: [], layout: {}, error: 'Missing required cube sources' };
     }
 
     // Get primary percentile
-    const primaryPercentile = selectedPercentiles?.unified || 50;
+    const primaryPercentile = selectedPercentile?.value || 50;
     console.log(`🔄 createTimelineChartConfig: Using percentile ${primaryPercentile}`);
 
     // Check debt service availability
@@ -51,7 +51,7 @@ export const createTimelineChartConfig = (context) => {
     // Build chart traces
     const traces = buildTimelineTracesFromCube({
         totalRevenue,
-        totalCosts,
+        totalCost,
         netCashflow,
         debtService: effectiveShowDebtService ? debtService : null,
         equityCashflowData,
@@ -80,7 +80,7 @@ export const createTimelineChartConfig = (context) => {
 const buildTimelineTracesFromCube = (cubeData, options = {}) => {
     const {
         totalRevenue,
-        totalCosts,
+        totalCost,
         netCashflow,
         debtService,
         equityCashflowData,
@@ -108,10 +108,10 @@ const buildTimelineTracesFromCube = (cubeData, options = {}) => {
     }
 
     // Costs trace (negative, red)
-    if (totalCosts?.data) {
+    if (totalCost?.data) {
         traces.push({
-            x: totalCosts.data.map(d => d.year),
-            y: totalCosts.data.map(d => -Math.abs(d.value)), // Ensure negative
+            x: totalCost.data.map(d => d.year),
+            y: totalCost.data.map(d => -Math.abs(d.value)), // Ensure negative
             type: 'scatter',
             mode: 'lines+markers',
             name: 'Total Costs',
@@ -147,7 +147,7 @@ const buildTimelineTracesFromCube = (cubeData, options = {}) => {
             name: 'Debt Service',
             line: { color: colors.debtService, width: 2, dash: 'dot' },
             marker: { size: 4, color: colors.debtService },
-            yaxis: 'y2',
+            yaxis: 'y',
             hovertemplate: 'Year: %{x}<br>Debt Service: $%{y:,.0f}<extra></extra>'
         });
     }
@@ -265,13 +265,13 @@ export const createChartControlsConfig = (context) => {
  */
 export const createMetadataFooterConfig = (context) => {
     const {
-        selectedPercentiles,
+        selectedPercentile,
         showDebtService,
         showEquityCashflow,
         metadata = {}
     } = context;
 
-    const strategyText = `Unified P${selectedPercentiles?.unified || 50}`;
+    const strategyText = `Unified P${selectedPercentile?.value || 50}`;
     const projectText = `${metadata.projectLife || 25} years • Cube Data`;
 
     const optionsText = [
@@ -295,10 +295,10 @@ export const validateChartData = (cubeData) => {
         return { isValid: false, error: 'No cube data available' };
     }
 
-    if (!cubeData.totalRevenue?.data || !cubeData.totalCosts?.data || !cubeData.netCashflow?.data) {
+    if (!cubeData.totalRevenue?.data || !cubeData.totalCost?.data || !cubeData.netCashflow?.data) {
         const missing = [];
         if (!cubeData.totalRevenue?.data) missing.push('totalRevenue');
-        if (!cubeData.totalCosts?.data) missing.push('totalCosts');
+        if (!cubeData.totalCost?.data) missing.push('totalCost');
         if (!cubeData.netCashflow?.data) missing.push('netCashflow');
 
         return { isValid: false, error: `Required cube sources missing: ${missing.join(', ')}` };

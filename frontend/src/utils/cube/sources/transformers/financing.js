@@ -322,5 +322,41 @@ export const operationalPrincipal = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for debt service
  */
 export const debtService = (sourceData, context) => {
-    return sourceData;
+    const { addAuditEntry, availablePercentiles, customPercentile, processedData } = context;
+
+    // Get already calculated operational interest and principal data
+    const interestSources = filterCubeSourceData(processedData, {
+        sourceId: 'operationalInterest'
+    });
+
+    const principalSources = filterCubeSourceData(processedData, {
+        sourceId: 'operationalPrincipal'
+    });
+
+    if (interestSources.length === 0 || principalSources.length === 0) {
+        console.warn(`⚠️ Missing sources for debtService: operationalInterest(${interestSources.length}), operationalPrincipal(${principalSources.length})`);
+        return [];
+    }
+
+    addAuditEntry(
+        'apply_debt_service_transformation',
+        'calculating debt service: operationalInterest + operationalPrincipal',
+        ['operationalInterest', 'operationalPrincipal']
+    );
+
+    // Combine interest and principal sources
+    const combinedSources = [interestSources[0], principalSources[0]];
+
+    // Aggregate with sum operation (interest + principal = total debt service)
+    const result = aggregateCubeSourceData(combinedSources, availablePercentiles, {
+        operation: 'sum',
+        customPercentile
+    }, addAuditEntry);
+
+    const totalDebtService = result.reduce((sum, simResult) =>
+        sum + simResult.data.reduce((dataSum, dataPoint) => dataSum + dataPoint.value, 0), 0
+    );
+    console.log(`💰 debtService: ${result.length} percentiles, $${totalDebtService.toLocaleString()} total debt service`);
+
+    return result;
 };

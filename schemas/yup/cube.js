@@ -104,8 +104,8 @@ const AuditTrailEntrySchema = Yup.object().shape({
     details: Yup.mixed().optional(),
     dependencies: Yup.array().of(Yup.string()).default([]),
     dataSample: Yup.object().shape({
-        percentile: Yup.number().required('Percentile is required'),
-        data: Yup.mixed().required('Sample data is required')
+        percentile: Yup.number(),
+        data: Yup.mixed()
     }).optional(),
     duration: Yup.number().optional()
 });
@@ -118,7 +118,7 @@ const CubeSourceDataSchema = Yup.object().shape({
     audit: Yup.object().shape({
         trail: Yup.array().of(AuditTrailEntrySchema).default([])
     }).required('Audit trail is required')
-})
+});
 
 const CubeReferenceDataSchema = Yup.array().of(Yup.object().shape({ // global references. available to all item's transformers/multipliers
     key: Yup.string().required('reference key is required'),
@@ -136,3 +136,16 @@ const CubeSourceDataResponseSchema = Yup.object().shape({
         Array.isArray(item.data) && typeof item.metadata === 'object'
     );
 });
+
+module.exports = {
+    CubeReferenceRegistryItemSchema,
+    CubeSourceMetadataSchema,
+    CubeSourceRegistryItemSchema,
+    CubeSourceRegistrySchema,
+    CubeSourceDataSchema,
+    CubeReferenceDataSchema,
+    CubeSourceDataResponseSchema,
+    AuditTrailEntrySchema,
+    SimResultsSchema,
+    DataPointSchema
+};

@@ -1,10 +1,11 @@
 // frontend/src/components/cards/CashflowTimelineCard.jsx - Modernized for CubeContext
-import React, { useMemo, useState, useEffect, useScenario } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, Empty, Alert, Space, Typography, Tag, Button, Switch } from 'antd';
 import { LineChartOutlined, InfoCircleOutlined, AuditOutlined, SettingOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { useCube } from '../../contexts/CubeContext';
 import { useCashflow } from '../../contexts/CashflowContext'; // Still need for selectedPercentiles
+import { useScenario } from '../../contexts/ScenarioContext';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import {
     createTimelineChartConfig,
@@ -21,24 +22,25 @@ const CashflowTimelineCard = () => {
     const [showEquityCashflow, setShowEquityCashflow] = useState(true);
 
     // Get cube data and percentile selection
-    const { getData, sourceData, isLoading, error } = useCube();
-    const { selectedPercentiles } = useCashflow();
+    const { getData, isLoading, error } = useCube();
+    const { getValueByPath } = useScenario();
+    const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
 
     // Get cube data for current percentile
     const cubeData = useMemo(() => {
-        if (!sourceData || !selectedPercentiles?.unified) {
-            console.log('⏸️ CashflowTimelineCard: No cube sourceData or selectedPercentiles');
-            return null;
-        }
+        // if (!sourceData || !selectedPercentile?.value) {
+        //     console.log('⏸️ CashflowTimelineCard: No cube sourceData or selectedPercentiles');
+        //     return null;
+        // }
 
         try {
-            console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentiles.unified}`);
-            return getData({ percentile: selectedPercentiles.unified });
+            console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentile.value}`);
+            return getData({ sourceIds: ['totalRevenue', 'totalCost', 'netCashflow', 'debtService'], percentile: selectedPercentile.value });
         } catch (error) {
             console.error('❌ CashflowTimelineCard: Cube data transformation failed:', error);
             return null;
         }
-    }, [sourceData, selectedPercentiles, getData]);
+    }, [selectedPercentile, getData]);
 
     // Prepare chart data using cube sources directly
     const chartData = useMemo(() => {
@@ -62,10 +64,10 @@ const CashflowTimelineCard = () => {
         try {
             return createTimelineChartConfig({
                 totalRevenue: cubeData.totalRevenue,
-                totalCosts: cubeData.totalCosts,
+                totalCost: cubeData.totalCost,
                 netCashflow: cubeData.netCashflow,
                 debtService: hasValidDebtService ? cubeData.debtService : null,
-                selectedPercentiles,
+                selectedPercentile,
                 showDebtService: showDebtService && hasValidDebtService,
                 showEquityCashflow: showEquityCashflow && hasValidDebtService
             });
@@ -77,7 +79,7 @@ const CashflowTimelineCard = () => {
                 error: `Chart configuration failed: ${error.message}`
             };
         }
-    }, [cubeData, selectedPercentiles, showDebtService, showEquityCashflow]);
+    }, [cubeData, selectedPercentile, showDebtService, showEquityCashflow]);
 
     // Controls configuration
     const controlsConfig = useMemo(() => {
@@ -98,20 +100,20 @@ const CashflowTimelineCard = () => {
         if (!cubeData) return null;
 
         return createMetadataFooterConfig({
-            selectedPercentiles,
+            selectedPercentile,
             showDebtService,
             showEquityCashflow,
             // Create metadata from cube data
             metadata: {
-                currency: 'USD', // TODO: Get from cube references
-                projectLife: 25, // TODO: Get from cube references
-                percentileStrategy: { strategy: 'unified' }
+                currency: getValueByPath(['settings', 'general', 'projectLife']), // TODO: Get from cube references
+                projectLife: getValueByPath(['settings', 'project', 'currency', 'local']), // TODO: Get from cube references
+                percentileStrategy: { strategy: selectedPercentile.strategy }
             }
         });
-    }, [cubeData, selectedPercentiles, showDebtService, showEquityCashflow]);
+    }, [cubeData, selectedPercentile, showDebtService, showEquityCashflow]);
 
     // Error states - fail explicitly
-    if (!sourceData && !isLoading) {
+    if (!cubeData && !isLoading) {
         console.error('❌ CubeContext sourceData unavailable for CashflowTimelineCard');
         return (
             <Card title="Cash Flow Timeline" variant="outlined">
@@ -183,7 +185,7 @@ const CashflowTimelineCard = () => {
                 extra={
                     <Space>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                            Cube Data • P{selectedPercentiles?.unified || 50}
+                            Cube Data • P{selectedPercentile?.value || 50}
                         </Text>
                         <Button
                             icon={<AuditOutlined />}

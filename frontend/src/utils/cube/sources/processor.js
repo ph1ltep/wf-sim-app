@@ -359,49 +359,44 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
             // Create optimized value lookup function
             const getMultiplierValue = createValueLookup(multiplierValues, customPercentile, multiplier.id);
 
-            // Apply multiplier operation
-            resultData = resultData.map(dataPoint => {
-                // Apply filter if exists - filter operates on source data (year, value, percentile)
-                if (multiplier.filter && !multiplier.filter(dataPoint.year, dataPoint.value, dataPoint.percentile.value)) {
-                    return dataPoint;
-                }
+            resultData = resultData.map(simResult => ({
+                ...simResult,
+                data: simResult.data.map(dataPoint => {
+                    // Apply filter if exists - filter operates on source data (year, value, percentile)
+                    if (multiplier.filter && !multiplier.filter(dataPoint.year, dataPoint.value, simResult.percentile.value)) {
+                        return dataPoint;
+                    }
 
-                // Get multiplier value for this data point
-                const multiplierValue = getMultiplierValue(dataPoint.year, dataPoint.percentile.value);
-                if (multiplierValue === null) return dataPoint;
+                    // Get multiplier value for this data point
+                    const multiplierValue = getMultiplierValue(dataPoint.year, simResult.percentile.value);
+                    if (multiplierValue === null) return dataPoint;
 
-                let newValue;
-                const baseYear = multiplier.baseYear || 1;
+                    let newValue;
+                    const baseYear = multiplier.baseYear || 1;
 
-                switch (multiplier.operation) {
-                    case 'multiply':
-                        newValue = dataPoint.value * multiplierValue;
-                        break;
-                    case 'compound':
-                        newValue = dataPoint.value * Math.pow(1 + multiplierValue, dataPoint.year - baseYear);
-                        break;
-                    case 'simple':
-                        newValue = dataPoint.value * (1 + multiplierValue * (dataPoint.year - baseYear));
-                        break;
-                    case 'summation':
-                        newValue = dataPoint.value + multiplierValue;
-                        break;
-                    default:
-                        throw new Error(`Unknown multiplier operation: ${multiplier.operation}`);
-                }
+                    switch (multiplier.operation) {
+                        case 'multiply':
+                            newValue = dataPoint.value * multiplierValue;
+                            break;
+                        case 'compound':
+                            newValue = dataPoint.value * Math.pow(1 + multiplierValue, dataPoint.year - baseYear);
+                            break;
+                        case 'simple':
+                            newValue = dataPoint.value * (1 + multiplierValue * (dataPoint.year - baseYear));
+                            break;
+                        case 'summation':
+                            newValue = dataPoint.value + multiplierValue;
+                            break;
+                        default:
+                            throw new Error(`Unknown multiplier operation: ${multiplier.operation}`);
+                    }
 
-                return {
-                    ...dataPoint,
-                    value: newValue
-                };
-            });
-
-            // Determine actual percentile for audit trail
-            let auditPercentile = null;
-            if (customPercentile && customPercentile[multiplier.id]) {
-                auditPercentile = customPercentile[multiplier.id];
-            }
-
+                    return {
+                        ...dataPoint,
+                        value: newValue
+                    };
+                })
+            }));
         }
     });
 
@@ -426,9 +421,14 @@ const createValueLookup = (multiplierValues, customPercentile, multiplierId) => 
             // Check if SimResultsSchema array
             Yup.array().of(SimResultsSchema).validateSync(multiplierValues);
             const lookupMap = new Map();
-            multiplierValues.forEach(item => {
-                const key = `${item.year}-${item.percentile.value}`;
-                lookupMap.set(key, item.value);
+
+            // ✅ FIXED: Handle SimResultsSchema structure properly
+            multiplierValues.forEach(simResult => {
+                // Iterate through the .data array within each SimResultsSchema
+                simResult.data.forEach(dataPoint => {
+                    const key = `${dataPoint.year}-${simResult.percentile.value}`;
+                    lookupMap.set(key, dataPoint.value);
+                });
             });
 
             return (year, percentile) => {
@@ -443,11 +443,11 @@ const createValueLookup = (multiplierValues, customPercentile, multiplierId) => 
             };
         } catch (error) {
             try {
-                // Check if DataPointSchema array
+                // Check if DataPointSchema array - this part is correct
                 Yup.array().of(DataPointSchema).validateSync(multiplierValues);
                 const lookupMap = new Map();
-                multiplierValues.forEach(item => {
-                    lookupMap.set(item.year, item.value);
+                multiplierValues.forEach(dataPoint => {
+                    lookupMap.set(dataPoint.year, dataPoint.value);
                 });
 
                 return (year, percentile) => lookupMap.get(year) || null;

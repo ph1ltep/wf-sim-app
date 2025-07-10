@@ -1,8 +1,6 @@
 // frontend/src/utils/cube/sources/transformers/common.js
-
-import Yup from 'yup';
-import { SimResultsSchema, DataPointSchema } from 'schemas/yup/distribution';
-import { CubeSourceDataSchema } from 'schemas/yup/cube';
+//const { } = require('schemas/yup/distribution');
+const { CubeSourceDataSchema, SimResultsSchema, DataPointSchema } = require('schemas/yup/cube');
 
 /**
  * Lightweight, optimized filtering for processedData in transformers
@@ -26,12 +24,16 @@ export const filterCubeSourceData = (processedData, filters = {}) => {
         sourceIds,
         metadata: metadataFilters,
         type,
-        cashflowGroup,
-        category
+        cashflowType,
+        visualGroup,
+        accountingClass,
+        projectPhase,
+        name,
+        customPercentile
     } = filters;
 
     // Early return if no filters
-    if (!sourceId && !sourceIds && !metadataFilters && !type && !cashflowGroup && !category) {
+    if (!sourceId && !sourceIds && !metadataFilters && !type && !cashflowType && !visualGroup && !accountingClass && !projectPhase && !name && !customPercentile) {
         return processedData;
     }
 
@@ -51,11 +53,26 @@ export const filterCubeSourceData = (processedData, filters = {}) => {
             return false;
         }
 
-        if (cashflowGroup && source.metadata.cashflowGroup !== cashflowGroup) {
+        if (cashflowType && source.metadata.cashflowType !== cashflowType) {
             return false;
         }
 
-        if (category && source.metadata.category !== category) {
+        if (visualGroup && source.metadata.visualGroup !== visualGroup) {
+            return false;
+        }
+
+        if (accountingClass && source.metadata.accountingClass !== accountingClass) {
+            return false;
+        }
+
+        if (projectPhase && source.metadata.projectPhase !== projectPhase) {
+            return false;
+        }
+
+        if (name && source.metadata.name !== name) {
+            return false;
+        }
+        if (customPercentile && source.metadata.customPercentile !== customPercentile) {
             return false;
         }
 
@@ -267,24 +284,30 @@ export const adjustSourceDataValues = (sourceData, adjustFunction) => {
         case 'CubeSourceData':
             result = dataToProcess.map(cubeSource => ({
                 ...cubeSource,
-                percentileSource: cubeSource.percentileSource.map(item => ({
-                    ...item,
-                    value: adjustFunction(item.percentile.value, item.year, item.value)
+                percentileSource: cubeSource.percentileSource.map(simResult => ({
+                    ...simResult,
+                    data: simResult.data.map(dataPoint => ({
+                        ...dataPoint,
+                        value: adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value)
+                    }))
                 }))
             }));
             break;
 
         case 'SimResults':
-            result = dataToProcess.map(item => ({
-                ...item,
-                value: adjustFunction(item.percentile.value, item.year, item.value)
+            result = dataToProcess.map(simResult => ({
+                ...simResult,
+                data: simResult.data.map(dataPoint => ({
+                    ...dataPoint,
+                    value: adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value)
+                }))
             }));
             break;
 
         case 'DataPoint':
-            result = dataToProcess.map(item => ({
-                ...item,
-                value: adjustFunction(50, item.year, item.value) // Default percentile for DataPoint
+            result = dataToProcess.map(dataPoint => ({
+                ...dataPoint,
+                value: adjustFunction(50, dataPoint.year, dataPoint.value) // Default percentile for DataPoint
             }));
             break;
 

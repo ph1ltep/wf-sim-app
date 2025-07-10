@@ -225,11 +225,11 @@ export const CubeProvider = ({ children }) => {
          * const invalidData2 = getData({ metadata: { category: 'energy' } }); // Error: requires either sourceId or percentile 
         */
     const getData = useCallback((filters = {}) => {
-        const { percentile, sourceId, metadata: metadataFilters } = filters;
+        const { percentile, sourceId, sourceIds, metadata: metadataFilters } = filters;
 
-        // Validate required parameters
-        if (!sourceId && percentile === undefined) {
-            throw new Error('getData requires either sourceId or percentile parameter');
+        // Validate required parameters - now includes sourceIds
+        if (!sourceId && !sourceIds && percentile === undefined) {
+            throw new Error('getData requires either sourceId, sourceIds, or percentile parameter');
         }
 
         if (!sourceData || !Array.isArray(sourceData)) {
@@ -239,10 +239,16 @@ export const CubeProvider = ({ children }) => {
         // Optimized filtering - apply most selective filters first
         let filteredSources = sourceData;
 
-        // Apply sourceId filter first (most selective)
+        // Apply sourceId filter first (most selective) - single source
         if (sourceId) {
             filteredSources = filteredSources.filter(source => source.id === sourceId);
             // Early return if no source found
+            if (filteredSources.length === 0) return {};
+        }
+        // ✅ NEW: Apply sourceIds filter (multiple sources with OR logic)
+        else if (sourceIds && Array.isArray(sourceIds)) {
+            filteredSources = filteredSources.filter(source => sourceIds.includes(source.id));
+            // Early return if no sources found
             if (filteredSources.length === 0) return {};
         }
 
@@ -268,14 +274,17 @@ export const CubeProvider = ({ children }) => {
 
             // Group by percentile for efficiency
             const percentileGroups = new Map();
-            source.percentileSource.forEach(item => {
-                const percentileKey = item.percentile.value;
+            source.percentileSource.forEach(simResult => {
+                const percentileKey = simResult.percentile.value;
                 if (!percentileGroups.has(percentileKey)) {
                     percentileGroups.set(percentileKey, []);
                 }
-                percentileGroups.get(percentileKey).push({
-                    year: item.year,
-                    value: item.value
+                // Extract data from simResult.data array
+                simResult.data.forEach(dataPoint => {
+                    percentileGroups.get(percentileKey).push({
+                        year: dataPoint.year,
+                        value: dataPoint.value
+                    });
                 });
             });
 
@@ -287,16 +296,51 @@ export const CubeProvider = ({ children }) => {
                 };
             });
         }
+        // ✅ NEW: Mode 1b: Only sourceIds set (group by percentile, multiple sources)
+        else if (sourceIds && Array.isArray(sourceIds) && percentile === undefined) {
+            // For each source, group by percentile
+            filteredSources.forEach(source => {
+                const percentileGroups = new Map();
+                source.percentileSource.forEach(simResult => {
+                    const percentileKey = simResult.percentile.value;
+                    if (!percentileGroups.has(percentileKey)) {
+                        percentileGroups.set(percentileKey, []);
+                    }
+                    // Extract data from simResult.data array
+                    simResult.data.forEach(dataPoint => {
+                        percentileGroups.get(percentileKey).push({
+                            year: dataPoint.year,
+                            value: dataPoint.value
+                        });
+                    });
+                });
+
+                // Build result with percentile keys for this source
+                percentileGroups.forEach((dataPoints, percentileKey) => {
+                    if (!result[percentileKey]) {
+                        result[percentileKey] = {
+                            data: [],
+                            metadata: { sources: [] }
+                        };
+                    }
+                    result[percentileKey].data.push(...dataPoints);
+                    result[percentileKey].metadata.sources.push(source.metadata);
+                });
+            });
+        }
         // Mode 2 & 3: Percentile set (group by sourceId)
         else if (percentile !== undefined) {
             filteredSources.forEach(source => {
                 // Pre-filter to specific percentile for efficiency
                 const dataPoints = [];
-                source.percentileSource.forEach(item => {
-                    if (item.percentile.value === percentile) {
-                        dataPoints.push({
-                            year: item.year,
-                            value: item.value
+                source.percentileSource.forEach(simResult => {
+                    if (simResult.percentile.value === percentile) {
+                        // Extract data from simResult.data array
+                        simResult.data.forEach(dataPoint => {
+                            dataPoints.push({
+                                year: dataPoint.year,
+                                value: dataPoint.value
+                            });
                         });
                     }
                 });
