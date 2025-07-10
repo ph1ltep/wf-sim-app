@@ -24,18 +24,18 @@ const CashflowTimelineCard = () => {
     // Get cube data and percentile selection
     const { getData, isLoading, error } = useCube();
     const { getValueByPath } = useScenario();
+
+    // sourceIds for cashflow timeline card
+    const cardSourceIds = ['totalRevenue', 'totalCost', 'netCashflow', 'debtService'];
+
     const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
 
     // Get cube data for current percentile
     const cubeData = useMemo(() => {
-        // if (!sourceData || !selectedPercentile?.value) {
-        //     console.log('⏸️ CashflowTimelineCard: No cube sourceData or selectedPercentiles');
-        //     return null;
-        // }
 
         try {
             console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentile.value}`);
-            return getData({ sourceIds: ['totalRevenue', 'totalCost', 'netCashflow', 'debtService'], percentile: selectedPercentile.value });
+            return getData({ sourceIds: cardSourceIds, percentile: selectedPercentile.value });
         } catch (error) {
             console.error('❌ CashflowTimelineCard: Cube data transformation failed:', error);
             return null;
@@ -244,7 +244,7 @@ const CashflowTimelineCard = () => {
             {/* Audit Trail Viewer - Updated for cube data */}
             {cubeData && (
                 <AuditTrailViewer
-                    cubeData={cubeData}
+                    sourceIds={cardSourceIds}
                     visible={auditTrailVisible}
                     onClose={() => setAuditTrailVisible(false)}
                 />

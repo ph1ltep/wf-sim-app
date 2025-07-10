@@ -208,22 +208,22 @@ export const CubeProvider = ({ children }) => {
      */
 
     /**
-         * Get filtered cube data with flexible filtering options
-         * @param {Object} filters - Filter parameters
-         * @param {number} [filters.percentile] - Filter by percentile value
-         * @param {string} [filters.sourceId] - Filter by source ID
-         * @param {Object} [filters.metadata] - Filter by metadata fields (exact matches)
-         * @returns {Object} CubeSourceDataResponseSchema - Filtered data with dynamic keys
-         * @throws {Error} If neither sourceId nor percentile is provided
-         * ✅ Valid calls
-         * const energyData = getData({ sourceId: 'energyRevenue' });
-         * const medianData = getData({ percentile: 50 });
-         * const specificData = getData({ sourceId: 'energyRevenue', percentile: 50 });
-         * const costSources = getData({ percentile: 50, metadata: { cashflowGroup: 'cost' } });
-         * // ❌ Invalid calls - will throw error
-         * const invalidData = getData({}); // Error: requires either sourceId or percentile
-         * const invalidData2 = getData({ metadata: { category: 'energy' } }); // Error: requires either sourceId or percentile 
-        */
+     * Get filtered cube data with flexible filtering options
+     * @param {Object} filters - Filter parameters
+     * @param {number} [filters.percentile] - Filter by percentile value
+     * @param {string} [filters.sourceId] - Filter by source ID
+     * @param {Object} [filters.metadata] - Filter by metadata fields (exact matches)
+     * @returns {Object} CubeSourceDataResponseSchema - Filtered data with dynamic keys
+     * @throws {Error} If neither sourceId nor percentile is provided
+     * ✅ Valid calls
+     * const energyData = getData({ sourceId: 'energyRevenue' });
+     * const medianData = getData({ percentile: 50 });
+     * const specificData = getData({ sourceId: 'energyRevenue', percentile: 50 });
+     * const costSources = getData({ percentile: 50, metadata: { cashflowGroup: 'cost' } });
+     * // ❌ Invalid calls - will throw error
+     * const invalidData = getData({}); // Error: requires either sourceId or percentile
+     * const invalidData2 = getData({ metadata: { category: 'energy' } }); // Error: requires either sourceId or percentile 
+    */
     const getData = useCallback((filters = {}) => {
         const { percentile, sourceId, sourceIds, metadata: metadataFilters } = filters;
 
@@ -396,6 +396,45 @@ export const CubeProvider = ({ children }) => {
         return result;
     }, [sourceData, scenarioData]);
 
+    /**
+     * Get audit trails for specific sources
+     * @param {Array} sourceIds - Array of source IDs to get audit trails for
+     * @returns {Object} Object with sourceId as keys and audit objects as values
+     */
+    const getAuditTrail = useCallback((sourceIds) => {
+        if (!Array.isArray(sourceIds) || sourceIds.length === 0) {
+            console.warn('⚠️ getAuditTrail: sourceIds must be a non-empty array');
+            return {};
+        }
+
+        if (!sourceData || !Array.isArray(sourceData)) {
+            console.warn('⚠️ getAuditTrail: No sourceData available');
+            return {};
+        }
+
+        const auditTrails = {};
+
+        sourceIds.forEach(sourceId => {
+            // Find the source in sourceData
+            const source = sourceData.find(item => item.id === sourceId);
+
+            if (source) {
+                // Extract audit trail if it exists
+                if (source.audit && source.audit.trail) {
+                    auditTrails[sourceId] = source.audit;
+                } else {
+                    console.warn(`⚠️ getAuditTrail: No audit trail found for source '${sourceId}'`);
+                    auditTrails[sourceId] = { trail: [] };
+                }
+            } else {
+                console.warn(`⚠️ getAuditTrail: Source '${sourceId}' not found in sourceData`);
+                auditTrails[sourceId] = null;
+            }
+        });
+
+        return auditTrails;
+    }, [sourceData]);
+
     const contextValue = {
         // Data
         sourceData,
@@ -424,9 +463,8 @@ export const CubeProvider = ({ children }) => {
 
         // Data access
         getData,
+        getAuditTrail,
 
-        // Utilities
-        //getValueByPath
     };
 
     return (

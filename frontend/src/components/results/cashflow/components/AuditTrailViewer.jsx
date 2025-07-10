@@ -1,173 +1,163 @@
-// src/components/results/cashflow/components/AuditTrailViewer.jsx - Audit trail visualization
+// frontend/src/components/results/cashflow/components/AuditTrailViewer.jsx - Modernized for CubeContext
 import React, { useState, useMemo } from 'react';
-import { Drawer, Tree, Descriptions, Typography, Space, Tag, Button, Card, Alert } from 'antd';
-import { AuditOutlined, CalculatorOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { Drawer, Tree, Descriptions, Typography, Space, Tag, Button, Card, Alert, Collapse, Timeline } from 'antd';
+import { AuditOutlined, CalculatorOutlined, ArrowRightOutlined, ClockCircleOutlined, LinkOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { useCube } from '../../../../contexts/CubeContext';
 
 const { Text, Title } = Typography;
+const { Panel } = Collapse;
 
-const AuditTrailViewer = ({ cashflowData, visible, onClose }) => {
-    const [selectedLineItem, setSelectedLineItem] = useState(null);
+const AuditTrailViewer = ({ sourceIds, visible, onClose }) => {
+    const [selectedSourceId, setSelectedSourceId] = useState(null);
+    const { getAuditTrail } = useCube();
+
+    // Get audit trail data for the specified sources
+    const auditData = useMemo(() => {
+        if (!sourceIds || !Array.isArray(sourceIds) || sourceIds.length === 0) return {};
+
+        try {
+            return getAuditTrail(sourceIds);
+        } catch (error) {
+            console.error('❌ AuditTrailViewer: Failed to get audit trail:', error);
+            return {};
+        }
+    }, [sourceIds, getAuditTrail]);
 
     // Generate audit trail tree data
     const auditTreeData = useMemo(() => {
-        if (!cashflowData?.lineItems) return [];
+        const sourceIdKeys = Object.keys(auditData);
+        if (sourceIdKeys.length === 0) return [];
 
-        return cashflowData.lineItems.map(lineItem => ({
-            title: `${lineItem.name} (${lineItem.category})`,
-            key: lineItem.id,
-            icon: <CalculatorOutlined />,
-            children: [
-                {
-                    title: `Source Data (P${lineItem.metadata.selectedPercentile})`,
-                    key: `${lineItem.id}-source`,
-                    icon: <AuditOutlined />,
-                },
-                ...lineItem.metadata.appliedMultipliers.map((multiplier, index) => ({
-                    title: `${multiplier.id} (${multiplier.operation})`,
-                    key: `${lineItem.id}-multiplier-${index}`,
-                    icon: <ArrowRightOutlined />,
-                })),
-                {
-                    title: `Final Result (${lineItem.data.length} data points)`,
-                    key: `${lineItem.id}-result`,
-                    icon: <CalculatorOutlined />,
-                }
-            ]
-        }));
-    }, [cashflowData]);
+        return sourceIdKeys.map(sourceId => {
+            const audit = auditData[sourceId];
+            const trailLength = audit?.trail?.length || 0;
+
+            return {
+                title: `${sourceId} (${trailLength} steps)`,
+                key: sourceId,
+                icon: <DatabaseOutlined />,
+                children: trailLength > 0 ? [
+                    {
+                        title: `${trailLength} Processing Steps`,
+                        key: `${sourceId}-steps`,
+                        icon: <AuditOutlined />,
+                    }
+                ] : []
+            };
+        });
+    }, [auditData]);
+
+    // Get selected source audit trail
+    const selectedAudit = useMemo(() => {
+        if (!selectedSourceId || !auditData[selectedSourceId]) return null;
+        return auditData[selectedSourceId];
+    }, [selectedSourceId, auditData]);
 
     // Handle tree node selection
-    const handleTreeSelect = (selectedKeys, info) => {
+    const handleTreeSelect = (selectedKeys) => {
+        if (selectedKeys.length === 0) return;
+
         const key = selectedKeys[0];
-        if (!key) return;
-
-        const [lineItemId] = key.split('-');
-        const lineItem = cashflowData?.lineItems?.find(item => item.id === lineItemId);
-
-        if (lineItem) {
-            setSelectedLineItem({
-                ...lineItem,
-                selectedNode: key
-            });
-        }
+        const sourceId = key.split('-')[0];
+        setSelectedSourceId(sourceId);
     };
 
-    // Render calculation steps
-    const renderCalculationSteps = () => {
-        if (!selectedLineItem) {
+    // Format duration for display
+    const formatDuration = (duration) => {
+        if (!duration || duration === 0) return '0ms';
+        return duration < 1 ? '<1ms' : `${duration.toFixed(1)}ms`;
+    };
+
+    // Render audit trail steps
+    const renderAuditSteps = () => {
+        if (!selectedAudit?.trail) {
             return (
                 <Alert
-                    message="Select a line item"
-                    description="Choose a line item from the tree to view its calculation steps."
+                    message="No audit trail available"
+                    description="This source does not have detailed audit trail information."
                     type="info"
                 />
             );
         }
 
-        const steps = [];
+        const trail = selectedAudit.trail;
+        const totalDuration = trail.reduce((sum, step) => sum + (step.duration || 0), 0);
 
-        // Step 1: Source data
-        steps.push(
-            <Card key="source" size="small" style={{ marginBottom: 16 }}>
-                <Title level={5}>
-                    1. Source Data
-                    <Tag color="blue" style={{ marginLeft: 8 }}>
-                        P{selectedLineItem.metadata.selectedPercentile}
-                    </Tag>
-                </Title>
-                <Descriptions size="small" column={2}>
-                    <Descriptions.Item label="Category">{selectedLineItem.category}</Descriptions.Item>
-                    <Descriptions.Item label="Subcategory">{selectedLineItem.subcategory}</Descriptions.Item>
-                    <Descriptions.Item label="Has Percentiles">{selectedLineItem.metadata.hasPercentileVariation ? 'Yes' : 'No'}</Descriptions.Item>
-                    <Descriptions.Item label="Data Points">{selectedLineItem.data.length}</Descriptions.Item>
-                </Descriptions>
+        return (
+            <div>
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                    {/* Source Overview */}
+                    <Card size="small" title="Source Overview">
+                        <Descriptions size="small" column={2}>
+                            <Descriptions.Item label="Source ID">{selectedSourceId}</Descriptions.Item>
+                            <Descriptions.Item label="Processing Steps">{trail.length}</Descriptions.Item>
+                            <Descriptions.Item label="Total Duration">{formatDuration(totalDuration)}</Descriptions.Item>
+                            <Descriptions.Item label="Dependencies">
+                                {trail.reduce((deps, step) => {
+                                    step.dependencies?.forEach(dep => {
+                                        if (!deps.includes(dep)) deps.push(dep);
+                                    });
+                                    return deps;
+                                }, []).length}
+                            </Descriptions.Item>
+                        </Descriptions>
+                    </Card>
 
-                {selectedLineItem.data.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                        <Text type="secondary">Sample data: </Text>
-                        <Text code>
-                            Year {selectedLineItem.data[0].year}: {selectedLineItem.data[0].value.toLocaleString()}
-                        </Text>
-                        {selectedLineItem.data.length > 1 && (
-                            <Text code style={{ marginLeft: 8 }}>
-                                ... ({selectedLineItem.data.length} total points)
-                            </Text>
-                        )}
-                    </div>
-                )}
-            </Card>
+                    {/* Processing Timeline */}
+                    <Card size="small" title="Processing Timeline">
+                        <Timeline>
+                            {trail.map((step, index) => (
+                                <Timeline.Item
+                                    key={index}
+                                    dot={<ClockCircleOutlined />}
+                                    color={step.duration > 10 ? 'red' : 'green'}
+                                >
+                                    <div>
+                                        <div style={{ marginBottom: 8 }}>
+                                            <Text strong>{step.step}</Text>
+                                            {step.duration > 0 && (
+                                                <Tag color="blue" style={{ marginLeft: 8 }}>
+                                                    {formatDuration(step.duration)}
+                                                </Tag>
+                                            )}
+                                        </div>
+
+                                        {step.details && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <Text type="secondary">{step.details}</Text>
+                                            </div>
+                                        )}
+
+                                        {step.dependencies && step.dependencies.length > 0 && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <Text type="secondary">Dependencies: </Text>
+                                                {step.dependencies.map((dep, i) => (
+                                                    <Tag key={i} icon={<LinkOutlined />} color="orange">
+                                                        {dep}
+                                                    </Tag>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {step.dataSample && (
+                                            <Collapse size="small" ghost>
+                                                <Panel header="View Data Sample" key="data">
+                                                    <div style={{ backgroundColor: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+                                                        <Text code style={{ fontSize: '11px' }}>
+                                                            {JSON.stringify(step.dataSample, null, 2)}
+                                                        </Text>
+                                                    </div>
+                                                </Panel>
+                                            </Collapse>
+                                        )}
+                                    </div>
+                                </Timeline.Item>
+                            ))}
+                        </Timeline>
+                    </Card>
+                </Space>
+            </div>
         );
-
-        // Step 2+: Applied multipliers
-        selectedLineItem.metadata.appliedMultipliers.forEach((multiplier, index) => {
-            steps.push(
-                <Card key={`multiplier-${index}`} size="small" style={{ marginBottom: 16 }}>
-                    <Title level={5}>
-                        {index + 2}. Apply {multiplier.id}
-                        <Tag color="orange" style={{ marginLeft: 8 }}>
-                            {multiplier.operation}
-                        </Tag>
-                    </Title>
-                    <Descriptions size="small" column={2}>
-                        <Descriptions.Item label="Operation">{multiplier.operation}</Descriptions.Item>
-                        <Descriptions.Item label="Base Year">{multiplier.baseYear}</Descriptions.Item>
-                        <Descriptions.Item label="Cumulative">{multiplier.cumulative ? 'Yes' : 'No'}</Descriptions.Item>
-                        <Descriptions.Item label="Multiplier Points">{multiplier.values?.length || 0}</Descriptions.Item>
-                    </Descriptions>
-
-                    {multiplier.operation === 'compound' && (
-                        <Alert
-                            message="Compound Growth Formula"
-                            description={`value × (1 + rate)^(year - ${multiplier.baseYear})`}
-                            type="info"
-                            size="small"
-                            style={{ marginTop: 8 }}
-                        />
-                    )}
-
-                    {multiplier.operation === 'multiply' && (
-                        <Alert
-                            message="Multiplication Formula"
-                            description="value × multiplier"
-                            type="info"
-                            size="small"
-                            style={{ marginTop: 8 }}
-                        />
-                    )}
-                </Card>
-            );
-        });
-
-        // Final step: Result
-        const totalValue = selectedLineItem.data.reduce((sum, point) => sum + point.value, 0);
-        steps.push(
-            <Card key="result" size="small" style={{ marginBottom: 16 }}>
-                <Title level={5}>
-                    {selectedLineItem.metadata.appliedMultipliers.length + 2}. Final Result
-                    <Tag color="green" style={{ marginLeft: 8 }}>
-                        Complete
-                    </Tag>
-                </Title>
-                <Descriptions size="small" column={2}>
-                    <Descriptions.Item label="Total Value">{totalValue.toLocaleString()}</Descriptions.Item>
-                    <Descriptions.Item label="Currency">{cashflowData.metadata.currency}</Descriptions.Item>
-                    <Descriptions.Item label="Project Years">{selectedLineItem.data.length}</Descriptions.Item>
-                    <Descriptions.Item label="Average Annual">{Math.round(totalValue / selectedLineItem.data.length).toLocaleString()}</Descriptions.Item>
-                </Descriptions>
-
-                {selectedLineItem.displayNote && (
-                    <Alert
-                        message="Display Note"
-                        description={selectedLineItem.displayNote}
-                        type="warning"
-                        size="small"
-                        style={{ marginTop: 8 }}
-                    />
-                )}
-            </Card>
-        );
-
-        return steps;
     };
 
     return (
@@ -175,7 +165,7 @@ const AuditTrailViewer = ({ cashflowData, visible, onClose }) => {
             title={
                 <Space>
                     <AuditOutlined />
-                    <Text>Cashflow Calculation Audit Trail</Text>
+                    <Text>Cube Data Audit Trail</Text>
                 </Space>
             }
             placement="right"
@@ -189,19 +179,35 @@ const AuditTrailViewer = ({ cashflowData, visible, onClose }) => {
             <div style={{ display: 'flex', height: '100%' }}>
                 {/* Tree view */}
                 <div style={{ width: '300px', borderRight: '1px solid #f0f0f0', paddingRight: '16px' }}>
-                    <Title level={5}>Line Items</Title>
-                    <Tree
-                        treeData={auditTreeData}
-                        onSelect={handleTreeSelect}
-                        selectedKeys={selectedLineItem ? [selectedLineItem.id] : []}
-                        defaultExpandAll
-                    />
+                    <Title level={5}>Data Sources</Title>
+                    {auditTreeData.length > 0 ? (
+                        <Tree
+                            treeData={auditTreeData}
+                            onSelect={handleTreeSelect}
+                            selectedKeys={selectedSourceId ? [selectedSourceId] : []}
+                            defaultExpandAll
+                        />
+                    ) : (
+                        <Alert
+                            message="No data sources"
+                            description="No audit trail data available for this view."
+                            type="warning"
+                            size="small"
+                        />
+                    )}
                 </div>
 
                 {/* Details view */}
                 <div style={{ flex: 1, paddingLeft: '16px', overflowY: 'auto' }}>
-                    <Title level={5}>Calculation Steps</Title>
-                    {renderCalculationSteps()}
+                    {selectedAudit ? (
+                        renderAuditSteps()
+                    ) : (
+                        <Alert
+                            message="Select a data source"
+                            description="Choose a data source from the tree to view its audit trail and processing steps."
+                            type="info"
+                        />
+                    )}
                 </div>
             </div>
         </Drawer>
