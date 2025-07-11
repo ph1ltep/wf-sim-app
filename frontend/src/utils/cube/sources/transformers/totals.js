@@ -14,6 +14,7 @@ export const totalCost = (sourceData, context) => {
         cashflowType: 'outflow',
     });
 
+
     if (costSources.length === 0) {
         console.warn('⚠️ No cost sources found for totalCost calculation');
         return [];
@@ -101,7 +102,7 @@ export const totalCapex = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const totalRevenue = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile } = context;
+    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
 
     // Filter to revenue sources only
     const revenueSources = filterCubeSourceData(processedData, {
@@ -119,6 +120,6 @@ export const totalRevenue = (sourceData, context) => {
     return aggregateCubeSourceData(revenueSources, availablePercentiles, {
         operation: 'sum',
         customPercentile
-    });
+    }, addAuditEntry);
 };
 

@@ -33,7 +33,7 @@ export const capexDrawdown = (sourceData, context) => {
 
     console.log(`🏗️ capexDrawdown: ${yearlyTotals.size} years, $${totalCapex.toLocaleString()}`);
 
-    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'capexDrawdown', customPercentile);
+    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'capexDrawdown', customPercentile, addAuditEntry);
 
 };
 
@@ -56,7 +56,10 @@ export const debtDrawdown = (sourceData, context) => {
     addAuditEntry(
         'apply_debt_drawdown_transformation',
         `transforming ${sourceData.length} construction cost sources to debt drawdown`,
-        ['financing'] // References financing data
+        ['financing'], // References financing data
+        sourceData,
+        'transform',
+        'complex'
     );
 
     // Get debt financing ratio (convert % to decimal)
@@ -89,5 +92,5 @@ export const debtDrawdown = (sourceData, context) => {
     console.log(`💰 debtDrawdown: ${debtDrawdownByYear.size} years, $${totalDebtDrawn.toLocaleString()} (${debtFinancingRatio * 100}% debt ratio)`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(debtDrawdownData, availablePercentiles, 'debtDrawdown', customPercentile);
+    return normalizeIntoSimResults(debtDrawdownData, availablePercentiles, 'debtDrawdown', customPercentile, addAuditEntry);
 };

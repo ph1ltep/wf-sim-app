@@ -106,18 +106,6 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
         return [];
     }
 
-    // Track dependencies for audit trail
-    const dependencies = sources.map(source => source.id);
-
-    // Add audit entry if function provided
-    if (addAuditEntry) {
-        addAuditEntry(
-            'apply_aggregation',
-            `aggregating ${sources.length} sources (${operation})`,
-            dependencies
-        );
-    }
-
     // Determine effective percentiles
     const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
         ? [...availablePercentiles, 0]
@@ -214,6 +202,21 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
         });
     });
 
+    // Track dependencies for audit trail
+    const dependencies = sources.map(source => source.id);
+
+    // Add audit entry if function provided
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_aggregation',
+            `aggregating ${sources.length} sources (${operation})`,
+            dependencies,
+            result, // No source data for aggregation
+            'aggregate',
+            operation
+        );
+    }
+
     return result;
 };
 
@@ -243,7 +246,7 @@ export const extractPercentileData = (data, percentile) => {
  * const doubled = adjustSourceDataValues(data, (percentile, year, value) => value * 2);
  * const adjusted = adjustSourceDataValues(data, (percentile, year, value) => { return percentile > 50 ? value * 1.1 : value * 0.9; });
  */
-export const adjustSourceDataValues = (sourceData, adjustFunction) => {
+export const adjustSourceDataValues = (sourceData, adjustFunction, addAuditEntry = null) => {
     if (!sourceData || typeof adjustFunction !== 'function') {
         return sourceData;
     }
@@ -315,6 +318,18 @@ export const adjustSourceDataValues = (sourceData, adjustFunction) => {
             throw new Error('Unsupported data type for adjustSourceDataValues');
     }
 
+    // Add audit entry if function provided
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_adjustment',
+            `adjusted ${sourceData.length} by (${adjustFunction.toString()})`,
+            null,
+            result,
+            'transform',
+            'adjust'
+        );
+    }
+
     // Return in same format as input (array or single object)
     return isArray ? result : result[0];
 };
@@ -327,7 +342,7 @@ export const adjustSourceDataValues = (sourceData, adjustFunction) => {
  * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Array} Array of SimResultsSchema objects {name, data, percentile}
  */
-export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, customPercentile = null) => {
+export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, customPercentile = null, addAuditEntry = null) => {
     if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
         return [];
     }
@@ -350,6 +365,18 @@ export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, 
             data: [...dataPoints], // Same data array
             percentile: { value: 0 }
         });
+    }
+
+    // Add audit entry if function provided
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_normalization',
+            `normalized fixed time-series into ${availablePercentiles.length} percentiles`,
+            null,
+            result,
+            'normalize',
+            'none'
+        );
     }
 
     return result;

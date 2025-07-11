@@ -106,12 +106,14 @@ export const createAuditTrail = (sourceId, preferredPercentile = 50, dataSamplin
      * @param {string|Array} dependencies - Dependencies (single string or array)
      * @param {any} sourceData - Optional source data for sampling
      */
-    const addAuditEntry = (step, details = null, dependencies = [], sourceData = null) => {
+    const addAuditEntry = (step, details = null, dependencies = [], sourceData = null, type = 'none', typeOperation = 'none') => {
         const entry = {
             timestamp: Date.now(),
             step,
             details,
-            dependencies: Array.isArray(dependencies) ? dependencies : [dependencies].filter(Boolean)
+            dependencies: Array.isArray(dependencies) ? dependencies : [dependencies].filter(Boolean),
+            type: type,
+            typeOperation: typeOperation,
         };
 
         // Add data sample if enabled and data provided
@@ -136,8 +138,52 @@ export const createAuditTrail = (sourceId, preferredPercentile = 50, dataSamplin
         return calcStepDurations(trail);
     };
 
+    /**
+     * Extract and resolve all unique references used in an audit trail
+     * @param {Array} trail - Array of AuditTrailEntrySchema objects
+     * @param {Object} referenceData - Reference data in allReferences format {refId: value, ...}
+     * @returns {Object} Object with reference IDs as keys and their values
+     */
+    const getReferences = (trail, referenceData) => {
+        if (!Array.isArray(trail) || trail.length === 0) {
+            console.warn('⚠️ getReferences: trail must be a non-empty array');
+            return {};
+        }
+
+        if (!referenceData || typeof referenceData !== 'object') {
+            console.warn('⚠️ getReferences: referenceData must be an object');
+            return {};
+        }
+
+        // Extract all dependencies from trail entries
+        const allDependencies = new Set();
+
+        trail.forEach(entry => {
+            if (entry.dependencies && Array.isArray(entry.dependencies)) {
+                entry.dependencies.forEach(dep => {
+                    if (typeof dep === 'string' && dep.trim()) {
+                        allDependencies.add(dep);
+                    }
+                });
+            }
+        });
+
+        // Cross-reference with referenceData to get values
+        const resolvedReferences = {};
+
+        allDependencies.forEach(refId => {
+            if (referenceData.hasOwnProperty(refId)) {
+                resolvedReferences[refId] = referenceData[refId];
+            }
+            // Silently skip dependencies that are not references
+        });
+
+        return resolvedReferences;
+    };
+
     return {
         addAuditEntry,
-        getTrail
+        getTrail,
+        getReferences
     };
 };

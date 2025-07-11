@@ -101,6 +101,8 @@ const CubeSourceRegistrySchema = Yup.object().shape({
 const AuditTrailEntrySchema = Yup.object().shape({
     timestamp: Yup.number().required('Timestamp is required'),
     step: Yup.string().required('Step name is required'),
+    type: Yup.string().oneOf(['aggregate', 'transform', 'multiply', 'reduce', 'normalize', 'none']).default('info'),
+    typeOperation: Yup.string().oneOf(['sum', 'subtract', 'multiply', 'compound', 'simple', 'adjust', 'summation', 'complex', 'none']).optional(),
     details: Yup.mixed().optional(),
     dependencies: Yup.array().of(Yup.string()).default([]),
     dataSample: Yup.object().shape({
@@ -116,7 +118,8 @@ const CubeSourceDataSchema = Yup.object().shape({
     percentileSource: Yup.array().of(SimResultsSchema).default([]),
     metadata: CubeSourceMetadataSchema.required('Metadata is required'), //can be copied from CubeSourceRegistryItemSchema.metadata and applies equally to all percentiles.
     audit: Yup.object().shape({
-        trail: Yup.array().of(AuditTrailEntrySchema).default([])
+        trail: Yup.array().of(AuditTrailEntrySchema).default([]), //audit object's getTrail
+        references: Yup.object().default([]) // audit object's getReferences
     }).required('Audit trail is required')
 });
 

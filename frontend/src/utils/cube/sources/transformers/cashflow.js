@@ -41,7 +41,7 @@ export const netCashflow = (sourceData, context) => {
     const costSource = totalCostSources[0];
 
     // Multiply cost values by -1 to convert to negative
-    const negativeCostSource = adjustSourceDataValues(costSource, (percentile, year, value) => value * -1);
+    const negativeCostSource = adjustSourceDataValues(costSource, (percentile, year, value) => value * -1, addAuditEntry);
 
     // Combine revenue (positive) and cost (negative) sources
     const combinedSources = [revenueSource, negativeCostSource];

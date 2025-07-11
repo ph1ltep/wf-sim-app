@@ -55,7 +55,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
         try {
             // Initialize audit trail for this source
             const auditTrail = createAuditTrail(source.id, 50, true);
-            const { addAuditEntry, getTrail } = auditTrail;
+            const { getTrail, getReferences } = auditTrail;
 
             // Step 3a: Validate source type
             if (!validateSourceType(source)) {
@@ -79,11 +79,11 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             const allReferences = { ...globalReferences, ...localReferences };
 
             // Add audit entry for reference loading
-            auditTrail.addAuditEntry(
-                'apply_reference_loading',
-                `loaded ${Object.keys(allReferences).length} references`,
-                Object.keys(allReferences)
-            );
+            // auditTrail.addAuditEntry(
+            //     'apply_reference_loading',
+            //     `loaded ${Object.keys(allReferences).length} references`,
+            //     Object.keys(allReferences)
+            // );
 
             // Step 3d: Extract source data
             let sourceData = null;
@@ -153,12 +153,14 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
                 multipliedData // Single data sample of final result
             );
             // Step 3g: Build CubeSourceDataSchema
+            const trail = getTrail();
             const cubeSourceData = {
                 id: source.id,
                 percentileSource: multipliedData,
                 metadata: source.metadata,
                 audit: {
-                    trail: getTrail()
+                    trail: trail,
+                    references: getReferences(trail, allReferences)
                 }
             };
 
@@ -344,17 +346,6 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
         const multiplierValues = findMultiplierValues(multiplier.id, processedData, allReferences);
 
         if (multiplierValues) {
-            // Determine multiplier value type for audit
-            const valueType = typeof multiplierValues === 'number' ? 'scalar' :
-                Array.isArray(multiplierValues) ? 'timeSeries' : 'processed';
-
-            // Add audit entry for multiplier with actual dependency and sample data
-            addAuditEntry(
-                'apply_multiplier',
-                `${multiplier.id} (${multiplier.operation}, ${valueType})`,
-                [multiplier.id], // This is the actual dependency - the multiplier source
-                multiplierValues // Single sample of the multiplier data
-            );
 
             // Create optimized value lookup function
             const getMultiplierValue = createValueLookup(multiplierValues, customPercentile, multiplier.id);
@@ -397,6 +388,22 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
                     };
                 })
             }));
+
+            // Determine multiplier value type for audit
+            const valueType = typeof multiplierValues === 'number' ? 'scalar' :
+                Array.isArray(multiplierValues) ? 'timeSeries' : 'processed';
+
+            // Add audit entry for multiplier with actual dependency and sample data
+            addAuditEntry(
+                'apply_multiplier',
+                `${multiplier.id} (${multiplier.operation}, ${valueType})`,
+                [multiplier.id], // This is the actual dependency - the multiplier source
+                multiplierValues, // Single sample of the multiplier data
+                'multiply', // Type of operation
+                multiplier.operation // Type of operation for audit
+            );
+
+
         }
     });
 

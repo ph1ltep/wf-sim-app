@@ -35,12 +35,6 @@ export const interestDuringConstruction = (sourceData, context) => {
         return [];
     }
 
-    addAuditEntry(
-        'apply_idc_transformation',
-        'calculating Interest During Construction from debt drawdown data',
-        ['financing', 'debtDrawdown']
-    );
-
     const debtDrawdownSource = debtDrawdownSources[0];
     const constructionDebtRate = (financing.costOfConstructionDebt || financing.costOfDebt || 5) / 100;
 
@@ -95,6 +89,15 @@ export const interestDuringConstruction = (sourceData, context) => {
     );
     console.log(`🏗️ interestDuringConstruction: ${result.length} percentiles, $${(totalIDC / availablePercentiles.length).toLocaleString()} Avg total IDC/percentile (${constructionDebtRate * 100}% rate)`);
 
+    addAuditEntry(
+        'apply_idc_transformation',
+        'calculating Interest During Construction from debt drawdown data',
+        ['financing', 'debtDrawdown'],
+        result,
+        'transform',
+        'complex'
+    );
+
     return result;
 };
 
@@ -126,12 +129,6 @@ export const operationalInterest = (sourceData, context) => {
         console.warn('⚠️ operationalInterest: No operational principal data found in processed sources');
         return [];
     }
-
-    addAuditEntry(
-        'apply_operational_interest_transformation',
-        'calculating operational interest payments from principal payment schedule',
-        ['financing', 'projectLife', 'operationalPrincipal']
-    );
 
     const principalSource = principalSources[0];
 
@@ -191,6 +188,15 @@ export const operationalInterest = (sourceData, context) => {
     );
     console.log(`💰 operationalInterest: ${result.length} percentiles, $${(totalInterest / availablePercentiles.length).toLocaleString()} Avg total interest (${operationalRate * 100}% rate)`);
 
+    addAuditEntry(
+        'apply_operational_interest_transformation',
+        'calculating operational interest payments from principal payment schedule',
+        ['financing', 'projectLife', 'operationalPrincipal'],
+        result,
+        'transform',
+        'complex'
+    );
+
     return result;
 };
 
@@ -231,12 +237,6 @@ export const operationalPrincipal = (sourceData, context) => {
         console.warn('⚠️ operationalPrincipal: No IDC data found in processed sources');
         return [];
     }
-
-    addAuditEntry(
-        'apply_operational_principal_transformation',
-        'calculating operational principal payments from debt drawdown and IDC data',
-        ['financing', 'projectLife', 'debtDrawdown', 'interestDuringConstruction']
-    );
 
     const debtDrawdownSource = debtDrawdownSources[0];
     const idcSource = idcSources[0];
@@ -312,6 +312,15 @@ export const operationalPrincipal = (sourceData, context) => {
     );
     console.log(`💰 operationalPrincipal: ${result.length} percentiles, $${(totalPrincipal / availablePercentiles.length).toLocaleString()} Avg total principal (${amortizationType} loan)`);
 
+    addAuditEntry(
+        'apply_operational_principal_transformation',
+        'calculating operational principal payments from debt drawdown and IDC data',
+        ['financing', 'projectLife', 'debtDrawdown', 'interestDuringConstruction'],
+        result,
+        'transform',
+        'complex'
+    );
+
     return result;
 };
 
@@ -338,12 +347,6 @@ export const debtService = (sourceData, context) => {
         return [];
     }
 
-    addAuditEntry(
-        'apply_debt_service_transformation',
-        'calculating debt service: operationalInterest + operationalPrincipal',
-        ['operationalInterest', 'operationalPrincipal']
-    );
-
     // Combine interest and principal sources
     const combinedSources = [interestSources[0], principalSources[0]];
 
@@ -357,6 +360,15 @@ export const debtService = (sourceData, context) => {
         sum + simResult.data.reduce((dataSum, dataPoint) => dataSum + dataPoint.value, 0), 0
     );
     console.log(`💰 debtService: ${result.length} percentiles, $${totalDebtService.toLocaleString()} total debt service`);
+
+    addAuditEntry(
+        'apply_debt_service_transformation',
+        'calculating debt service: operationalInterest + operationalPrincipal',
+        ['operationalInterest', 'operationalPrincipal'],
+        result,
+        'transform',
+        'complex'
+    );
 
     return result;
 };

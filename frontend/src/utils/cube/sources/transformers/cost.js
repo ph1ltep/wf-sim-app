@@ -57,7 +57,7 @@ export const contractFees = (sourceData, context) => {
     console.log(`📋 contractFees: ${contractFeesData.length} years, $${totalContractFees.toLocaleString()}`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(contractFeesData, availablePercentiles, 'contractFees', customPercentile);
+    return normalizeIntoSimResults(contractFeesData, availablePercentiles, 'contractFees', customPercentile, addAuditEntry);
 };
 
 /**
@@ -115,7 +115,7 @@ export const majorRepairs = (sourceData, context) => {
     console.log(`🔧 majorRepairs: ${annualCosts.length} events, $${totalRepairCosts.toLocaleString()}`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'majorRepairs', customPercentile);
+    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'majorRepairs', customPercentile, addAuditEntry);
 };
 
 /**
@@ -152,5 +152,5 @@ export const reserveFunds = (sourceData, context) => {
     console.log(`💰 reserveFunds: ${provisionData.length} years, $${sourceData.toLocaleString()} total provision`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(provisionData, availablePercentiles, 'reserveFunds', customPercentile);
+    return normalizeIntoSimResults(provisionData, availablePercentiles, 'reserveFunds', customPercentile, addAuditEntry);
 };
