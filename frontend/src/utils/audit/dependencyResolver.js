@@ -67,24 +67,102 @@ export const resolveDependencies = (sourceIds, getAuditTrail, options = {}) => {
     console.log(`✅ Dependency resolution complete. Total sources: ${Object.keys(resolvedAuditData).length}`);
     return resolvedAuditData;
 };
+/**
+ * Create artificial root nodes for the actual data sources
+ * @param {Object} nodeAuditData - Processed audit data
+ * @param {Object} sourceRegistry - Source registry
+ * @returns {Object} Object with new root nodes and updated audit data
+ */
+const createRealRootNodes = (nodeAuditData, sourceRegistry) => {
+    const realRootNodes = new Map();
+    const updatedAuditData = { ...nodeAuditData };
+
+    // Find sources that should have real root nodes
+    Object.entries(nodeAuditData).forEach(([sourceId, audit]) => {
+        const registrySource = sourceRegistry?.sources?.find(s => s.id === sourceId);
+
+        if (registrySource?.path) {
+            // Create a unique root node ID for this path
+            const pathKey = registrySource.path.join('.');
+            const rootNodeId = `root_${pathKey.replace(/\./g, '_')}`;
+
+            // Determine root node type
+            let rootType = 'scalar'; // default
+            if (registrySource.transformer) {
+                rootType = 'complex';
+            } else if (registrySource.hasPercentiles) {
+                rootType = 'distribution';
+            }
+
+            // Create the real root node if it doesn't exist
+            if (!realRootNodes.has(rootNodeId)) {
+                realRootNodes.set(rootNodeId, {
+                    id: rootNodeId,
+                    type: 'realRoot',
+                    rootType: rootType,
+                    path: registrySource.path,
+                    pathKey: pathKey,
+                    hasPercentiles: registrySource.hasPercentiles,
+                    transformer: registrySource.transformer,
+                    dependents: new Set([sourceId]),
+                    sourceData: audit.sourceData || null
+                });
+            } else {
+                // Add this source as a dependent
+                realRootNodes.get(rootNodeId).dependents.add(sourceId);
+            }
+
+            // Update the registry source's audit to show dependency on real root
+            if (updatedAuditData[sourceId]?.trail) {
+                // Add artificial step showing dependency on real root node
+                const rootDependencyStep = {
+                    timestamp: Date.now() - 2000, // Before other steps
+                    step: 'root_data_access',
+                    type: 'none',
+                    typeOperation: null,
+                    details: `Accessed ${rootType} data from path: ${pathKey}`,
+                    dependencies: [rootNodeId],
+                    dataSample: {
+                        percentile: 'source',
+                        data: audit.sourceData || null
+                    },
+                    duration: 0
+                };
+
+                updatedAuditData[sourceId] = {
+                    ...updatedAuditData[sourceId],
+                    trail: [rootDependencyStep, ...updatedAuditData[sourceId].trail]
+                };
+            }
+        }
+    });
+
+    return {
+        realRootNodes: Array.from(realRootNodes.values()),
+        updatedAuditData
+    };
+};
 
 /**
- * Classify nodes based on their role in the dependency graph
- * @param {Object} nodeAuditData - Audit data for actual source nodes (references excluded)
- * @param {string[]} originalSourceIds - The original input source IDs (these are output sources)
- * @param {Set} allReferenceIds - Set of all reference IDs
- * @returns {Object} Node classifications by sourceId
+ * Classify nodes with the new real root concept
+ * @param {Object} nodeAuditData - Audit data for source nodes
+ * @param {string[]} originalSourceIds - Original input source IDs
+ * @param {Set} allReferenceIds - Reference IDs to exclude
+ * @param {Array} realRootNodes - Real root node data
+ * @returns {Object} Node classifications
  */
-export const classifyNodes = (nodeAuditData, originalSourceIds, allReferenceIds) => {
+export const classifyNodesWithRealRoots = (nodeAuditData, originalSourceIds, allReferenceIds, realRootNodes) => {
     const classifications = {};
     const allSourceIds = Object.keys(nodeAuditData);
     const dependencyMap = new Map();
     const dependentMap = new Map();
 
-    console.log(`🔍 Classifying ${allSourceIds.length} source nodes`);
-    console.log(`📋 Original input sourceIds:`, originalSourceIds);
+    // Get all real root node IDs
+    const realRootNodeIds = new Set(realRootNodes.map(node => node.id));
 
-    // Build dependency and dependent maps (excluding references)
+    console.log(`🌳 Classifying nodes with ${realRootNodes.length} real root nodes:`, Array.from(realRootNodeIds));
+
+    // Build dependency maps
     allSourceIds.forEach(sourceId => {
         const audit = nodeAuditData[sourceId];
         const dataDependencies = new Set();
@@ -94,23 +172,22 @@ export const classifyNodes = (nodeAuditData, originalSourceIds, allReferenceIds)
             audit.trail.forEach(step => {
                 if (step.dependencies && Array.isArray(step.dependencies)) {
                     step.dependencies.forEach(depId => {
-                        // Check if dependency is a reference
                         const isReference = audit?.references && audit.references.hasOwnProperty(depId);
                         const isReferenceId = allReferenceIds.has(depId);
+                        const isRealRootNode = realRootNodeIds.has(depId);
 
                         if (isReference || isReferenceId) {
                             referenceDependencies.add(depId);
-                        } else {
-                            // Only count as data dependency if it exists in our node audit data
-                            if (nodeAuditData.hasOwnProperty(depId)) {
-                                dataDependencies.add(depId);
+                        } else if (isRealRootNode) {
+                            // Don't count real root nodes as data dependencies for classification
+                            // They're infrastructure, not peer dependencies
+                        } else if (nodeAuditData.hasOwnProperty(depId)) {
+                            dataDependencies.add(depId);
 
-                                // Track what depends on this data dependency
-                                if (!dependentMap.has(depId)) {
-                                    dependentMap.set(depId, new Set());
-                                }
-                                dependentMap.get(depId).add(sourceId);
+                            if (!dependentMap.has(depId)) {
+                                dependentMap.set(depId, new Set());
                             }
+                            dependentMap.get(depId).add(sourceId);
                         }
                     });
                 }
@@ -123,7 +200,7 @@ export const classifyNodes = (nodeAuditData, originalSourceIds, allReferenceIds)
         });
     });
 
-    // Classify each node - FIXED LOGIC
+    // Classify source nodes
     allSourceIds.forEach(sourceId => {
         const dependencies = dependencyMap.get(sourceId);
         const dependents = dependentMap.get(sourceId);
@@ -131,18 +208,12 @@ export const classifyNodes = (nodeAuditData, originalSourceIds, allReferenceIds)
 
         let nodeType;
 
-        // ✅ FIXED: Classification priority
-        // 1. If in original sourceIds -> always outputSource (regardless of dependencies)
+        // Classification logic with real roots
         if (originalSourceIds.includes(sourceId)) {
             nodeType = 'outputSource';
-        }
-        // 2. If has no data dependencies -> rootSource  
-        else if (dependencies.data.size === 0) {
-            nodeType = 'rootSource';
-        }
-        // 3. Everything else -> intermediarySource
-        else {
-            nodeType = 'intermediarySource';
+        } else {
+            // ✅ FIXED: All non-output sources are registry sources
+            nodeType = 'registrySource';
         }
 
         classifications[sourceId] = {
@@ -153,61 +224,64 @@ export const classifyNodes = (nodeAuditData, originalSourceIds, allReferenceIds)
             dataDependencies: Array.from(dependencies.data),
             referenceDependencies: Array.from(dependencies.references),
             dependents: dependents ? Array.from(dependents) : [],
-            references: audit?.references || {},
-            isOriginalInput: originalSourceIds.includes(sourceId)
+            references: audit?.references || {}
         };
+    });
 
-        console.log(`📊 ${sourceId}: ${nodeType} (deps: ${dependencies.data.size}, refs: ${dependencies.references.size}, original: ${originalSourceIds.includes(sourceId)})`);
+    // Classify real root nodes
+    realRootNodes.forEach(rootNode => {
+        classifications[rootNode.id] = {
+            type: 'realRoot',
+            rootType: rootNode.rootType,
+            dataDependencyCount: 0,
+            referenceDependencyCount: 0,
+            dependentCount: rootNode.dependents.size,
+            dataDependencies: [],
+            referenceDependencies: [],
+            dependents: Array.from(rootNode.dependents),
+            references: {},
+            path: rootNode.path,
+            pathKey: rootNode.pathKey
+        };
     });
 
     return classifications;
 };
 
 /**
- * Extract edges (data flow relationships) from audit data
- * Only includes data dependencies, excludes references
- * @param {Object} auditData - Complete audit data
- * @param {Set} allReferenceIds - Set of all reference IDs to exclude
- * @returns {Array} Array of edge objects for graph visualization
+ * Extract edges including real root node connections
  */
-export const extractEdges = (auditData, allReferenceIds) => {
+export const extractEdgesWithRealRoots = (auditData, allReferenceIds, realRootNodeIds) => {
     const edges = [];
-    const edgeSet = new Set(); // Prevent duplicate edges
+    const edgeSet = new Set();
 
     Object.entries(auditData).forEach(([sourceId, audit]) => {
-        // Skip if this source is actually a reference
-        if (allReferenceIds.has(sourceId)) {
-            return;
-        }
+        if (allReferenceIds.has(sourceId)) return;
 
         if (audit?.trail) {
-            // Find primary data dependencies (not references)
             const dataDependencies = new Set();
 
             audit.trail.forEach(step => {
                 if (step.dependencies && Array.isArray(step.dependencies)) {
                     step.dependencies.forEach(depId => {
-                        // ✅ FIXED: Include ALL data dependencies that exist in auditData
-                        // (even if they're also in originalSourceIds)
                         const isReference = audit?.references && audit.references.hasOwnProperty(depId);
-                        const existsInAuditData = auditData.hasOwnProperty(depId);
                         const isReferenceId = allReferenceIds.has(depId);
+                        const isRealRootNode = realRootNodeIds.has(depId);
 
-                        if (!isReference && existsInAuditData && !isReferenceId) {
+                        if (!isReference && !isReferenceId &&
+                            (auditData.hasOwnProperty(depId) || isRealRootNode)) {
                             dataDependencies.add(depId);
                         }
                     });
                 }
             });
 
-            // Create edges for data dependencies
             dataDependencies.forEach(depId => {
                 const edgeId = `${depId}-${sourceId}`;
 
                 if (!edgeSet.has(edgeId)) {
                     edgeSet.add(edgeId);
 
-                    // Count transformation steps between these sources
                     const stepCount = audit.trail.filter(step =>
                         step.dependencies && step.dependencies.includes(depId)
                     ).length;
@@ -232,20 +306,16 @@ export const extractEdges = (auditData, allReferenceIds) => {
 };
 
 /**
- * Main function to build complete graph data structure
- * @param {string[]} sourceIds - Initial source IDs
- * @param {Function} getAuditTrail - Audit trail data function
- * @param {Object} sourceRegistry - Source registry for root source classification
- * @returns {Object} Complete graph data with nodes and edges
+ * Main function with real root nodes
  */
 export const buildDependencyGraph = (sourceIds, getAuditTrail, sourceRegistry = null) => {
-    console.log(`🎯 Building dependency graph for: ${sourceIds.join(', ')}`);
+    console.log(`🎯 Building dependency graph with real roots for: ${sourceIds.join(', ')}`);
 
     try {
-        // Step 1: Resolve all dependencies recursively
+        // Step 1: Resolve all dependencies
         const auditData = resolveDependencies(sourceIds, getAuditTrail);
 
-        // Step 1.5: Collect all reference IDs across all sources
+        // Step 2: Collect reference IDs
         const allReferenceIds = new Set();
         Object.values(auditData).forEach(audit => {
             if (audit?.references) {
@@ -255,61 +325,44 @@ export const buildDependencyGraph = (sourceIds, getAuditTrail, sourceRegistry = 
             }
         });
 
-        console.log(`📋 Found ${allReferenceIds.size} reference IDs to exclude from nodes:`, Array.from(allReferenceIds));
-
-        // Step 2: Filter out reference items and enhance root sources
+        // Step 3: Filter out references
         const nodeAuditData = {};
         Object.entries(auditData).forEach(([sourceId, audit]) => {
-            // ✅ FIXED: Only include sources that are NOT references
             if (!allReferenceIds.has(sourceId)) {
-                let enhancedAudit = audit;
-
-                // Check if this source has data dependencies (excluding references)
-                const dataDependencies = new Set();
-                if (audit?.trail) {
-                    audit.trail.forEach(step => {
-                        if (step.dependencies && Array.isArray(step.dependencies)) {
-                            step.dependencies.forEach(depId => {
-                                const isReference = audit?.references && audit.references.hasOwnProperty(depId);
-                                const isReferenceId = allReferenceIds.has(depId);
-                                if (!isReference && !isReferenceId && auditData.hasOwnProperty(depId)) {
-                                    dataDependencies.add(depId);
-                                }
-                            });
-                        }
-                    });
-                }
-
-                // ✅ FIXED: If this is a root source (no data dependencies) AND not in original sourceIds, enhance it
-                const isRootSource = dataDependencies.size === 0 && !sourceIds.includes(sourceId);
-                if (isRootSource) {
-                    const rootType = classifyRootSourceType(audit, sourceRegistry, sourceId);
-                    enhancedAudit = addArtificialSourceStep(audit, sourceId, rootType);
-                    enhancedAudit.rootSourceType = rootType;
-                    console.log(`🌱 Enhanced root source ${sourceId} as ${rootType}`);
-                }
-
-                nodeAuditData[sourceId] = enhancedAudit;
+                nodeAuditData[sourceId] = audit;
             }
         });
 
-        console.log(`📊 Filtered audit data: ${Object.keys(auditData).length} total sources → ${Object.keys(nodeAuditData).length} actual source nodes`);
+        // Step 4: Create real root nodes and update audit data
+        const { realRootNodes, updatedAuditData } = createRealRootNodes(nodeAuditData, sourceRegistry);
+        const realRootNodeIds = new Set(realRootNodes.map(node => node.id));
 
-        // Step 3: Classify nodes (pass original sourceIds for correct classification)
-        const nodeClassifications = classifyNodes(nodeAuditData, sourceIds, allReferenceIds);
+        console.log(`🌱 Created ${realRootNodes.length} real root nodes:`, realRootNodes.map(n => `${n.id}(${n.rootType})`));
 
-        // Step 4: Extract edges (data flow only, excluding references)
-        const edges = extractEdges(auditData, allReferenceIds);
+        // Step 5: Classify all nodes
+        const nodeClassifications = classifyNodesWithRealRoots(
+            updatedAuditData,
+            sourceIds,
+            allReferenceIds,
+            realRootNodes
+        );
 
-        // Step 5: Build node objects (only for non-reference sources)
-        const nodes = Object.entries(nodeAuditData).map(([sourceId, audit]) => {
+        // Step 6: Extract edges
+        const edges = extractEdgesWithRealRoots(updatedAuditData, allReferenceIds, realRootNodeIds);
+
+        // Step 7: Build all nodes (sources + real roots)
+        const sourceNodes = Object.entries(updatedAuditData).map(([sourceId, audit]) => {
             const classification = nodeClassifications[sourceId];
             const trailLength = audit?.trail?.length || 0;
             const totalDuration = audit?.trail?.reduce((sum, step) => sum + (step.duration || 0), 0) || 0;
 
+            // ✅ FIXED: Get registry type from source registry
+            const registrySource = sourceRegistry?.sources?.find(s => s.id === sourceId);
+            const registryType = registrySource?.metadata?.type || 'direct';
+
             return {
                 id: sourceId,
-                type: classification.type,
+                type: classification.type === 'intermediarySource' ? 'registrySource' : classification.type,
                 data: {
                     label: sourceId,
                     steps: trailLength,
@@ -318,24 +371,62 @@ export const buildDependencyGraph = (sourceIds, getAuditTrail, sourceRegistry = 
                     referenceDependencyCount: classification.referenceDependencyCount,
                     dependentCount: classification.dependentCount,
                     references: classification.references,
-                    rootSourceType: audit.rootSourceType || null,
+                    registryType: registryType, // ✅ FIXED: Add registry type
                     audit
                 },
-                position: { x: 0, y: 0 } // Will be calculated by layout algorithm
+                position: { x: 0, y: 0 }
             };
         });
 
-        console.log(`✅ Graph built: ${nodes.length} nodes, ${edges.length} edges`);
-        console.log(`📊 Node types:`, nodes.reduce((acc, node) => {
-            acc[node.type] = (acc[node.type] || 0) + 1;
-            return acc;
-        }, {}));
+        const rootNodes = realRootNodes.map(rootNode => {
+            const classification = nodeClassifications[rootNode.id];
+
+            return {
+                id: rootNode.id,
+                type: 'realRoot',
+                data: {
+                    label: rootNode.pathKey,
+                    rootType: rootNode.rootType,
+                    path: rootNode.path,
+                    dependentCount: classification.dependentCount,
+                    hasPercentiles: rootNode.hasPercentiles,
+                    sourceData: rootNode.sourceData,
+                    steps: 1, // Artificial step count
+                    referenceDependencyCount: 0,
+                    audit: {
+                        trail: [{
+                            timestamp: Date.now(),
+                            step: 'data_source',
+                            type: 'none',
+                            details: `Root data source: ${rootNode.pathKey}`,
+                            dependencies: [],
+                            dataSample: {
+                                percentile: 'source',
+                                data: rootNode.sourceData
+                            },
+                            duration: 0
+                        }],
+                        references: {}
+                    }
+                },
+                position: { x: 0, y: 0 }
+            };
+        });
+
+        const allNodes = [...rootNodes, ...sourceNodes];
+
+        // ✅ FIXED: Calculate summary statistics
+        const summaryStats = calculateSummaryStats(allNodes, updatedAuditData);
+
+        console.log(`✅ Graph built: ${allNodes.length} total nodes (${rootNodes.length} real roots + ${sourceNodes.length} sources), ${edges.length} edges`);
+        console.log(`📊 Summary:`, summaryStats);
 
         return {
-            nodes,
+            nodes: allNodes,
             edges,
-            auditData, // Keep full audit data for step details
-            nodeClassifications
+            auditData: { ...updatedAuditData, ...Object.fromEntries(realRootNodes.map(n => [n.id, { trail: [], references: {} }])) },
+            nodeClassifications,
+            summaryStats // ✅ FIXED: Include summary stats
         };
 
     } catch (error) {
@@ -345,55 +436,61 @@ export const buildDependencyGraph = (sourceIds, getAuditTrail, sourceRegistry = 
 };
 
 /**
- * Classify root source types based on transformer and path
- * @param {Object} audit - Audit data for the source
- * @param {Object} sourceRegistry - The source registry to check for transformer
- * @param {string} sourceId - Source ID
- * @returns {string} Root source type: 'complex', 'distribution', or 'scalar'
+ * Calculate total compute time from all audit trails
+ * @param {Object} auditData - All audit data
+ * @returns {number} Total compute time in milliseconds
  */
-const classifyRootSourceType = (audit, sourceRegistry, sourceId) => {
-    // Find the source in registry to check for transformer
-    const registrySource = sourceRegistry?.sources?.find(s => s.id === sourceId);
+const calculateTotalComputeTime = (auditData) => {
+    let minTimestamp = Infinity;
+    let maxTimestamp = -Infinity;
+    let totalSteps = 0;
 
-    if (registrySource?.transformer) {
-        return 'complex';
-    }
+    Object.values(auditData).forEach(audit => {
+        if (audit?.trail && Array.isArray(audit.trail)) {
+            audit.trail.forEach(step => {
+                if (step.timestamp) {
+                    minTimestamp = Math.min(minTimestamp, step.timestamp);
+                    maxTimestamp = Math.max(maxTimestamp, step.timestamp);
+                    totalSteps++;
+                }
+            });
+        }
+    });
 
-    if (registrySource?.hasPercentiles) {
-        return 'distribution';
-    }
+    const computeTime = totalSteps > 0 ? maxTimestamp - minTimestamp : 0;
+    console.log(`⏱️ Total compute time: ${computeTime}ms (${totalSteps} steps, ${minTimestamp} → ${maxTimestamp})`);
 
-    console.log(`📝 Classified ${sourceId} as scalar`);
-    return 'scalar';
+    return computeTime;
 };
 
 /**
- * Add artificial source step to show the original path data
- * @param {Object} audit - Audit data
- * @param {string} sourceId - Source ID
- * @param {string} rootType - Root source type
- * @returns {Object} Updated audit with artificial step
+ * Calculate summary statistics for the graph
+ * @param {Array} nodes - All nodes
+ * @param {Object} auditData - All audit data
+ * @returns {Object} Summary statistics
  */
-const addArtificialSourceStep = (audit, sourceId, rootType) => {
-    if (!audit?.trail) return audit;
-
-    // Create artificial step showing the source path data
-    const artificialStep = {
-        timestamp: Date.now() - 1000, // Before other steps
-        step: 'source_data_extraction',
-        type: 'none',
-        typeOperation: null,
-        details: `Extracted ${rootType} source data from path`,
-        dependencies: [],
-        dataSample: {
-            percentile: 'source',
-            data: audit.sourceData || null
-        },
-        duration: 0
+const calculateSummaryStats = (nodes, auditData) => {
+    const stats = {
+        totalNodes: nodes.length,
+        nodeTypes: {},
+        totalReferences: 0,
+        totalSteps: 0,
+        totalComputeTime: calculateTotalComputeTime(auditData)
     };
 
-    return {
-        ...audit,
-        trail: [artificialStep, ...audit.trail]
-    };
+    // Count node types
+    nodes.forEach(node => {
+        const type = node.type;
+        stats.nodeTypes[type] = (stats.nodeTypes[type] || 0) + 1;
+
+        // Count references and steps
+        if (node.data.referenceDependencyCount) {
+            stats.totalReferences += node.data.referenceDependencyCount;
+        }
+        if (node.data.steps) {
+            stats.totalSteps += node.data.steps;
+        }
+    });
+
+    return stats;
 };

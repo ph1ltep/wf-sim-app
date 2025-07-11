@@ -1,10 +1,29 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/IntermediarySourceNode.jsx
+// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/RegistrySourceNode.jsx
 import React from 'react';
 import { Handle, Position } from 'reactflow';
-import { CalculatorOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, CalculatorOutlined, FunctionOutlined } from '@ant-design/icons';
 
-const IntermediarySourceNode = ({ data, selected }) => {
+const RegistrySourceNode = ({ data, selected }) => {
     const hasReferences = data.referenceDependencyCount > 0;
+    const registryType = data.registryType || 'direct'; // From registry .type property
+
+    // Different icons based on registry type
+    const typeConfig = {
+        direct: {
+            icon: <DatabaseOutlined />,
+            description: 'Direct data source'
+        },
+        indirect: {
+            icon: <CalculatorOutlined />,
+            description: 'Calculated with multipliers'
+        },
+        virtual: {
+            icon: <FunctionOutlined />,
+            description: 'Virtual transformation'
+        }
+    };
+
+    const config = typeConfig[registryType] || typeConfig.direct;
 
     return (
         <div style={{
@@ -24,11 +43,16 @@ const IntermediarySourceNode = ({ data, selected }) => {
             cursor: 'pointer',
             position: 'relative'
         }}>
-            <CalculatorOutlined style={{ fontSize: '16px', marginBottom: '4px' }} />
+            <div style={{ fontSize: '16px', marginBottom: '4px' }}>
+                {config.icon}
+            </div>
             <div style={{ textAlign: 'center', lineHeight: '10px' }}>
                 <div>{data.label}</div>
                 <div style={{ fontSize: '8px', opacity: 0.8 }}>
                     {data.steps} steps • {data.dataDependencyCount} deps
+                </div>
+                <div style={{ fontSize: '7px', opacity: 0.7 }}>
+                    {registryType}
                 </div>
             </div>
 
@@ -80,4 +104,4 @@ const IntermediarySourceNode = ({ data, selected }) => {
     );
 };
 
-export default IntermediarySourceNode;
+export default RegistrySourceNode;

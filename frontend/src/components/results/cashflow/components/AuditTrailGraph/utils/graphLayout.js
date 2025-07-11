@@ -11,29 +11,28 @@ import dagre from 'dagre';
 export const applyGraphLayout = (nodes, edges) => {
     const dagreGraph = new dagre.graphlib.Graph();
 
-    // Configure layout - TB (top-bottom) with output sources at top
+    // Configure layout
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     dagreGraph.setGraph({
         rankdir: 'TB', // Top to bottom
-        align: 'UL',   // Upper left alignment
-        nodesep: 80,  // Horizontal spacing between nodes
-        ranksep: 80,   // Vertical spacing between ranks
+        align: 'UL',
+        nodesep: 100,
+        ranksep: 80,
         marginx: 20,
         marginy: 20
     });
 
-    // Add nodes to dagre graph with custom ranking
+    // Add nodes with custom ranking
     nodes.forEach(node => {
-        // Set custom rank to control vertical position
         let rank = 0;
         switch (node.type) {
             case 'outputSource':
                 rank = 0; // Top level
                 break;
-            case 'intermediarySource':
+            case 'registrySource':  // ✅ FIXED: Updated name
                 rank = 1; // Middle level
                 break;
-            case 'rootSource':
+            case 'realRoot':
                 rank = 2; // Bottom level
                 break;
             default:
@@ -47,7 +46,7 @@ export const applyGraphLayout = (nodes, edges) => {
         });
     });
 
-    // Add edges to dagre graph
+    // Add edges
     edges.forEach(edge => {
         dagreGraph.setEdge(edge.source, edge.target);
     });
@@ -55,7 +54,7 @@ export const applyGraphLayout = (nodes, edges) => {
     // Calculate layout
     dagre.layout(dagreGraph);
 
-    // Apply calculated positions to nodes
+    // Apply positions
     return nodes.map(node => {
         const nodeWithPosition = dagreGraph.node(node.id);
 
@@ -69,29 +68,20 @@ export const applyGraphLayout = (nodes, edges) => {
     });
 };
 
-/**
- * Get node width based on type
- * @param {string} nodeType - Node type (rootSource, intermediarySource, etc.)
- * @returns {number} Width in pixels
- */
+// Update the width/height functions
 const getNodeWidth = (nodeType) => {
     switch (nodeType) {
-        case 'rootSource': return 120;
-        case 'intermediarySource': return 140;
+        case 'realRoot': return 120;
+        case 'registrySource': return 120;  // ✅ FIXED: Updated name
         case 'outputSource': return 130;
         default: return 120;
     }
 };
 
-/**
- * Get node height based on type  
- * @param {string} nodeType - Node type
- * @returns {number} Height in pixels
- */
 const getNodeHeight = (nodeType) => {
     switch (nodeType) {
-        case 'rootSource': return 60;
-        case 'intermediarySource': return 70;
+        case 'realRoot': return 70;
+        case 'registrySource': return 70;  // ✅ FIXED: Updated name
         case 'outputSource': return 70;
         default: return 60;
     }

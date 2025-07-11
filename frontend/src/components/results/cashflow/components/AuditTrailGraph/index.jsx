@@ -15,6 +15,7 @@ import { nodeTypes } from './components/CustomNodes';
 import StepDetailsPanel from './components/StepDetailsPanel';
 import GraphLegend from './components/GraphLegend';
 import 'reactflow/dist/style.css';
+import RealRootDetailsPanel from './components/RealRootDetailsPanel';
 
 const { Text } = Typography;
 
@@ -22,7 +23,7 @@ const { Text } = Typography;
 const edgeTypes = {};
 
 const AuditTrailGraph = ({ sourceIds }) => {
-    const { nodes: rawNodes, edges: rawEdges, auditData, isLoading, error } = useDependencyResolver(sourceIds);
+    const { nodes: rawNodes, edges: rawEdges, auditData, summaryStats, isLoading, error } = useDependencyResolver(sourceIds);
     const [selectedNode, setSelectedNode] = useState(null);
 
     // Apply layout to nodes
@@ -51,6 +52,13 @@ const AuditTrailGraph = ({ sourceIds }) => {
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(styledEdges);
+
+    // Format compute time for display
+    const formatComputeTime = (timeMs) => {
+        if (timeMs < 1000) return `${timeMs.toFixed(0)}ms`;
+        if (timeMs < 60000) return `${(timeMs / 1000).toFixed(1)}s`;
+        return `${(timeMs / 60000).toFixed(1)}min`;
+    };
 
     // Update nodes when layout changes
     React.useEffect(() => {
@@ -148,18 +156,73 @@ const AuditTrailGraph = ({ sourceIds }) => {
 
                     <Panel position="top-left">
                         <Space direction="vertical" size="small">
-                            {/* Summary Card */}
-                            <Card size="small" style={{ minWidth: '180px' }}>
+                            {/* Enhanced Summary Card */}
+                            <Card
+                                size="small"
+                                style={{
+                                    minWidth: '200px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                            >
                                 <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                                    <Text strong>{nodes.length}</Text> sources • <Text strong>{edges.length}</Text> dependencies
+                                    <Text strong style={{ fontSize: '12px' }}>
+                                        Audit Trail Summary
+                                    </Text>
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#666' }}>
-                                    {nodeCounts.outputSource && <div>🟣 {nodeCounts.outputSource} output sources</div>}
-                                    {nodeCounts.intermediarySource && <div>🟠 {nodeCounts.intermediarySource} intermediary sources</div>}
-                                    {nodeCounts.rootSource && <div>🟢 {nodeCounts.rootSource} root sources</div>}
+
+                                {/* Node counts */}
+                                <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Total Nodes:</span>
+                                        <Text strong>{summaryStats?.totalNodes || nodes.length}</Text>
+                                    </div>
+                                    {summaryStats?.nodeTypes?.realRoot && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>🏗️ Real Roots:</span>
+                                            <Text strong>{summaryStats.nodeTypes.realRoot}</Text>
+                                        </div>
+                                    )}
+                                    {summaryStats?.nodeTypes?.registrySource && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>📋 Registry Sources:</span>
+                                            <Text strong>{summaryStats.nodeTypes.registrySource}</Text>
+                                        </div>
+                                    )}
+                                    {summaryStats?.nodeTypes?.outputSource && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>🎯 Output Sources:</span>
+                                            <Text strong>{summaryStats.nodeTypes.outputSource}</Text>
+                                        </div>
+                                    )}
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#999', marginTop: '6px', textAlign: 'center' }}>
-                                    Click a node to view steps
+
+                                {/* Dependencies and processing info */}
+                                <div style={{ fontSize: '10px', color: '#666', borderTop: '1px solid #f0f0f0', paddingTop: '6px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Dependencies:</span>
+                                        <Text strong>{edges.length}</Text>
+                                    </div>
+                                    {summaryStats?.totalReferences > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>🔵 References:</span>
+                                            <Text strong>{summaryStats.totalReferences}</Text>
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Total Steps:</span>
+                                        <Text strong>{summaryStats?.totalSteps || 0}</Text>
+                                    </div>
+                                    {summaryStats?.totalComputeTime > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>⏱️ Compute Time:</span>
+                                            <Text strong>{formatComputeTime(summaryStats.totalComputeTime)}</Text>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ fontSize: '9px', color: '#999', marginTop: '6px', textAlign: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '4px' }}>
+                                    Click nodes to explore details
                                 </div>
                             </Card>
 
@@ -171,13 +234,18 @@ const AuditTrailGraph = ({ sourceIds }) => {
             </div>
 
             {/* Step Details Side Panel */}
-            {selectedNode && (
+            {selectedNode && selectedNode.type === 'realRoot' ? (
+                <RealRootDetailsPanel
+                    node={selectedNode}
+                    onClose={() => setSelectedNode(null)}
+                />
+            ) : selectedNode ? (
                 <StepDetailsPanel
                     node={selectedNode}
                     auditData={auditData}
                     onClose={() => setSelectedNode(null)}
                 />
-            )}
+            ) : null}
         </div>
     );
 };

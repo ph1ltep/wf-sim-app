@@ -1,16 +1,16 @@
 // frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/index.js
-import RootSourceNode from './RootSourceNode';
-import IntermediarySourceNode from './IntermediarySourceNode';
+import RegistrySourceNode from './RegistrySourceNode';
 import OutputSourceNode from './OutputSourceNode';
+import RealRootNode from './RealRootNode';
 
 export const nodeTypes = {
-    rootSource: RootSourceNode,
-    intermediarySource: IntermediarySourceNode,
-    outputSource: OutputSourceNode
+    registrySource: RegistrySourceNode,  // ✅ FIXED: Renamed
+    outputSource: OutputSourceNode,
+    realRoot: RealRootNode
 };
 
 export {
-    RootSourceNode,
-    IntermediarySourceNode,
-    OutputSourceNode
+    RegistrySourceNode,
+    OutputSourceNode,
+    RealRootNode
 };
