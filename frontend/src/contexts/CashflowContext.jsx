@@ -16,7 +16,11 @@ import {
 import { calculateSensitivityAnalysis } from '../utils/finance/sensitivityAnalysis';
 import { SENSITIVITY_SOURCE_REGISTRY, discoverAllSensitivityVariables } from './SensitivityRegistry';
 import { SUPPORTED_METRICS } from '../utils/finance/sensitivityMetrics';
-
+import { computeAllMetrics } from '../utils/cashflow/metrics/processor';
+import { getMetricsByUsage, getMetricConfig } from '../utils/cashflow/metrics/registry';
+// PHASE 2: Add direct reference helper and percentile discovery
+import { discoverPercentiles } from '../utils/finance/percentileUtils';
+import { getSelectedPercentileData } from '../utils/cashflow/metrics/directReference';
 
 const CashflowContext = createContext();
 export const useCashflow = () => useContext(CashflowContext);
@@ -221,127 +225,217 @@ export const CashflowProvider = ({ children }) => {
     const { scenarioData, getValueByPath, updateByPath } = useScenario();
     const { updateDistributions } = useInputSim();
 
-    // State management
-    const [cashflowData, setCashflowData] = useState(null);
+    // Core data state
     const [sensitivityData, setSensitivityData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [transformError, setTransformError] = useState(null);
 
-    // Refresh state management
+    // Refresh cycle state
     const [refreshRequested, setRefreshRequested] = useState(false);
-    const [forceRefresh, setForceRefresh] = useState(false);
-    const [refreshStage, setRefreshStage] = useState('idle'); // Add 'sensitivity' to existing stages
+    const [refreshStage, setRefreshStage] = useState('idle');
     const refreshTimeoutRef = useRef(null);
-    const lastScenarioIdRef = useRef(null);
 
-    // Basic percentile info with error handling
-    const availablePercentiles = useMemo(() => {
+    // Unified metrics state (Phase 1 completed)
+    const [computedMetrics, setComputedMetrics] = useState(null);
+    const [metricsLoading, setMetricsLoading] = useState(false);
+    const [metricsError, setMetricsError] = useState(null);
+
+    // PHASE 2: Enhanced percentile discovery using percentileUtils
+    const { percentiles, primaryPercentile, availableValues } = useMemo(() => {
+        if (!scenarioData) {
+            return {
+                percentiles: [],
+                primaryPercentile: 50,
+                availableValues: [10, 25, 50, 75, 90]
+            };
+        }
+
         try {
-            if (!scenarioData) return [];
-            const percentiles = getValueByPath(['settings', 'simulation', 'percentiles'], []);
-            if (!Array.isArray(percentiles)) return [];
-            return percentiles
-                .map(p => p?.value)
-                .filter(v => typeof v === 'number')
-                .sort((a, b) => a - b);
+            return discoverPercentiles(getValueByPath);
         } catch (error) {
-            console.error('Error getting available percentiles:', error);
-            return [10, 25, 50, 75, 90]; // Fallback
+            console.error('Error discovering percentiles:', error);
+            return {
+                percentiles: [
+                    { value: 50, description: 'primary' },
+                    { value: 75, description: 'upper_bound' },
+                    { value: 25, description: 'lower_bound' },
+                    { value: 10, description: 'extreme_lower' },
+                    { value: 90, description: 'extreme_upper' },
+                ],
+                primaryPercentile: 50,
+                availableValues: [10, 25, 50, 75, 90]
+            };
         }
     }, [scenarioData, getValueByPath]);
 
-    const primaryPercentile = useMemo(() => {
-        try {
-            if (!scenarioData) return 50;
-            const primary = getValueByPath(['settings', 'simulation', 'primaryPercentile'], 50);
-            return typeof primary === 'number' ? primary : 50;
-        } catch (error) {
-            console.error('Error getting primary percentile:', error);
-            return 50;
-        }
-    }, [scenarioData, getValueByPath]);
+    // Extract available percentiles for compatibility
+    const availablePercentiles = availableValues;
 
-    const percentileSources = useMemo(() => {
+    const percentileSources = useMemo(() => getPercentileSourcesFromRegistry(CASHFLOW_SOURCE_REGISTRY), []);
+    const [selectedPercentiles, setSelectedPercentiles] = useState({
+        strategy: 'unified',
+        unified: primaryPercentile || 50,
+        perSource: createPerSourceDefaults(percentileSources, primaryPercentile || 50)
+    });
+
+    // PHASE 2: Convert cashflowData from state to computed property
+    const cashflowData = useMemo(() => {
+        if (!computedMetrics) return null;
+
         try {
-            return getPercentileSourcesFromRegistry(CASHFLOW_SOURCE_REGISTRY);
+            const selectedData = getSelectedPercentileData(computedMetrics, selectedPercentiles);
+            if (selectedData) {
+                console.log('✅ Direct reference: cashflowData computed for',
+                    selectedPercentiles.strategy === 'unified'
+                        ? `P${selectedPercentiles.unified}`
+                        : 'per-source'
+                );
+            }
+            return selectedData;
         } catch (error) {
-            console.error('Error getting percentile sources:', error);
-            return [];
+            console.error('❌ Error generating selected percentile data:', error);
+            return null;
+        }
+    }, [computedMetrics, selectedPercentiles]);
+
+    // PHASE 2: Sequential and controlled refresh cycle
+    const refreshCashflowData = useCallback(async (force = false) => {
+        if (refreshRequested && !force) {
+            console.log('⏭️ Refresh already in progress, skipping...');
+            return;
+        }
+
+        try {
+            setRefreshRequested(true);
+            setLoading(true);
+            setTransformError(null);
+            setRefreshStage('dependencies');
+
+            // Sequential execution handled by useEffect switch/case
+
+        } catch (error) {
+            console.error('❌ Refresh initiation failed:', error);
+            setTransformError(error.message);
+            setLoading(false);
+            setRefreshRequested(false);
+            setRefreshStage('idle');
         }
     }, []);
 
-    // Simple percentile selection state
-    const [selectedPercentiles, setSelectedPercentiles] = useState(() => ({
-        strategy: 'unified',
-        unified: 50,
-        perSource: {}
-    }));
-
-    // NEW: Sequential refresh effect
+    // PHASE 2: Enhanced sequential refresh cycle with switch/case pattern
     useEffect(() => {
         if (!refreshRequested || !scenarioData) return;
 
-        const runStage = async () => {
+        const executeStage = async () => {
             try {
-                setLoading(true);
-                setTransformError(null);
-
                 switch (refreshStage) {
-                    case 'distributions':
-                        if (forceRefresh || !isDistributionsComplete(getValueByPath)) {
-                            console.log('🔄 Refreshing distributions...');
-                            const success = await updateDistributions();
-                            if (!success) throw new Error('Distribution refresh failed');
-                        } else {
-                            console.log('✅ Distributions already complete');
-                        }
-                        setRefreshStage('construction');
-                        break;
+                    case 'dependencies':
+                        console.log('🔍 Checking dependencies...');
 
-                    case 'construction':
-                        if (forceRefresh || !isConstructionSourcesComplete(getValueByPath)) {
-                            console.log('🔄 Refreshing construction sources...');
-                            const codDate = getValueByPath(['settings', 'project', 'windFarm', 'codDate']);
-                            const generatedSources = generateConstructionCostSources(codDate);
-                            const result = await updateByPath({
-                                'settings.modules.cost.constructionPhase.costSources': generatedSources
-                            });
-                            if (!result.isValid) {
-                                throw new Error('Construction sources update failed: ' + (result.error || 'Unknown error'));
-                            }
-                            console.log('✅ Construction sources updated successfully');
-                        } else {
-                            console.log('✅ Construction sources already complete');
+                        // ✅ FIXED: Call with only getValueByPath
+                        if (!isDistributionsComplete(getValueByPath)) {
+                            throw new Error('Distributions not complete - missing required distribution data');
                         }
-                        setRefreshStage('metrics');
-                        break;
 
-                    case 'metrics':
-                        console.log('🔄 Refreshing metrics...');
-                        const metricUpdates = await refreshAllMetrics(scenarioData, updateByPath);
-                        if (Object.keys(metricUpdates).length === 0) {
-                            console.warn('⚠️ No metrics were updated - this may indicate missing data');
-                        } else {
-                            console.log('✅ Metrics refreshed');
+                        // ✅ FIXED: Call with only getValueByPath
+                        if (!isConstructionSourcesComplete(getValueByPath)) {
+                            console.log('🏗️ Generating construction sources...');
+                            const constructionSources = generateConstructionCostSources(scenarioData, getValueByPath);
+                            await updateByPath(['settings', 'modules', 'cost', 'constructionPhase', 'costSources'], constructionSources);
+                            console.log('✅ Construction sources generated');
                         }
+
+                        console.log('✅ Dependencies validated');
                         setRefreshStage('transform');
                         break;
 
                     case 'transform':
                         console.log('🔄 Transforming to cashflow data...');
-                        const transformedData = await transformScenarioToCashflow(
-                            scenarioData,
-                            CASHFLOW_SOURCE_REGISTRY,
-                            selectedPercentiles,
-                            getValueByPath
-                        );
-                        if (transformedData) {
-                            setCashflowData(transformedData);
-                            message.success('Cashflow data refreshed successfully');
-                        } else {
-                            throw new Error('Transform returned no data');
+
+                        try {
+                            const transformedData = await transformScenarioToCashflow(
+                                scenarioData,
+                                CASHFLOW_SOURCE_REGISTRY,
+                                selectedPercentiles,
+                                getValueByPath
+                            );
+
+                            if (transformedData) {
+                                // Store transformed data for metrics computation
+                                // Note: This will eventually be used by the metrics stage
+                                console.log('✅ Cashflow transformation completed');
+                            } else {
+                                throw new Error('Transform returned no data');
+                            }
+                        } catch (error) {
+                            console.error('❌ Transform failed:', error);
+                            throw error; // Let it bubble up to main error handler
                         }
-                        setRefreshStage('sensitivity'); // NEW: Move to sensitivity stage
+
+                        setRefreshStage('metrics');
+                        break;
+
+                    case 'metrics':
+                        console.log('📊 Computing unified metrics system...');
+
+                        try {
+                            setMetricsLoading(true);
+                            setMetricsError(null);
+
+                            if (scenarioData && availablePercentiles.length > 0) {
+                                console.log('🔄 Starting two-tier metrics computation...');
+
+                                // PHASE 2: Two-tier metrics computation
+                                // TODO: Integrate actual computeAllMetrics when ready
+                                // const allMetrics = await computeAllMetrics(
+                                //     transformedData,  // cashflowData from transform stage
+                                //     scenarioData,     // scenario data for parameters
+                                //     { selectedPercentiles, getValueByPath }  // options
+                                // );
+
+                                // TEMPORARY: Placeholder to prevent breakage
+                                console.log('⚠️ computeAllMetrics integration pending - using placeholder');
+                                const allMetrics = new Map();
+
+                                if (allMetrics && allMetrics.size > 0) {
+                                    setComputedMetrics(allMetrics);
+                                    console.log(`✅ Unified metrics computed: ${allMetrics.size} metrics across scenarios`);
+
+                                    // Log available scenarios for debugging
+                                    const sampleMetric = allMetrics.values().next().value;
+                                    if (sampleMetric) {
+                                        const scenarios = Object.keys(sampleMetric);
+                                        console.log(`📈 Available scenarios: ${scenarios.join(', ')}`);
+                                    }
+                                } else {
+                                    console.log('⚠️ No metrics computed from unified system');
+                                    setComputedMetrics(new Map()); // Empty map instead of null
+                                }
+                            } else {
+                                setComputedMetrics(new Map());
+                                console.log('⚠️ No scenario data or percentiles available for metrics computation');
+                            }
+                        } catch (error) {
+                            console.error('❌ Unified metrics computation failed:', error);
+                            setMetricsError(error.message);
+                            setComputedMetrics(new Map());
+                        } finally {
+                            setMetricsLoading(false);
+                        }
+
+                        // PHASE 2: Keep parallel old system during transition (temporary)
+                        try {
+                            const metricUpdates = await refreshAllMetrics(scenarioData, updateByPath);
+                            if (Object.keys(metricUpdates).length === 0) {
+                                console.warn('⚠️ Legacy metrics: No metrics were updated');
+                            } else {
+                                console.log('✅ Legacy metrics: Parallel system updated for comparison');
+                            }
+                        } catch (error) {
+                            console.warn('⚠️ Legacy metrics system failed:', error);
+                        }
+
+                        setRefreshStage('sensitivity');
                         break;
 
                     case 'sensitivity':
@@ -399,229 +493,56 @@ export const CashflowProvider = ({ children }) => {
                         }
                         setRefreshStage('complete');
                         break;
-                        // ✅ FIXED: Compute sensitivity analysis following established pattern
-                        console.log('🔄 Computing sensitivity analysis...');
-                        try {
-                            const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
-
-                            if (distributionAnalysis && scenarioData) {
-                                // ✅ FIXED: Use proper percentile objects from scenario
-                                const simulationConfig = {
-                                    percentiles: getValueByPath(['settings', 'simulation', 'percentiles']) || [],
-                                    primaryPercentile: primaryPercentile
-                                };
-
-                                // ✅ DEBUG: Verify the fix
-                                console.log('🔍 Simulation config debug:', {
-                                    percentiles: simulationConfig.percentiles.map(p => ({ value: p.value, hasValue: !!p.value })),
-                                    primaryPercentile: simulationConfig.primaryPercentile
-                                });
-
-                                // ✅ COMPUTE: Multiple metrics for comprehensive analysis
-                                const sensitivityResults = {};
-                                const targetMetrics = ['npv', 'irr', 'lcoe']; // Can be expanded
-
-                                for (const metric of targetMetrics) {
-                                    try {
-                                        const results = calculateSensitivityAnalysis({
-                                            cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
-                                            sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
-                                            targetMetric: metric,
-                                            simulationConfig,
-                                            distributionAnalysis,
-                                            getValueByPath
-                                        });
-
-                                        sensitivityResults[metric] = results;
-                                        console.log(`✅ ${metric.toUpperCase()} sensitivity: ${results.length} variables`);
-                                    } catch (error) {
-                                        console.error(`❌ Error calculating sensitivity for ${metric}:`, error);
-                                        sensitivityResults[metric] = [];
-                                    }
-                                }
-
-                                // ✅ STORE: Set sensitivity data with metadata
-                                setSensitivityData({
-                                    ...sensitivityResults, // npv: [...], irr: [...], lcoe: [...]
-                                    metadata: {
-                                        computedAt: new Date().toISOString(),
-                                        simulationConfig,
-                                        totalVariables: Object.values(sensitivityResults).reduce((sum, results) => sum + results.length, 0),
-                                        metrics: targetMetrics
-                                    }
-                                });
-
-                                console.log('✅ Sensitivity analysis computed for metrics:', targetMetrics.join(', '));
-                            } else {
-                                console.warn('⚠️ No distribution analysis available for sensitivity computation');
-                                setSensitivityData(null);
-                            }
-                        } catch (error) {
-                            console.error('❌ Sensitivity computation failed:', error);
-                            setSensitivityData(null);
-                        }
-                        setRefreshStage('complete');
-                        break;
-                        // ✅ FIXED: Compute sensitivity analysis following established pattern
-                        console.log('🔄 Computing sensitivity analysis...');
-                        try {
-                            const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis']);
-
-                            if (distributionAnalysis && scenarioData) {
-                                // Create simulation config for sensitivity analysis
-                                const simulationConfig = {
-                                    percentiles: getValueByPath(['settings', 'simulation', 'percentiles']) || [],
-                                    primaryPercentile: primaryPercentile
-                                };
-
-                                // ✅ COMPUTE: Multiple metrics for comprehensive analysis
-                                const sensitivityResults = {};
-                                const targetMetrics = ['npv', 'irr', 'lcoe']; // Can be expanded
-
-                                for (const metric of targetMetrics) {
-                                    try {
-                                        const results = calculateSensitivityAnalysis({
-                                            cashflowRegistry: CASHFLOW_SOURCE_REGISTRY,
-                                            sensitivityRegistry: SENSITIVITY_SOURCE_REGISTRY,
-                                            targetMetric: metric,
-                                            simulationConfig,
-                                            distributionAnalysis,
-                                            getValueByPath
-                                        });
-
-                                        sensitivityResults[metric] = results;
-                                        console.log(`✅ ${metric.toUpperCase()} sensitivity: ${results.length} variables`);
-                                    } catch (error) {
-                                        console.error(`❌ Error calculating sensitivity for ${metric}:`, error);
-                                        sensitivityResults[metric] = [];
-                                    }
-                                }
-
-                                // ✅ STORE: Set sensitivity data with metadata
-                                setSensitivityData({
-                                    ...sensitivityResults, // npv: [...], irr: [...], lcoe: [...]
-                                    metadata: {
-                                        computedAt: new Date().toISOString(),
-                                        simulationConfig,
-                                        totalVariables: Object.values(sensitivityResults).reduce((sum, results) => sum + results.length, 0),
-                                        metrics: targetMetrics
-                                    }
-                                });
-
-                                console.log('✅ Sensitivity analysis computed for metrics:', targetMetrics.join(', '));
-                            } else {
-                                console.warn('⚠️ No distribution analysis available for sensitivity computation');
-                                setSensitivityData(null);
-                            }
-                        } catch (error) {
-                            console.error('❌ Sensitivity computation failed:', error);
-                            setSensitivityData(null);
-                        }
-                        setRefreshStage('complete');
-                        break;
 
                     case 'complete':
                         // Reset and finish
                         console.log('✅ Cashflow refresh complete (with sensitivity data)');
                         setRefreshRequested(false);
-                        setForceRefresh(false);
+                        //setForceRefresh(false);
                         setRefreshStage('idle');
                         setLoading(false);
                         return;
+
+                    default:
+                        console.warn('Unknown refresh stage:', refreshStage);
+                        setRefreshStage('idle');
+                        setRefreshRequested(false);
+                        setLoading(false);
+                        break;
                 }
             } catch (error) {
-                console.error('❌ Refresh failed at stage:', refreshStage, error);
-                setTransformError(error.message || 'Failed to refresh cashflow data');
-                setCashflowData(null);
-                setSensitivityData(null);
-                message.error(`Failed at ${refreshStage} stage: ${error.message}`);
+                console.error(`❌ Error in ${refreshStage} stage:`, error);
+                setTransformError(error.message);
+                message.error(`Refresh failed at ${refreshStage}: ${error.message}`);
 
-                // Reset on error
-                setRefreshRequested(false);
-                setForceRefresh(false);
-                setRefreshStage('idle');
+                // Reset state on error
                 setLoading(false);
+                setRefreshRequested(false);
+                setRefreshStage('idle');
             }
         };
 
-        runStage();
-    }, [refreshStage, refreshRequested, forceRefresh, scenarioData, selectedPercentiles, getValueByPath, updateByPath, updateDistributions, availablePercentiles, primaryPercentile]);
+        executeStage();
+    }, [refreshStage, refreshRequested, scenarioData, selectedPercentiles, getValueByPath, updateByPath, availablePercentiles, percentiles, primaryPercentile]);
 
-    // NEW: Simple public interface (replaces old refreshCashflowData)
-    const refreshCashflowData = useCallback((force = false) => {
-        if (refreshRequested) {
-            console.log('⏳ Refresh already in progress, skipping');
-            return;
-        }
-
-        console.log('🚀 Starting', force ? 'forced' : 'smart', 'cashflow refresh...');
-        setForceRefresh(force);
-        setRefreshRequested(true);
-        setRefreshStage('distributions');
-    }, [refreshRequested]);
-
-    // Simple update function for percentile changes
+    // PHASE 2: Enhanced percentile selection with instant switching
     const updatePercentileSelection = useCallback((newSelection) => {
+        console.log('🎯 Percentile selection changed:', {
+            from: selectedPercentiles.strategy,
+            to: newSelection.strategy,
+            unified: newSelection.unified,
+            perSourceCount: Object.keys(newSelection.perSource || {}).length
+        });
+
         setSelectedPercentiles(newSelection);
+        // PHASE 2: No need to refresh data - cashflowData will update automatically via useMemo
+        console.log('⚡ Instant percentile switch - no recomputation needed');
+    }, [selectedPercentiles]);
 
-        // Debounce refresh to prevent rapid firing
-        if (refreshTimeoutRef.current) {
-            clearTimeout(refreshTimeoutRef.current);
-        }
-
-        refreshTimeoutRef.current = setTimeout(() => {
-            if (cashflowData) {
-                refreshCashflowData(false);
-            }
-        }, 100);
-
-        return true;
-    }, [cashflowData, refreshCashflowData]);
-
-    // Reset initialization state when scenario changes
+    // Debug logging for percentile changes
     useEffect(() => {
-        const currentScenarioId = scenarioData?._id || scenarioData?.name || 'new';
-
-        if (currentScenarioId !== lastScenarioIdRef.current) {
-            lastScenarioIdRef.current = currentScenarioId;
-
-            // Reset state for new scenario
-            setCashflowData(null);
-            setSensitivityData(null);
-            setTransformError(null);
-            setRefreshRequested(false);
-            setRefreshStage('idle');
-
-            console.log('📋 Scenario changed, reset cashflow state');
-        }
-    }, [scenarioData]);
-
-    // Update percentile defaults when scenario loads
-    useEffect(() => {
-        if (primaryPercentile && percentileSources.length > 0) {
-            setSelectedPercentiles(prev => {
-                // Only update if actually different
-                const newUnified = primaryPercentile;
-                const newPerSource = createPerSourceDefaults(percentileSources, primaryPercentile);
-
-                if (prev.unified === newUnified &&
-                    JSON.stringify(prev.perSource) === JSON.stringify(newPerSource)) {
-                    return prev; // No change needed
-                }
-
-                return {
-                    strategy: prev.strategy,
-                    unified: newUnified,
-                    perSource: newPerSource
-                };
-            });
-        }
-    }, [primaryPercentile, percentileSources]);
-
-    // Log percentile changes for debugging
-    useEffect(() => {
-        if (selectedPercentiles && scenarioData) {
-            console.log('🔄 Percentile selection changed:', {
+        if (selectedPercentiles && availablePercentiles.length > 0) {
+            console.log('🎯 Current percentile selection:', {
                 strategy: selectedPercentiles.strategy,
                 unified: selectedPercentiles.unified,
                 perSourceCount: Object.keys(selectedPercentiles.perSource).length
@@ -649,25 +570,30 @@ export const CashflowProvider = ({ children }) => {
     }, []);
 
     const value = {
-        // Data
-        cashflowData,
+        // PHASE 2: Enhanced data access
+        cashflowData, // Now computed property with instant percentile switching
         sensitivityData,
         setSensitivityData,
         loading,
         transformError,
 
-        // NEW: Stage tracking for UI feedback
+        // Enhanced stage tracking for UI feedback
         refreshStage: refreshRequested ? refreshStage : 'idle',
         isRefreshing: refreshRequested,
 
-        // Percentiles
+        // Percentiles with enhanced switching
         availablePercentiles,
         primaryPercentile,
         percentileSources,
         selectedPercentiles,
-        updatePercentileSelection,
+        updatePercentileSelection, // Enhanced with instant switching
 
-        // Actions - single refresh method
+        // Unified metrics data (Phase 1)
+        computedMetrics,
+        metricsLoading,
+        metricsError,
+
+        // Actions - enhanced refresh method
         refreshCashflowData,
 
         // Config

@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useScenario } from '../../../contexts/ScenarioContext';
 import { useCashflow } from '../../../contexts/CashflowContext';
+import { useCube } from '../../../contexts/CubeContext';
 import { FormSection, ResponsiveFieldRow } from '../../contextFields/layouts';
 import PercentileSelector from './components/PercentileSelector';
 
@@ -136,25 +137,40 @@ const PlaceholderCard = ({ cardConfig, ...props }) => {
 
 const CashflowAnalysis = () => {
     const { scenarioData } = useScenario();
-    const {
-        cashflowData,
-        loading,
-        transformError,
-        availablePercentiles,
-        selectedPercentiles,
-        refreshCashflowData,
-        // NEW: Stage tracking
-        refreshStage,
-        isRefreshing
-    } = useCashflow();
+    // const {
+    //     //cashflowData,
+    //     //loading,
+    //     //transformError,
+    //     availablePercentiles,
+    //     //selectedPercentiles,
+    //     //refreshCashflowData,
+    //     // NEW: Stage tracking
+    //     //refreshStage,
+    //     //isRefreshing
+    // } = useCashflow();
 
-    // Auto-initialize on first access if not already initialized
+    const { getData,
+        selectedPercentile,
+        availablePercentiles,
+        sourceData, isLoading,
+        isRefreshing, refreshStage,
+        refreshCubeData } = useCube();
+
+    // // Auto-initialize on first access if not already initialized
+    // useEffect(() => {
+    //     if (!cashflowData && !loading && scenarioData) {
+    //         console.log('💹 Cash Flows accessed for first time, initializing...');
+    //         refreshCashflowData(false); // Auto-initialize with dependency checking
+    //     }
+    // }, [cashflowData, loading, scenarioData, refreshCashflowData]);
+
+    // ✅ ADDED: Auto-initialize like CashflowAnalysis pattern
     useEffect(() => {
-        if (!cashflowData && !loading && scenarioData) {
-            console.log('💹 Cash Flows accessed for first time, initializing...');
-            refreshCashflowData(false); // Auto-initialize with dependency checking
+        if (!sourceData && !isLoading && scenarioData) {
+            console.log('🧊 Cube data accessed for first time, initializing...');
+            refreshCubeData(false); // Auto-initialize with dependency checking
         }
-    }, [cashflowData, loading, scenarioData, refreshCashflowData]);
+    }, [sourceData, isLoading, scenarioData, refreshCubeData]);
 
     // Local state for card visibility
     const [cardVisibility, setCardVisibility] = useState(() => {
@@ -175,17 +191,19 @@ const CashflowAnalysis = () => {
 
     // Single refresh handler
     const handleRefresh = () => {
-        refreshCashflowData(true);
+        //refreshCashflowData(true);
+        refreshCubeData(true); // Force refresh of cube data
     };
 
     // NEW: Get stage display info
     const getStageDisplay = (stage) => {
         const stageInfo = {
             idle: { text: 'Ready', icon: '✅', color: '#52c41a' },
-            distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
-            construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
+            // distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
+            // construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
+            sources: { text: 'Computing sources', icon: '📊', color: '#1890ff' },
             metrics: { text: 'Calculating metrics', icon: '🧮', color: '#722ed1' },
-            transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
+            // transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
             complete: { text: 'Complete', icon: '✅', color: '#52c41a' }
         };
         return stageInfo[stage] || stageInfo.idle;
@@ -210,42 +228,42 @@ const CashflowAnalysis = () => {
         );
     }
 
-    // Handle transformation errors
-    if (transformError) {
-        return (
-            <div style={{ padding: '20px' }}>
-                <Row justify="space-between" align="middle">
-                    <Col>
-                        <Title level={2}>Cashflow Analysis</Title>
-                    </Col>
-                    <Col>
-                        <Button
-                            type="primary"
-                            icon={<ReloadOutlined />}
-                            onClick={handleRefresh}
-                            loading={loading}
-                        >
-                            Retry
-                        </Button>
-                    </Col>
-                </Row>
+    // // Handle transformation errors
+    // if (transformError) {
+    //     return (
+    //         <div style={{ padding: '20px' }}>
+    //             <Row justify="space-between" align="middle">
+    //                 <Col>
+    //                     <Title level={2}>Cashflow Analysis</Title>
+    //                 </Col>
+    //                 <Col>
+    //                     <Button
+    //                         type="primary"
+    //                         icon={<ReloadOutlined />}
+    //                         onClick={handleRefresh}
+    //                         loading={loading}
+    //                     >
+    //                         Retry
+    //                     </Button>
+    //                 </Col>
+    //             </Row>
 
-                <Card>
-                    <Alert
-                        message="Data Transformation Error"
-                        description={transformError}
-                        type="error"
-                        showIcon
-                        action={
-                            <Button size="small" onClick={handleRefresh} loading={loading}>
-                                Retry
-                            </Button>
-                        }
-                    />
-                </Card>
-            </div>
-        );
-    }
+    //             <Card>
+    //                 <Alert
+    //                     message="Data Transformation Error"
+    //                     description={transformError}
+    //                     type="error"
+    //                     showIcon
+    //                     action={
+    //                         <Button size="small" onClick={handleRefresh} loading={loading}>
+    //                             Retry
+    //                         </Button>
+    //                     }
+    //                 />
+    //             </Card>
+    //         </div>
+    //     );
+    // }
 
     // Get enabled cards sorted by order
     const enabledCards = Object.entries(CASHFLOW_CARD_REGISTRY)
@@ -311,7 +329,7 @@ const CashflowAnalysis = () => {
                                 <span style={{ color: '#52c41a' }}>✅ Previous stages complete</span>
                             )}
                         </Space>
-                    ) : cashflowData ? (
+                    ) : sourceData ? (
                         <Text type="secondary" style={{ fontSize: '12px' }}>
                             ✅ Data ready - last refreshed: {new Date().toLocaleTimeString()}
                         </Text>
@@ -339,7 +357,7 @@ const CashflowAnalysis = () => {
                                 }
                             </Text>
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                                Strategy: {selectedPercentiles?.strategy || 'unified'}
+                                Strategy: {selectedPercentile?.strategy || 'unified'}
                             </Text>
                         </Space>
                     </div>
@@ -349,31 +367,31 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cashflow Data Summary */}
-            {cashflowData && (
+            {sourceData && (
                 <FormSection title="Data Summary" level={4}>
                     <ResponsiveFieldRow layout="fourColumn">
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Line Items</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.lineItems?.length || 0}
+                                {sourceData.length || 0}
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Project Life</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.projectLife || 0} years
+                                {scenarioData.settings?.general?.projectLife || 0} years
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">Currency</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.currency || 'USD'}
+                                {scenarioData.settings?.project?.currency.local || 'USD'}
                             </Title>
                         </Card>
                         <Card size="small" bordered={false}>
                             <Text type="secondary">WTGs</Text>
                             <Title level={4} style={{ margin: 0 }}>
-                                {cashflowData.metadata?.numWTGs || 0}
+                                {scenarioData.settings?.project?.windFarm.numWTGs || 0}
                             </Title>
                         </Card>
                     </ResponsiveFieldRow>
@@ -383,7 +401,7 @@ const CashflowAnalysis = () => {
             <Divider />
 
             {/* Cards Section */}
-            {loading ? (
+            {isLoading ? (
                 <Card>
                     <Spin tip="Refreshing cashflow analysis..." style={{
                         display: 'flex',
@@ -392,7 +410,7 @@ const CashflowAnalysis = () => {
                         minHeight: '400px'
                     }} />
                 </Card>
-            ) : !cashflowData ? (
+            ) : !sourceData ? (
                 <Card>
                     <Alert
                         message="No Cashflow Data"
@@ -400,7 +418,7 @@ const CashflowAnalysis = () => {
                         type="info"
                         showIcon
                         action={
-                            <Button onClick={handleRefresh} loading={loading}>
+                            <Button onClick={handleRefresh} loading={isLoading}>
                                 Refresh Data
                             </Button>
                         }
@@ -416,8 +434,8 @@ const CashflowAnalysis = () => {
                                 <CardErrorBoundary cardName={cardConfig.name} gridProps={cardConfig.gridProps}>
                                     {CardComponent ? (
                                         <CardComponent
-                                            cashflowData={cashflowData}
-                                            selectedPercentiles={selectedPercentiles}
+                                            cashflowData={sourceData}
+                                            selectedPercentiles={selectedPercentile}
                                             cardConfig={cardConfig}
                                         />
                                     ) : (
