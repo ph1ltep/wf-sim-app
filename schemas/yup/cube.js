@@ -1,6 +1,6 @@
 
 const Yup = require('yup');
-const { DataPointSchema, SimResultsSchema } = require('./distribution');
+const { DataPointSchema, SimResultsSchema, PercentileSchema } = require('./distribution');
 
 
 //note: sources with no multipliers are independent variables/sources. Need to process independents first so they can be referenced by others.
@@ -37,6 +37,9 @@ const { DataPointSchema, SimResultsSchema } = require('./distribution');
 // need to pass selectedPercentiles to computeSourceData
 
 // adds data references that can be used in multipliers, transformers, formatters. takes path string array.
+
+// SOURCE DATA SCHEMAS
+
 const CubeReferenceRegistryItemSchema = Yup.object().shape({ // global references. available to all item's transformers/multipliers
     id: Yup.string().required('reference id is required'),
     path: Yup.array().of(Yup.string()).required('reference path is required')
@@ -140,7 +143,143 @@ const CubeSourceDataResponseSchema = Yup.object().shape({
     );
 });
 
+// METRIC DATA SCHEMAS
+
+// Metric value type union - scalar or object
+const CubeMetricValueSchema = Yup.lazy(value => {
+    if (typeof value === 'number') {
+        return Yup.number();
+    }
+    return Yup.object(); // For complex metric objects
+});
+
+// Individual metric result for a specific percentile
+const CubeMetricResultSchema = Yup.object().shape({
+    percentile: PercentileSchema.required('Percentile is required'),
+    value: Yup.number().required('Metric value is required'), // Only number
+    stats: Yup.object().test('dynamic-stats', 'Stats must have number values', (value) => {
+        return Object.values(value || {}).every(val => typeof val === 'number');
+    }).default(() => ({})) // Dynamic keys like stats.min, stats.max
+});
+
+// Metric dependency specification
+const CubeMetricDependencySchema = Yup.object().shape({
+    id: Yup.string().required('Dependency ID is required'),
+    type: Yup.string().oneOf(['source', 'metric', 'reference']).required('Dependency type is required'),
+    path: Yup.array().of(Yup.string()).optional() // Only used for type: 'reference' when not in global references
+});
+
+// Aggregation configuration for metrics
+const CubeMetricAggregationSchema = Yup.object().shape({
+    sourceId: Yup.string().required('Source ID is required'),
+    operation: Yup.string().oneOf(['min', 'max', 'mean', 'stdev', 'mode', 'sum']).required('Operation is required'),
+    outputKey: Yup.string().required('Output key is required'),
+    isDefault: Yup.boolean().default(false) // New property
+});
+
+// Operation configuration for metrics
+const CubeMetricOperationSchema = Yup.object().shape({
+    id: Yup.string().required('ID is required'), // Can be metric, reference, or aggregation outputKey
+    operation: Yup.mixed().required('Operation function is required') // Function type
+});
+
+// Registry item for individual metrics
+const CubeMetricRegistryItemSchema = Yup.object().shape({
+    id: Yup.string().required('Metric ID is required'),
+    priority: Yup.number().default(100),
+    dependencies: Yup.array().of(CubeMetricDependencySchema).default([]),
+    aggregations: Yup.array().of(CubeMetricAggregationSchema).default([]),
+    transformer: Yup.mixed().optional(), // Function type
+    operations: Yup.array().of(CubeMetricOperationSchema).default([]),
+    references: Yup.array().of(CubeReferenceRegistryItemSchema).default([]),
+    metadata: CubeSourceMetadataSchema.required('Metadata is required'),
+    sensitivity: Yup.object().shape({
+        enabled: Yup.boolean().default(true),
+        excludeSources: Yup.array().of(Yup.string()).default([]),
+        analyses: Yup.array().of(Yup.string()).default([]), // Which analyses to run
+        customPercentileRange: Yup.array().of(Yup.number()).nullable().default(null)
+    }).default(() => ({}))
+});
+
+// Main metrics registry schema
+const CubeMetricsRegistrySchema = Yup.object().shape({
+    references: Yup.array().of(CubeReferenceRegistryItemSchema).default([]),
+    metrics: Yup.array().of(CubeMetricRegistryItemSchema).default([])
+});
+
+// Processed metric data (parallel to CubeSourceDataSchema)
+const CubeMetricDataSchema = Yup.object().shape({
+    id: Yup.string().required('Metric ID is required'),
+    valueType: Yup.string().oneOf(['scalar', 'object']).required('Value type is required'),
+    percentileMetrics: Yup.array().of(CubeMetricResultSchema).default([]),
+    metadata: CubeSourceMetadataSchema.required('Metadata is required'),
+    audit: Yup.object().shape({
+        trail: Yup.array().of(AuditTrailEntrySchema).default([]),
+        references: Yup.object().default({})
+    }).required('Audit trail is required')
+});
+
+// Response schema for metric data queries (parallel to CubeSourceDataResponseSchema)
+const CubeMetricDataResponseSchema = Yup.object().shape({
+    // Dynamic keys with metric data and metadata
+    // Mode 1: key = percentile (50, 75, 90, etc.) when querying by percentile
+    // Mode 2: key = metricId ("projectIRR", "equityIRR", etc.) when querying by metric
+}).test('dynamic-keys', 'Invalid metric response structure', function (value) {
+    // Validate that each key has appropriate data structure
+    return Object.values(value).every(item =>
+        (typeof item.value === 'number' || typeof item.value === 'object') &&
+        typeof item.metadata === 'object'
+    );
+});
+
+// SENSITIVITY ANALYSIS SCHEMAS
+
+// Sensitivity analysis configuration in registry
+const CubeSensitivityRegistryItemSchema = Yup.object().shape({
+    id: Yup.string().required('Analysis ID is required'),
+    name: Yup.string().required('Analysis name is required'),
+    description: Yup.string().required('Description is required'),
+    transformer: Yup.mixed().required('Transformer function is required'),
+    enabled: Yup.boolean().default(true),
+    schema: Yup.mixed().required('Validation schema is required'), // Yup schema for this analysis type
+    config: Yup.object().default(() => ({})) // Analysis-specific configuration
+});
+
+// Sensitivity analysis registry
+const CubeSensitivityRegistrySchema = Yup.object().shape({
+    analyses: Yup.array().of(CubeSensitivityRegistryItemSchema).default([])
+});
+
+// Base sensitivity data configuration
+const CubeSensitivityConfigSchema = Yup.object().shape({
+    computedMetrics: Yup.array().of(Yup.string()).required('Computed metrics list is required'),
+    baselinePercentiles: Yup.array().of(Yup.number()).required('Baseline percentiles are required'),
+    enabledAnalyses: Yup.array().of(Yup.string()).required('Enabled analyses list is required'),
+    lastComputed: Yup.date().required('Last computed timestamp is required')
+});
+
+// Main sensitivity data schema (metric-root structure)
+const CubeSensitivityDataSchema = Yup.object().shape({
+    config: CubeSensitivityConfigSchema.required('Configuration is required')
+    // Dynamic metric keys validated by registry schemas
+    // Structure: { [metricId]: { [analysisId]: analysisResults } }
+}).test('dynamic-metric-keys', 'Invalid metric-analysis structure', function (value) {
+    // Validate that all non-config keys are valid metric IDs
+    // and their analysis data matches registry schemas
+    const { config } = value;
+    if (!config) return false;
+
+    const nonConfigKeys = Object.keys(value).filter(key => key !== 'config');
+    return nonConfigKeys.every(metricId =>
+        config.computedMetrics.includes(metricId) &&
+        typeof value[metricId] === 'object'
+    );
+});
+
+
+
 module.exports = {
+    // Source schemas
     CubeReferenceRegistryItemSchema,
     CubeSourceMetadataSchema,
     CubeSourceRegistryItemSchema,
@@ -149,6 +288,25 @@ module.exports = {
     CubeReferenceDataSchema,
     CubeSourceDataResponseSchema,
     AuditTrailEntrySchema,
+
+    // Metrics schemas
+    CubeMetricValueSchema,
+    CubeMetricResultSchema,
+    CubeMetricDependencySchema,
+    CubeMetricAggregationSchema,
+    CubeMetricOperationSchema,
+    CubeMetricRegistryItemSchema,
+    CubeMetricsRegistrySchema,
+    CubeMetricDataSchema,
+    CubeMetricDataResponseSchema,
+
+    // Sensitivity schemas
+    CubeSensitivityRegistryItemSchema,
+    CubeSensitivityRegistrySchema,
+    CubeSensitivityConfigSchema,
+    CubeSensitivityDataSchema,
+
+    // re-export existing schemas
     SimResultsSchema,
-    DataPointSchema
+    DataPointSchema,
 };

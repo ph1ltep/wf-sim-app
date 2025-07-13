@@ -152,6 +152,9 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
                                         case 'multiply':
                                             aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue * dataPoint.value);
                                             break;
+                                        case 'divide':
+                                            aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue / dataPoint.value);
+                                            break;
                                         default:
                                             aggregationMap.set(dataPoint.year, currentValue + dataPoint.value);
                                     }
@@ -177,6 +180,9 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
                                 break;
                             case 'multiply':
                                 aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue * dataPoint.value);
+                                break;
+                            case 'divide':
+                                aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue / dataPoint.value);
                                 break;
                             default:
                                 aggregationMap.set(dataPoint.year, currentValue + dataPoint.value);
@@ -240,11 +246,11 @@ export const extractPercentileData = (data, percentile) => {
 /**
  * Adjust values in source data using an inline transformation function
  * @param {Array|Object} sourceData - CubeSourceDataSchema array/object, SimResultsSchema array/object, or DataPointSchema array
- * @param {Function} adjustFunction - Function to transform each value: (percentile, year, value) => newValue
+ * @param {Function} adjustFunction - Function to transform each value: (percentile, year, value, previousValue) => newValue
  * @returns {Array|Object} Transformed data in same format as input
  * ✅ Valid calls
  * const doubled = adjustSourceDataValues(data, (percentile, year, value) => value * 2);
- * const adjusted = adjustSourceDataValues(data, (percentile, year, value) => { return percentile > 50 ? value * 1.1 : value * 0.9; });
+ * const cumulative = adjustSourceDataValues(data, (percentile, year, value, previousValue=null) => value + (previousValue || 0));
  */
 export const adjustSourceDataValues = (sourceData, adjustFunction, addAuditEntry = null) => {
     if (!sourceData || typeof adjustFunction !== 'function') {
@@ -287,31 +293,50 @@ export const adjustSourceDataValues = (sourceData, adjustFunction, addAuditEntry
         case 'CubeSourceData':
             result = dataToProcess.map(cubeSource => ({
                 ...cubeSource,
-                percentileSource: cubeSource.percentileSource.map(simResult => ({
-                    ...simResult,
-                    data: simResult.data.map(dataPoint => ({
-                        ...dataPoint,
-                        value: adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value)
-                    }))
-                }))
+                percentileSource: cubeSource.percentileSource.map(simResult => {
+                    let previousValue = null;
+                    return {
+                        ...simResult,
+                        data: simResult.data.map(dataPoint => {
+                            const newValue = adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value, previousValue);
+                            previousValue = newValue;
+                            return {
+                                ...dataPoint,
+                                value: newValue
+                            };
+                        })
+                    };
+                })
             }));
             break;
 
         case 'SimResults':
-            result = dataToProcess.map(simResult => ({
-                ...simResult,
-                data: simResult.data.map(dataPoint => ({
-                    ...dataPoint,
-                    value: adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value)
-                }))
-            }));
+            result = dataToProcess.map(simResult => {
+                let previousValue = null;
+                return {
+                    ...simResult,
+                    data: simResult.data.map(dataPoint => {
+                        const newValue = adjustFunction(simResult.percentile.value, dataPoint.year, dataPoint.value, previousValue);
+                        previousValue = newValue;
+                        return {
+                            ...dataPoint,
+                            value: newValue
+                        };
+                    })
+                };
+            });
             break;
 
         case 'DataPoint':
-            result = dataToProcess.map(dataPoint => ({
-                ...dataPoint,
-                value: adjustFunction(50, dataPoint.year, dataPoint.value) // Default percentile for DataPoint
-            }));
+            let previousValue = null;
+            result = dataToProcess.map(dataPoint => {
+                const newValue = adjustFunction(50, dataPoint.year, dataPoint.value, previousValue); // Default percentile for DataPoint
+                previousValue = newValue;
+                return {
+                    ...dataPoint,
+                    value: newValue
+                };
+            });
             break;
 
         default:
@@ -380,4 +405,100 @@ export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, 
     }
 
     return result;
+};
+
+/**
+ * Trim/filter source data using a comparator function with options
+ * @param {Array|Object} sourceData - CubeSourceDataSchema array/object, SimResultsSchema array/object, or DataPointSchema array
+ * @param {Function} trimFunction - Function to filter each value: (year, value, options) => boolean (true = remove item)
+ * @param {Object} options - Options object passed to trimFunction (e.g., { min: 1, max: 10 })
+ * @param {Function|null} addAuditEntry - Optional audit trail function
+ * @returns {Array|Object} Filtered data in same format as input
+ * ✅ Valid calls
+ * const afterYear5 = trimSourceDataValues(data, (year, value, options) => year < options.min, { min: 5 });
+ * const withinRange = trimSourceDataValues(data, (year, value, options) => value < options.min || value > options.max, { min: 1000, max: 5000 });
+ */
+export const trimSourceDataValues = (sourceData, trimFunction, options, addAuditEntry = null) => {
+    if (!sourceData || typeof trimFunction !== 'function') {
+        return sourceData;
+    }
+
+    // Handle single object vs array
+    const isArray = Array.isArray(sourceData);
+    const dataToProcess = isArray ? sourceData : [sourceData];
+
+    if (dataToProcess.length === 0) {
+        return sourceData;
+    }
+
+    // Detect data type using schema validation (single pass)
+    const firstItem = dataToProcess[0];
+    let dataType;
+
+    try {
+        CubeSourceDataSchema.validateSync(firstItem);
+        dataType = 'CubeSourceData';
+    } catch (error) {
+        try {
+            SimResultsSchema.validateSync(firstItem);
+            dataType = 'SimResults';
+        } catch (error2) {
+            try {
+                DataPointSchema.validateSync(firstItem);
+                dataType = 'DataPoint';
+            } catch (error3) {
+                throw new Error('Invalid source data format for trimSourceDataValues');
+            }
+        }
+    }
+
+    // Process based on detected type
+    let result;
+
+    switch (dataType) {
+        case 'CubeSourceData':
+            result = dataToProcess.map(cubeSource => ({
+                ...cubeSource,
+                percentileSource: cubeSource.percentileSource.map(simResult => ({
+                    ...simResult,
+                    data: simResult.data.filter(dataPoint =>
+                        !trimFunction(dataPoint.year, dataPoint.value, options)
+                    )
+                }))
+            }));
+            break;
+
+        case 'SimResults':
+            result = dataToProcess.map(simResult => ({
+                ...simResult,
+                data: simResult.data.filter(dataPoint =>
+                    !trimFunction(dataPoint.year, dataPoint.value, options)
+                )
+            }));
+            break;
+
+        case 'DataPoint':
+            result = dataToProcess.filter(dataPoint =>
+                !trimFunction(dataPoint.year, dataPoint.value, options)
+            );
+            break;
+
+        default:
+            throw new Error('Unsupported data type for trimSourceDataValues');
+    }
+
+    // Add audit entry if function provided
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_trim',
+            `trimmed data using (${trimFunction.toString()}) with options: ${JSON.stringify(options)}`,
+            null,
+            result,
+            'transform',
+            'trim'
+        );
+    }
+
+    // Return in same format as input (array or single object)
+    return isArray ? result : result[0];
 };

@@ -13,7 +13,9 @@ import {
     debtService,
     contractFees,
     majorRepairs,
-    reserveFunds
+    reserveFunds,
+    dscr,
+    cumulativeCashflow
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -355,6 +357,50 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 accountingClass: 'none',
                 projectPhase: 'operations',
                 description: 'Net project cashflow (revenues - costs)',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'dscr',
+            priority: 901,
+            path: null,
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: dscr,
+            multipliers: [],
+            metadata: {
+                name: 'DSCR',
+                type: 'virtual',
+                visualGroup: 'financing',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Annual debt service coverage ratios',
+                customPercentile: 50,
+                formatter: (value) => `${value.toFixed(2)}x`
+            }
+        },
+
+        // Virtual cumulative cashflow for payback analysis
+        {
+            id: 'cumulativeCashflow',
+            priority: 902,
+            path: null,
+            hasPercentiles: false,
+            references: [],
+            transformer: cumulativeCashflow,
+            multipliers: [],
+            metadata: {
+                name: 'Cumulative Cashflow',
+                type: 'virtual',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Cumulative net cashflow by year',
                 customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }

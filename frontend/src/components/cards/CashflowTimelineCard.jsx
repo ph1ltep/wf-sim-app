@@ -26,7 +26,7 @@ const CashflowTimelineCard = () => {
     const { getValueByPath } = useScenario();
 
     // sourceIds for cashflow timeline card
-    const cardSourceIds = ['totalRevenue', 'totalCost', 'netCashflow', 'debtService'];
+    const cardSourceIds = ['totalRevenue', 'totalCost', 'netCashflow', 'debtService', 'dscr', 'cumulativeCashflow'];
 
     const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
 

@@ -1,5 +1,5 @@
 
-import { filterCubeSourceData, aggregateCubeSourceData, normalizeIntoSimResults, extractPercentileData } from './common.js';
+import { filterCubeSourceData, aggregateCubeSourceData, normalizeIntoSimResults, extractPercentileData, trimSourceDataValues } from './common.js';
 
 
 /**
@@ -334,13 +334,8 @@ export const debtService = (sourceData, context) => {
     const { addAuditEntry, availablePercentiles, customPercentile, processedData } = context;
 
     // Get already calculated operational interest and principal data
-    const interestSources = filterCubeSourceData(processedData, {
-        sourceId: 'operationalInterest'
-    });
-
-    const principalSources = filterCubeSourceData(processedData, {
-        sourceId: 'operationalPrincipal'
-    });
+    const interestSources = filterCubeSourceData(processedData, { sourceId: 'operationalInterest' });
+    const principalSources = filterCubeSourceData(processedData, { sourceId: 'operationalPrincipal' });
 
     if (interestSources.length === 0 || principalSources.length === 0) {
         console.warn(`⚠️ Missing sources for debtService: operationalInterest(${interestSources.length}), operationalPrincipal(${principalSources.length})`);
@@ -369,6 +364,64 @@ export const debtService = (sourceData, context) => {
         'transform',
         'complex'
     );
+
+    return result;
+};
+
+/**
+ * Calculate DSCR time series from net cashflow and debt service
+ * @param {null} sourceData - Not used for virtual sources
+ * @param {Object} context - Transformer context
+ * @returns {Array} Array of SimResultsSchema objects for DSCR by year
+ */
+export const dscr = (sourceData, context) => {
+    const { addAuditEntry, availablePercentiles, customPercentile, processedData, allReferences } = context;
+
+    // Get net cashflow and debt service sources
+    const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });
+    const debtServiceSources = filterCubeSourceData(processedData, { sourceId: 'debtService' });
+
+    // Get financing data from references
+    const financing = allReferences.financing;
+    if (!financing) {
+        console.warn('⚠️ DSCR: No financing data available in references');
+        return [];
+    }
+
+    if (netCashflowSources.length === 0 || debtServiceSources.length === 0) {
+        console.warn(`⚠️ Missing sources for DSCR: netCashflow(${netCashflowSources.length}), debtService(${debtServiceSources.length})`);
+        return [];
+    }
+
+    console.log('📊 Calculating DSCR: netCashflow / debtService');
+
+    // Track dependencies for audit trail
+    const dependencies = ['netCashflow', 'debtService'];
+
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_dscr_calculation',
+            'calculating DSCR: netCashflow / debtService',
+            dependencies
+        );
+    }
+
+    // Get single sources (since sourceId filtering returns max 1 item)
+    const netCashflow = netCashflowSources[0];
+    const debtService = debtServiceSources[0];
+
+    // Combine revenue (positive) and cost (negative) sources
+    const combinedSources = [netCashflow, debtService];
+
+    // Aggregate with sum operation (revenue + (-cost) = revenue - cost)
+    let result = aggregateCubeSourceData(combinedSources, availablePercentiles, {
+        operation: 'divide',
+        customPercentile
+    }, addAuditEntry);
+
+    result = trimSourceDataValues(result, (year, value, options) => year < options.loanStart || year > options.loanEnd, { loanStart: (1 + financing.gracePeriod), loanEnd: financing.loanDuration || 10 }, addAuditEntry);
+
+    console.log(`✅ netCashflow calculated for ${result.length} data points`);
 
     return result;
 };
