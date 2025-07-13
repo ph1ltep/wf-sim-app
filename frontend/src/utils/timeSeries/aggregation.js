@@ -25,7 +25,7 @@ export const aggregateTimeSeries = (data, method, options = {}) => {
     // Apply period filters
     let filteredData = data;
     switch (filter) {
-        case 'operational':
+        case 'operational': 
             filteredData = data.filter(d => d.year > 0);
             break;
         case 'construction':

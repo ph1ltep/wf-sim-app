@@ -174,7 +174,8 @@ const CubeMetricAggregationSchema = Yup.object().shape({
     sourceId: Yup.string().required('Source ID is required'),
     operation: Yup.string().oneOf(['min', 'max', 'mean', 'stdev', 'mode', 'sum']).required('Operation is required'),
     outputKey: Yup.string().required('Output key is required'),
-    isDefault: Yup.boolean().default(false) // New property
+    isDefault: Yup.boolean().default(false), // New property
+    filter: Yup.mixed().optional() // Function type: (year, value, refs) => boolean
 });
 
 // Operation configuration for metrics
