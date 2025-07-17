@@ -4,6 +4,8 @@ import { message } from 'antd';
 import { useScenario } from './ScenarioContext';
 import { computeSourceData } from '../utils/cube/sources/processor';
 import { CASHFLOW_SOURCE_REGISTRY } from '../utils/cube/sources/registry';
+import { computeMetricsData } from '../utils/cube/metrics/processor';
+import { METRICS_REGISTRY } from '../utils/cube/metrics/registry';
 import {
     isDistributionsComplete,
     isConstructionSourcesComplete
@@ -158,9 +160,15 @@ export const CubeProvider = ({ children }) => {
                     case 'metrics':
                         console.log('🔄 CubeContext: Stage 3 - Computing metrics data...');
                         try {
-                            // TODO: Implement metrics computation when ready
-                            setMetricsData({});
-                            console.log('✅ CubeContext: Metrics data computed (placeholder)');
+                            const computedMetricsData = await computeMetricsData(
+                                METRICS_REGISTRY,
+                                availablePercentiles,
+                                getValueByPath,
+                                getData, // Use existing getData function as getSourceData
+                                customPercentile
+                            );
+                            setMetricsData(computedMetricsData);
+                            console.log(`✅ CubeContext: ${computedMetricsData.length} metrics computed successfully`);
                             setRefreshStage('complete');
                         } catch (error) {
                             console.error('❌ CubeContext: Failed to compute metrics data:', error);

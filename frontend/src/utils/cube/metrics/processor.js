@@ -107,28 +107,22 @@ const processMetric = (metric, processedMetrics, globalReferences, availablePerc
         // Step 4b: Apply aggregations
         let aggregationResults = [];
         if (metric.aggregations && metric.aggregations.length > 0) {
-            addAuditEntry('apply_aggregations', `applying ${metric.aggregations.length} aggregations`,
-                metric.aggregations.map(agg => agg.sourceId));
             aggregationResults = applyAggregations(
                 metric.aggregations,
-                dependencies,
+                dependencies, // ✅ Pass full dependencies object
                 availablePercentiles,
                 addAuditEntry
             );
         }
-
         // Step 4c: Apply transformer
         let transformerResults = null;
         if (metric.transformer) {
-            addAuditEntry('apply_transformer', 'applying metric transformer',
-                Object.keys(dependencies.sources).concat(Object.keys(dependencies.metrics)));
             transformerResults = applyTransformer(
                 metric.transformer,
-                dependencies,
+                dependencies, // ✅ Pass full dependencies object
                 processedMetrics,
                 aggregationResults,
                 availablePercentiles,
-                globalReferences,
                 customPercentile,
                 addAuditEntry
             );
@@ -145,13 +139,11 @@ const processMetric = (metric, processedMetrics, globalReferences, availablePerc
         // Step 4e: Apply operations
         let operationResults = finalResults;
         if (metric.operations && metric.operations.length > 0) {
-            addAuditEntry('apply_operations', `applying ${metric.operations.length} operations`,
-                metric.operations.map(op => op.id));
             operationResults = applyOperations(
                 metric.operations,
                 finalResults,
                 processedMetrics,
-                globalReferences,
+                dependencies, // ✅ Pass full dependencies object
                 addAuditEntry
             );
         }
@@ -191,13 +183,13 @@ const processMetric = (metric, processedMetrics, globalReferences, availablePerc
  * @param {Object} globalReferences - Global reference data
  * @param {Function} getValueByPath - Path extraction function
  * @param {Function} getSourceData - Source data retrieval function
- * @returns {Object} { sources: {}, metrics: {}, references: {} }
+ * @returns {Object} { sources: {}, metrics: {}, references: {} } - references includes ALL references
  */
 const resolveDependencies = (dependencies, processedMetrics, globalReferences, getValueByPath, getSourceData) => {
     const resolved = {
         sources: {},
         metrics: {},
-        references: {}
+        references: { ...globalReferences } // Start with all global references
     };
 
     dependencies.forEach(dependency => {
@@ -228,10 +220,11 @@ const resolveDependencies = (dependencies, processedMetrics, globalReferences, g
                         refValue = globalReferences[dependency.id];
                     } else if (dependency.path) {
                         refValue = getValueByPath(dependency.path);
+                        // Add local reference to the consolidated references object
+                        resolved.references[dependency.id] = refValue;
                     } else {
                         throw new Error(`Reference '${dependency.id}' not found in global references and no path provided`);
                     }
-                    resolved.references[dependency.id] = refValue;
                     break;
 
                 default:
@@ -248,108 +241,168 @@ const resolveDependencies = (dependencies, processedMetrics, globalReferences, g
 /**
  * Apply aggregation operations to source time-series data
  * @param {Array} aggregationConfigs - Array of CubeMetricAggregationSchema
- * @param {Object} dependencies - Resolved dependencies object
+ * @param {Object} dependencies - Resolved dependencies object with consolidated references
  * @param {Array} availablePercentiles - Available percentiles
  * @param {Function} addAuditEntry - Audit trail function
  * @returns {Array} Array of CubeMetricResultSchema with stats populated
  */
-const applyAggregations = (aggregationConfigs, dependencies, availablePercentiles, globalReferences, addAuditEntry) => {
+const applyAggregations = (aggregationConfigs, dependencies, availablePercentiles, addAuditEntry) => {
     if (!aggregationConfigs || aggregationConfigs.length === 0) {
         return [];
     }
 
-    const results = [];
+    // Resolve parameters once per metric (not per percentile or per aggregation)
+    const resolvedConfigs = aggregationConfigs.map(config => {
+        const resolvedConfig = { ...config };
 
-    // Process each percentile
-    availablePercentiles.forEach(percentile => {
-        const stats = {};
+        if (config.parameters) {
+            resolvedConfig.resolvedParameters = {};
 
-        // Apply each aggregation config
-        aggregationConfigs.forEach(config => {
-            const { sourceId, operation, outputKey, filter } = config;
+            Object.entries(config.parameters).forEach(([paramName, paramFunction]) => {
+                if (typeof paramFunction === 'function') {
+                    try {
+                        resolvedConfig.resolvedParameters[paramName] = paramFunction(
+                            dependencies.references,
+                            dependencies.metrics
+                        );
+                    } catch (error) {
+                        throw new Error(`Failed to resolve parameter '${paramName}' for aggregation '${config.outputKey}': ${error.message}`);
+                    }
+                } else {
+                    resolvedConfig.resolvedParameters[paramName] = paramFunction;
+                }
+            });
+        }
 
-            // Get source data for this percentile
-            const sourceData = dependencies.sources[sourceId];
-            if (!sourceData || !sourceData[percentile]) {
+        return resolvedConfig;
+    });
+
+    // Initialize results array with empty stats for each percentile
+    const results = availablePercentiles.map(percentile => ({
+        percentile: { value: percentile },
+        value: 0, // Will be set later by default values or transformer
+        stats: {}
+    }));
+
+    // ✅ OPTIMIZED: Process each aggregation config once, apply to all percentiles
+    resolvedConfigs.forEach(config => {
+        const { sourceId, operation, outputKey, filter, resolvedParameters = {} } = config;
+
+        // Get source data for all percentiles of this source
+        const sourceData = dependencies.sources[sourceId];
+        if (!sourceData) {
+            console.warn(`⚠️ Source '${sourceId}' not found in dependencies`);
+            // Set zero values for all percentiles for this outputKey
+            results.forEach(result => {
+                result.stats[outputKey] = 0;
+            });
+            return;
+        }
+
+        // ✅ Process each percentile's time-series separately for this aggregation
+        availablePercentiles.forEach((percentile, percentileIndex) => {
+            const percentileData = sourceData[percentile];
+            if (!percentileData || !percentileData.data) {
                 console.warn(`⚠️ Source '${sourceId}' data not found for percentile ${percentile}`);
-                stats[outputKey] = 0;
+                results[percentileIndex].stats[outputKey] = 0;
                 return;
             }
 
-            const timeSeriesData = sourceData[percentile].data; // Array of DataPointSchema
+            const timeSeriesData = percentileData.data; // Array of DataPointSchema for THIS percentile
             if (!Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
-                stats[outputKey] = 0;
+                results[percentileIndex].stats[outputKey] = 0;
                 return;
             }
 
-            // Apply filter if provided
+            // Apply filter if provided (filter operates on THIS percentile's data)
             let filteredData = timeSeriesData;
             if (filter && typeof filter === 'function') {
                 try {
                     filteredData = timeSeriesData.filter(dataPoint =>
-                        filter(dataPoint.year, dataPoint.value, globalReferences)
+                        filter(dataPoint.year, dataPoint.value, dependencies.references)
                     );
                 } catch (filterError) {
-                    console.warn(`⚠️ Filter function failed for ${sourceId}: ${filterError.message}`);
-                    filteredData = timeSeriesData; // Fall back to unfiltered data
+                    console.warn(`⚠️ Filter function failed for ${sourceId} P${percentile}: ${filterError.message}`);
+                    filteredData = timeSeriesData;
                 }
             }
 
             if (filteredData.length === 0) {
                 console.warn(`⚠️ No data points passed filter for ${sourceId} at percentile ${percentile}`);
-                stats[outputKey] = 0;
+                results[percentileIndex].stats[outputKey] = 0;
                 return;
             }
 
-            // Apply aggregation operation to filtered data
-            const values = filteredData.map(dataPoint => dataPoint.value);
+            // ✅ Aggregate THIS percentile's filtered time-series data
             let aggregatedValue;
 
             switch (operation) {
                 case 'min':
+                    const values = filteredData.map(dataPoint => dataPoint.value);
                     aggregatedValue = Math.min(...values);
                     break;
                 case 'max':
-                    aggregatedValue = Math.max(...values);
+                    const maxValues = filteredData.map(dataPoint => dataPoint.value);
+                    aggregatedValue = Math.max(...maxValues);
                     break;
                 case 'mean':
-                    aggregatedValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    const meanValues = filteredData.map(dataPoint => dataPoint.value);
+                    aggregatedValue = meanValues.reduce((sum, val) => sum + val, 0) / meanValues.length;
                     break;
                 case 'sum':
-                    aggregatedValue = values.reduce((sum, val) => sum + val, 0);
+                    const sumValues = filteredData.map(dataPoint => dataPoint.value);
+                    aggregatedValue = sumValues.reduce((sum, val) => sum + val, 0);
                     break;
                 case 'stdev':
-                    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-                    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+                    const stdevValues = filteredData.map(dataPoint => dataPoint.value);
+                    const mean = stdevValues.reduce((sum, val) => sum + val, 0) / stdevValues.length;
+                    const variance = stdevValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / stdevValues.length;
                     aggregatedValue = Math.sqrt(variance);
                     break;
                 case 'mode':
-                    // Find most frequent value (simplified implementation)
+                    const modeValues = filteredData.map(dataPoint => dataPoint.value);
                     const frequency = {};
-                    values.forEach(val => frequency[val] = (frequency[val] || 0) + 1);
+                    modeValues.forEach(val => frequency[val] = (frequency[val] || 0) + 1);
                     aggregatedValue = Number(Object.keys(frequency).reduce((a, b) =>
                         frequency[a] > frequency[b] ? a : b));
+                    break;
+                case 'npv':
+                    // NPV calculation on THIS percentile's time-series
+                    const discountRate = resolvedParameters.discountRate;
+                    if (discountRate === undefined) {
+                        throw new Error(`NPV operation requires 'discountRate' parameter for '${outputKey}'`);
+                    }
+
+                    aggregatedValue = filteredData.reduce((npv, dataPoint) => {
+                        const presentValue = dataPoint.value / Math.pow(1 + discountRate, dataPoint.year);
+                        return npv + presentValue;
+                    }, 0);
+                    break;
+                case 'reduce':
+                    // Custom reduce on THIS percentile's time-series
+                    const reducerFunction = resolvedParameters.reducer;
+                    if (!reducerFunction || typeof reducerFunction !== 'function') {
+                        throw new Error(`Reduce operation requires 'reducer' function parameter for '${outputKey}'`);
+                    }
+
+                    const initialValue = resolvedParameters.initialValue;
+                    aggregatedValue = filteredData.reduce(reducerFunction, initialValue);
                     break;
                 default:
                     throw new Error(`Unknown aggregation operation: ${operation}`);
             }
 
-            stats[outputKey] = aggregatedValue;
-
-            // Add audit info about filtering
-            if (filter) {
-                addAuditEntry('aggregation_filter_applied',
-                    `filtered ${timeSeriesData.length} to ${filteredData.length} data points for ${outputKey}`,
-                    [sourceId]);
-            }
+            // Store the aggregated value for THIS percentile
+            results[percentileIndex].stats[outputKey] = aggregatedValue;
         });
 
-        // Create CubeMetricResultSchema for this percentile
-        results.push({
-            percentile: { value: percentile },
-            value: 0, // Will be set later by default values or transformer
-            stats: stats
-        });
+        // Add audit entry for this aggregation config
+        const parameterInfo = Object.keys(resolvedParameters).length > 0
+            ? ` with parameters: ${Object.keys(resolvedParameters).join(', ')}`
+            : '';
+        addAuditEntry('aggregation_operation_applied',
+            `applied ${operation}${parameterInfo} to ${availablePercentiles.length} percentiles for ${outputKey}`,
+            [sourceId]);
     });
 
     addAuditEntry('aggregation_complete',
@@ -367,12 +420,11 @@ const applyAggregations = (aggregationConfigs, dependencies, availablePercentile
  * @param {Array} processedMetrics - Metrics processed so far
  * @param {Array} aggregationResults - Results from aggregations
  * @param {Array} availablePercentiles - Available percentiles
- * @param {Object} globalReferences - Global references
  * @param {Object|null} customPercentile - Custom percentile config
  * @param {Function} addAuditEntry - Audit trail function
  * @returns {Array|null} Array of CubeMetricResultSchema or null
  */
-const applyTransformer = (transformer, dependencies, processedMetrics, aggregationResults, availablePercentiles, globalReferences, customPercentile, addAuditEntry) => {
+const applyTransformer = (transformer, dependencies, processedMetrics, aggregationResults, availablePercentiles, customPercentile, addAuditEntry) => {
     if (!transformer || typeof transformer !== 'function') {
         return null;
     }
@@ -381,7 +433,7 @@ const applyTransformer = (transformer, dependencies, processedMetrics, aggregati
         // Build context similar to cube sources
         const context = {
             availablePercentiles,
-            allReferences: globalReferences,
+            allReferences: dependencies.references,
             processedData: processedMetrics, // Metrics processed so far
             aggregationResults,
             customPercentile,
@@ -485,11 +537,11 @@ const setDefaultValues = (transformerResults, aggregationResults, aggregationCon
  * @param {Array} operationConfigs - Array of CubeMetricOperationSchema
  * @param {Array} baseResults - Base metric results
  * @param {Array} processedMetrics - Metrics processed so far
- * @param {Object} globalReferences - Global references
+ * @param {Object} dependencies - Resolved dependencies object with consolidated references
  * @param {Function} addAuditEntry - Audit trail function
  * @returns {Array} Array of CubeMetricResultSchema after operations
  */
-const applyOperations = (operationConfigs, baseResults, processedMetrics, globalReferences, addAuditEntry) => {
+const applyOperations = (operationConfigs, baseResults, processedMetrics, dependencies, addAuditEntry) => {
     if (!operationConfigs || operationConfigs.length === 0) {
         return baseResults;
     }
@@ -507,9 +559,9 @@ const applyOperations = (operationConfigs, baseResults, processedMetrics, global
         // Resolve operation target (metric or reference)
         let targetData = null;
 
-        // Check if it's a reference first
-        if (globalReferences.hasOwnProperty(id)) {
-            targetData = globalReferences[id];
+        // Check references first (now consolidated)
+        if (dependencies.references.hasOwnProperty(id)) {
+            targetData = dependencies.references[id];
         } else {
             // Check if it's a metric
             const targetMetric = processedMetrics.find(metric => metric.id === id);
@@ -535,10 +587,10 @@ const applyOperations = (operationConfigs, baseResults, processedMetrics, global
 
                 // Call operation function
                 const newValue = operation(
-                    result.value,           // baseValue
-                    result.percentile.value, // percentile
-                    targetValue,            // targetValue
-                    globalReferences        // references
+                    result.value,                    // baseValue
+                    result.percentile.value,         // percentile
+                    targetValue,                     // targetValue
+                    dependencies.references          // ✅ Use consolidated references
                 );
 
                 if (typeof newValue !== 'number' || isNaN(newValue)) {

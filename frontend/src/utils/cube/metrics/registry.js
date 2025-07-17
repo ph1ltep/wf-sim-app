@@ -1,4 +1,5 @@
 // Updated utils/cube/metrics/registry.js
+import { calculateNPVCosts, calculateNPVEnergy, calculateProjectIRR } from './transformers';
 
 export const METRICS_REGISTRY = {
     references: [
@@ -16,8 +17,14 @@ export const METRICS_REGISTRY = {
                 { id: 'totalCost', type: 'source' },
                 { id: 'financing', type: 'reference' }
             ],
-            aggregations: [],
-            transformer: calculateNPVCosts, // Simple NPV calculation
+            aggregations: [
+                {
+                    sourceId: 'totalCost', operation: 'npv', outputKey: 'npvValue', isDefault: true,
+                    parameters: { discountRate: (refs, metrics) => (refs.financing.costOfEquity) / 100 },
+                    filter: (year, value, refs) => year >= 0 // Include all years including construction
+                }
+            ],
+            transformer: null, // Simple NPV calculation
             operations: [],
             metadata: {
                 name: 'NPV of Costs',
@@ -38,10 +45,15 @@ export const METRICS_REGISTRY = {
             priority: 90,
             dependencies: [
                 { id: 'energyRevenue', type: 'source' },
-                { id: 'escalationRate', type: 'source' },
                 { id: 'financing', type: 'reference' }
             ],
-            aggregations: [],
+            aggregations: [
+                {
+                    sourceId: 'energyRevenue', operation: 'npv', outputKey: 'npvValue', isDefault: true,
+                    parameters: { discountRate: (refs, metrics) => (refs.financing.costOfEquity) / 100 },
+                    filter: (year, value, refs) => year >= 0 // Include all years including construction
+                }
+            ],
             transformer: calculateNPVEnergy, // Derive MWh from revenue, then NPV
             operations: [],
             metadata: {
@@ -65,9 +77,9 @@ export const METRICS_REGISTRY = {
                 { id: 'dscr', type: 'source' }
             ],
             aggregations: [
-                { sourceId: 'dscr', operation: 'min', outputKey: 'min', isDefault: true },
-                { sourceId: 'dscr', operation: 'max', outputKey: 'max', isDefault: false },
-                { sourceId: 'dscr', operation: 'mean', outputKey: 'avg', isDefault: false }
+                { sourceId: 'dscr', operation: 'min', outputKey: 'min', isDefault: true, filter: (year, value, refs) => year > 0 && year <= refs.financing.loanDuration },
+                { sourceId: 'dscr', operation: 'max', outputKey: 'max', isDefault: false, filter: (year, value, refs) => year > 0 && year <= refs.financing.loanDuration },
+                { sourceId: 'dscr', operation: 'mean', outputKey: 'avg', isDefault: false, filter: (year, value, refs) => year > 0 && year <= refs.financing.loanDuration }
             ],
             transformer: null, // Use aggregations only
             operations: [],
