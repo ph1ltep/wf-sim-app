@@ -4,7 +4,32 @@
 
 The Cube Metrics System is a high-performance financial and operational metrics computation engine that transforms time-series cube source data into scalar business metrics. It features declarative configuration, dependency resolution, aggregation functions, custom transformers, and sensitivity analysis capabilities.
 
----
+### Dependency Access Patterns
+Transformers access all data through the consolidated `dependencies` object:
+
+```javascript
+// ✅ Source data access (per percentile)
+const netCashflowP50 = dependencies.sources.netCashflow[50].data;
+const totalCostP75 = dependencies.sources.totalCost[75].data;
+
+// ✅ Metric data access (previously computed metrics)
+const projectIRRMetric = dependencies.metrics.projectIRR;
+const equityIRRValue = projectIRRMetric.percentileMetrics.find(pm => pm.percentile.value === 50)?.value;
+
+// ✅ Reference data access (consolidated global + local)
+const discountRate = dependencies.references.financing.costOfEquity;
+const projectLife = dependencies.references.projectLife;
+const customSetting = dependencies.references.localCustomSetting; // From dependency path
+
+// ✅ Context access
+const { availablePercentiles, aggregationResults, addAuditEntry } = context;
+```
+
+**Performance Benefits**:
+- **O(1) Metric Lookups**: Direct object access instead of array.find()
+- **Consolidated References**: Single object for all reference access
+- **Simplified Interface**: Cleaner function signatures with fewer parameters
+- **Reduced Redundancy**: No duplicate data passing between functions
 
 ## Parameterized Aggregations
 
@@ -131,7 +156,97 @@ const metricsData = computeMetricsData(
 );
 ```
 
----
+### Payback Period Transformer
+```javascript
+/**
+ * Calculate payback period from cumulative cashflow with linear interpolation
+ * @param {Object} dependencies - Resolved dependencies
+ * @param {Object} context - Transformer context
+ * @returns {Array} Array of CubeMetricResultSchema objects
+ */
+export const calculatePaybackPeriod = (dependencies, context) => {
+  const { availablePercentiles, addAuditEntry } = context;
+
+  // Validate required source dependency
+  if (!dependencies.sources.cumulativeCashflow) {
+    throw new Error('Payback period calculation requires cumulativeCashflow source dependency');
+  }
+
+  const results = [];
+
+  // Process each percentile separately
+  availablePercentiles.forEach(percentile => {
+    const cumulativeCashflowData = dependencies.sources.cumulativeCashflow[percentile];
+    
+    if (!cumulativeCashflowData?.data) {
+      results.push({
+        percentile: { value: percentile },
+        value: dependencies.references.projectLife || 25, // Fallback to project life
+        stats: {}
+      });
+      return;
+    }
+
+    const timeSeriesData = cumulativeCashflowData.data;
+    const sortedData = [...timeSeriesData].sort((a, b) => a.year - b.year);
+    
+    let paybackPeriod = dependencies.references.projectLife || 25;
+    
+    // Find first year where cumulative cashflow becomes positive
+    for (let i = 0; i < sortedData.length; i++) {
+      const currentDataPoint = sortedData[i];
+      
+      if (currentDataPoint.value > 0) {
+        if (i === 0) {
+          paybackPeriod = currentDataPoint.year;
+        } else {
+          // Linear interpolation for sub-year precision
+          const prevDataPoint = sortedData[i - 1];
+          if (prevDataPoint.value < 0) {
+            const fraction = Math.abs(prevDataPoint.value) / 
+                           (currentDataPoint.value - prevDataPoint.value);
+            paybackPeriod = prevDataPoint.year + fraction;
+          } else {
+            paybackPeriod = currentDataPoint.year;
+          }
+        }
+        break;
+      }
+    }
+
+    results.push({
+      percentile: { value: percentile },
+      value: Math.round(paybackPeriod * 100) / 100, // Round to 2 decimal places
+      stats: {}
+    });
+
+    addAuditEntry('payback_period_calculated',
+      `calculated payback period ${paybackPeriod} years for percentile ${percentile}`,
+      ['cumulativeCashflow']);
+  });
+
+  return results;
+};
+```
+
+**Registry Configuration**:
+```javascript
+{
+  id: 'paybackPeriod',
+  dependencies: [
+    { id: 'cumulativeCashflow', type: 'source' }
+  ],
+  aggregations: [],
+  transformer: calculatePaybackPeriod,
+  operations: [],
+  metadata: {
+    name: 'Payback Period',
+    type: 'direct',
+    description: 'Years to recover initial investment with linear interpolation',
+    formatter: (value) => `${value.toFixed(1)} years`
+  }
+}
+```
 
 ## Processing Flow Map
 
@@ -337,11 +452,16 @@ Functions that convert dependencies into metric results with full context access
 ```javascript
 transformer(dependencies, context) => CubeMetricResultSchema[]
 
-// Context object structure:
+// Dependencies object structure (first parameter):
+{
+  sources: { [sourceId]: { [percentile]: { data: DataPointSchema[], metadata: {} } } },
+  metrics: { [metricId]: CubeMetricDataSchema },
+  references: { ...globalReferences, ...localReferences } // All references consolidated
+}
+
+// Context object structure (second parameter):
 {
   availablePercentiles: number[],
-  allReferences: Object,
-  processedData: CubeMetricDataSchema[],
   aggregationResults: CubeMetricResultSchema[],
   customPercentile: Object|null,
   addAuditEntry: Function
@@ -351,14 +471,17 @@ transformer(dependencies, context) => CubeMetricResultSchema[]
 ### Financial Transformer Example
 ```javascript
 export const calculateProjectIRR = (dependencies, context) => {
-  const { availablePercentiles, allReferences, addAuditEntry } = context;
+  const { availablePercentiles, addAuditEntry } = context;
   
   return availablePercentiles.map(percentile => {
-    // Extract net cashflow for this percentile
+    // ✅ Direct access to source data for this percentile
     const netCashflowData = dependencies.sources.netCashflow[percentile].data;
+    const totalCapexData = dependencies.sources.totalCapex[percentile].data;
+    
+    // ✅ Direct access to consolidated references
+    const minimumIRR = dependencies.references.financing?.minimumIRR || 0;
     
     // Get initial investment from total CAPEX
-    const totalCapexData = dependencies.sources.totalCapex[percentile].data;
     const initialInvestment = totalCapexData.find(d => d.year === 0)?.value || 0;
     
     // Build cashflow array starting with negative investment
@@ -376,7 +499,7 @@ export const calculateProjectIRR = (dependencies, context) => {
     
     return {
       percentile: { value: percentile },
-      value: irr,
+      value: Math.max(irr, minimumIRR),
       stats: {}
     };
   });
@@ -410,6 +533,10 @@ operations: [
 ```
 
 **Operation Function Signature**: `(baseValue, percentile, targetValue, references) => number`
+- `baseValue`: Current metric value
+- `percentile`: Current percentile being processed
+- `targetValue`: Value from target metric or reference
+- `references`: Consolidated references object (global + local)
 
 ### Complex Operations Example
 ```javascript

@@ -1,5 +1,5 @@
 // Updated utils/cube/metrics/registry.js
-import { calculateNPVCosts, calculateNPVEnergy, calculateProjectIRR } from './transformers';
+import { calculateNPVCosts, calculateNPVEnergy, calculateProjectIRR, calculatePaybackPeriod } from './transformers';
 
 export const METRICS_REGISTRY = {
     references: [
@@ -108,17 +108,8 @@ export const METRICS_REGISTRY = {
                 { id: 'cumulativeCashflow', type: 'source' }
             ],
             aggregations: [],
-            transformer: null,
-            operations: [
-                {
-                    id: 'cumulativeCashflow',
-                    operation: (baseValue, percentile, source, references) => {
-                        // Find first year where cumulative cashflow becomes positive
-                        const positiveYear = source.find(dataPoint => dataPoint.value > 0);
-                        return positiveYear ? positiveYear.year : references.projectLife; // Return year or project life if never positive
-                    }
-                }
-            ],
+            transformer: calculatePaybackPeriod,
+            operations: [],
             metadata: {
                 name: 'Payback Period',
                 type: 'direct',
@@ -149,9 +140,9 @@ export const METRICS_REGISTRY = {
             operations: [
                 {
                     id: 'npvEnergy',
-                    operation: (npvCostsValue, percentile, npvEnergyValue, references) => {
+                    operation: (npvCostsValue, percentile, npvEnergyValue, refs, metrics) => {
                         // LCOE = NPV of Costs / NPV of Energy (in MWh)
-                        return npvEnergyValue > 0 ? (npvCostsValue / npvEnergyValue) : 0;
+                        return npvEnergyValue > 0 ? (metrics.npvCosts.percentileMetrics[percentile].value / npvEnergyValue) : 0;
                     }
                 }
             ],

@@ -120,7 +120,6 @@ const processMetric = (metric, processedMetrics, globalReferences, availablePerc
             transformerResults = applyTransformer(
                 metric.transformer,
                 dependencies, // ✅ Pass full dependencies object
-                processedMetrics,
                 aggregationResults,
                 availablePercentiles,
                 customPercentile,
@@ -142,7 +141,6 @@ const processMetric = (metric, processedMetrics, globalReferences, availablePerc
             operationResults = applyOperations(
                 metric.operations,
                 finalResults,
-                processedMetrics,
                 dependencies, // ✅ Pass full dependencies object
                 addAuditEntry
             );
@@ -414,27 +412,24 @@ const applyAggregations = (aggregationConfigs, dependencies, availablePercentile
 };
 
 /**
- * Apply transformer to dependencies and context (parallel to computeSourceData pattern)
+ * Apply transformer to dependencies and context
  * @param {Function} transformer - Transformer function
- * @param {Object} dependencies - Resolved dependencies
- * @param {Array} processedMetrics - Metrics processed so far
+ * @param {Object} dependencies - Resolved dependencies object with consolidated references
  * @param {Array} aggregationResults - Results from aggregations
  * @param {Array} availablePercentiles - Available percentiles
  * @param {Object|null} customPercentile - Custom percentile config
  * @param {Function} addAuditEntry - Audit trail function
  * @returns {Array|null} Array of CubeMetricResultSchema or null
  */
-const applyTransformer = (transformer, dependencies, processedMetrics, aggregationResults, availablePercentiles, customPercentile, addAuditEntry) => {
+const applyTransformer = (transformer, dependencies, aggregationResults, availablePercentiles, customPercentile, addAuditEntry) => {
     if (!transformer || typeof transformer !== 'function') {
         return null;
     }
 
     try {
-        // Build context similar to cube sources
+        // Build context with consolidated references and dependencies
         const context = {
             availablePercentiles,
-            allReferences: dependencies.references,
-            processedData: processedMetrics, // Metrics processed so far
             aggregationResults,
             customPercentile,
             addAuditEntry
@@ -536,12 +531,11 @@ const setDefaultValues = (transformerResults, aggregationResults, aggregationCon
  * Apply operations to metric results using other metrics and references
  * @param {Array} operationConfigs - Array of CubeMetricOperationSchema
  * @param {Array} baseResults - Base metric results
- * @param {Array} processedMetrics - Metrics processed so far
  * @param {Object} dependencies - Resolved dependencies object with consolidated references
  * @param {Function} addAuditEntry - Audit trail function
  * @returns {Array} Array of CubeMetricResultSchema after operations
  */
-const applyOperations = (operationConfigs, baseResults, processedMetrics, dependencies, addAuditEntry) => {
+const applyOperations = (operationConfigs, baseResults, dependencies, addAuditEntry) => {
     if (!operationConfigs || operationConfigs.length === 0) {
         return baseResults;
     }
@@ -556,20 +550,17 @@ const applyOperations = (operationConfigs, baseResults, processedMetrics, depend
             throw new Error(`Operation for '${id}' must be a function`);
         }
 
-        // Resolve operation target (metric or reference)
+        // Resolve operation target (metric or reference) - ✅ Direct access instead of .find()
         let targetData = null;
 
-        // Check references first (now consolidated)
+        // Check references first (consolidated)
         if (dependencies.references.hasOwnProperty(id)) {
             targetData = dependencies.references[id];
+        } else if (dependencies.metrics.hasOwnProperty(id)) {
+            // ✅ Direct access by key instead of array.find()
+            targetData = dependencies.metrics[id];
         } else {
-            // Check if it's a metric
-            const targetMetric = processedMetrics.find(metric => metric.id === id);
-            if (targetMetric) {
-                targetData = targetMetric;
-            } else {
-                throw new Error(`Operation target '${id}' not found in metrics or references`);
-            }
+            throw new Error(`Operation target '${id}' not found in metrics or references`);
         }
 
         // Apply operation to each percentile
@@ -590,7 +581,8 @@ const applyOperations = (operationConfigs, baseResults, processedMetrics, depend
                     result.value,                    // baseValue
                     result.percentile.value,         // percentile
                     targetValue,                     // targetValue
-                    dependencies.references          // ✅ Use consolidated references
+                    dependencies.references,          // ✅ Use consolidated references
+                    dependencies.metrics            // ✅ Use consolidated metrics
                 );
 
                 if (typeof newValue !== 'number' || isNaN(newValue)) {
