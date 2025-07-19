@@ -376,7 +376,7 @@ export const CubeProvider = ({ children }) => {
         const percentileSources = sourceData.filter(source => source.hasPercentiles === true);
 
         // Get selectedPercentile data from scenarioData
-        const selectedPercentile = scenarioData?.settings?.simulation?.inputSim?.selectedPercentile;
+        const selectedPercentile = scenarioData?.simulation?.inputSim?.cashflow?.selectedPercentile;
 
         if (!selectedPercentile) {
             console.log('⏸️ CubeContext: No selectedPercentile found in scenarioData');

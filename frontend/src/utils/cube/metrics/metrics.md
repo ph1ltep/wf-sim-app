@@ -1,122 +1,99 @@
-# Cube Metrics System API Documentation v1.0
+# Cube Metrics System API Documentation v2.0
 
 ## Overview
 
-The Cube Metrics System is a high-performance financial and operational metrics computation engine that transforms time-series cube source data into scalar business metrics. It features declarative configuration, dependency resolution, aggregation functions, custom transformers, and sensitivity analysis capabilities.
+The Cube Metrics System transforms time-series cube source data into scalar business metrics. It features declarative configuration, dependency resolution, parameterized aggregations, custom transformers, and automatic validation.
 
-### Dependency Access Patterns
-Transformers access all data through the consolidated `dependencies` object:
+## Processing Pipeline & Execution Order
 
+The metrics system executes in a specific order to ensure dependencies are available when needed:
+
+### 1. Reference Loading
+Global and local references are loaded from scenario data using `getValueByPath()`.
+
+### 2. Metric Processing Order
+Metrics are processed in two phases:
+- **Direct Metrics** (type: 'direct') - Process first, depend only on sources and references
+- **Indirect Metrics** (type: 'indirect') - Process second, can depend on other metrics
+
+Within each type, metrics are sorted by ascending priority value.
+
+### 3. Per-Metric Processing Steps
+For each metric, the following steps execute in order:
+
+1. **Dependency Resolution** - Resolve all source, metric, and reference dependencies
+2. **Aggregations** - Apply aggregation operations to time-series data → scalar values
+3. **Transformer** - Apply custom transformation logic using full context
+4. **Default Values** - Set values from aggregations if transformer absent/incomplete
+5. **Operations** - Apply post-processing operations using other metrics/references
+
+## Data Flow & Types
+
+### Input/Output Data Types
+
+| Stage | Input Type | Output Type | Purpose |
+|-------|------------|-------------|---------|
+| **Aggregations** | Time-series arrays (`DataPointSchema[]`) | Scalar values + stats | Reduce time-series to single values per percentile |
+| **Transformers** | Full context (sources, metrics, references) | Any format → normalized to `CubeMetricResultSchema[]` | Custom business logic with complete data access |
+| **Operations** | Scalar values from base metric | Scalar values | Post-process using other metrics/references |
+
+### Aggregation Data Flow
 ```javascript
-// ✅ Source data access (per percentile)
-const netCashflowP50 = dependencies.sources.netCashflow[50].data;
-const totalCostP75 = dependencies.sources.totalCost[75].data;
+// Input: Time-series data per percentile
+sources.netCashflow[50].data = [
+  {year: 1, value: 100000},
+  {year: 2, value: 120000}
+]
 
-// ✅ Metric data access (previously computed metrics)
-const projectIRRMetric = dependencies.metrics.projectIRR;
-const equityIRRValue = projectIRRMetric.percentileMetrics.find(pm => pm.percentile.value === 50)?.value;
-
-// ✅ Reference data access (consolidated global + local)
-const discountRate = dependencies.references.financing.costOfEquity;
-const projectLife = dependencies.references.projectLife;
-const customSetting = dependencies.references.localCustomSetting; // From dependency path
-
-// ✅ Context access
-const { availablePercentiles, aggregationResults, addAuditEntry } = context;
-```
-
-**Performance Benefits**:
-- **O(1) Metric Lookups**: Direct object access instead of array.find()
-- **Consolidated References**: Single object for all reference access
-- **Simplified Interface**: Cleaner function signatures with fewer parameters
-- **Reduced Redundancy**: No duplicate data passing between functions
-
-## Parameterized Aggregations
-
-### Function-Based Parameters
-Advanced aggregation operations support dynamic parameters resolved through function callbacks.
-
-**Parameter Resolution**:
-- Parameters are resolved **once per metric** (not per percentile)
-- Functions receive access to global references and processed metrics
-- Parameter values are cached for all percentiles of the metric
-
-**Parameter Function Signature**: `(refs, metrics) => parameterValue`
-
-### NPV Aggregation
-Net Present Value calculation with parameterized discount rate.
-
-```javascript
-{
-  sourceId: 'netCashflow',
-  operation: 'npv',
-  outputKey: 'riskAdjustedNPV',
-  parameters: {
-    discountRate: (refs, metrics) => {
-      const baseRate = refs.financing.costOfEquity / 100;
-      const riskPremium = refs.riskAssessment?.premium || 0;
-      return baseRate + (riskPremium / 100);
-    }
-  },
-  filter: (year, value, refs) => year >= 0
-}
-```
-
-### Custom Reduce Aggregation
-Flexible reducer function for complex calculations.
-
-```javascript
-{
-  sourceId: 'netCashflow',
-  operation: 'reduce',
-  outputKey: 'weightedAverage',
-  parameters: {
-    reducer: (refs, metrics) => {
-      const weightMultiplier = refs.analysisSettings?.weightMultiplier || 1;
-      return (accumulator, currentDataPoint, index, array) => {
-        const weight = (currentDataPoint.year + 1) * weightMultiplier;
-        const weightedValue = currentDataPoint.value * weight;
-        
-        if (index === 0) {
-          return { totalWeightedValue: weightedValue, totalWeight: weight };
-        }
-        
-        if (index === array.length - 1) {
-          // Final calculation
-          const finalTotal = accumulator.totalWeightedValue + weightedValue;
-          const finalWeight = accumulator.totalWeight + weight;
-          return finalTotal / finalWeight;
-        }
-        
-        return {
-          totalWeightedValue: accumulator.totalWeightedValue + weightedValue,
-          totalWeight: accumulator.totalWeight + weight
-        };
-      };
-    },
-    initialValue: (refs, metrics) => ({ totalWeightedValue: 0, totalWeight: 0 })
+// Aggregation processes each percentile separately
+// Output: Scalar result per percentile + stats
+aggregationResults[0] = {
+  percentile: {value: 50},
+  value: 0, // Set by transformer or default
+  stats: {
+    npvValue: 180000,    // From NPV aggregation
+    avgValue: 110000     // From mean aggregation
   }
 }
 ```
 
-**Required Parameters**:
-- **NPV**: `discountRate` - Discount rate as decimal (e.g., 0.08 for 8%)
-- **Reduce**: `reducer` - Function with signature `(accumulator, currentDataPoint, index, array) => accumulator`
-- **Reduce**: `initialValue` - Initial accumulator value (optional, defaults to undefined)
-
-### Error Handling
+### Transformer Context Access
+Transformers receive comprehensive context and can return flexible formats:
 ```javascript
-// Missing required parameter
-Error: NPV operation requires 'discountRate' parameter for 'npvCashflow'
+// Full context access
+const transformer = (dependencies, context) => {
+  // Access resolved sources, metrics, references
+  const cashflowData = dependencies.sources.projectCashflow[50].data;
+  const financingParams = dependencies.references.financing;
+  const existingMetric = dependencies.metrics.projectIRR;
+  
+  // Return any format - automatically normalized
+  return 12.5; // Scalar → replicated per percentile
+  // OR return full array for percentile-specific values
+};
+```
 
-// Parameter resolution failure  
-Error: Failed to resolve parameter 'discountRate' for aggregation 'npvCashflow': Cannot read property 'costOfEquity' of undefined
+### Dependency Access Pattern
+All data is accessed through the consolidated `dependencies` object:
+
+```javascript
+// ✅ Source data access (per percentile)
+const netCashflowP50 = dependencies.sources.netCashflow[50].data;
+const projectCashflowP75 = dependencies.sources.projectCashflow[75].data;
+
+// ✅ Metric data access (previously computed metrics)
+const projectIRRMetric = dependencies.metrics.projectIRR;
+const projectIRRValue = extractPercentileMetric(projectIRRMetric, 50)?.value || 0;
+
+// ✅ Reference data access (consolidated global + local)
+const discountRate = dependencies.references.financing.costOfEquity;
+const projectLife = dependencies.references.projectLife;
 ```
 
 ## Core Processing API
 
 ### `computeMetricsData()`
-Main processing pipeline that transforms metrics registry configuration into computed metric data with full audit trails and performance tracking.
+Main processing pipeline that transforms metrics registry into computed metric data.
 
 **Parameters**:
 ```javascript
@@ -130,175 +107,14 @@ computeMetricsData(
 ```
 
 **Returns**: `CubeMetricDataSchema[]`
-```javascript
-// Array of computed metrics with audit trails
-[
-  {
-    id: 'projectIRR',
-    valueType: 'scalar',
-    percentileMetrics: [
-      { percentile: {value: 50}, value: 12.5, stats: {min: 8.2, max: 18.7} }
-    ],
-    metadata: { name: 'Project IRR', type: 'direct', ... },
-    audit: { trail: [...], references: {...} }
-  }
-]
-```
 
-**Example Usage**:
-```javascript
-const metricsData = computeMetricsData(
-  METRICS_REGISTRY,
-  [10, 25, 50, 75, 90],
-  getValueByPath,
-  getData,
-  {"escalationRate": 25}
-);
-```
-
-### Payback Period Transformer
-```javascript
-/**
- * Calculate payback period from cumulative cashflow with linear interpolation
- * @param {Object} dependencies - Resolved dependencies
- * @param {Object} context - Transformer context
- * @returns {Array} Array of CubeMetricResultSchema objects
- */
-export const calculatePaybackPeriod = (dependencies, context) => {
-  const { availablePercentiles, addAuditEntry } = context;
-
-  // Validate required source dependency
-  if (!dependencies.sources.cumulativeCashflow) {
-    throw new Error('Payback period calculation requires cumulativeCashflow source dependency');
-  }
-
-  const results = [];
-
-  // Process each percentile separately
-  availablePercentiles.forEach(percentile => {
-    const cumulativeCashflowData = dependencies.sources.cumulativeCashflow[percentile];
-    
-    if (!cumulativeCashflowData?.data) {
-      results.push({
-        percentile: { value: percentile },
-        value: dependencies.references.projectLife || 25, // Fallback to project life
-        stats: {}
-      });
-      return;
-    }
-
-    const timeSeriesData = cumulativeCashflowData.data;
-    const sortedData = [...timeSeriesData].sort((a, b) => a.year - b.year);
-    
-    let paybackPeriod = dependencies.references.projectLife || 25;
-    
-    // Find first year where cumulative cashflow becomes positive
-    for (let i = 0; i < sortedData.length; i++) {
-      const currentDataPoint = sortedData[i];
-      
-      if (currentDataPoint.value > 0) {
-        if (i === 0) {
-          paybackPeriod = currentDataPoint.year;
-        } else {
-          // Linear interpolation for sub-year precision
-          const prevDataPoint = sortedData[i - 1];
-          if (prevDataPoint.value < 0) {
-            const fraction = Math.abs(prevDataPoint.value) / 
-                           (currentDataPoint.value - prevDataPoint.value);
-            paybackPeriod = prevDataPoint.year + fraction;
-          } else {
-            paybackPeriod = currentDataPoint.year;
-          }
-        }
-        break;
-      }
-    }
-
-    results.push({
-      percentile: { value: percentile },
-      value: Math.round(paybackPeriod * 100) / 100, // Round to 2 decimal places
-      stats: {}
-    });
-
-    addAuditEntry('payback_period_calculated',
-      `calculated payback period ${paybackPeriod} years for percentile ${percentile}`,
-      ['cumulativeCashflow']);
-  });
-
-  return results;
-};
-```
-
-**Registry Configuration**:
-```javascript
-{
-  id: 'paybackPeriod',
-  dependencies: [
-    { id: 'cumulativeCashflow', type: 'source' }
-  ],
-  aggregations: [],
-  transformer: calculatePaybackPeriod,
-  operations: [],
-  metadata: {
-    name: 'Payback Period',
-    type: 'direct',
-    description: 'Years to recover initial investment with linear interpolation',
-    formatter: (value) => `${value.toFixed(1)} years`
-  }
-}
-```
-
-## Processing Flow Map
-
-```mermaid
-flowchart TD
-    A[Start computeMetricsData] --> B[Load Global References]
-    B --> C[Sort Metrics by Type & Priority]
-    C --> D{Process Each Metric}
-    
-    D --> E[Resolve Dependencies]
-    E --> F{Has Aggregations?}
-    F -->|Yes| G[Apply Aggregations]
-    F -->|No| H{Has Transformer?}
-    G --> H
-    
-    H -->|Yes| I[Apply Transformer]
-    H -->|No| J[Set Default Values]
-    I --> K{Has Operations?}
-    J --> K
-    
-    K -->|Yes| L[Apply Operations]
-    K -->|No| M[Build Audit Trail]
-    L --> M
-    
-    M --> N[Create CubeMetricDataSchema]
-    N --> O[Add to ProcessedMetrics]
-    O --> P{More Metrics?}
-    
-    P -->|Yes| D
-    P -->|No| Q[Return MetricsData Array]
-    
-    style A fill:#e1f5fe
-    style Q fill:#c8e6c9
-    style E fill:#fff3e0
-    style G fill:#f3e5f5
-    style I fill:#e8f5e8
-    style L fill:#fce4ec
-```
-
-### Processing Order
-1. **Direct Metrics** (type: 'direct') - Dependencies are sources only
-2. **Indirect Metrics** (type: 'indirect') - Dependencies include other metrics
-
-Within each type, metrics are processed by ascending priority value.
+**Processing Order**: Direct metrics (type: 'direct') first, then indirect metrics (type: 'indirect'), sorted by priority within each type.
 
 ---
 
 ## Registry Configuration
 
 ### Metrics Registry Schema
-Complete configuration structure for defining metrics with all features.
-
 ```javascript
 const METRICS_REGISTRY = {
   references: [
@@ -307,200 +123,160 @@ const METRICS_REGISTRY = {
   
   metrics: [
     {
-      id: 'minDSCR',
-      priority: 200,
+      id: 'projectIRR',
+      priority: 100,
       dependencies: [
-        { id: 'dscr', type: 'source' },
+        { id: 'projectCashflow', type: 'source' },
         { id: 'financing', type: 'reference' }
       ],
-      aggregations: [
-        { 
-          sourceId: 'dscr', 
-          operation: 'min', 
-          outputKey: 'minValue', 
-          isDefault: true,
-          filter: (year, value, refs) => year > refs.financing.gracePeriod
-        }
-      ],
-      transformer: calculateMinDSCR,
-      operations: [
-        {
-          id: 'riskAdjustment',
-          operation: (baseValue, percentile, adjustmentValue, refs) => {
-            return baseValue * (1 + adjustmentValue / 100);
-          }
-        }
-      ],
+      aggregations: [],
+      transformer: calculateProjectIRR,
+      operations: [],
       metadata: {
-        name: 'Minimum DSCR',
+        name: 'Project IRR',
         type: 'direct',
-        visualGroup: 'risk',
-        description: 'Minimum debt service coverage ratio during operational period',
-        formatter: (value) => `${value.toFixed(2)}x`
-      },
-      sensitivity: {
-        enabled: true,
-        excludeSources: ['reserveFunds'],
-        analyses: ['tornado', 'correlation']
+        description: 'Internal rate of return for project cash flows',
+        formatter: (value) => `${value.toFixed(2)}%`
       }
     }
   ]
 }
 ```
 
----
-
-## Dependency System
-
 ### Dependency Types
-Three types of dependencies with different resolution strategies.
-
-| Type | Resolution Strategy | Example |
-|------|-------------------|---------|
-| `source` | `getSourceData({sourceId})` | Time-series cube data |
-| `metric` | Previously computed metrics | Other metric results |
-| `reference` | `globalReferences[id]` or `getValueByPath(path)` | Scenario configuration |
-
-### Dependency Configuration
-```javascript
-dependencies: [
-  { id: 'netCashflow', type: 'source' },                    // From cube sources
-  { id: 'projectIRR', type: 'metric' },                     // From processed metrics
-  { id: 'financing', type: 'reference' },                   // From global references
-  { id: 'discountRate', type: 'reference', path: ['settings', 'analysis', 'rate'] } // Local reference
-]
-```
+| Type | Resolution Method | Input Data Type | Example Usage |
+|------|------------------|-----------------|---------------|
+| `source` | `getSourceData({sourceId})` | `{[percentile]: {data: DataPointSchema[]}}` | Time-series cube data per percentile |
+| `metric` | Previously computed metrics | `CubeMetricDataSchema` | Access other calculated metrics |
+| `reference` | Global/local references via `getValueByPath()` | `any` | Scenario configuration parameters |
 
 ---
 
 ## Aggregation System
 
-### Aggregation Operations
-Mathematical operations applied to time-series source data to produce scalar values.
+### Operations Overview
+Aggregations take time-series data from cube sources and convert them to scalar values. Each operation processes the time-series data for each percentile separately, producing a scalar result that gets stored in the `stats` object.
 
-| Operation | Description | Use Case | Parameters |
-|-----------|-------------|----------|------------|
-| `min` | Minimum value | Worst-case scenarios | None |
-| `max` | Maximum value | Best-case scenarios | None |
-| `mean` | Average value | Expected performance | None |
-| `sum` | Total value | Cumulative amounts | None |
-| `stdev` | Standard deviation | Variability analysis | None |
-| `mode` | Most frequent value | Typical occurrences | None |
-| `npv` | Net Present Value | Discounted cash flows | `discountRate` |
-| `reduce` | Custom reducer function | Complex calculations | `reducer`, `initialValue` |
+| Operation | Input | Output | Parameters | Description |
+|-----------|-------|--------|------------|-------------|
+| `min` | `DataPointSchema[]` | `number` | None | Minimum value across all time points |
+| `max` | `DataPointSchema[]` | `number` | None | Maximum value across all time points |
+| `mean` | `DataPointSchema[]` | `number` | None | Average value across all time points |
+| `sum` | `DataPointSchema[]` | `number` | None | Total sum of all time points |
+| `stdev` | `DataPointSchema[]` | `number` | None | Standard deviation of values |
+| `npv` | `DataPointSchema[]` | `number` | `discountRate: number` | Net Present Value calculation |
+| `reduce` | `DataPointSchema[]` | `any` | `reducer: Function, initialValue: any` | Custom reducer function |
 
-### Advanced Aggregation Example
+### How Aggregations Work
+1. **Input**: Time-series data from cube sources (`{year, value}` arrays)
+2. **Processing**: Each percentile's time-series is processed independently
+3. **Output**: Scalar values stored in `aggregationResults[percentile].stats[outputKey]`
+4. **Usage**: Transformers access via `context.aggregationResults` or used as default values
+
+### Parameterized Aggregations
+Parameters are resolved **once per metric** (not per percentile) using function callbacks that receive access to references and processed metrics:
+
 ```javascript
 aggregations: [
   {
-    sourceId: 'netCashflow',
+    sourceId: 'projectCashflow',
     operation: 'npv',
-    outputKey: 'npvCashflow',
+    outputKey: 'npvValue',
     isDefault: true,
     parameters: {
-      discountRate: (refs, metrics) => (refs.financing.costOfEquity || 8) / 100
+      discountRate: (refs, metrics) => {
+        // Access financing parameters and apply risk adjustment
+        const baseRate = (refs.financing.costOfEquity || 8) / 100;
+        const riskPremium = (refs.riskAssessment?.premium || 0) / 100;
+        return baseRate + riskPremium;
+      }
     },
-    filter: (year, value, refs) => {
-      // Only operational years after grace period
-      return year > refs.financing.gracePeriod && 
-             year <= refs.financing.loanDuration + refs.financing.gracePeriod;
-    }
-  },
-  {
-    sourceId: 'dscr',
-    operation: 'min',
-    outputKey: 'worstDSCR',
-    isDefault: false,
-    filter: (year, value, refs) => year > 0 // Exclude construction
-  },
-  {
-    sourceId: 'cumulativeCashflow',
-    operation: 'reduce',
-    outputKey: 'paybackPeriod',
-    isDefault: false,
-    parameters: {
-      reducer: (refs, metrics) => {
-        return (accumulator, currentDataPoint, index, array) => {
-          if (currentDataPoint.value > 0 && accumulator === null) {
-            return currentDataPoint.year;
-          }
-          return accumulator;
-        };
-      },
-      initialValue: (refs, metrics) => null
-    }
+    filter: (year, value, refs) => year >= 0 // Only include operational years
   }
 ]
 ```
 
-**Filter Function Signature**: `(year, value, refs) => boolean`
-- `year`: Data point year
-- `value`: Data point value  
-- `refs`: Combined global and local references
+**Parameter Function Signature**: `(refs: Object, metrics: Object) => parameterValue`
+- Called once per metric to resolve parameter values
+- `refs`: Consolidated global and local references
+- `metrics`: Previously computed metrics
+- Return value is cached and used for all percentiles
 
-**Parameter Function Signature**: `(refs, metrics) => parameterValue`
-- `refs`: Global references object
-- `metrics`: Processed metrics dependencies object
+**Filter Function Signature**: `(year: number, value: number, refs: Object) => boolean`
+- Called for each data point to determine inclusion
+- Return `true` to include the data point in aggregation
 
 ---
 
 ## Transformer System
 
-### Transformer Function Signature
-Functions that convert dependencies into metric results with full context access.
+### Purpose & Capabilities
+Transformers are custom functions that implement business logic for calculating metrics. They have access to all resolved dependencies (sources, metrics, references) and aggregation results, making them powerful for complex calculations that can't be achieved through simple aggregations.
 
+### Function Signature & Data Access
 ```javascript
-transformer(dependencies, context) => CubeMetricResultSchema[]
+transformer(dependencies, context) => any // Auto-normalized to CubeMetricResultSchema[]
 
-// Dependencies object structure (first parameter):
+// Dependencies object - Direct access to all data:
 {
-  sources: { [sourceId]: { [percentile]: { data: DataPointSchema[], metadata: {} } } },
+  sources: { 
+    [sourceId]: { 
+      [percentile]: { data: DataPointSchema[], metadata: Object } 
+    } 
+  },
   metrics: { [metricId]: CubeMetricDataSchema },
-  references: { ...globalReferences, ...localReferences } // All references consolidated
+  references: { ...globalReferences, ...localReferences }
 }
 
-// Context object structure (second parameter):
+// Context object - Processing context and utilities:
 {
   availablePercentiles: number[],
-  aggregationResults: CubeMetricResultSchema[],
+  aggregationResults: CubeMetricResultSchema[], // Results from aggregations
   customPercentile: Object|null,
   addAuditEntry: Function
 }
 ```
 
-### Financial Transformer Example
+### Return Value Flexibility
+The `validateMetricDataStructure` function automatically normalizes any transformer return value:
+
+| Return Type | Normalization | Use Case |
+|-------------|---------------|----------|
+| `CubeMetricResultSchema[]` | No change (already correct) | Full percentile-specific control |
+| `CubeMetricResultSchema` | Replicated per percentile | Same calculation for all percentiles |
+| `number` | Wrapped as value, replicated | Simple scalar metrics |
+| `Object` | Used as value, replicated | Complex value objects |
+| `string/boolean` | Converted to number, replicated | Primitive type conversion |
+
+### Access Patterns for Different Data Types
+
 ```javascript
 export const calculateProjectIRR = (dependencies, context) => {
-  const { availablePercentiles, addAuditEntry } = context;
+  const { availablePercentiles, aggregationResults, addAuditEntry } = context;
   
+  // Access source time-series data per percentile
+  const cashflowP50 = dependencies.sources.projectCashflow[50].data;
+  
+  // Access other computed metrics
+  const npvMetric = dependencies.metrics.projectNPV;
+  const npvP75 = extractPercentileMetric(npvMetric, 75)?.value || 0;
+  
+  // Access aggregation results (scalars with stats)
+  const aggregationP50 = aggregationResults.find(r => r.percentile.value === 50);
+  const npvFromAggregation = aggregationP50?.stats?.npvValue || 0;
+  
+  // Access scenario parameters
+  const discountRate = dependencies.references.financing.costOfEquity;
+  
+  // Process each percentile or return single value
   return availablePercentiles.map(percentile => {
-    // ✅ Direct access to source data for this percentile
-    const netCashflowData = dependencies.sources.netCashflow[percentile].data;
-    const totalCapexData = dependencies.sources.totalCapex[percentile].data;
-    
-    // ✅ Direct access to consolidated references
-    const minimumIRR = dependencies.references.financing?.minimumIRR || 0;
-    
-    // Get initial investment from total CAPEX
-    const initialInvestment = totalCapexData.find(d => d.year === 0)?.value || 0;
-    
-    // Build cashflow array starting with negative investment
-    const cashflows = [
-      { year: 0, value: -initialInvestment },
-      ...netCashflowData.filter(d => d.year > 0)
-    ];
-    
-    // Calculate IRR using Newton-Raphson method
-    const irr = calculateIRR(cashflows);
-    
-    addAuditEntry('irr_calculation', 
-      `calculated IRR ${irr.toFixed(2)}% for percentile ${percentile}`,
-      ['netCashflow', 'totalCapex']);
+    const cashflowData = dependencies.sources.projectCashflow[percentile].data;
+    const irr = calculateIRR(cashflowData);
     
     return {
       percentile: { value: percentile },
-      value: Math.max(irr, minimumIRR),
-      stats: {}
+      value: irr,
+      stats: { cashflowYears: cashflowData.length }
     };
   });
 };
@@ -510,20 +286,33 @@ export const calculateProjectIRR = (dependencies, context) => {
 
 ## Operations System
 
-### Operations Configuration
-Post-processing operations that modify metric results using other metrics or references.
+### Purpose & Constraints
+Operations are post-processing functions that modify metric results using values from other metrics or references. They operate on **scalar values only** and are applied after transformers have completed.
 
+### Function Signature & Data Flow
+```javascript
+operation(baseValue, percentile, targetValue, references, metrics) => number
+
+// Parameters:
+// baseValue: number - Current metric value for this percentile
+// percentile: number - Current percentile being processed (e.g., 50)
+// targetValue: number|any - Value from target metric/reference for this percentile
+// references: Object - Consolidated global and local references
+// metrics: Object - All computed metrics (for advanced operations)
+```
+
+### Configuration & Target Resolution
 ```javascript
 operations: [
   {
-    id: 'equityIRR',
-    operation: (projectIRRValue, percentile, equityIRRValue, references) => {
+    id: 'projectIRR', // Target metric or reference ID
+    operation: (baseValue, percentile, projectIRRValue, references, metrics) => {
       // Calculate IRR spread: Equity IRR - Project IRR
-      return equityIRRValue - projectIRRValue;
+      return baseValue - projectIRRValue; // Both are scalar values
     }
   },
   {
-    id: 'marketRate',
+    id: 'marketRate', // Reference ID
     operation: (baseValue, percentile, marketRate, references) => {
       // Risk premium over market rate
       return baseValue - marketRate;
@@ -532,77 +321,111 @@ operations: [
 ]
 ```
 
-**Operation Function Signature**: `(baseValue, percentile, targetValue, references) => number`
-- `baseValue`: Current metric value
-- `percentile`: Current percentile being processed
-- `targetValue`: Value from target metric or reference
-- `references`: Consolidated references object (global + local)
+### Target Value Resolution
+Operations automatically resolve target values based on the `id`:
 
-### Complex Operations Example
-```javascript
-// LCOE calculation using NPV metrics
-{
-  id: 'lcoe',
-  dependencies: [
-    { id: 'npvCosts', type: 'metric' },
-    { id: 'npvEnergy', type: 'metric' }
-  ],
-  operations: [
-    {
-      id: 'npvEnergy',
-      operation: (npvCostsValue, percentile, npvEnergyValue, references) => {
-        // LCOE = NPV of Costs / NPV of Energy Production (MWh)
-        if (npvEnergyValue <= 0) {
-          console.warn(`Invalid NPV Energy for LCOE at P${percentile}: ${npvEnergyValue}`);
-          return 0;
-        }
-        return npvCostsValue / npvEnergyValue;
-      }
-    }
-  ]
-}
-```
+1. **Reference targets**: `targetValue = references[id]` (direct scalar access)
+2. **Metric targets**: `targetValue = metrics[id].percentileMetrics.find(pm => pm.percentile.value === percentile).value`
+
+This ensures operations always receive scalar values, maintaining simplicity and performance.
 
 ---
 
 ## Default Values & Fallback Logic
 
-### Automatic Value Assignment
-When transformers are absent or return incomplete results, the system uses aggregation results as defaults.
+### Fallback Hierarchy
+When transformers are absent, return incomplete results, or fail, the system uses this priority order:
+
+1. **Transformer Result** - If transformer exists and returns valid, complete data
+2. **Default Aggregation** - Uses aggregation marked with `isDefault: true`
+3. **First Available Aggregation** - Uses first aggregation if no defaults specified
+4. **Zero Value** - If no aggregations exist
+
+### How Aggregation Results Become Default Values
+Aggregation results are stored in the `stats` object of each percentile. When used as defaults:
 
 ```javascript
-// Configuration
+// Aggregation configuration
 aggregations: [
   { sourceId: 'dscr', operation: 'min', outputKey: 'minValue', isDefault: false },
   { sourceId: 'dscr', operation: 'mean', outputKey: 'avgValue', isDefault: true },
   { sourceId: 'dscr', operation: 'max', outputKey: 'maxValue', isDefault: false }
 ]
 
-// Result when no transformer
+// Resulting metric structure (when no transformer)
 {
   percentile: { value: 50 },
-  value: 1.35, // Uses 'avgValue' from aggregation (isDefault: true)
+  value: 1.35, // Uses 'avgValue' from isDefault: true aggregation
   stats: {
-    minValue: 1.12,
-    avgValue: 1.35,
-    maxValue: 1.58
+    minValue: 1.12,  // Available in stats
+    avgValue: 1.35,  // Also in stats + used as main value
+    maxValue: 1.58   // Available in stats
   }
 }
 ```
 
-### Fallback Hierarchy
-1. **Transformer Result** (if transformer exists and returns valid value)
-2. **Last isDefault: true Aggregation** (if multiple defaults exist)
-3. **First Available Aggregation** (if no defaults specified)
-4. **Zero Value** (if no aggregations available)
+### Transformer Access to Aggregation Results
+Transformers can access aggregation results through the context:
+
+```javascript
+const transformer = (dependencies, context) => {
+  const { aggregationResults } = context;
+  
+  // Access aggregation results per percentile
+  const p50Results = aggregationResults.find(r => r.percentile.value === 50);
+  const minDSCR = p50Results?.stats?.minValue || 0;
+  const avgDSCR = p50Results?.stats?.avgValue || 0;
+  
+  // Use in custom calculation logic
+  return customCalculation(minDSCR, avgDSCR);
+};
+```
 
 ---
 
-## Data Access Functions
+## Helper Functions
+
+### `extractPercentileMetric(metricData, percentile)`
+Extract specific percentile result from computed metric data.
+
+**Input**: `CubeMetricDataSchema` object, `number` percentile  
+**Output**: `CubeMetricResultSchema` object or `null`
+
+```javascript
+const projectIRRMetric = dependencies.metrics.projectIRR;
+const p50Result = extractPercentileMetric(projectIRRMetric, 50);
+const irrValue = p50Result?.value || 0;
+const irrStats = p50Result?.stats || {};
+```
+
+### `calculateIRR(cashflows)`
+Calculate Internal Rate of Return from cashflow array using Newton-Raphson method.
+
+**Input**: `Array<{year: number, value: number}>` cashflow data  
+**Output**: `number` IRR as percentage
+
+```javascript
+const cashflows = [
+  { year: 0, value: -1000000 }, // Initial investment
+  { year: 1, value: 200000 },   // Annual returns
+  { year: 2, value: 300000 }
+];
+const irr = calculateIRR(cashflows); // Returns 8.5 for 8.5%
+```
+
+### `validateMetricDataStructure(metricData, availablePercentiles)`
+Automatically normalize any transformer return value to proper `CubeMetricResultSchema[]` format.
+
+**Input**: `any` transformer result, `Array<number>` percentiles  
+**Output**: `CubeMetricResultSchema[]` normalized array
+
+This function is called automatically by the processor - transformers don't need to call it directly.
+
+---
+
+## Data Access
 
 ### CubeContext Integration
-Access computed metrics through the CubeContext with optimized filtering.
-
 ```javascript
 const { getMetricsData } = useCube();
 
@@ -613,250 +436,53 @@ const projectIRRData = getMetricsData({ metricId: 'projectIRR' });
 // Get all metrics for one percentile  
 const medianMetrics = getMetricsData({ percentile: 50 });
 // Returns: { projectIRR: {value: 12.5, metadata}, equityIRR: {value: 18.3, metadata} }
-
-// Get specific metric-percentile combination
-const specificData = getMetricsData({ metricId: 'projectIRR', percentile: 50 });
-// Returns: { projectIRR: {value: 12.5, metadata} }
 ```
 
-### Filter Options
-| Filter | Type | Purpose |
-|--------|------|---------|
-| `metricId` | `string` | Single metric by ID |
-| `percentile` | `number` | Single percentile across metrics |
-| `metadata` | `Object` | Filter by metadata fields |
-
 ---
 
-## Error Handling & Validation
+## Common Patterns
 
-### Comprehensive Error Management
-The system provides detailed error messages and graceful degradation.
-
+### Simple Aggregation-Only Metric
 ```javascript
-// Dependency resolution errors
-Error: Failed to resolve dependency 'totalCapex': Source 'totalCapex' not found
-
-// Transformer validation errors  
-Error: Invalid transformer result at index 0: percentile.value is required
-
-// Operation execution errors
-Error: Operation failed for percentile 75: targetValue is not a number
-
-// Schema validation errors
-Error: Invalid CubeMetricDataSchema for 'projectIRR': valueType must be 'scalar'
-```
-
-### Validation Checkpoints
-1. **Registry Validation**: Metrics configuration structure
-2. **Dependency Resolution**: Source/metric/reference availability
-3. **Transformer Results**: Output format compliance
-4. **Operation Execution**: Function return value validation
-5. **Final Schema**: Complete metric data structure
-
----
-
-## Performance Optimization
-
-### Processing Metrics
-- **Sub-100ms Processing**: Typical metrics computation time
-- **Dependency Caching**: Resolved dependencies cached per metric
-- **Parallel Processing Ready**: Independent metrics can be parallelized
-- **Memory Efficient**: Minimal data duplication
-
-### Audit Trail Performance
-- **Optional Data Sampling**: Reduces memory footprint
-- **Calculated Durations**: Automatic timing measurements
-- **Dependency Tracking**: Minimal overhead dependency resolution
-
----
-
-## Advanced Examples
-
-### Building Block Metrics with NPV Aggregation
-```javascript
-// NPV of Costs using aggregation instead of transformer
 {
-  id: 'npvCosts',
+  id: 'minDSCR',
+  dependencies: [{ id: 'dscr', type: 'source' }],
+  aggregations: [
+    { sourceId: 'dscr', operation: 'min', outputKey: 'value', isDefault: true }
+  ],
+  transformer: null // Use aggregation result
+}
+```
+
+### Complex Transformer with Dependencies
+```javascript
+{
+  id: 'equityIRR',
   dependencies: [
-    { id: 'totalCost', type: 'source' },
+    { id: 'equityCashflow', type: 'source' },
+    { id: 'projectIRR', type: 'metric' }
+  ],
+  transformer: calculateEquityIRR,
+  // Transformer can access both source data and other metrics
+}
+```
+
+### NPV with Parameterized Discount Rate
+```javascript
+{
+  id: 'projectNPV',
+  dependencies: [
+    { id: 'projectCashflow', type: 'source' },
     { id: 'financing', type: 'reference' }
   ],
   aggregations: [
-    { 
-      sourceId: 'totalCost',
+    {
+      sourceId: 'projectCashflow',
       operation: 'npv',
       outputKey: 'npvValue',
       isDefault: true,
       parameters: {
-        discountRate: (refs, metrics) => (refs.financing.costOfEquity || 8) / 100
-      }
-    }
-  ],
-  transformer: null // Use aggregation result only
-},
-
-// NPV of Energy Production  
-{
-  id: 'npvEnergy',
-  dependencies: [
-    { id: 'energyRevenue', type: 'source' },
-    { id: 'financing', type: 'reference' }
-  ],
-  aggregations: [
-    { 
-      sourceId: 'energyRevenue',
-      operation: 'reduce',
-      outputKey: 'npvMWh',
-      isDefault: true,
-      parameters: {
-        reducer: (refs, metrics) => {
-          const discountRate = (refs.financing.costOfEquity || 8) / 100;
-          const electricityPrice = refs.electricityPrice || 50; // $/MWh
-          
-          return (accumulator, currentDataPoint, index, array) => {
-            // Convert revenue to MWh, then calculate NPV
-            const mwh = currentDataPoint.value / electricityPrice;
-            const presentValueMWh = mwh / Math.pow(1 + discountRate, currentDataPoint.year);
-            return accumulator + presentValueMWh;
-          };
-        },
-        initialValue: (refs, metrics) => 0
-      }
-    }
-  ]
-}
-
-// Stage 2: Composite metric using operations
-{
-  id: 'lcoe',
-  dependencies: [
-    { id: 'npvCosts', type: 'metric' },
-    { id: 'npvEnergy', type: 'metric' }
-  ],
-  operations: [
-    {
-      id: 'npvEnergy',
-      operation: (npvCosts, percentile, npvEnergy, refs) => npvCosts / npvEnergy
-    }
-  ]
-}
-```
-
-### Complex Parameterized Aggregations
-```javascript
-// Payback period using custom reduce
-{
-  id: 'paybackAnalysis',
-  dependencies: [
-    { id: 'cumulativeCashflow', type: 'source' },
-    { id: 'totalCapex', type: 'source' }
-  ],
-  aggregations: [
-    {
-      sourceId: 'cumulativeCashflow',
-      operation: 'reduce',
-      outputKey: 'paybackPeriod',
-      isDefault: true,
-      parameters: {
-        reducer: (refs, metrics) => {
-          return (accumulator, currentDataPoint, index, array) => {
-            // Find first year where cumulative cashflow becomes positive
-            if (currentDataPoint.value > 0 && accumulator === null) {
-              // Linear interpolation for precise payback
-              if (index > 0) {
-                const prevDataPoint = array[index - 1];
-                const fraction = Math.abs(prevDataPoint.value) / 
-                               (currentDataPoint.value - prevDataPoint.value);
-                return prevDataPoint.year + fraction;
-              }
-              return currentDataPoint.year;
-            }
-            return accumulator;
-          };
-        },
-        initialValue: (refs, metrics) => null
-      }
-    }
-  ]
-},
-
-// Volatility analysis with risk adjustment
-{
-  id: 'riskMetrics', 
-  dependencies: [
-    { id: 'netCashflow', type: 'source' },
-    { id: 'riskProfile', type: 'reference' }
-  ],
-  aggregations: [
-    {
-      sourceId: 'netCashflow',
-      operation: 'reduce',
-      outputKey: 'volatility',
-      isDefault: true,
-      parameters: {
-        reducer: (refs, metrics) => {
-          const riskAdjustment = refs.riskProfile?.adjustment || 1.0;
-          
-          return (accumulator, currentDataPoint, index, array) => {
-            const adjustedValue = currentDataPoint.value * riskAdjustment;
-            
-            // Two-pass standard deviation calculation
-            if (index === array.length - 1) {
-              const variance = accumulator.sumSquaredDiff / accumulator.count;
-              return Math.sqrt(variance);
-            }
-            
-            if (index === 0) {
-              // Calculate mean with risk adjustment
-              const adjustedSum = array.reduce((sum, dp) => 
-                sum + (dp.value * riskAdjustment), 0);
-              const mean = adjustedSum / array.length;
-              
-              return {
-                count: array.length,
-                mean: mean,
-                sumSquaredDiff: Math.pow(adjustedValue - mean, 2)
-              };
-            }
-            
-            return {
-              ...accumulator,
-              sumSquaredDiff: accumulator.sumSquaredDiff + 
-                             Math.pow(adjustedValue - accumulator.mean, 2)
-            };
-          };
-        },
-        initialValue: (refs, metrics) => null
-      }
-    }
-  ]
-}
-```
-
-### Cascading Operations
-```javascript
-{
-  id: 'riskAdjustedReturn',
-  dependencies: [
-    { id: 'projectIRR', type: 'metric' },
-    { id: 'marketVolatility', type: 'reference' },
-    { id: 'projectRiskRating', type: 'reference' }
-  ],
-  operations: [
-    {
-      id: 'marketVolatility',
-      operation: (irrValue, percentile, volatility, refs) => {
-        // Apply volatility adjustment
-        return irrValue * (1 - volatility / 100);
-      }
-    },
-    {
-      id: 'projectRiskRating', 
-      operation: (adjustedValue, percentile, riskRating, refs) => {
-        // Apply risk rating penalty
-        const riskPenalty = riskRating > 3 ? (riskRating - 3) * 0.5 : 0;
-        return adjustedValue - riskPenalty;
+        discountRate: (refs) => refs.financing.costOfEquity / 100
       }
     }
   ]
@@ -865,51 +491,26 @@ Error: Invalid CubeMetricDataSchema for 'projectIRR': valueType must be 'scalar'
 
 ---
 
-## Integration with Sensitivity Analysis
+## Error Handling
 
-### Sensitivity-Ready Metrics
-Metrics automatically integrate with the sensitivity analysis system when properly configured.
+### Validation Errors
+- **Dependency resolution**: Missing sources/metrics/references
+- **Transformer validation**: Invalid return format (automatically normalized)
+- **Operation execution**: Function return value validation
+- **Schema validation**: Complete metric data structure
 
-```javascript
-sensitivity: {
-  enabled: true,
-  excludeSources: ['reserveFunds', 'contingency'],
-  analyses: ['tornado', 'correlation'],
-  customPercentileRange: [25, 75] // Override default range
-}
-```
-
-### Sensitivity Data Access
-```javascript
-const { getSensitivityData } = useCube();
-
-// Get tornado analysis for project IRR
-const tornadoData = getSensitivityData('projectIRR', 'tornado');
-
-// Get correlation analysis
-const correlationData = getSensitivityData('projectIRR', 'correlation');
-```
+### Graceful Degradation
+- Missing data returns zero values with error stats
+- Invalid transformer results are normalized automatically
+- Failed operations preserve base values
 
 ---
 
-## Best Practices
+## Performance
 
-### Registry Design
-- **Use meaningful IDs**: Clear, descriptive metric identifiers
-- **Logical priority ordering**: Group related metrics with consistent priority ranges
-- **Comprehensive metadata**: Include proper formatting and descriptions
-- **Efficient dependencies**: Minimize dependency chains when possible
+- **Sub-100ms Processing**: Typical metrics computation time
+- **Dependency Caching**: Resolved dependencies cached per metric
+- **Automatic Normalization**: No manual result formatting required
+- **Memory Efficient**: Minimal data duplication through direct access patterns
 
-### Transformer Development
-- **Return format consistency**: Always return `CubeMetricResultSchema[]`
-- **Error handling**: Check for null/undefined dependencies
-- **Audit trail usage**: Record significant calculation steps
-- **Performance awareness**: Avoid expensive operations in tight loops
-
-### Operations Design
-- **Simple functions**: Keep operations focused and testable
-- **Input validation**: Check for valid numeric inputs
-- **Reference usage**: Leverage reference data for dynamic calculations
-- **Error reporting**: Provide meaningful error messages
-
-This comprehensive system provides the foundation for sophisticated financial and operational metrics analysis while maintaining performance, reliability, and extensibility.
+This streamlined system provides sophisticated financial metrics analysis while maintaining performance and developer experience.
