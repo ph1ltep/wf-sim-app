@@ -2,79 +2,118 @@
 import { extractSourcePercentileData, extractMetricValue, calculateIRR, calculateNPV, buildMetricResults } from './common.js';
 
 /**
- * Calculate Project IRR from net cashflow and initial investment
+ * Calculate Project IRR using pre-computed project cashflow source
  * @param {Object} dependencies - Resolved dependencies
- * @param {Object} context - Simplified transformer context
+ * @param {Object} context - Transformer context
  * @returns {Array} Array of CubeMetricResultSchema objects
  */
 export const calculateProjectIRR = (dependencies, context) => {
     const { availablePercentiles, addAuditEntry } = context;
 
-    return availablePercentiles.map(percentile => {
-        // ✅ Direct access to sources
-        const netCashflowData = dependencies.sources.netCashflow[percentile].data;
-        const totalCapexData = dependencies.sources.totalCapex[percentile].data;
+    const results = [];
 
-        // ✅ Direct access to references
-        const minimumIRR = dependencies.references.financing?.minimumIRR || 0;
+    availablePercentiles.forEach(percentile => {
+        // Get pre-computed project cashflow data directly from source
+        const projectCashflowData = dependencies.sources.projectCashflow[percentile]?.data || [];
 
-        // Get initial investment from total CAPEX
-        const initialInvestment = totalCapexData.find(d => d.year === 0)?.value || 0;
+        if (projectCashflowData.length === 0) {
+            console.warn(`⚠️ No project cashflow data for Project IRR at P${percentile}`);
+            results.push({
+                percentile: { value: percentile },
+                value: 0,
+                stats: { error: 'no_cashflow_data' }
+            });
+            return;
+        }
 
-        // Build cashflow array starting with negative investment
-        const cashflows = [
-            { year: 0, value: -initialInvestment },
-            ...netCashflowData.filter(d => d.year > 0)
-        ];
+        // Calculate IRR directly from pre-computed cashflows
+        const irr = calculateIRR(projectCashflowData);
 
-        // Calculate IRR using helper function
-        const irr = calculateIRR(cashflows);
+        // Extract stats from cashflow data
+        const initialInvestment = Math.abs(projectCashflowData.find(d => d.year === 0)?.value || 0);
+        const totalInflows = projectCashflowData.filter(d => d.year > 0 && d.value > 0)
+            .reduce((sum, d) => sum + d.value, 0);
+        const totalOutflows = projectCashflowData.filter(d => d.value < 0)
+            .reduce((sum, d) => sum + Math.abs(d.value), 0);
 
-        addAuditEntry('irr_calculation',
-            `calculated IRR ${irr.toFixed(2)}% for percentile ${percentile}`,
-            ['netCashflow', 'totalCapex']);
-
-        return {
+        results.push({
             percentile: { value: percentile },
-            value: Math.max(irr, minimumIRR), // Apply minimum IRR constraint
-            stats: {}
-        };
+            value: irr,
+            stats: {
+                initialInvestment,
+                totalInflows,
+                totalOutflows,
+                cashflowYears: projectCashflowData.length - 1, // Exclude year 0
+                paybackIndicator: totalInflows / initialInvestment
+            }
+        });
+
+        addAuditEntry('project_irr_calculated',
+            `calculated Project IRR ${irr.toFixed(2)}% for percentile ${percentile}`,
+            ['projectCashflow']);
     });
+
+    console.log(`💰 calculateProjectIRR: Processed ${results.length} percentiles`);
+    return results;
 };
 
 /**
- * Calculate Equity IRR from net cashflow minus debt service
+ * Calculate Equity IRR using pre-computed equity cashflow source
  * @param {Object} dependencies - Resolved dependencies
  * @param {Object} context - Transformer context
  * @returns {Array} Array of CubeMetricResultSchema objects
  */
 export const calculateEquityIRR = (dependencies, context) => {
-    const { availablePercentiles, allReferences, addAuditEntry } = context;
+    const { availablePercentiles, addAuditEntry } = context;
 
-    // For each percentile:
-    // 1. Extract net cashflow and debt service data
-    // 2. Calculate equity investment from totalCapex and financing.debtFinancingRatio
-    // 3. Build equity cashflow array (net cashflow - debt service, starting with negative equity investment)
-    // 4. Calculate IRR using common.calculateIRR()
-    // 5. Add audit entry
-    // Return buildMetricResults(equityIrrValue, availablePercentiles)
-};
+    const results = [];
 
-/**
- * Calculate NPV using cost of equity as discount rate
- * @param {Object} dependencies - Resolved dependencies
- * @param {Object} context - Transformer context
- * @returns {Array} Array of CubeMetricResultSchema objects
- */
-export const calculateNPV = (dependencies, context) => {
-    const { availablePercentiles, allReferences, addAuditEntry } = context;
+    availablePercentiles.forEach(percentile => {
+        // Get pre-computed equity cashflow data directly from source
+        const equityCashflowData = dependencies.sources.equityCashflow[percentile]?.data || [];
 
-    // For each percentile:
-    // 1. Extract net cashflow data
-    // 2. Get discount rate from allReferences.financing.costOfEquity (convert % to decimal)
-    // 3. Calculate NPV using common.calculateNPV()
-    // 4. Add audit entry
-    // Return buildMetricResults(npvValue, availablePercentiles)
+        if (equityCashflowData.length === 0) {
+            console.warn(`⚠️ No equity cashflow data for Equity IRR at P${percentile}`);
+            results.push({
+                percentile: { value: percentile },
+                value: 0,
+                stats: { error: 'no_cashflow_data' }
+            });
+            return;
+        }
+
+        // Calculate Equity IRR directly from pre-computed cashflows
+        const equityIRR = calculateIRR(equityCashflowData);
+
+        // Extract stats from cashflow data
+        const equityInvestment = Math.abs(equityCashflowData.find(d => d.year === 0)?.value || 0);
+        const totalEquityInflows = equityCashflowData.filter(d => d.year > 0 && d.value > 0)
+            .reduce((sum, d) => sum + d.value, 0);
+        const totalEquityOutflows = equityCashflowData.filter(d => d.value < 0)
+            .reduce((sum, d) => sum + Math.abs(d.value), 0);
+
+        // Calculate returns multiples
+        const cashOnCashReturn = totalEquityInflows / equityInvestment;
+
+        results.push({
+            percentile: { value: percentile },
+            value: equityIRR,
+            stats: {
+                equityInvestment,
+                totalEquityInflows,
+                totalEquityOutflows,
+                cashOnCashReturn,
+                cashflowYears: equityCashflowData.length - 1 // Exclude year 0
+            }
+        });
+
+        addAuditEntry('equity_irr_calculated',
+            `calculated Equity IRR ${equityIRR.toFixed(2)}% for percentile ${percentile}`,
+            ['equityCashflow']);
+    });
+
+    console.log(`💰 calculateEquityIRR: Processed ${results.length} percentiles`);
+    return results;
 };
 
 // Add to utils/cube/metrics/transformers/financial.js

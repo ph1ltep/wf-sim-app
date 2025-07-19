@@ -15,7 +15,9 @@ import {
     majorRepairs,
     reserveFunds,
     dscr,
-    cumulativeCashflow
+    cumulativeCashflow,
+    projectCashflow,
+    equityCashflow
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -337,6 +339,50 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 accountingClass: 'liability',
                 projectPhase: 'operations',
                 description: 'Annual debt service payments (principal + interest)',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'projectCashflow',
+            priority: 905,
+            path: null,
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: projectCashflow,
+            multipliers: [],
+            metadata: {
+                name: 'Project Cashflow',
+                type: 'virtual',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Complete project cashflow series for IRR calculation (CAPEX + net cashflow)',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'equityCashflow',
+            priority: 905,
+            path: null,
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: equityCashflow,
+            multipliers: [],
+            metadata: {
+                name: 'Equity Cashflow',
+                type: 'virtual',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Equity cashflow series for Equity IRR calculation (equity investment + net cashflow - debt service)',
                 customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }

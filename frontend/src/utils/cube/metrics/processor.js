@@ -1,6 +1,9 @@
 // utils/cube/metrics/processor.js
 import { CubeMetricDataSchema, CubeMetricResultSchema } from 'schemas/yup/cube';
 import { createAuditTrail } from '../audit';
+import { extractPercentileMetric } from './transformers/common';
+
+const Yup = require('yup');
 
 /**
  * Process metrics registry data following metrics processing flow (parallel to computeSourceData)
@@ -76,6 +79,113 @@ export const computeMetricsData = (metricsRegistry, availablePercentiles, getVal
     console.log(`⏱️ Total processing time: ${duration}ms`);
 
     return processedMetrics;
+};
+
+/**
+ * Validate and normalize metric data to CubeMetricResultSchema array
+ * @param {any} metricData - Raw metric data from transformer
+ * @param {Array} availablePercentiles - Available percentiles [10, 25, 50, 75, 90]
+ * @returns {Array} Array of CubeMetricResultSchema objects
+ * 
+ * Acceptable input types:
+ * - Array of CubeMetricResultSchema objects (returns as-is if valid)
+ * - Single CubeMetricResultSchema object (replicates for all percentiles)
+ * - Scalar value (number) - creates CubeMetricResultSchema array with value replicated
+ * - Any other object - creates CubeMetricResultSchema array with object as value
+ */
+const validateMetricDataStructure = (metricData, availablePercentiles) => {
+    if (!metricData) {
+        // Return empty results for null/undefined
+        return availablePercentiles.map(percentile => ({
+            percentile: { value: percentile },
+            value: 0,
+            stats: {}
+        }));
+    }
+
+    // Check if already compliant CubeMetricResultSchema array
+    if (Array.isArray(metricData)) {
+        try {
+            // Direct Yup validation for CubeMetricResultSchema array
+            Yup.array().of(CubeMetricResultSchema).validateSync(metricData);
+
+            // Ensure we have results for all percentiles
+            if (metricData.length === availablePercentiles.length) {
+                return metricData;
+            } else {
+                console.warn(`validateMetricDataStructure: Array length ${metricData.length} doesn't match percentiles ${availablePercentiles.length}`);
+
+                // Fill missing percentiles with zero values
+                const result = [];
+                availablePercentiles.forEach(percentile => {
+                    const existingResult = metricData.find(item =>
+                        item.percentile && item.percentile.value === percentile
+                    );
+
+                    if (existingResult) {
+                        result.push(existingResult);
+                    } else {
+                        result.push({
+                            percentile: { value: percentile },
+                            value: 0,
+                            stats: {}
+                        });
+                    }
+                });
+
+                return result;
+            }
+        } catch (error) {
+            throw new Error(`Invalid CubeMetricResultSchema array format: ${error.message}`);
+        }
+    }
+
+    // Handle single CubeMetricResultSchema object
+    try {
+        CubeMetricResultSchema.validateSync(metricData);
+
+        // Replicate for all percentiles, preserving the original value and stats
+        return availablePercentiles.map(percentile => ({
+            percentile: { value: percentile },
+            value: metricData.value,
+            stats: { ...metricData.stats } // Clone stats object
+        }));
+    } catch (error) {
+        // Not a valid CubeMetricResultSchema, continue to other checks
+    }
+
+    // Handle scalar values (numbers)
+    if (typeof metricData === 'number' && !isNaN(metricData)) {
+        return availablePercentiles.map(percentile => ({
+            percentile: { value: percentile },
+            value: metricData,
+            stats: {}
+        }));
+    }
+
+    // Handle any other object type - use as value
+    if (typeof metricData === 'object') {
+        return availablePercentiles.map(percentile => ({
+            percentile: { value: percentile },
+            value: metricData, // Store the entire object as value
+            stats: {}
+        }));
+    }
+
+    // Handle primitive types (string, boolean, etc.) - convert to number or 0
+    let numericValue = 0;
+    if (typeof metricData === 'string') {
+        const parsed = parseFloat(metricData);
+        numericValue = isNaN(parsed) ? 0 : parsed;
+    } else if (typeof metricData === 'boolean') {
+        numericValue = metricData ? 1 : 0;
+    }
+
+    return availablePercentiles.map(percentile => ({
+        percentile: { value: percentile },
+        value: numericValue,
+        stats: {}
+    }));
 };
 
 /**
@@ -438,26 +548,15 @@ const applyTransformer = (transformer, dependencies, aggregationResults, availab
         // Call transformer with dependencies and context
         const transformerResult = transformer(dependencies, context);
 
-        // Validate transformer result
-        if (!Array.isArray(transformerResult)) {
-            throw new Error('Transformer must return an array of CubeMetricResultSchema objects');
-        }
-
-        // Validate each result item
-        transformerResult.forEach((item, index) => {
-            try {
-                CubeMetricResultSchema.validateSync(item);
-            } catch (validationError) {
-                throw new Error(`Invalid transformer result at index ${index}: ${validationError.message}`);
-            }
-        });
+        // Validate and normalize transformer result using new validation function
+        const validatedResults = validateMetricDataStructure(transformerResult, availablePercentiles);
 
         addAuditEntry('transformer_complete',
-            `transformer returned ${transformerResult.length} results`,
+            `transformer returned ${validatedResults.length} results`,
             Object.keys(dependencies.sources).concat(Object.keys(dependencies.metrics)),
-            transformerResult);
+            validatedResults);
 
-        return transformerResult;
+        return validatedResults;
 
     } catch (error) {
         addAuditEntry('transformer_error', `Transformer failed: ${error.message}`, []);

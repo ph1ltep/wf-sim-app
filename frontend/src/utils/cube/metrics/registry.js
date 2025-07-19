@@ -1,5 +1,12 @@
 // Updated utils/cube/metrics/registry.js
-import { calculateNPVCosts, calculateNPVEnergy, calculateProjectIRR, calculatePaybackPeriod } from './transformers';
+import {
+    calculateNPVCosts,
+    calculateNPVEnergy,
+    calculateProjectIRR,
+    calculateEquityIRR,
+    calculatePaybackPeriod,
+    extractPercentileMetric
+} from './transformers';
 
 export const METRICS_REGISTRY = {
     references: [
@@ -54,7 +61,7 @@ export const METRICS_REGISTRY = {
                     filter: (year, value, refs) => year >= 0 // Include all years including construction
                 }
             ],
-            transformer: calculateNPVEnergy, // Derive MWh from revenue, then NPV
+            transformer: null, //calculateNPVEnergy, // Derive MWh from revenue, then NPV
             operations: [],
             metadata: {
                 name: 'NPV of Energy',
@@ -136,13 +143,16 @@ export const METRICS_REGISTRY = {
                 { id: 'npvEnergy', type: 'metric' }
             ],
             aggregations: [],
-            transformer: null,
+            transformer: (dependencies, context) => {
+                return dependencies.metrics.npvCosts.percentileMetrics
+            },
             operations: [
                 {
                     id: 'npvEnergy',
-                    operation: (npvCostsValue, percentile, npvEnergyValue, refs, metrics) => {
+                    operation: (npvCost, percentile, npvEnergyValue, refs, metrics) => {
                         // LCOE = NPV of Costs / NPV of Energy (in MWh)
-                        return npvEnergyValue > 0 ? (metrics.npvCosts.percentileMetrics[percentile].value / npvEnergyValue) : 0;
+                        const npvCostsValue = extractPercentileMetric(metrics.npvCosts, percentile);
+                        return npvEnergyValue > 0 ? (npvCost / npvEnergyValue) : 0;
                     }
                 }
             ],
@@ -162,17 +172,14 @@ export const METRICS_REGISTRY = {
                 analyses: ['tornado', 'correlation']
             }
         },
-
-        // Simplified IRR metrics (keeping transformers for complex calculations)
         {
             id: 'projectIRR',
             priority: 100,
             dependencies: [
-                { id: 'netCashflow', type: 'source' },
-                { id: 'totalCapex', type: 'source' }
+                { id: 'projectCashflow', type: 'source' }
             ],
             aggregations: [],
-            transformer: calculateProjectIRR, // Still needs transformer for IRR calculation
+            transformer: calculateProjectIRR,
             operations: [],
             metadata: {
                 name: 'Project IRR',
@@ -189,6 +196,62 @@ export const METRICS_REGISTRY = {
                 excludeSources: ['reserveFunds'],
                 analyses: ['tornado', 'correlation']
             }
-        }
+        },
+        {
+            id: 'equityIRR',
+            priority: 110,
+            dependencies: [
+                { id: 'equityCashflow', type: 'source' }
+            ],
+            aggregations: [],
+            transformer: calculateEquityIRR,
+            operations: [],
+            metadata: {
+                name: 'Equity IRR',
+                type: 'direct',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Internal rate of return for equity investors',
+                formatter: (value) => `${value.toFixed(2)}%`
+            },
+            sensitivity: {
+                enabled: true,
+                excludeSources: ['reserveFunds'],
+                analyses: ['tornado', 'correlation']
+            }
+        },
+        {
+            id: 'projectNPV',
+            priority: 120,
+            dependencies: [
+                { id: 'projectCashflow', type: 'source' },
+                { id: 'financing', type: 'reference' }
+            ],
+            aggregations: [
+                {
+                    sourceId: 'projectCashflow', operation: 'npv', outputKey: 'npvValue', isDefault: true,
+                    parameters: { discountRate: (refs, metrics) => (refs.financing.costOfEquity || 8) / 100 }
+                }
+            ],
+            transformer: null, // Use aggregation result only
+            operations: [],
+            metadata: {
+                name: 'Project NPV',
+                type: 'direct',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Net present value of project cash flows',
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            },
+            sensitivity: {
+                enabled: true,
+                excludeSources: ['reserveFunds'],
+                analyses: ['tornado', 'correlation']
+            }
+        },
     ]
 };
