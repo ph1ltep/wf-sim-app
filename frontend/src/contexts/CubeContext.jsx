@@ -366,6 +366,174 @@ export const CubeProvider = ({ children }) => {
         return result;
     }, [sourceData]);
 
+    /**
+ * Get metrics data with flexible filtering, heavily optimized for performance
+ * @param {Object} filters - Filter parameters
+ * @param {string} [filters.metricId] - Single metric ID
+ * @param {string[]} [filters.metricIds] - Multiple metric IDs
+ * @param {number} [filters.percentile] - Single percentile value
+ * @param {Object} [filters.metadata] - Metadata filter criteria
+ * @returns {Object} Filtered metrics data with dynamic keys
+ */
+    const getMetric = useCallback((filters = {}) => {
+        const { percentile, metricId, metricIds, metadata: metadataFilters } = filters;
+
+        // Fast validation
+        if (!metricId && !metricIds && percentile === undefined) {
+            throw new Error('getMetric requires either metricId, metricIds, or percentile parameter');
+        }
+
+        if (!metricsData?.length) return {};
+
+        // Pre-compute metadata filter function for reuse
+        let metadataFilterFn = null;
+        if (metadataFilters) {
+            const filterEntries = Object.entries(metadataFilters);
+            if (filterEntries.length > 0) {
+                metadataFilterFn = (metadata) => filterEntries.every(([key, value]) => metadata[key] === value);
+            }
+        }
+
+        // Mode 1: Single metric, all percentiles - FASTEST PATH
+        if (metricId && percentile === undefined) {
+            // Direct find - no array filtering needed
+            const metric = metricsData.find(m => m.id === metricId);
+            if (!metric || (metadataFilterFn && !metadataFilterFn(metric.metadata))) return {};
+
+            // Pre-allocate result object size
+            const result = {};
+            const percentileMetrics = metric.percentileMetrics;
+            const metadata = metric.metadata; // Cache metadata reference
+
+            // Single loop with direct property assignment
+            for (let i = 0; i < percentileMetrics.length; i++) {
+                const pm = percentileMetrics[i];
+                result[pm.percentile.value] = {
+                    value: pm.value,
+                    stats: pm.stats,
+                    metadata
+                };
+            }
+            return result;
+        }
+
+        // Mode 2: Single percentile, all metrics - SECOND FASTEST PATH
+        if (percentile !== undefined && !metricId && !metricIds) {
+            const result = {};
+
+            // Single pass through metrics with early continue for non-matches
+            for (let i = 0; i < metricsData.length; i++) {
+                const metric = metricsData[i];
+
+                // Apply metadata filter early
+                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
+
+                // Use cached percentileMetrics and direct find with index optimization
+                const percentileMetrics = metric.percentileMetrics;
+                let percentileResult = null;
+
+                // Optimized find - assume percentiles are ordered for early break
+                for (let j = 0; j < percentileMetrics.length; j++) {
+                    if (percentileMetrics[j].percentile.value === percentile) {
+                        percentileResult = percentileMetrics[j];
+                        break;
+                    }
+                }
+
+                if (percentileResult) {
+                    result[metric.id] = {
+                        value: percentileResult.value,
+                        stats: percentileResult.stats,
+                        metadata: metric.metadata
+                    };
+                }
+            }
+            return result;
+        }
+
+        // Mode 3: Single metric + single percentile - ULTRA FAST PATH
+        if (metricId && percentile !== undefined) {
+            const metric = metricsData.find(m => m.id === metricId);
+            if (!metric || (metadataFilterFn && !metadataFilterFn(metric.metadata))) return {};
+
+            // Direct percentile lookup with optimized find
+            const percentileMetrics = metric.percentileMetrics;
+            for (let i = 0; i < percentileMetrics.length; i++) {
+                if (percentileMetrics[i].percentile.value === percentile) {
+                    return {
+                        [metric.id]: {
+                            value: percentileMetrics[i].value,
+                            stats: percentileMetrics[i].stats,
+                            metadata: metric.metadata
+                        }
+                    };
+                }
+            }
+            return {};
+        }
+
+        // Mode 4: Multiple metrics + single percentile - OPTIMIZED FOR BATCH
+        if (metricIds && percentile !== undefined) {
+            // Create Set for O(1) lookup instead of O(n) includes()
+            const metricIdSet = new Set(metricIds);
+            const result = {};
+
+            // Single pass with Set lookup
+            for (let i = 0; i < metricsData.length; i++) {
+                const metric = metricsData[i];
+
+                // Fast Set lookup
+                if (!metricIdSet.has(metric.id)) continue;
+                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
+
+                // Optimized percentile find
+                const percentileMetrics = metric.percentileMetrics;
+                for (let j = 0; j < percentileMetrics.length; j++) {
+                    if (percentileMetrics[j].percentile.value === percentile) {
+                        result[metric.id] = {
+                            value: percentileMetrics[j].value,
+                            stats: percentileMetrics[j].stats,
+                            metadata: metric.metadata
+                        };
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Mode 5: Multiple metrics, all percentiles - COMPLEX CASE
+        if (metricIds && percentile === undefined) {
+            const metricIdSet = new Set(metricIds);
+            const result = {};
+
+            for (let i = 0; i < metricsData.length; i++) {
+                const metric = metricsData[i];
+
+                if (!metricIdSet.has(metric.id)) continue;
+                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
+
+                // Group by metric ID with all percentiles
+                const metricResult = {};
+                const percentileMetrics = metric.percentileMetrics;
+                const metadata = metric.metadata;
+
+                for (let j = 0; j < percentileMetrics.length; j++) {
+                    const pm = percentileMetrics[j];
+                    metricResult[pm.percentile.value] = {
+                        value: pm.value,
+                        stats: pm.stats,
+                        metadata
+                    };
+                }
+                result[metric.id] = metricResult;
+            }
+            return result;
+        }
+
+        return {};
+    }, [metricsData]);
+
     const getCustomPercentiles = useCallback(() => {
         if (!sourceData || !scenarioData) {
             console.log('⏸️ CubeContext: No sourceData or scenarioData available for getCustomPercentiles');

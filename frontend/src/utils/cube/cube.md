@@ -1,363 +1,554 @@
-# Cube System API Documentation v2.0
+# Cube System General API Documentation v2.0
 
 ## Overview
 
-The Cube system is a high-performance financial data processing pipeline that transforms scenario data into structured time-series analysis. It features advanced audit trails, custom percentile handling, and sub-100ms processing performance.
+The Cube System is a high-performance financial data processing pipeline that transforms scenario data into structured time-series analysis and scalar business metrics. It provides a unified interface for accessing both source data (time-series) and metrics data (scalars) with comprehensive audit trails, custom percentile handling, and sub-100ms processing performance.
 
----
+## System Architecture
 
-## Core Processing API
+The Cube System consists of three main layers:
 
-### `computeSourceData()`
-Main processing pipeline that transforms registry configuration into processed cube data with full audit trails and performance tracking.
+### 1. **Sources Layer** - Time-Series Data Processing
+Transforms raw scenario data into structured time-series with multipliers, transformers, and aggregations.
+- **Input**: Raw scenario data from paths
+- **Output**: `CubeSourceDataSchema[]` - Time-series data per percentile
+- **Documentation**: See [sources.md](./sources.md) for detailed API
 
-**Parameters**:
-```
-sourceRegistry: CubeSourceRegistrySchema
-  ├─ Registry with references and sources
+### 2. **Metrics Layer** - Scalar Business Metrics
+Converts time-series data into business metrics using aggregations, transformers, and operations.
+- **Input**: `CubeSourceDataSchema[]` + references
+- **Output**: `CubeMetricDataSchema[]` - Scalar values per percentile
+- **Documentation**: See [metrics.md](./metrics.md) for detailed API
 
-availablePercentiles: number[]
-  ├─ Available percentiles [10, 25, 50, 75, 90]
+### 3. **Context Layer** - React Integration & Data Access
+Provides React context, state management, and optimized data access functions.
+- **Input**: Registry configurations + scenario data
+- **Output**: React hooks and data access APIs
+- **Documentation**: This document (sections below)
 
-getValueByPath: Function
-  ├─ (path: string[]) => any
-  └─ Scenario data extraction function
-
-customPercentile?: Object | null
-  ├─ {sourceId: percentileValue}
-  └─ Custom percentile mapping
-```
-
-**Returns**: `CubeSourceDataSchema[]`
-```
-Array of processed sources with audit trails
-```
+## Data Flow Pipeline
 
 ```javascript
-const data = computeSourceData(REGISTRY, [10, 25, 50, 75, 90], getValueByPath, {"escalationRate": 25});
+// 1. Raw Scenario Data
+scenarioData = {
+  simulation: { inputSim: { distributionAnalysis: { energyProduction: {...} } } }
+}
+
+// 2. Sources Processing (see sources.md)
+sourceData = computeSourceData(SOURCES_REGISTRY, percentiles, getValueByPath)
+// → [{id: 'energyRevenue', percentileSource: [...], metadata: {...}, audit: {...}}]
+
+// 3. Metrics Processing (see metrics.md)  
+metricsData = computeMetricsData(METRICS_REGISTRY, percentiles, getValueByPath, getSourceData)
+// → [{id: 'projectIRR', percentileMetrics: [...], metadata: {...}, audit: {...}}]
+
+// 4. Context Integration (this document)
+const { getData, getMetric } = useCube();
+const revenueData = getData({sourceId: 'energyRevenue', percentile: 50});
+const irrData = getMetric({metricId: 'projectIRR', percentile: 50});
 ```
 
 ---
 
 ## CubeContext API
 
+### Context Provider Setup
+```javascript
+import { CubeProvider } from '../contexts/CubeContext';
+
+// Wrap your app or analysis component
+<CubeProvider>
+  <CashflowAnalysis />
+</CubeProvider>
+```
+
+### Hook Usage
+```javascript
+const {
+  // Data state
+  sourceData,           // CubeSourceDataSchema[] - Processed source data
+  metricsData,         // CubeMetricDataSchema[] - Processed metrics data
+  availablePercentiles, // number[] - [10, 25, 50, 75, 90]
+  
+  // Loading states
+  isLoading,           // boolean - Initial loading state
+  isRefreshing,        // boolean - Refresh in progress
+  refreshStage,        // string - Current processing stage
+  lastRefresh,         // Date|null - Last successful refresh
+  
+  // Custom percentile management
+  customPercentile,    // Object|null - Custom percentile config
+  setCustomPercentile, // Function - Set custom percentile mapping
+  
+  // Data access functions
+  getData,             // Function - Access source data
+  getMetric,           // Function - Access metrics data
+  getAuditTrail,       // Function - Access audit trails
+  
+  // Actions
+  refreshCubeData,     // Function - Trigger data refresh
+  triggerRefresh       // Function - Force refresh
+} = useCube();
+```
+
 ### Context State Management
-React context providing processed cube data, loading states, version tracking, and custom percentile configuration management.
+The CubeContext manages a sophisticated state machine with sequential processing stages:
 
-**Available State**:
-- `sourceData`: `CubeSourceDataSchema[]` - Processed cube data
-- `isLoading`, `isRefreshing`: `boolean` - Processing states  
-- `lastRefresh`: `Date|null` - Last refresh timestamp
-- `cubeVersion`: `string|null` - Cache version for invalidation
-- `customPercentile`: `Object|null`, `setCustomPercentile`: `Function` - Custom percentile management
-- `refreshCubeData`: `Function` - Manual refresh trigger
-
-```javascript
-const { sourceData, getData, customPercentile, setCustomPercentile } = useCube();
-```
-
-### `getData()`
-Optimized data retrieval with flexible filtering, metadata support, and multiple return formats based on filter criteria.
-
-**Parameters**:
-```
-filters: Object
-  ├─ sourceId?: string          - Single source ID
-  ├─ sourceIds?: string[]       - Multiple source IDs  
-  ├─ percentile?: number        - Single percentile value
-  ├─ metadata?: Object          - Metadata filter criteria
-  └─ cashflowGroup?: string     - Filter by cashflow group
-
-options?: Object
-  └─ Additional options (reserved for future use)
-```
-
-**Returns**: `Object` with dynamic keys based on filters
-```
-Dynamic object structure:
-├─ Single source: {percentile: {data: DataPointSchema[], metadata}}
-├─ Single percentile: {sourceId: {data: DataPointSchema[], metadata}}  
-└─ Filtered sources: {sourceId: {data: DataPointSchema[], metadata}}
-```
-
-| Filter Type | Input | Output Keys | Use Case |
-|-------------|-------|-------------|----------|
-| `{sourceId: 'energyRevenue'}` | Single source | Percentile values (10, 25, 50...) | All percentiles for one source |
-| `{percentile: 50}` | Single percentile | Source IDs | All sources for one percentile |
-| `{sourceId: 'x', percentile: 50}` | Specific | Source ID | Single source-percentile combination |
-| `{metadata: {cashflowGroup: 'cost'}}` | Metadata filter | Source IDs | Filtered sources by metadata |
-
-```javascript
-const allPercentiles = getData({sourceId: 'energyRevenue'}); // {10: {data, metadata}, 25: {...}}
-const medianData = getData({percentile: 50}); // {energyRevenue: {data, metadata}, ...}
-const specific = getData({sourceId: 'energyRevenue', percentile: 50}); // {energyRevenue: {data, metadata}}
-```
+| Stage | Purpose | Dependencies | Output |
+|-------|---------|--------------|--------|
+| `idle` | Default state | None | Ready for refresh |
+| `dependencies` | Validate prerequisites | Scenario data | Dependency validation |
+| `sources` | Process source data | Valid dependencies | `sourceData` |
+| `metrics` | Process metrics data | `sourceData` | `metricsData` |
+| `complete` | Finalize refresh | Both data sets | Updated timestamps |
 
 ---
 
-## Registry Configuration
+## Data Access Functions
 
-### Source Types
-Three processing types with **fixed execution order**: `direct` → `indirect` → `virtual` (regardless of priority values). Priority only determines order within each type.
+### `getData()` - Source Data Access
+High-performance source data retrieval with flexible filtering and dynamic return formats.
 
-| Type | Priority Range | Requirements | Purpose |
-|------|----------------|--------------|---------|
-| `direct` | 1-99 | Must have `path`, no `multipliers` | Raw scenario data extraction |
-| `indirect` | 100-199 | Must have `path` and `multipliers` | Data with mathematical operations |
-| `virtual` | 200+ | Must have `transformer`, no `path` | Calculated/derived data |
+**Function Signature**:
+```javascript
+getData(filters: Object) => Object
+```
 
-**Processing Order**: All `direct` sources (by priority) → All `indirect` sources (by priority) → All `virtual` sources (by priority)
-
-### Source Configuration Schema
-
+**Parameters**:
 ```javascript
 {
-    id: 'energyRevenue',                    // Unique identifier
-    priority: 99,                           // Processing order within type
-    path: ['simulation', 'data', 'energy'], // Scenario data extraction path (direct/indirect only)
-    hasPercentiles: true,                   // Whether source varies by percentile
-    references: [{id: 'financing', path: ['settings', 'financing']}], // Local dependencies
-    transformer: transformerFunction,       // Data transformation (virtual only)
-    multipliers: [{id: 'escalationRate', operation: 'compound', baseYear: 1}], // Math operations
-    metadata: {
-        type: 'indirect',                   // direct|indirect|virtual
-        cashflowGroup: 'revenue',          // cost|revenue|asset|liability|risk|opportunity|none
-        category: 'energy',               // Custom categorization
-        // ... other metadata
-    }
+  sourceId?: string,        // Single source ID
+  sourceIds?: string[],     // Multiple source IDs
+  percentile?: number,      // Single percentile value
+  metadata?: Object         // Metadata filter criteria
+}
+```
+
+**Return Format Logic**:
+| Filter Combination | Output Keys | Example Usage |
+|-------------------|-------------|---------------|
+| `{sourceId}` | Percentile values (10, 25, 50...) | All percentiles for one source |
+| `{percentile}` | Source IDs | All sources for one percentile |
+| `{sourceId, percentile}` | Source ID | Single source-percentile combo |
+| `{sourceIds, percentile}` | Source IDs (filtered) | Multiple sources for one percentile |
+
+**Usage Examples**:
+```javascript
+// Get all percentiles for energy revenue
+const energyData = getData({ sourceId: 'energyRevenue' });
+// Returns: { 10: {data: [...], metadata}, 25: {data: [...], metadata}, ... }
+
+// Get all sources for median percentile
+const medianData = getData({ percentile: 50 });
+// Returns: { energyRevenue: {data: [...], metadata}, totalCost: {data: [...], metadata}, ... }
+
+// Get specific source-percentile combination
+const specificData = getData({ sourceId: 'energyRevenue', percentile: 50 });
+// Returns: { energyRevenue: {data: [...], metadata} }
+
+// Get multiple sources for one percentile
+const cashflowSources = getData({ 
+  sourceIds: ['totalRevenue', 'totalCost', 'netCashflow'], 
+  percentile: 75 
+});
+// Returns: { totalRevenue: {data: [...]}, totalCost: {data: [...]}, netCashflow: {data: [...]} }
+
+// Filter by metadata
+const inflowSources = getData({ 
+  percentile: 50, 
+  metadata: { cashflowType: 'inflow' } 
+});
+// Returns: { energyRevenue: {data: [...]}, otherRevenue: {data: [...]} }
+```
+
+### `getMetric()` - Metrics Data Access
+Ultra-high-performance metrics data retrieval optimized for scalar business metrics.
+
+**Function Signature**:
+```javascript
+getMetric(filters: Object) => Object
+```
+
+**Parameters**:
+```javascript
+{
+  metricId?: string,        // Single metric ID
+  metricIds?: string[],     // Multiple metric IDs
+  percentile?: number,      // Single percentile value
+  metadata?: Object         // Metadata filter criteria
+}
+```
+
+**Performance Optimization**:
+- **Mode 1** (Single metric, all percentiles): Direct find + single loop - **FASTEST**
+- **Mode 2** (Single percentile, all metrics): Single pass with early continue - **FAST**
+- **Mode 3** (Single metric + percentile): Direct lookup - **ULTRA FAST**
+- **Mode 4** (Multiple metrics + percentile): Set-based lookup - **OPTIMIZED BATCH**
+
+**Usage Examples**:
+```javascript
+// Get all percentiles for project IRR
+const irrData = getMetric({ metricId: 'projectIRR' });
+// Returns: { 10: {value: 8.2, stats: {...}, metadata}, 50: {value: 12.5, stats: {...}, metadata}, ... }
+
+// Get all metrics for median percentile
+const medianMetrics = getMetric({ percentile: 50 });
+// Returns: { projectIRR: {value: 12.5, stats: {...}, metadata}, equityIRR: {value: 18.3, stats: {...}, metadata}, ... }
+
+// Get specific metric-percentile combination (FASTEST)
+const medianIRR = getMetric({ metricId: 'projectIRR', percentile: 50 });
+// Returns: { projectIRR: {value: 12.5, stats: {...}, metadata} }
+
+// Get multiple metrics for one percentile (BATCH OPTIMIZED)
+const financialMetrics = getMetric({ 
+  metricIds: ['projectIRR', 'equityIRR', 'projectNPV'], 
+  percentile: 75 
+});
+// Returns: { projectIRR: {value: 15.2, ...}, equityIRR: {value: 22.1, ...}, projectNPV: {value: 450000, ...} }
+
+// Filter by metadata
+const profitabilityMetrics = getMetric({ 
+  percentile: 50, 
+  metadata: { visualGroup: 'profitability' } 
+});
+```
+
+**Data Structure**: Each result contains:
+```javascript
+{
+  value: number,           // Calculated metric value
+  stats: Object,          // Additional statistics from aggregations/transformers
+  metadata: Object        // Metric metadata (name, type, formatter, etc.)
 }
 ```
 
 ---
 
-## Transformer Functions
+## Custom Percentile Management
 
-### Function Signature
-Transformer functions process raw data into `SimResultsSchema[]` format with full context access and audit trail support.
+### Purpose & Benefits
+Custom percentiles enable mixed-percentile analysis for scenario modeling:
+- **Conservative Costs**: Use P10 (low) percentiles for cost estimates
+- **Optimistic Revenue**: Use P90 (high) percentiles for revenue projections
+- **Realistic Operations**: Use P50 (median) for operational parameters
 
-**Parameters**:
-```
-sourceData: any
-  ├─ Raw data from getValueByPath() for direct/indirect sources
-  └─ null for virtual sources
-
-context: Object
-  ├─ addAuditEntry: Function        - Add audit trail entries
-  ├─ processedData: CubeSourceDataSchema[] - Previously processed sources
-  ├─ availablePercentiles: number[] - Available percentiles
-  ├─ allReferences: Object          - Combined global + local references
-  ├─ hasPercentiles: boolean        - Whether source has percentile variation
-  ├─ metadata: Object               - Source metadata
-  └─ customPercentile: Object|null  - Custom percentile configuration
-```
-
-**Returns**: `SimResultsSchema[]`
-```
-Array of time-series data points:
-└─ [{year: number, value: number, percentile: {value: number}}]
-```
-
+### Configuration API
 ```javascript
-export const customTransformer = (sourceData, context) => {
-    const { addAuditEntry, processedData, availablePercentiles, allReferences, 
-            hasPercentiles, metadata, customPercentile } = context;
-    
-    // Use addAuditEntry() to record transformation steps and dependencies
-    addAuditEntry('transformation_step', 'description', ['dependency1', 'dependency2']);
-    
-    return results; // Must return SimResultsSchema[]
+const { customPercentile, setCustomPercentile, updateCustomPercentile } = useCube();
+
+// Set complete custom percentile configuration
+setCustomPercentile({
+  "escalationRate": 25,    // Use P25 for escalation
+  "energyRevenue": 75,     // Use P75 for energy revenue
+  "omCosts": 10,          // Use P10 for O&M costs
+  "constructionCosts": 90  // Use P90 for construction costs (conservative)
+});
+
+// Update individual source percentiles
+updateCustomPercentile("energyRevenue", 90); // Switch to P90 for energy revenue
+
+// Clear custom percentiles
+setCustomPercentile(null);
+```
+
+### Implementation Details
+1. **Percentile 0 Creation**: System creates percentile 0 entries that reference specified percentiles
+2. **Transparent Processing**: All transformers and aggregations handle percentile 0 automatically
+3. **Audit Trail Accuracy**: Records actual percentiles used (not 0) in audit trails
+4. **Cache Invalidation**: Changing custom percentiles triggers data refresh
+
+### Usage in Components
+```javascript
+const CustomPercentileControl = () => {
+  const { customPercentile, updateCustomPercentile, availablePercentiles } = useCube();
+
+  const handlePercentileChange = (sourceId, percentile) => {
+    updateCustomPercentile(sourceId, percentile);
+  };
+
+  return (
+    <div>
+      {customPercentile && Object.entries(customPercentile).map(([sourceId, percentile]) => (
+        <Select 
+          key={sourceId}
+          value={percentile}
+          onChange={(value) => handlePercentileChange(sourceId, value)}
+          options={availablePercentiles.map(p => ({ value: p, label: `P${p}` }))}
+        />
+      ))}
+    </div>
+  );
 };
 ```
-
-### Helper Functions
-
-#### `filterCubeSourceData()`
-Optimized filtering for processed sources with multiple filter criteria and performance optimization.
-
-**Input**: `CubeSourceDataSchema[]`, `Object` (filters)  
-**Output**: `CubeSourceDataSchema[]`
-
-| Filter Option | Type | Purpose |
-|---------------|------|---------|
-| `sourceId` | `string` | Single source by ID |
-| `sourceIds` | `string[]` | Multiple sources by IDs |
-| `cashflowGroup` | `string` | Filter by cashflow category |
-| `category` | `string` | Filter by custom category |
-| `metadata` | `Object` | Custom metadata matching |
-
-```javascript
-const costs = filterCubeSourceData(processedData, {cashflowGroup: 'cost'});
-const specific = filterCubeSourceData(processedData, {sourceId: 'debtService'});
-```
-
-#### `aggregateCubeSourceData()`
-Aggregate multiple sources into single time-series with operation selection, custom percentile support, and automatic audit trail creation.
-
-**Input**: `CubeSourceDataSchema[]`, `number[]`, `Object` (options), `Function` (addAuditEntry)  
-**Output**: `SimResultsSchema[]`
-
-**Features**:
-- Multiple aggregation operations (sum, subtract, multiply, divide)
-- Custom percentile handling with automatic percentile 0 processing
-- Automatic dependency tracking for audit trails
-- Performance-optimized aggregation algorithms
-
-**Options**:
-- `operation`: 'sum'|'subtract'|'multiply'|'divide'
-- `customPercentile`: Custom percentile configuration object
-
-```javascript
-const total = aggregateCubeSourceData(sources, percentiles, {operation: 'sum'}, addAuditEntry);
-```
-
----
-
-## Custom Percentiles
-
-### Configuration & Behavior
-Enable mixed-percentile analysis by creating percentile 0 placeholders that reference specific percentiles for each source.
-
-**Use Case**: Conservative cost estimates (P10) combined with optimistic revenue projections (P90) for risk analysis.
-
-```javascript
-setCustomPercentile({
-    "escalationRate": 25,    // Use P25 for escalation
-    "energyRevenue": 75,     // Use P75 for revenue  
-    "omCosts": 10           // Use P10 for O&M costs
-});
-```
-
-**Processing Behavior**:
-- Creates percentile 0 entries copying data from specified percentiles
-- Transparent to transformers and multipliers
-- Audit trails record actual percentiles used (not 0)
-- Enables scenario analysis with mixed risk assumptions
 
 ---
 
 ## Audit Trail System
 
-### `createAuditTrail()`
-Factory function for creating performance-tracked audit trails with optional data sampling and step duration calculation.
+### Purpose & Capabilities
+Comprehensive audit trails provide complete transparency for all data transformations:
+- **Data Lineage**: Track source dependencies for each calculation
+- **Performance Monitoring**: Measure processing times per operation
+- **Debugging Support**: Data samples and error tracking
+- **Compliance**: Full transformation history for financial calculations
 
-**Input**: `string` (sourceId), `number` (percentile), `boolean` (sampling)  
-**Output**: `{addAuditEntry: Function, getTrail: Function}`
-
+### Accessing Audit Trails
 ```javascript
-const {addAuditEntry, getTrail} = createAuditTrail('energyRevenue', 50, true);
-addAuditEntry('step_name', 'description', ['dep1', 'dep2'], sampleData);
-const auditTrail = getTrail(); // Returns trail with calculated durations
+const { getAuditTrail } = useCube();
+
+// Get audit trails for specific sources
+const auditData = getAuditTrail(['energyRevenue', 'totalCost', 'netCashflow']);
+
+// Returns:
+{
+  energyRevenue: {
+    trail: [
+      {
+        timestamp: 1640995200000,
+        step: 'apply_multiplier_electricityPrice',
+        details: 'Applied electricity price multiplier: $50.00/MWh',
+        dependencies: ['energyProduction', 'electricityPrice'],
+        type: 'multiply',
+        typeOperation: 'multiply',
+        duration: 2.3,
+        dataSample: { percentile: 50, data: [{year: 1, value: 5000000}] }
+      },
+      // ... more audit entries
+    ],
+    references: {
+      electricityPrice: 50,
+      escalationRate: 0.025
+    }
+  },
+  // ... other sources
+}
 ```
 
-### Audit Data Storage
-Audit trails should capture transformation transparency and calculation lineage.
+### Audit Trail Integration
+```javascript
+import AuditTrailViewer from '../components/AuditTrailViewer';
 
-**Required Data**:
-- **Step identification**: Clear step names and descriptions
-- **Dependencies**: Source IDs used as inputs for the calculation
-- **Performance metrics**: Automatic timing and duration calculation
-- **Data lineage**: Track data flow through transformation pipeline
+const CashflowAnalysisCard = () => {
+  const { getAuditTrail } = useCube();
+  const [showAudit, setShowAudit] = useState(false);
 
-**Optional Data**:
-- **Data samples**: Sample input/output data for debugging
-- **Calculation details**: Formulas, parameters, or business logic applied
-- **Error information**: Failures, warnings, or edge cases encountered
+  const auditData = getAuditTrail(['energyRevenue', 'totalCost']);
 
-### Output Structure
+  return (
+    <Card 
+      title="Cashflow Analysis"
+      extra={
+        <Button 
+          icon={<AuditOutlined />}
+          onClick={() => setShowAudit(!showAudit)}
+        >
+          View Audit Trail
+        </Button>
+      }
+    >
+      {/* Chart content */}
+      
+      {showAudit && (
+        <AuditTrailViewer 
+          auditTrails={auditData}
+          onClose={() => setShowAudit(false)}
+        />
+      )}
+    </Card>
+  );
+};
+```
 
-| Field | Type | Purpose |
-|-------|------|---------|
-| `timestamp` | `number` | Processing timestamp |
-| `step` | `string` | Step name/identifier |
-| `details` | `string` | Optional description |
-| `dependencies` | `string[]` | Source IDs used as inputs |
-| `dataSample` | `Object` | Optional data sample for debugging |
-| `duration` | `number` | Calculated step duration in ms |
-
----
-
-## Multiplier System
-
-### Operations & Formulas
-Mathematical operations applied to time-series data with automatic audit trail creation and custom percentile support.
-
-| Operation | Formula | Use Case |
-|-----------|---------|----------|
-| `multiply` | `value × multiplier` | Simple scaling factors |
-| `compound` | `value × (1 + rate)^(year-baseYear)` | Annual escalation, inflation |
-| `simple` | `value × (1 + rate × (year-baseYear))` | Linear growth rates |
-| `summation` | `value + multiplier` | Fixed value additions |
-
-### Configuration Options
-
+### Audit Entry Structure
 ```javascript
 {
-    id: 'escalationRate',           // Reference to multiplier data source
-    operation: 'compound',          // Operation type
-    baseYear: 1,                   // Starting year for calculations
-    filter: (year, value, percentile) => year > 0  // Optional filter function
+  timestamp: number,           // Processing timestamp (ms)
+  step: string,               // Operation identifier
+  details: string,            // Human-readable description
+  dependencies: string[],     // Source IDs used as inputs
+  type: string,              // Operation category ('transform', 'multiply', 'aggregate')
+  typeOperation: string,     // Specific operation ('sum', 'compound', 'complex')
+  duration: number,          // Processing time in milliseconds
+  dataSample?: {             // Optional data sample for debugging
+    percentile: number,
+    data: any
+  }
 }
 ```
 
-**Features**:
-- Automatic audit trail creation with dependency tracking
-- Custom percentile support with actual percentile recording
-- Optional filtering before multiplication
-- Performance-optimized value lookup for large datasets
+---
+
+## Performance & Optimization
+
+### Processing Performance Targets
+| Operation | Target Time | Measurement |
+|-----------|-------------|-------------|
+| **Total Cube Refresh** | <500ms | Complete sources + metrics processing |
+| **Sources Processing** | <100ms | 20+ sources with transformers/multipliers |
+| **Metrics Processing** | <100ms | 10+ metrics with dependencies |
+| **getData() Call** | <1ms | Single percentile or source access |
+| **getMetric() Call** | <0.5ms | Single metric or percentile access |
+
+### Memory Optimization
+- **Reference Consolidation**: Single object for all reference access
+- **Cache-Friendly Access**: Sequential array processing for CPU cache efficiency
+- **Object Reuse**: Minimize allocations in hot paths
+- **Set-Based Lookups**: O(1) complexity for multiple ID filtering
+
+### Caching Strategy
+```javascript
+// Version-based cache invalidation
+const isDataOutOfDate = useMemo(() => {
+  const currentVersion = scenarioData?.metadata?.lastModified || scenarioData?.metadata?.version;
+  return cubeVersion !== currentVersion;
+}, [cubeVersion, scenarioData]);
+
+// Intelligent refresh triggering
+useEffect(() => {
+  if (isDataOutOfDate && !isLoading) {
+    refreshCubeData();
+  }
+}, [isDataOutOfDate, isLoading]);
+```
 
 ---
 
-## Performance & Error Handling
+## Error Handling & Resilience
 
-### Performance Targets
+### Error Categories
+| Error Type | Handling Strategy | User Experience |
+|------------|------------------|-----------------|
+| **Configuration Errors** | Log and skip invalid entries | Graceful degradation |
+| **Data Extraction Errors** | Return empty with error stats | Clear error messaging |
+| **Transformation Errors** | Fallback to aggregations | Automatic recovery |
+| **Network/State Errors** | Retry with exponential backoff | Loading states |
 
-| Metric | Target | Purpose |
-|--------|--------|---------|
-| Processing Speed | <100ms | Typical scenario processing |
-| Memory Efficiency | 50%+ reduction | Compared to legacy systems |
-| Percentile Switching | <10ms | UI responsiveness |
-| Cache Management | Smart invalidation | Version-based cache control |
-
-### Error Handling Patterns
-
+### Error Boundary Integration
 ```javascript
-// Processing errors
-try {
-    const data = computeSourceData(registry, percentiles, getValueByPath);
-} catch (error) {
-    console.error('Processing failed:', error.message);
-}
+import { ErrorBoundary } from 'react-error-boundary';
 
-// Safe data access
-const data = getData({sourceId: 'energyRevenue'});
-if (Object.keys(data).length === 0) {
-    // Handle missing data
-}
-
-// Transformer error handling
-export const safeTransformer = (sourceData, context) => {
-    try {
-        return performTransformation(sourceData, context);
-    } catch (error) {
-        context.addAuditEntry('error', error.message);
-        return []; // Graceful degradation
+const CubeErrorFallback = ({ error, resetErrorBoundary }) => (
+  <Alert
+    type="error"
+    message="Cube System Error"
+    description={error.message}
+    action={
+      <Button onClick={resetErrorBoundary}>
+        Retry Cube Processing
+      </Button>
     }
+  />
+);
+
+// Wrap cube-dependent components
+<ErrorBoundary FallbackComponent={CubeErrorFallback}>
+  <CubeProvider>
+    <CashflowAnalysis />
+  </CubeProvider>
+</ErrorBoundary>
+```
+
+---
+
+## Integration Patterns
+
+### Component Integration Best Practices
+```javascript
+// ✅ Efficient data access pattern
+const CashflowChart = () => {
+  const { getData, getMetric, isLoading } = useCube();
+  
+  // Get only needed data with specific filters
+  const cashflowData = useMemo(() => {
+    return getData({ 
+      sourceIds: ['totalRevenue', 'totalCost', 'netCashflow'], 
+      percentile: selectedPercentile 
+    });
+  }, [getData, selectedPercentile]);
+  
+  const irrMetrics = useMemo(() => {
+    return getMetric({ 
+      metricIds: ['projectIRR', 'equityIRR'], 
+      percentile: selectedPercentile 
+    });
+  }, [getMetric, selectedPercentile]);
+
+  if (isLoading) return <Spin />;
+  
+  return <Chart data={cashflowData} metrics={irrMetrics} />;
+};
+```
+
+### Conditional Rendering with Loading States
+```javascript
+const FinancialDashboard = () => {
+  const { sourceData, metricsData, isLoading, refreshStage } = useCube();
+
+  // Progressive loading with stage-specific content
+  if (isLoading) {
+    return (
+      <div>
+        <Spin tip={`Processing ${refreshStage}...`} />
+        <Progress 
+          percent={getStageProgress(refreshStage)} 
+          status="active" 
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {sourceData && <CashflowTimelineCard />}
+      {metricsData && <FinancialMetricsCard />}
+    </>
+  );
 };
 ```
 
 ---
 
-## Development Best Practices
+## Advanced Usage
 
-### Transformer Development
-- **Return format**: Always return `SimResultsSchema[]` arrays, even empty for failures
-- **Audit usage**: Use `addAuditEntry()` to record dependencies and key calculations  
-- **Error handling**: Check for null/undefined data before processing
-- **Helper functions**: Use `filterCubeSourceData()` and `aggregateCubeSourceData()` for common operations
-- **Custom percentiles**: Handle percentile 0 transparently in calculations
+### Dynamic Registry Configuration
+```javascript
+// Runtime registry modification for different analysis modes
+const useAnalysisMode = (mode) => {
+  const { refreshCubeData } = useCube();
+  
+  const switchAnalysisMode = useCallback((newMode) => {
+    // Modify registries based on analysis mode
+    if (newMode === 'detailed') {
+      METRICS_REGISTRY.metrics.push(...DETAILED_METRICS);
+    } else {
+      METRICS_REGISTRY.metrics = BASE_METRICS;
+    }
+    
+    // Trigger refresh with new configuration
+    refreshCubeData();
+  }, [refreshCubeData]);
 
-### Registry Configuration  
-- **Priority ranges**: Use type-based ranges (direct: 1-99, indirect: 100-199, virtual: 200+)
-- **Dependencies**: Define `references` for data dependencies and transformer inputs
-- **Type selection**: Choose `direct` for raw data, `indirect` for multiplied data, `virtual` for calculations
-- **Metadata accuracy**: Set correct `cashflowGroup` and `category` for filtering and organization
+  return { switchAnalysisMode };
+};
+```
+
+### Performance Monitoring
+```javascript
+const usePerformanceMonitoring = () => {
+  const { lastRefresh, refreshStage } = useCube();
+  
+  useEffect(() => {
+    if (refreshStage === 'complete' && lastRefresh) {
+      const processingTime = Date.now() - lastRefresh.getTime();
+      
+      // Log performance metrics
+      console.log(`🔥 Cube processing completed in ${processingTime}ms`);
+      
+      // Send to analytics if needed
+      analytics.track('cube_processing_time', { duration: processingTime });
+    }
+  }, [refreshStage, lastRefresh]);
+};
+```
+
+This comprehensive system provides enterprise-grade financial data processing with React integration, complete transparency through audit trails, and optimized performance for real-time financial analysis applications.
