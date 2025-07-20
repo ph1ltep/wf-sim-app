@@ -2,9 +2,9 @@
 
 // FinanceabilityCard configurations
 export {
-    createFinancialMetricsConfig,
+    //createFinancialMetricsConfig,
     createDSCRChartConfig,
-    createCovenantAnalysisConfig
+    //createCovenantAnalysisConfig
 } from './FinanceabilityConfig';
 
 // CashflowTimelineCard configurations

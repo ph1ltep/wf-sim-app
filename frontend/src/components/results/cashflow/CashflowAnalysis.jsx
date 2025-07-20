@@ -434,7 +434,7 @@ const CashflowAnalysis = () => {
                                 <CardErrorBoundary cardName={cardConfig.name} gridProps={cardConfig.gridProps}>
                                     {CardComponent ? (
                                         <CardComponent
-                                            cashflowData={sourceData}
+                                            //cashflowData={sourceData}
                                             selectedPercentiles={selectedPercentile}
                                             cardConfig={cardConfig}
                                         />

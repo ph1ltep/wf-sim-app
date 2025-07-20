@@ -639,6 +639,7 @@ export const CubeProvider = ({ children }) => {
 
         // Data access
         getData,
+        getMetric,
         getAuditTrail,
 
     };

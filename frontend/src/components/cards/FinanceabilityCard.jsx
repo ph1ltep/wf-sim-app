@@ -1,4 +1,4 @@
-// src/components/cards/FinanceabilityCard.jsx - Enhanced with MetricsDataTable and new charts
+// frontend/src/components/cards/FinanceabilityCard.jsx - Full CubeContext Migration
 import React, { useMemo, useState } from 'react';
 import { Card, Empty, Alert, Space, Typography, Tag, Button, Row, Col } from 'antd';
 import {
@@ -8,156 +8,217 @@ import {
     AuditOutlined
 } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
+import { useCube } from '../../contexts/CubeContext';
+import { useScenario } from '../../contexts/ScenarioContext';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import { MetricsTable } from '../tables';
-import { createFinancialMetricsConfig, createDSCRChartConfig, createCovenantAnalysisConfig } from './configs'; // UPDATED
-import { prepareFinancialTimelineData } from './configs/FinanceabilityConfig';
 import {
+    createFinancialMetricsConfig,
+    createDSCRChartConfig,
+    prepareFinancialTimelineData,
     calculateCovenantAnalysis,
     getBankabilityRiskLevel
-} from '../../utils/finance';
-import { useScenario } from '../../contexts/ScenarioContext';
-import { useCube } from '../../contexts/CubeContext';
-
+} from './configs/FinanceabilityConfig';
 
 const { Text, Title } = Typography;
 
 /**
- * FinanceabilityCard - Summary card for bankability analysis with MetricsDataTable
- * Enhanced with LLCR, ICR metrics and column selection for chart filtering
+ * FinanceabilityCard - Full CubeContext integration for bankability analysis
  */
 const FinanceabilityCard = () => {
-    const { scenarioData } = useScenario();
-    //const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
     const [auditTrailVisible, setAuditTrailVisible] = useState(false);
+    const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
 
-    // Get cube data and percentile selection
-    const { getData, isLoading, error } = useCube();
-    const { getValueByPath } = useScenario();
+    // Cube context and scenario data
+    const { getData, getMetric, isLoading, error } = useCube();
+    const { getValueByPath, scenarioData } = useScenario();
 
-    // sourceIds for cashflow timeline card
-    const cardSourceIds = ['totalRevenue', 'totalCost', 'netCashflow', 'debtService', 'dscr', 'cumulativeCashflow'];
-
+    // Get configuration from scenario data
     const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
-    const availablePercentiles = getValueByPath(['settings', 'simulation', 'percentiles', 'availablePercentiles']);
+    const availablePercentiles = getValueByPath(['settings', 'simulation', 'percentiles'])?.map(p => p.value) || [10, 25, 50, 75, 90];
     const primaryPercentile = getValueByPath(['settings', 'simulation', 'percentiles', 'primaryPercentile']) || 50;
-    const localCurrency = getValueByPath(['settings', 'project', 'currency', 'local']);
+    const localCurrency = getValueByPath(['settings', 'project', 'currency', 'local']) || 'USD';
+    const projectLife = getValueByPath(['settings', 'general', 'projectLife']) || 20;
 
-    // Get cube data for current percentile
-    const cubeData = useMemo(() => {
+    // Define required source IDs for time-series data
+    const cardSourceIds = [
+        'netCashflow',       // For DSCR calculation base
+        'debtService',       // Combined debt service payments
+        'dscr',              // Pre-calculated DSCR time series
+        'cumulativeCashflow' // For visualization
+    ];
+
+    // Define required metric IDs for scalar financial metrics
+    const cardMetricIds = [
+        'projectIRR',        // Project Internal Rate of Return
+        'equityIRR',         // Equity Internal Rate of Return  
+        'projectNPV',        // Net Present Value
+        'minDSCR',           // Minimum DSCR across project life
+        'avgDSCR',           // Average DSCR operational years
+        'minLLCR',           // Minimum Loan Life Coverage Ratio
+        'minICR',            // Minimum Interest Coverage Ratio
+        'covenantBreaches'   // Covenant breach analysis
+    ];
+
+    // Get cube source data for current percentile
+    const cubeSourceData = useMemo(() => {
+        if (!selectedPercentile?.value) return {};
 
         try {
-            console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentile.value}`);
-            return getData({ sourceIds: cardSourceIds, percentile: selectedPercentile.value });
+            console.log(`🏦 FinanceabilityCard: Getting cube source data for P${selectedPercentile.value}`);
+            return getData({
+                sourceIds: cardSourceIds,
+                percentile: selectedPercentile.value
+            });
         } catch (error) {
-            console.error('❌ CashflowTimelineCard: Cube data transformation failed:', error);
-            return null;
+            console.error('❌ FinanceabilityCard: Failed to get cube source data:', error);
+            return {};
         }
-    }, [selectedPercentile, getData]);
+    }, [selectedPercentile?.value, getData]);
 
+    // Get cube metrics data for all percentiles (for table)
+    const cubeMetricsData = useMemo(() => {
+        try {
+            console.log('🏦 FinanceabilityCard: Getting cube metrics data for all percentiles');
+            return getMetric({
+                metricIds: cardMetricIds
+            });
+        } catch (error) {
+            console.error('❌ FinanceabilityCard: Failed to get cube metrics data:', error);
+            return {};
+        }
+    }, [getMetric]);
 
-    // Extract financing parameters and thresholds
-    const financingData = useMemo(() => {
-        if (!cashflowData?.financeMetrics) return null;
+    // Transform cube data to financial metrics format for MetricsTable
+    const financialMetricsData = useMemo(() => {
+        if (!cubeMetricsData || Object.keys(cubeMetricsData).length === 0) return null;
 
-        const { dscr, irr, npv, llcr, equityIRR, icr, avgDSCR, covenantBreaches } = cashflowData.financeMetrics;
+        console.log('🔄 FinanceabilityCard: Transforming cube metrics to financial format');
+
+        // Extract covenant threshold from scenario or default
+        const covenantThreshold = getValueByPath(['settings', 'modules', 'financing', 'minimumDSCR']) || 1.3;
 
         return {
-            dscr,
-            irr,
-            npv,
-            llcr,
-            equityIRR,
-            icr,        // NEW: Interest Coverage Ratio
-            avgDSCR,    // NEW: Average DSCR
-            covenantBreaches,
-            covenantThreshold: cashflowData.financeMetrics.covenantThreshold || 1.3
+            // Transform cube metrics to expected format
+            irr: cubeMetricsData.projectIRR || {},
+            equityIRR: cubeMetricsData.equityIRR || {},
+            npv: cubeMetricsData.projectNPV || {},
+            dscr: cubeMetricsData.minDSCR || {},
+            avgDSCR: cubeMetricsData.avgDSCR || {},
+            llcr: cubeMetricsData.minLLCR || {},
+            icr: cubeMetricsData.minICR || {},
+            covenantBreaches: cubeMetricsData.covenantBreaches || {},
+            covenantThreshold
         };
-    }, [cashflowData]);
+    }, [cubeMetricsData, getValueByPath]);
 
-    // Create metrics table data using new utility
+    // Create metrics table configuration
     const { tableData, tableConfig } = useMemo(() => {
-        if (!financingData || availablePercentiles) {
+        if (!financialMetricsData || !availablePercentiles?.length) {
             return { tableData: [], tableConfig: { columns: [] } };
         }
 
+        console.log('🔄 FinanceabilityCard: Creating metrics table configuration');
+
         const { data, config } = createFinancialMetricsConfig({
-            financingData,
-            availablePercentiles: availablePercentiles,
-            primaryPercentile: primaryPercentile || 50,
+            financingData: financialMetricsData,
+            availablePercentiles,
+            primaryPercentile: selectedPercentile?.value || primaryPercentile,
             currency: localCurrency,
-            scenarioData, // Add scenarioData to context
+            scenarioData,
             onColumnSelect: (percentile, columnKey, rowData) => {
+                console.log(`📊 Column selected: P${percentile} for ${rowData?.key}`);
                 setSelectedChartPercentile(percentile);
             }
         });
 
-        // Add selected column to config
+        // Add selected column highlight
         const enhancedConfig = {
             ...config,
-            selectedColumn: selectedChartPercentile ? `P${selectedChartPercentile}` : `P${selectedPercentiles?.unified || 50}`
+            selectedColumn: selectedChartPercentile ? `P${selectedChartPercentile}` : `P${selectedPercentile?.value || primaryPercentile}`
         };
 
         return { tableData: data, tableConfig: enhancedConfig };
-    }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile, scenarioData]); // Add scenarioData dependency
+    }, [financialMetricsData, availablePercentiles, selectedPercentile, primaryPercentile, localCurrency, scenarioData, selectedChartPercentile]);
 
-    // Calculate covenant breach analysis
+    // Calculate covenant analysis for risk assessment
     const covenantAnalysis = useMemo(() => {
-        if (!financingData?.covenantBreaches || !financingData?.covenantThreshold ||
-            !cashflowData?.metadata?.availablePercentiles) return null;
+        if (!financialMetricsData?.covenantBreaches || !financialMetricsData?.covenantThreshold) return null;
 
-        const analysisConfig = createCovenantAnalysisConfig({
-            financingData,
-            availablePercentiles: cashflowData.metadata.availablePercentiles
-        });
+        console.log('🔄 FinanceabilityCard: Calculating covenant analysis');
 
         return calculateCovenantAnalysis(
-            analysisConfig.financingData,
-            analysisConfig.confidenceIntervals,
-            analysisConfig.availablePercentiles
+            financialMetricsData,
+            availablePercentiles,
+            financialMetricsData.covenantThreshold
         );
-    }, [financingData, cashflowData?.metadata?.availablePercentiles]);
+    }, [financialMetricsData, availablePercentiles]);
 
-    // Enhanced DSCR timeline chart with LLCR and ICR
-    const enhancedChartData = useMemo(() => {
-        if (!financingData?.dscr || !cashflowData?.metadata?.availablePercentiles) {
+    // Prepare chart data for DSCR timeline
+    const chartData = useMemo(() => {
+        if (!cubeSourceData?.dscr?.data && !financialMetricsData?.dscr) {
             return { data: [], layout: {} };
         }
 
-        const chartConfig = createDSCRChartConfig({
-            financingData,
-            availablePercentiles: cashflowData.metadata.availablePercentiles,
-            primaryPercentile: selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
-            selectedPercentile: selectedChartPercentile,
-            projectLife: cashflowData.metadata.projectLife
-        });
+        console.log('🔄 FinanceabilityCard: Preparing DSCR chart data');
 
-        return prepareFinancialTimelineData(
-            chartConfig.financingData,
-            chartConfig.availablePercentiles,
-            chartConfig.primaryPercentile,
-            chartConfig.options
-        );
-    }, [financingData, cashflowData?.metadata, selectedPercentiles, selectedChartPercentile]);
+        try {
+            const chartConfig = createDSCRChartConfig({
+                sourceData: cubeSourceData,
+                financingData: financialMetricsData,
+                availablePercentiles,
+                primaryPercentile: selectedPercentile?.value || primaryPercentile,
+                selectedPercentile: selectedChartPercentile,
+                projectLife,
+                covenantThreshold: financialMetricsData?.covenantThreshold
+            });
+
+            return prepareFinancialTimelineData(chartConfig);
+        } catch (error) {
+            console.error('❌ FinanceabilityCard: Chart preparation failed:', error);
+            return { data: [], layout: {}, error: error.message };
+        }
+    }, [cubeSourceData, financialMetricsData, selectedPercentile, selectedChartPercentile]);
+
+    // Calculate bankability risk level
+    const bankabilityRisk = useMemo(() => {
+        if (!financialMetricsData) return null;
+
+        return getBankabilityRiskLevel({
+            minDSCR: financialMetricsData.dscr[selectedPercentile?.value || primaryPercentile]?.value,
+            projectIRR: financialMetricsData.irr[selectedPercentile?.value || primaryPercentile]?.value,
+            equityIRR: financialMetricsData.equityIRR[selectedPercentile?.value || primaryPercentile]?.value,
+            covenantBreaches: financialMetricsData.covenantBreaches[selectedPercentile?.value || primaryPercentile]?.value || [],
+            covenantThreshold: financialMetricsData.covenantThreshold
+        });
+    }, [financialMetricsData, selectedPercentile, primaryPercentile]);
 
     // Error states
-    if (!cashflowData) {
+    if (error) {
         return (
             <Card title="Financeability Analysis" variant="outlined">
-                <Empty description="No cashflow data available" />
+                <Alert
+                    type="error"
+                    message="Cube Data Error"
+                    description={`Failed to load financial data: ${error}`}
+                    showIcon
+                />
             </Card>
         );
     }
 
-    if (!financingData) {
+    if (isLoading) {
+        return (
+            <Card title="Financeability Analysis" variant="outlined" loading>
+                <div style={{ height: 200 }} />
+            </Card>
+        );
+    }
+
+    if (!financialMetricsData) {
         return (
             <Card title="Financeability Analysis" variant="outlined">
-                <Alert
-                    message="No Finance Data"
-                    description="No finance metrics available for financeability analysis."
-                    type="info"
-                    showIcon
-                />
+                <Empty description="No financial metrics available from cube data" />
             </Card>
         );
     }
@@ -168,26 +229,17 @@ const FinanceabilityCard = () => {
                 title={
                     <Space>
                         <DollarOutlined />
-                        <Text>Financeability Analysis</Text>
+                        <span>Financeability Analysis</span>
+                        {bankabilityRisk && (
+                            <Tag color={bankabilityRisk.color}>
+                                {bankabilityRisk.level.toUpperCase()}
+                            </Tag>
+                        )}
                     </Space>
                 }
                 variant="outlined"
                 extra={
                     <Space>
-                        {covenantAnalysis && (
-                            <Tag
-                                color={covenantAnalysis.riskLevel === 'low' ? 'success' :
-                                    covenantAnalysis.riskLevel === 'medium' ? 'warning' : 'error'}
-                                size="small"
-                            >
-                                {covenantAnalysis.riskLevel.toUpperCase()} RISK
-                            </Tag>
-                        )}
-                        {selectedChartPercentile && (
-                            <Tag color="blue" size="small">
-                                Viewing P{selectedChartPercentile}
-                            </Tag>
-                        )}
                         <Button
                             icon={<AuditOutlined />}
                             size="small"
@@ -195,74 +247,50 @@ const FinanceabilityCard = () => {
                         >
                             Audit Trail
                         </Button>
+                        <Button
+                            icon={<InfoCircleOutlined />}
+                            size="small"
+                            type="text"
+                        >
+                            P{selectedPercentile?.value || primaryPercentile}
+                        </Button>
                     </Space>
                 }
             >
-                {/* MetricsTable replacing inline table */}
+                {/* Financial Metrics Table */}
                 <div style={{ marginBottom: 24 }}>
-                    <Title level={5} style={{ marginBottom: 12 }}>
-                        Financial Summary - All Percentiles
-                        <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-                            {' '}(Click column to filter chart)
-                        </span>
+                    <Title level={5} style={{ margin: '0 0 12px 0' }}>
+                        Financial Metrics
+                        <Text style={{ fontSize: '12px', color: '#666', fontWeight: 'normal', marginLeft: 8 }}>
+                            (All percentiles - click to highlight in chart)
+                        </Text>
                     </Title>
-
                     <MetricsTable
-                        theme="metrics"
                         data={tableData}
                         config={tableConfig}
-                        loading={false}
-                        size="small"
+                        loading={isLoading}
+                        theme="metrics"
                     />
                 </div>
 
-                {/* Compact Bankability Status */}
+                {/* Covenant Analysis Summary */}
                 {covenantAnalysis && (
-                    <div style={{
-                        marginBottom: 24,
-                        padding: '8px 12px',
-                        backgroundColor: `${covenantAnalysis.riskColor}08`,
-                        borderRadius: '4px',
-                        border: `1px solid ${covenantAnalysis.riskColor}30`,
-                        fontSize: '12px'
-                    }}>
-                        <Row gutter={[16, 0]} align="middle">
-                            <Col flex="auto">
-                                <Space size="large">
-                                    <div>
-                                        <Text strong style={{ color: covenantAnalysis.riskColor, fontSize: '13px' }}>
-                                            {covenantAnalysis.riskLevel.toUpperCase()} RISK
-                                        </Text>
-                                    </div>
-                                    <div>
-                                        <Text strong>{covenantAnalysis.breachProbability}%</Text>
-                                        <Text type="secondary" style={{ marginLeft: 4 }}>breach probability</Text>
-                                    </div>
-                                    <div>
-                                        <Text strong style={{ color: covenantAnalysis.totalBreachYears > 0 ? '#ff4d4f' : '#52c41a' }}>
-                                            {covenantAnalysis.totalBreachYears}
-                                        </Text>
-                                        <Text type="secondary" style={{ marginLeft: 4 }}>years below {covenantAnalysis.threshold}</Text>
-                                    </div>
-                                </Space>
-                            </Col>
-                            <Col>
-                                <SafetyOutlined style={{
-                                    fontSize: '16px',
-                                    color: covenantAnalysis.riskColor,
-                                    opacity: 0.7
-                                }} />
-                            </Col>
-                        </Row>
+                    <div style={{ marginBottom: 24 }}>
+                        <Alert
+                            type={covenantAnalysis.severity === 'high' ? 'error' : covenantAnalysis.severity === 'medium' ? 'warning' : 'info'}
+                            message={`Covenant Analysis: ${covenantAnalysis.breachCount} potential breaches across percentiles`}
+                            description={covenantAnalysis.summary}
+                            showIcon
+                        />
                     </div>
                 )}
 
-                {/* Enhanced Multi-Metric Timeline Chart */}
-                <div style={{ marginBottom: 24 }}>
-                    <Title level={5} style={{ marginBottom: 16 }}>
-                        Coverage Ratios Timeline
+                {/* DSCR Timeline Chart */}
+                <div style={{ marginBottom: 16 }}>
+                    <Title level={5} style={{ margin: '0 0 12px 0' }}>
+                        Debt Service Coverage Timeline
                         <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-                            {' '}(DSCR, LLCR, ICR - Years 0+)
+                            {' '}(DSCR, LLCR, ICR - Years 1+)
                         </span>
                         {selectedChartPercentile && (
                             <Button
@@ -275,15 +303,19 @@ const FinanceabilityCard = () => {
                             </Button>
                         )}
                     </Title>
-                    <Plot
-                        data={enhancedChartData.data}
-                        layout={enhancedChartData.layout}
-                        config={{ responsive: true, displayModeBar: false }}
-                        style={{ width: '100%' }}
-                    />
+                    {chartData.error ? (
+                        <Alert type="error" message={`Chart Error: ${chartData.error}`} />
+                    ) : (
+                        <Plot
+                            data={chartData.data}
+                            layout={chartData.layout}
+                            config={{ responsive: true, displayModeBar: false }}
+                            style={{ width: '100%' }}
+                        />
+                    )}
                 </div>
 
-                {/* Metadata footer */}
+                {/* Metadata Footer */}
                 <div style={{
                     marginTop: 16,
                     padding: '8px 0',
@@ -294,19 +326,19 @@ const FinanceabilityCard = () => {
                     color: '#999'
                 }}>
                     <span>
-                        Analysis: {cashflowData.lineItems?.length || 0} line items,
-                        {cashflowData.metadata.availablePercentiles?.length || 0} percentiles
+                        Metrics: {cardMetricIds.length} financial metrics,
+                        {availablePercentiles?.length || 0} percentiles
                     </span>
                     <span>
-                        Currency: {cashflowData.metadata.currency},
-                        Project: {cashflowData.metadata.projectLife} years
+                        Currency: {localCurrency}, Project: {projectLife} years
                     </span>
                 </div>
             </Card>
 
             {/* Audit Trail Viewer */}
             <AuditTrailViewer
-                cashflowData={cashflowData}
+                cubeSourceData={cubeSourceData}
+                cubeMetricsData={cubeMetricsData}
                 visible={auditTrailVisible}
                 onClose={() => setAuditTrailVisible(false)}
             />
