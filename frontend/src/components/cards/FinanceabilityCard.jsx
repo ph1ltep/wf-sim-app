@@ -17,6 +17,7 @@ import {
     getBankabilityRiskLevel
 } from '../../utils/finance';
 import { useScenario } from '../../contexts/ScenarioContext';
+import { useCube } from '../../contexts/CubeContext';
 
 
 const { Text, Title } = Typography;
@@ -25,10 +26,35 @@ const { Text, Title } = Typography;
  * FinanceabilityCard - Summary card for bankability analysis with MetricsDataTable
  * Enhanced with LLCR, ICR metrics and column selection for chart filtering
  */
-const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
+const FinanceabilityCard = () => {
     const { scenarioData } = useScenario();
+    //const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
     const [auditTrailVisible, setAuditTrailVisible] = useState(false);
-    const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
+
+    // Get cube data and percentile selection
+    const { getData, isLoading, error } = useCube();
+    const { getValueByPath } = useScenario();
+
+    // sourceIds for cashflow timeline card
+    const cardSourceIds = ['totalRevenue', 'totalCost', 'netCashflow', 'debtService', 'dscr', 'cumulativeCashflow'];
+
+    const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
+    const availablePercentiles = getValueByPath(['settings', 'simulation', 'percentiles', 'availablePercentiles']);
+    const primaryPercentile = getValueByPath(['settings', 'simulation', 'percentiles', 'primaryPercentile']) || 50;
+    const localCurrency = getValueByPath(['settings', 'project', 'currency', 'local']);
+
+    // Get cube data for current percentile
+    const cubeData = useMemo(() => {
+
+        try {
+            console.log(`🔄 CashflowTimelineCard: Getting cube data for percentile ${selectedPercentile.value}`);
+            return getData({ sourceIds: cardSourceIds, percentile: selectedPercentile.value });
+        } catch (error) {
+            console.error('❌ CashflowTimelineCard: Cube data transformation failed:', error);
+            return null;
+        }
+    }, [selectedPercentile, getData]);
+
 
     // Extract financing parameters and thresholds
     const financingData = useMemo(() => {
@@ -51,15 +77,15 @@ const FinanceabilityCard = ({ cashflowData, selectedPercentiles }) => {
 
     // Create metrics table data using new utility
     const { tableData, tableConfig } = useMemo(() => {
-        if (!financingData || !cashflowData?.metadata?.availablePercentiles) {
+        if (!financingData || availablePercentiles) {
             return { tableData: [], tableConfig: { columns: [] } };
         }
 
         const { data, config } = createFinancialMetricsConfig({
             financingData,
-            availablePercentiles: cashflowData.metadata.availablePercentiles,
-            primaryPercentile: selectedPercentiles?.unified || cashflowData.metadata.primaryPercentile || 50,
-            currency: cashflowData.metadata.currency,
+            availablePercentiles: availablePercentiles,
+            primaryPercentile: primaryPercentile || 50,
+            currency: localCurrency,
             scenarioData, // Add scenarioData to context
             onColumnSelect: (percentile, columnKey, rowData) => {
                 setSelectedChartPercentile(percentile);

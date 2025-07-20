@@ -105,8 +105,8 @@ const CashflowTimelineCard = () => {
             showEquityCashflow,
             // Create metadata from cube data
             metadata: {
-                currency: getValueByPath(['settings', 'general', 'projectLife']), // TODO: Get from cube references
-                projectLife: getValueByPath(['settings', 'project', 'currency', 'local']), // TODO: Get from cube references
+                projectLife: getValueByPath(['settings', 'general', 'projectLife']), // TODO: Get from cube references
+                currency: getValueByPath(['settings', 'project', 'currency', 'local']), // TODO: Get from cube references
                 percentileStrategy: { strategy: selectedPercentile.strategy }
             }
         });
