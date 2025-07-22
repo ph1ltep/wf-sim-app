@@ -4,175 +4,119 @@ import { addCovenantAnnotations } from '../../../utils/charts/annotations';
 import { getFinancialColorScheme, getSemanticColor } from '../../../utils/charts/colors';
 
 /**
- * Create financial metrics table configuration for cube-based FinanceabilityCard
- * @param {Object} context - Configuration context
- * @returns {Object} { data, config } for MetricsTable
+ * Row configuration for FinanceabilityCard metrics table
  */
-export const createFinancialMetricsConfig = (context) => {
-    const {
-        financingData,           // Cube metrics data transformed to legacy format
-        availablePercentiles,
-        primaryPercentile,
-        currency = 'USD',
-        onColumnSelect = null,
-        scenarioData = null
-    } = context;
-
-    // Get finance-specific thresholds from scenario settings
-    const financialThresholds = createFinancialThresholds(financingData, scenarioData);
-
-    // Row definitions for financial metrics (same as before, but using cube data)
-    const rowDefinitions = [
+export const createFinanceabilityRowConfig = (localCurrency = 'USD') => ({
+    showRowLabels: true,
+    rows: [
         {
-            key: 'irr',
+            metricId: 'projectIRR',
             label: 'Project IRR (%)',
             tooltip: {
                 title: 'Project Internal Rate of Return',
                 content: 'Return on total project investment before debt service. Calculated from cube projectIRR metric.',
                 icon: 'DollarOutlined'
-            },
-            tags: [
-                { text: 'Primary', color: 'blue' },
-                { text: 'Returns', color: 'green' }
-            ],
-            thresholds: financialThresholds.irr
+            }
+            // No formatter - use registry default
+            // No tags - auto-generate from registry
+            // No valueField - defaults to 'value'
         },
         {
-            key: 'equityIRR',
+            metricId: 'equityIRR',
             label: 'Equity IRR (%)',
             tooltip: {
                 title: 'Equity Internal Rate of Return',
                 content: 'Return to equity investors after debt service. Calculated from cube equityIRR metric.',
                 icon: 'DollarOutlined'
-            },
-            tags: [
-                { text: 'Equity', color: 'purple' },
-                { text: 'Returns', color: 'green' }
-            ],
-            thresholds: financialThresholds.equityIRR
+            }
         },
         {
-            key: 'npv',
-            label: `NPV (${currency}M)`,
+            metricId: 'projectNPV',
+            label: `NPV (${localCurrency}M)`,
             tooltip: {
                 title: 'Net Present Value',
                 content: 'Present value of all future cash flows discounted at cost of equity. From cube projectNPV metric.',
                 icon: 'DollarOutlined'
             },
-            tags: [
-                { text: 'Valuation', color: 'orange' }
-            ],
-            thresholds: financialThresholds.npv
+            // Custom formatter for currency display
+            formatter: (value, rowData) => {
+                if (!value && value !== 0) return '-';
+                const millions = value / 1000000;
+                return `$${millions.toFixed(1)}M`;
+            }
         },
         {
-            key: 'dscr',
+            metricId: 'dscrMetrics', // FIXED: Use correct metric ID
             label: 'Min DSCR',
+            valueField: 'value', // Extract minimum from stats
             tooltip: {
                 title: 'Minimum Debt Service Coverage Ratio',
-                content: 'Lowest DSCR during operational period. From cube minDSCR metric with covenant threshold validation.',
+                content: 'Lowest DSCR during operational period. From cube dscrMetrics metric with stats.min extraction.',
                 icon: 'SafetyOutlined'
-            },
-            tags: [
-                { text: 'Covenant', color: 'red' },
-                { text: 'Risk', color: 'orange' }
-            ],
-            thresholds: financialThresholds.dscr
+            }
         },
         {
-            key: 'avgDSCR',
+            metricId: 'dscrMetrics', // FIXED: Same metric ID, different field
             label: 'Avg DSCR',
+            valueField: 'stats.avg', // Extract average from stats
             tooltip: {
                 title: 'Average Debt Service Coverage Ratio',
-                content: 'Average DSCR across operational years. From cube avgDSCR metric.',
+                content: 'Average DSCR across operational years. From cube dscrMetrics metric with stats.avg extraction.',
                 icon: 'SafetyOutlined'
-            },
-            tags: [
-                { text: 'Coverage', color: 'blue' }
-            ],
-            thresholds: financialThresholds.avgDSCR
+            }
         },
         {
-            key: 'llcr',
+            metricId: 'minLLCR',
             label: 'Min LLCR',
             tooltip: {
                 title: 'Minimum Loan Life Coverage Ratio',
                 content: 'NPV of remaining cash flows vs outstanding debt. From cube minLLCR metric.',
                 icon: 'SafetyOutlined'
-            },
-            tags: [
-                { text: 'Debt Coverage', color: 'purple' }
-            ],
-            thresholds: financialThresholds.llcr
+            }
         },
         {
-            key: 'icr',
+            metricId: 'minICR',
             label: 'Min ICR',
             tooltip: {
                 title: 'Minimum Interest Coverage Ratio',
                 content: 'Cash flow available for interest payments. From cube minICR metric.',
                 icon: 'SafetyOutlined'
+            }
+        },
+        {
+            metricId: 'covenantBreaches',
+            label: 'Covenant Breaches',
+            tooltip: {
+                title: 'Covenant Breach Analysis',
+                content: 'Number and severity of covenant breaches across operational period.',
+                icon: 'SafetyOutlined'
             },
-            tags: [
-                { text: 'Interest Coverage', color: 'orange' }
-            ],
-            thresholds: financialThresholds.icr
+            tags: [] // Explicitly no tags for this metric
         }
-    ];
+    ]
+});
 
-    // Generate table data from cube metrics (transform percentile-based data)
-    const tableData = rowDefinitions.map(rowDef => {
-        const metricData = financingData[rowDef.key] || {};
-
-        // Create row with percentile columns
-        const row = {
-            key: rowDef.key,
-            label: rowDef.label,
-            tooltip: rowDef.tooltip,
-            tags: rowDef.tags,
-            thresholds: rowDef.thresholds
-        };
-
-        // Add percentile data columns
-        availablePercentiles.forEach(percentile => {
-            const percentileData = metricData[percentile];
-            row[`P${percentile}`] = percentileData?.metadata.formatter(percentileData?.value) //{
-            // value: percentileData?.value || 0,
-            // metadata: percentileData?.metadata || {},
-            // stats: percentileData?.stats || {}
-            //};
-        });
-
-        return row;
-    });
-
-    // Generate column configuration for MetricsTable
-    const columnConfig = {
-        showHeader: true,
-        showRowLabels: true,
-        onColumnSelect,
-        primaryPercentile: `P${primaryPercentile}`,
-        columns: [
-            {
-                key: 'label',
-                title: 'Metric',
-                fixed: 'left',
-                width: 140
-            },
-            ...availablePercentiles.map(percentile => ({
-                key: `P${percentile}`,
-                title: `P${percentile}`,
-                align: 'center',
-                width: 80,
-                clickable: true
-            }))
-        ]
-    };
-
-    return {
-        data: tableData,
-        config: columnConfig
-    };
-};
+/**
+ * Column configuration for FinanceabilityCard metrics table
+ */
+export const createFinanceabilityColConfig = (percentileInfo, onColumnSelect, token) => ({
+    showHeader: true,
+    size: 'small',
+    onColumnSelect,
+    //selectedColumn: `P${percentileInfo.selected || percentileInfo.primary}`,
+    columns: percentileInfo.available.map(p => ({
+        key: `P${p}`,
+        label: `P${p}`,
+        width: 80, // Explicit width
+        selectable: true,
+        primary: p === percentileInfo.primary,
+        marker: p === percentileInfo.primary ? {
+            type: 'primary',
+            color: getSemanticColor('primary', 5, token), // Use token-aware colors
+            tag: 'Primary'
+        } : null,
+    }))
+});
 
 /**
  * Create DSCR chart configuration using cube source and metrics data
@@ -235,39 +179,39 @@ export const prepareFinancialTimelineData = (chartConfig) => {
     const colors = getFinancialColorScheme();
 
     // Create DSCR traces
-    if (chartOptions.showPercentilesBand && !selectedPercentile) {
-        // Show percentile bands
-        availablePercentiles.forEach((percentile, index) => {
-            const dscrData = timeSeriesData.dscr.filter(d => d.percentile === percentile);
+    // if (chartOptions.showPercentilesBand && !selectedPercentile) {
+    //     // Show percentile bands
+    //     //availablePercentiles.forEach((percentile, index) => {
+    //     const dscrData = timeSeriesData.dscr //.filter(d => d.percentile === percentile);
 
-            traces.push({
-                x: dscrData.map(d => d.year),
-                y: dscrData.map(d => d.value),
-                type: 'scatter',
-                mode: 'lines',
-                name: `DSCR P${percentile}`,
-                line: {
-                    color: colors.percentiles[index],
-                    width: percentile === primaryPercentile ? 3 : 1
-                },
-                opacity: percentile === primaryPercentile ? 1.0 : 0.6
-            });
-        });
-    } else {
-        // Show single percentile
-        const targetPercentile = selectedPercentile || primaryPercentile;
-        const dscrData = timeSeriesData.dscr.filter(d => d.percentile === targetPercentile);
+    //     traces.push({
+    //         x: dscrData.map(d => d.year),
+    //         y: dscrData.map(d => d.value),
+    //         type: 'scatter',
+    //         mode: 'lines',
+    //         name: `DSCR P${percentile}`,
+    //         line: {
+    //             color: colors.percentiles[index],
+    //             width: percentile === primaryPercentile ? 3 : 1
+    //         },
+    //         opacity: percentile === primaryPercentile ? 1.0 : 0.6
+    //     });
+    //     //});
+    // } else {
+    // Show single percentile
+    const targetPercentile = selectedPercentile || primaryPercentile;
+    const dscrData = timeSeriesData.dscr //.filter(d => d.percentile === targetPercentile);
 
-        traces.push({
-            x: dscrData.map(d => d.year),
-            y: dscrData.map(d => d.value),
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: `DSCR P${targetPercentile}`,
-            line: { color: colors.primary, width: 3 },
-            marker: { color: colors.primary, size: 6 }
-        });
-    }
+    traces.push({
+        x: dscrData.map(d => d.year),
+        y: dscrData.map(d => d.value),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: `DSCR P${targetPercentile}`,
+        line: { color: colors.primary, width: 3 },
+        marker: { color: colors.primary, size: 6 }
+    });
+    // }
 
     // Add covenant threshold line
     if (chartOptions.showCovenantLine) {
@@ -298,7 +242,7 @@ export const prepareFinancialTimelineData = (chartConfig) => {
         showlegend: true,
         legend: { x: 1, y: 1 },
         margin: { t: 50, r: 50, b: 50, l: 60 },
-        annotations: addCovenantAnnotations(covenantThreshold)
+        //annotations: addCovenantAnnotations(covenantThreshold)
     };
 
     return { data: traces, layout };
@@ -410,72 +354,72 @@ export const getBankabilityRiskLevel = (metrics) => {
  * @param {Object} scenarioData - Scenario configuration
  * @returns {Object} Threshold configurations by metric
  */
-const createFinancialThresholds = (financingData, scenarioData) => {
-    const financing = scenarioData?.settings?.modules?.financing || {};
+// const createFinancialThresholds = (financingData, scenarioData) => {
+//     const financing = scenarioData?.settings?.modules?.financing || {};
 
-    return {
-        dscr: [
-            {
-                field: 'covenantThreshold',
-                comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 600 } : null,
-                priority: 10,
-                description: 'DSCR below covenant threshold'
-            }
-        ],
-        irr: [
-            {
-                field: 'target_irr',
-                comparison: 'below',
-                colorRule: (value, threshold) => value < (financing.targetIRR || 10) ? { color: '#ff4d4f' } : null,
-                priority: 8,
-                description: 'Project IRR below target'
-            }
-        ],
-        equityIRR: [
-            {
-                field: 'target_equity_irr',
-                comparison: 'below',
-                colorRule: (value, threshold) => value < (financing.targetEquityIRR || 12) ? { color: '#ff4d4f' } : null,
-                priority: 8,
-                description: 'Equity IRR below target'
-            }
-        ],
-        npv: [
-            {
-                field: 'npv_positive',
-                comparison: 'above',
-                colorRule: (value) => value > 0 ? { color: '#52c41a' } : { color: '#ff4d4f' },
-                priority: 10,
-                description: 'NPV positive/negative indicator'
-            }
-        ],
-        avgDSCR: [
-            {
-                field: 'covenantThreshold',
-                comparison: 'below',
-                colorRule: (value, threshold) => value < threshold ? { color: '#faad14' } : null,
-                priority: 7,
-                description: 'Average DSCR below covenant'
-            }
-        ],
-        llcr: [
-            {
-                field: 'llcr_minimum',
-                comparison: 'below',
-                colorRule: (value) => value < 1.5 ? { color: '#faad14' } : null,
-                priority: 6,
-                description: 'LLCR below recommended minimum'
-            }
-        ],
-        icr: [
-            {
-                field: 'icr_minimum',
-                comparison: 'below',
-                colorRule: (value) => value < 2.0 ? { color: '#faad14' } : null,
-                priority: 6,
-                description: 'ICR below recommended minimum'
-            }
-        ]
-    };
-};
+//     return {
+//         dscr: [
+//             {
+//                 field: 'covenantThreshold',
+//                 comparison: 'below',
+//                 colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 600 } : null,
+//                 priority: 10,
+//                 description: 'DSCR below covenant threshold'
+//             }
+//         ],
+//         irr: [
+//             {
+//                 field: 'target_irr',
+//                 comparison: 'below',
+//                 colorRule: (value, threshold) => value < (financing.targetIRR || 10) ? { color: '#ff4d4f' } : null,
+//                 priority: 8,
+//                 description: 'Project IRR below target'
+//             }
+//         ],
+//         equityIRR: [
+//             {
+//                 field: 'target_equity_irr',
+//                 comparison: 'below',
+//                 colorRule: (value, threshold) => value < (financing.targetEquityIRR || 12) ? { color: '#ff4d4f' } : null,
+//                 priority: 8,
+//                 description: 'Equity IRR below target'
+//             }
+//         ],
+//         npv: [
+//             {
+//                 field: 'npv_positive',
+//                 comparison: 'above',
+//                 colorRule: (value) => value > 0 ? { color: '#52c41a' } : { color: '#ff4d4f' },
+//                 priority: 10,
+//                 description: 'NPV positive/negative indicator'
+//             }
+//         ],
+//         avgDSCR: [
+//             {
+//                 field: 'covenantThreshold',
+//                 comparison: 'below',
+//                 colorRule: (value, threshold) => value < threshold ? { color: '#faad14' } : null,
+//                 priority: 7,
+//                 description: 'Average DSCR below covenant'
+//             }
+//         ],
+//         llcr: [
+//             {
+//                 field: 'llcr_minimum',
+//                 comparison: 'below',
+//                 colorRule: (value) => value < 1.5 ? { color: '#faad14' } : null,
+//                 priority: 6,
+//                 description: 'LLCR below recommended minimum'
+//             }
+//         ],
+//         icr: [
+//             {
+//                 field: 'icr_minimum',
+//                 comparison: 'below',
+//                 colorRule: (value) => value < 2.0 ? { color: '#faad14' } : null,
+//                 priority: 6,
+//                 description: 'ICR below recommended minimum'
+//             }
+//         ]
+//     };
+// };

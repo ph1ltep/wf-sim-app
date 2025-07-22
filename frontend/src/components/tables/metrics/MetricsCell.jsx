@@ -1,5 +1,4 @@
-// src/components/tables/metrics/MetricsCell.jsx - v3.1 FIXED: Semantic class integration
-
+// src/components/tables/metrics/MetricsCell.jsx - MINIMAL change to original
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
 import { evaluateThresholds } from './TableConfiguration';
@@ -7,7 +6,7 @@ import { evaluateThresholds } from './TableConfiguration';
 const { Text } = Typography;
 
 /**
- * Format value based on column configuration
+ * Format value based on column configuration - KEEP EXACTLY THE SAME
  */
 const formatValue = (value, columnConfig, rowData) => {
     if (value === null || value === undefined || value === '') return null;
@@ -52,11 +51,11 @@ const formatValue = (value, columnConfig, rowData) => {
 };
 
 /**
- * MetricsCell component - UPDATED: Works with semantic class system
- * Semantic classes applied by parent <td>, this component handles content + thresholds
+ * MetricsCell component - EXACTLY as original with ONLY formatter prop support
  */
 export const MetricsCell = ({
     value,
+    formatter = null, // ONLY ADDITION: formatter prop
     rowData = {},
     columnConfig = {},
     isSelected = false,
@@ -66,12 +65,22 @@ export const MetricsCell = ({
     className = '', // Not used - wrapped in content-inner
     style = {} // Not used - wrapped in content-inner
 }) => {
-    // Format the display value
+    // Format the display value - ONLY CHANGE: Add formatter prop priority
     const formattedValue = useMemo(() => {
+        // NEW: PRIORITY 0 - Use formatter prop if provided
+        if (formatter && typeof formatter === 'function') {
+            try {
+                return formatter(value, rowData);
+            } catch (error) {
+                console.error('MetricsCell: Error applying formatter prop:', error);
+            }
+        }
+
+        // EXISTING: Use formatValue function (unchanged)
         return formatValue(value, columnConfig, rowData);
-    }, [value, columnConfig, rowData]);
+    }, [value, formatter, columnConfig, rowData]); // Add formatter to deps
 
-
+    // KEEP EVERYTHING ELSE EXACTLY THE SAME
     // Evaluate thresholds for styling (HIGHEST PRECEDENCE - supersedes all theme styling)
     const thresholdStyles = useMemo(() => {
         const thresholds = rowData.thresholds || columnConfig.thresholds;
@@ -80,20 +89,6 @@ export const MetricsCell = ({
             return {};
         }
 
-        // DETAILED DSCR DEBUGGING
-        // if (rowData.key === 'dscr') {
-        //     console.log('🎯 DSCR SPECIFIC DEBUG:', {
-        //         rowKey: rowData.key,
-        //         cellValue: value,
-        //         valueType: typeof value,
-        //         rowData: rowData,
-        //         hasThresholds: !!(rowData.thresholds),
-        //         thresholds: rowData.thresholds,
-        //         covenantThreshold: rowData.covenantThreshold,
-        //         covenantThresholdType: typeof rowData.covenantThreshold
-        //     });
-        // }
-
         if (!rowData.thresholds || !Array.isArray(rowData.thresholds) || rowData.thresholds.length === 0) {
             if (rowData.key === 'dscr') {
                 console.log('❌ DSCR: No thresholds found');
@@ -101,12 +96,7 @@ export const MetricsCell = ({
             return {};
         }
 
-
         const result = evaluateThresholds(rowData, rowData.thresholds, value);
-
-        // if (rowData.key === 'dscr') {
-        //     console.log('🔍 DSCR evaluateThresholds result:', result);
-        // }
 
         // DEBUG: Log threshold evaluation
         if (process.env.NODE_ENV === 'development' && Object.keys(result).length > 0) {
@@ -120,7 +110,6 @@ export const MetricsCell = ({
 
         return result;
     }, [rowData, columnConfig.thresholds, value]);
-
 
     // UPDATED: Minimal base styling - let semantic classes handle most styling
     const cellStyle = useMemo(() => {

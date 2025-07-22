@@ -8,6 +8,7 @@ import {
     getCellClasses,
     getMarkerStyles
 } from '../shared/TableThemeEngine';
+import { get } from 'lodash';
 
 const { Text } = Typography;
 
@@ -61,6 +62,10 @@ const renderHeaderCell = (rowData) => {
 /**
  * Generate table columns using semantic class engine
  */
+// frontend/src/components/tables/metrics/TableConfiguration.js - FIXED theming integration
+/**
+ * Generate table columns using semantic class engine - KEEP EXACT STRUCTURE
+ */
 export const generateMetricsTableColumns = (data, config, handleColumnSelect) => {
     if (!config.columns || !Array.isArray(config.columns)) {
         console.warn('generateMetricsTableColumns: No columns configuration provided');
@@ -72,7 +77,7 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     const totalCols = config.columns.length + 1;
     const totalRows = data.length;
 
-    // Header column (metric labels) - using semantic classes
+    // Header column (metric labels) - using semantic classes - KEEP EXACT
     const headerColumn = {
         title: (
             <div className="content-inner">
@@ -126,17 +131,14 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
 
     columns.push(headerColumn);
 
-    // Data columns with semantic class engine
+    // Data columns with semantic class engine - KEEP EXACT STRUCTURE
     const dataColumns = config.columns.map((columnConfig, colIndex) => {
         const isSelected = config.selectedColumn === columnConfig.key;
 
         // Use marker from config (no built-in primary logic)
         const marker = columnConfig.marker || null;
 
-
-        const columnStates = {
-            selected: isSelected
-        };
+        const columnStates = { selected: isSelected };
 
         return {
             title: (
@@ -215,27 +217,39 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                         () => handleColumnSelect(columnConfig.value || columnConfig.key, record, columnConfig) : undefined
                 };
             },
-            render: (value, record, rowIndex) => (
-                <div className="content-inner">
-                    <MetricsCell
-                        value={value}
-                        rowData={record}
-                        columnConfig={columnConfig}
-                        isSelected={isSelected}
-                        isPrimary={columnConfig.primary}
-                        position={{
-                            rowIndex: rowIndex || 0,
-                            colIndex: colIndex + 1,
-                            totalRows,
-                            totalCols,
-                            isHeaderRow: false,
-                            isHeaderCol: false,
-                            orientation
-                        }}
-                        states={columnStates}
-                    />
-                </div>
-            )
+            render: (cellData, record, rowIndex) => {
+                // ONLY CHANGE: Extract value and formatter
+                if (!cellData) {
+                    return <span>-</span>;
+                }
+
+                const extractField = cellData._extractedField || 'value';
+                const formatter = cellData._formatter;
+                const rawValue = get(cellData, extractField);
+
+                return (
+                    <div className="content-inner">
+                        <MetricsCell
+                            value={rawValue} // Pass extracted value
+                            formatter={formatter} // Pass formatter
+                            rowData={record}
+                            columnConfig={columnConfig}
+                            isSelected={isSelected}
+                            isPrimary={columnConfig.primary}
+                            position={{
+                                rowIndex: rowIndex || 0,
+                                colIndex: colIndex + 1,
+                                totalRows,
+                                totalCols,
+                                isHeaderRow: false,
+                                isHeaderCol: false,
+                                orientation
+                            }}
+                            states={columnStates}
+                        />
+                    </div>
+                );
+            }
         };
     });
 

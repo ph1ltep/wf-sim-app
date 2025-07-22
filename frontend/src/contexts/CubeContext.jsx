@@ -11,6 +11,7 @@ import {
     isConstructionSourcesComplete
 } from '../utils/dependencies/checkFunctions';
 import { generateConstructionCostSources } from '../utils/drawdownUtils';
+import { get, set } from 'lodash';
 
 const CubeContext = createContext();
 export const useCube = () => useContext(CubeContext);
@@ -34,6 +35,7 @@ export const CubeProvider = ({ children }) => {
     // ✅ FIXED: Sequential refresh state management
     const [sourceData, setSourceData] = useState(null);
     const [metricsData, setMetricsData] = useState(null);
+    const [percentileData, setPercentileData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshRequested, setRefreshRequested] = useState(false);
     const [refreshStage, setRefreshStage] = useState('idle');
@@ -47,7 +49,82 @@ export const CubeProvider = ({ children }) => {
         [] // ✅ No dependencies - static once computed
     );
 
-    const selectedPercentile = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
+    // TODO: this function is messy. it shouldn't run often and it shouldn't be reading directly from source data when we can get it from registry.
+    const getCustomPercentiles = useCallback(() => {
+        if (!sourceData || !scenarioData) {
+            console.log('⏸️ CubeContext: No sourceData or scenarioData available for getCustomPercentiles');
+            return [];
+        }
+
+        // Get all sources with hasPercentiles: true
+        const percentileSources = sourceData.filter(source => source.hasPercentiles === true);
+
+        // Get selectedPercentile data from scenarioData
+        const selectedPercentile = percentileData.selected //scenarioData?.simulation?.inputSim?.cashflow?.selectedPercentile;
+
+        if (!selectedPercentile) {
+            console.log('⏸️ CubeContext: No selectedPercentile found in scenarioData');
+            return [];
+        }
+
+        const defaultValue = selectedPercentile.value;
+        const customPercentileArray = selectedPercentile.customPercentile || [];
+
+        // Create the result array
+        const result = percentileSources.map(source => {
+            // Look for matching customPercentile entry
+            const customEntry = customPercentileArray.find(entry => entry.sourceId === source.id);
+
+            // Use custom percentile if found, otherwise use default
+            const percentileValue = customEntry ? customEntry.percentile : defaultValue;
+
+            return {
+                sourceId: source.id,
+                percentile: percentileValue
+            };
+        });
+
+        console.log('✅ CubeContext: getCustomPercentiles result:', result);
+        return result;
+    }, [sourceData, scenarioData]);
+
+    /**
+    * Get percentile information for components
+    * @returns {Object} Percentile configuration object
+    */
+    const getPercentileData = useCallback(() => {
+        let p;
+
+        if (!percentileData) {
+            const selected = getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile'])?.value;
+            const primary = getValueByPath(['settings', 'simulation', 'percentiles', 'primaryPercentile']) || 50;
+            p = {
+                selected: selected || primary,
+                available: availablePercentiles,
+                primary: primary,
+                custom: null, //getCustomPercentiles(),
+                strategy: 'unified'
+            };
+            setPercentileData(p);
+        }
+
+        return percentileData || p;
+    }, [getValueByPath]);
+
+    const setSelectedPercentile = useCallback((percentile) => {
+        const numericPercentile = typeof percentile === 'string' && percentile.startsWith('P')
+            ? Number(percentile.slice(1))
+            : Number(percentile);
+        set(percentileData, 'selected', numericPercentile);
+    }, [percentileData]);
+
+
+    const percentileInfo = useMemo(() =>
+        getPercentileData(),
+        []
+    );
+
+    //const selectedPercentile = percentileInfo.selected //getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
     const percentileSources = useMemo(() =>
         getPercentileSourcesFromCubeRegistry(CASHFLOW_SOURCE_REGISTRY),
         [] // ✅ Static registry - never changes
@@ -367,212 +444,6 @@ export const CubeProvider = ({ children }) => {
     }, [sourceData]);
 
     /**
- * Get metrics data with flexible filtering, heavily optimized for performance
- * @param {Object} filters - Filter parameters
- * @param {string} [filters.metricId] - Single metric ID
- * @param {string[]} [filters.metricIds] - Multiple metric IDs
- * @param {number} [filters.percentile] - Single percentile value
- * @param {Object} [filters.metadata] - Metadata filter criteria
- * @returns {Object} Filtered metrics data with dynamic keys
- */
-    const getMetric = useCallback((filters = {}) => {
-        const { percentile, metricId, metricIds, metadata: metadataFilters } = filters;
-
-        // Fast validation
-        if (!metricId && !metricIds && percentile === undefined) {
-            throw new Error('getMetric requires either metricId, metricIds, or percentile parameter');
-        }
-
-        if (!metricsData?.length) return {};
-
-        // Pre-compute metadata filter function for reuse
-        let metadataFilterFn = null;
-        if (metadataFilters) {
-            const filterEntries = Object.entries(metadataFilters);
-            if (filterEntries.length > 0) {
-                metadataFilterFn = (metadata) => filterEntries.every(([key, value]) => metadata[key] === value);
-            }
-        }
-
-        // Mode 1: Single metric, all percentiles - FASTEST PATH
-        if (metricId && percentile === undefined) {
-            // Direct find - no array filtering needed
-            const metric = metricsData.find(m => m.id === metricId);
-            if (!metric || (metadataFilterFn && !metadataFilterFn(metric.metadata))) return {};
-
-            // Pre-allocate result object size
-            const result = {};
-            const percentileMetrics = metric.percentileMetrics;
-            const metadata = metric.metadata; // Cache metadata reference
-
-            // Single loop with direct property assignment
-            for (let i = 0; i < percentileMetrics.length; i++) {
-                const pm = percentileMetrics[i];
-                result[pm.percentile.value] = {
-                    value: pm.value,
-                    stats: pm.stats,
-                    metadata
-                };
-            }
-            return result;
-        }
-
-        // Mode 2: Single percentile, all metrics - SECOND FASTEST PATH
-        if (percentile !== undefined && !metricId && !metricIds) {
-            const result = {};
-
-            // Single pass through metrics with early continue for non-matches
-            for (let i = 0; i < metricsData.length; i++) {
-                const metric = metricsData[i];
-
-                // Apply metadata filter early
-                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
-
-                // Use cached percentileMetrics and direct find with index optimization
-                const percentileMetrics = metric.percentileMetrics;
-                let percentileResult = null;
-
-                // Optimized find - assume percentiles are ordered for early break
-                for (let j = 0; j < percentileMetrics.length; j++) {
-                    if (percentileMetrics[j].percentile.value === percentile) {
-                        percentileResult = percentileMetrics[j];
-                        break;
-                    }
-                }
-
-                if (percentileResult) {
-                    result[metric.id] = {
-                        value: percentileResult.value,
-                        stats: percentileResult.stats,
-                        metadata: metric.metadata
-                    };
-                }
-            }
-            return result;
-        }
-
-        // Mode 3: Single metric + single percentile - ULTRA FAST PATH
-        if (metricId && percentile !== undefined) {
-            const metric = metricsData.find(m => m.id === metricId);
-            if (!metric || (metadataFilterFn && !metadataFilterFn(metric.metadata))) return {};
-
-            // Direct percentile lookup with optimized find
-            const percentileMetrics = metric.percentileMetrics;
-            for (let i = 0; i < percentileMetrics.length; i++) {
-                if (percentileMetrics[i].percentile.value === percentile) {
-                    return {
-                        [metric.id]: {
-                            value: percentileMetrics[i].value,
-                            stats: percentileMetrics[i].stats,
-                            metadata: metric.metadata
-                        }
-                    };
-                }
-            }
-            return {};
-        }
-
-        // Mode 4: Multiple metrics + single percentile - OPTIMIZED FOR BATCH
-        if (metricIds && percentile !== undefined) {
-            // Create Set for O(1) lookup instead of O(n) includes()
-            const metricIdSet = new Set(metricIds);
-            const result = {};
-
-            // Single pass with Set lookup
-            for (let i = 0; i < metricsData.length; i++) {
-                const metric = metricsData[i];
-
-                // Fast Set lookup
-                if (!metricIdSet.has(metric.id)) continue;
-                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
-
-                // Optimized percentile find
-                const percentileMetrics = metric.percentileMetrics;
-                for (let j = 0; j < percentileMetrics.length; j++) {
-                    if (percentileMetrics[j].percentile.value === percentile) {
-                        result[metric.id] = {
-                            value: percentileMetrics[j].value,
-                            stats: percentileMetrics[j].stats,
-                            metadata: metric.metadata
-                        };
-                        break;
-                    }
-                }
-            }
-            return result;
-        }
-
-        // Mode 5: Multiple metrics, all percentiles - COMPLEX CASE
-        if (metricIds && percentile === undefined) {
-            const metricIdSet = new Set(metricIds);
-            const result = {};
-
-            for (let i = 0; i < metricsData.length; i++) {
-                const metric = metricsData[i];
-
-                if (!metricIdSet.has(metric.id)) continue;
-                if (metadataFilterFn && !metadataFilterFn(metric.metadata)) continue;
-
-                // Group by metric ID with all percentiles
-                const metricResult = {};
-                const percentileMetrics = metric.percentileMetrics;
-                const metadata = metric.metadata;
-
-                for (let j = 0; j < percentileMetrics.length; j++) {
-                    const pm = percentileMetrics[j];
-                    metricResult[pm.percentile.value] = {
-                        value: pm.value,
-                        stats: pm.stats,
-                        metadata
-                    };
-                }
-                result[metric.id] = metricResult;
-            }
-            return result;
-        }
-
-        return {};
-    }, [metricsData]);
-
-    const getCustomPercentiles = useCallback(() => {
-        if (!sourceData || !scenarioData) {
-            console.log('⏸️ CubeContext: No sourceData or scenarioData available for getCustomPercentiles');
-            return [];
-        }
-
-        // Get all sources with hasPercentiles: true
-        const percentileSources = sourceData.filter(source => source.hasPercentiles === true);
-
-        // Get selectedPercentile data from scenarioData
-        const selectedPercentile = scenarioData?.simulation?.inputSim?.cashflow?.selectedPercentile;
-
-        if (!selectedPercentile) {
-            console.log('⏸️ CubeContext: No selectedPercentile found in scenarioData');
-            return [];
-        }
-
-        const defaultValue = selectedPercentile.value;
-        const customPercentileArray = selectedPercentile.customPercentile || [];
-
-        // Create the result array
-        const result = percentileSources.map(source => {
-            // Look for matching customPercentile entry
-            const customEntry = customPercentileArray.find(entry => entry.sourceId === source.id);
-
-            // Use custom percentile if found, otherwise use default
-            const percentileValue = customEntry ? customEntry.percentile : defaultValue;
-
-            return {
-                sourceId: source.id,
-                percentile: percentileValue
-            };
-        });
-
-        console.log('✅ CubeContext: getCustomPercentiles result:', result);
-        return result;
-    }, [sourceData, scenarioData]);
-
-    /**
      * Get audit trails for specific sources
      * @param {Array} sourceIds - Array of source IDs to get audit trails for
      * @returns {Object} Object with sourceId as keys and audit objects as values
@@ -611,12 +482,42 @@ export const CubeProvider = ({ children }) => {
         return auditTrails;
     }, [sourceData]);
 
+
+
+    /**
+     * Get comprehensive cube status for monitoring
+     * @returns {Object} Cube status object
+     */
+    const getCubeStatus = useCallback(() => {
+        return {
+            isLoading,
+            version: cubeVersion,
+            lastRefresh,
+            sourceDataCount: sourceData?.length || 0,
+            metricsDataCount: metricsData?.length || 0,
+            refreshRequested,
+            refreshStage,
+            error: cubeError,
+            isDataOutOfDate
+        };
+    }, [
+        isLoading,
+        cubeVersion,
+        lastRefresh,
+        sourceData?.length,
+        metricsData?.length,
+        refreshRequested,
+        refreshStage,
+        cubeError,
+        isDataOutOfDate
+    ]);
+
     const contextValue = {
         // Data
         sourceData,
         metricsData,
         availablePercentiles,
-        selectedPercentile,
+        //selectedPercentile,
         percentileSources,
 
         // Custom percentile management
@@ -639,8 +540,13 @@ export const CubeProvider = ({ children }) => {
 
         // Data access
         getData,
-        getMetric,
         getAuditTrail,
+
+        getPercentileData,
+        getCubeStatus,
+
+        //Data set
+        setSelectedPercentile
 
     };
 
