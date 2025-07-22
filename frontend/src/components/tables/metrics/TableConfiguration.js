@@ -76,6 +76,10 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     const orientation = 'horizontal'; // MetricsTable is always horizontal
     const totalCols = config.columns.length + 1;
     const totalRows = data.length;
+    const currentConfig = {
+        ...config,
+        selectedColumn: config.selectedColumn // This should come from parent
+    };
 
     // Header column (metric labels) - using semantic classes - KEEP EXACT
     const headerColumn = {
@@ -132,8 +136,8 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
     columns.push(headerColumn);
 
     // Data columns with semantic class engine - KEEP EXACT STRUCTURE
-    const dataColumns = config.columns.map((columnConfig, colIndex) => {
-        const isSelected = config.selectedColumn === columnConfig.key;
+    const dataColumns = currentConfig.columns.map((columnConfig, colIndex) => {
+        const isSelected = currentConfig.selectedColumn === columnConfig.key;
 
         // Use marker from config (no built-in primary logic)
         const marker = columnConfig.marker || null;

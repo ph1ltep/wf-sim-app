@@ -109,7 +109,7 @@ export const CubeProvider = ({ children }) => {
         }
 
         return percentileData || p;
-    }, [getValueByPath]);
+    }, [getValueByPath, percentileData, availablePercentiles]);
 
     const setSelectedPercentile = useCallback((percentile) => {
         const numericPercentile = typeof percentile === 'string' && percentile.startsWith('P')

@@ -34,7 +34,7 @@ const FinanceabilityCard = () => {
     // Use cube metrics hook
     const { getMetric, prepareMetricsTable, cubeStatus, isLoading, hasError, isReady } = useCubeMetrics();
     const { getValueByPath } = useScenario();
-    const percentileInfo = getPercentileData();
+    //const percentileInfo = getPercentileData();
 
 
     // Define required metric IDs - static array
@@ -46,7 +46,7 @@ const FinanceabilityCard = () => {
         //'avgDSCR',
         //'minLLCR',
         //'minICR',
-        'covenantBreaches'
+        //'covenantBreaches'
     ];
 
     // Everything depends ONLY on cube refresh - all data is computed together
@@ -67,6 +67,9 @@ const FinanceabilityCard = () => {
 
         console.log('🏦 FinanceabilityCard: Computing all data from cube refresh');
 
+        // ✅ Get fresh percentileInfo inside useMemo
+        const percentileInfo = getPercentileData();
+
         // Get static configuration
         const staticConfig = {
             localCurrency: getValueByPath(['settings', 'project', 'currency', 'local']) || 'USD',
@@ -86,6 +89,9 @@ const FinanceabilityCard = () => {
             },
             token
         );
+
+        // ✅ Add selectedColumn to colConfig
+        colConfig.selectedColumn = `P${percentileInfo.selected}`;
 
         // Prepare metrics table data
         const metricsTableData = prepareMetricsTable({
@@ -150,13 +156,14 @@ const FinanceabilityCard = () => {
             cubeMetricsData,
             covenantAnalysis,
             bankabilityRisk,
-            staticConfig
+            staticConfig,
+            percentileInfo
         };
     }, [
         cubeStatus.lastRefresh, // ONLY dependency - everything else is derived when cube refreshes
         isReady,
         getValueByPath,
-        percentileInfo,
+        getPercentileData,
         prepareMetricsTable,
         getMetric
     ]);
@@ -204,7 +211,7 @@ const FinanceabilityCard = () => {
         );
     }
 
-    const { metricsTableData, covenantAnalysis, bankabilityRisk, staticConfig } = cardData;
+    const { metricsTableData, covenantAnalysis, bankabilityRisk, staticConfig, percentileInfo } = cardData;
 
     // Show preparation errors if any
     if (metricsTableData.errors?.length > 0) {
