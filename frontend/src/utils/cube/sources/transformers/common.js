@@ -384,7 +384,7 @@ export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, 
     });
 
     // Add custom percentile entry if configured
-    if (customPercentile) {
+    if (customPercentile && customPercentile != {}) {
         result.push({
             name,
             data: [...dataPoints], // Same data array

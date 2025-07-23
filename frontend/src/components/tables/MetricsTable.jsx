@@ -49,7 +49,7 @@ const MetricsTable = ({
         if (!config.onColumnSelect) return;
         // Pass the key (percentile) directly, not cell value
         config.onColumnSelect(key, columnConfig?.key || key, rowData);
-        config.selectedColumn = key;
+        //config.selectedColumn = key;
     }, [config]);
 
     // Render metric header with consolidated classes

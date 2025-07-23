@@ -54,71 +54,16 @@ export const CASHFLOW_CARD_REGISTRY = {
 };
 
 // Card Error Boundary Component
-class CardErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-    }
-
-    static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-    }
-
-    componentDidCatch(error, errorInfo) {
-        console.error('Card Error Boundary caught an error:', error, errorInfo);
-    }
-
-    render() {
-        if (this.state.hasError) {
-            return (
-                <Card
-                    title={this.props.cardName || 'Card Error'}
-                    variant="outlined"
-                    {...this.props.gridProps}
-                >
-                    <Alert
-                        message="Card Rendering Error"
-                        description={`Failed to render ${this.props.cardName}: ${this.state.error?.message || 'Unknown error'}`}
-                        type="error"
-                        showIcon
-                    />
-                </Card>
-            );
-        }
-
-        return this.props.children;
-    }
-}
+const CardErrorBoundary = ({ children, cardName, gridProps = {} }) => {
+    return children;
+};
 
 // Placeholder Card Component
-const PlaceholderCard = ({ cardConfig, ...props }) => {
+const PlaceholderCard = ({ cardConfig }) => {
     return (
-        <Card
-            title={
-                <Space>
-                    <BarChartOutlined />
-                    <Text>{cardConfig.name}</Text>
-                </Space>
-            }
-            variant="outlined"
-            extra={
-                <Space>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {cardConfig.category}
-                    </Text>
-                </Space>
-            }
-            {...props}
-        >
-            <div style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#999',
-                backgroundColor: '#fafafa',
-                borderRadius: '6px',
-                border: '2px dashed #d9d9d9'
-            }}>
-                <BarChartOutlined style={{ fontSize: '48px', marginBottom: '16px', color: '#d9d9d9' }} />
+        <Card style={{ textAlign: 'center', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div>
+                <SettingOutlined style={{ fontSize: '48px', marginBottom: '16px', color: '#d9d9d9' }} />
                 <Title level={4} style={{ color: '#999', margin: '0 0 8px 0' }}>
                     {cardConfig.name} - Coming Soon
                 </Title>
@@ -136,35 +81,27 @@ const PlaceholderCard = ({ cardConfig, ...props }) => {
 };
 
 const CashflowAnalysis = () => {
+    // Scenario and cube context
     const { scenarioData } = useScenario();
-    // const {
-    //     //cashflowData,
-    //     //loading,
-    //     //transformError,
-    //     availablePercentiles,
-    //     //selectedPercentiles,
-    //     //refreshCashflowData,
-    //     // NEW: Stage tracking
-    //     //refreshStage,
-    //     //isRefreshing
-    // } = useCashflow();
 
-    const { getData,
-        selectedPercentile,
-        availablePercentiles,
-        sourceData, isLoading,
-        isRefreshing, refreshStage,
-        refreshCubeData } = useCube();
+    // Updated: Use CubeContext for cube-related data
+    const {
+        sourceData,
+        isLoading,
+        refreshStage,
+        refreshCubeData,
+        getPercentileData,
+        cubeError
+    } = useCube();
 
-    // // Auto-initialize on first access if not already initialized
-    // useEffect(() => {
-    //     if (!cashflowData && !loading && scenarioData) {
-    //         console.log('💹 Cash Flows accessed for first time, initializing...');
-    //         refreshCashflowData(false); // Auto-initialize with dependency checking
-    //     }
-    // }, [cashflowData, loading, scenarioData, refreshCashflowData]);
+    // Set up clean local percentile variables from cube
+    const percentileInfo = getPercentileData();
+    const selectedPercentile = percentileInfo?.selected;
+    const availablePercentiles = percentileInfo?.available || [];
+    const primaryPercentile = percentileInfo?.primary;
+    const percentileStrategy = percentileInfo?.strategy;
 
-    // ✅ ADDED: Auto-initialize like CashflowAnalysis pattern
+    // Auto-initialize on first access if not already initialized (restored from original)
     useEffect(() => {
         if (!sourceData && !isLoading && scenarioData) {
             console.log('🧊 Cube data accessed for first time, initializing...');
@@ -191,25 +128,21 @@ const CashflowAnalysis = () => {
 
     // Single refresh handler
     const handleRefresh = () => {
-        //refreshCashflowData(true);
         refreshCubeData(true); // Force refresh of cube data
     };
 
-    // NEW: Get stage display info
-    const getStageDisplay = (stage) => {
-        const stageInfo = {
-            idle: { text: 'Ready', icon: '✅', color: '#52c41a' },
-            // distributions: { text: 'Processing distributions', icon: '📊', color: '#1890ff' },
-            // construction: { text: 'Setting up construction', icon: '🏗️', color: '#fa8c16' },
-            sources: { text: 'Computing sources', icon: '📊', color: '#1890ff' },
-            metrics: { text: 'Calculating metrics', icon: '🧮', color: '#722ed1' },
-            // transform: { text: 'Generating cashflow', icon: '🔄', color: '#13c2c2' },
-            complete: { text: 'Complete', icon: '✅', color: '#52c41a' }
-        };
-        return stageInfo[stage] || stageInfo.idle;
+    // Refresh stage display mapping
+    const refreshStageDisplay = {
+        idle: { icon: '⏸️', text: 'Ready', color: '#666' },
+        initialization: { icon: '🔄', text: 'Initializing', color: '#1890ff' },
+        dependencies: { icon: '🔍', text: 'Checking Dependencies', color: '#1890ff' },
+        sources: { icon: '📊', text: 'Processing Sources', color: '#1890ff' },
+        metrics: { icon: '📈', text: 'Computing Metrics', color: '#1890ff' },
+        complete: { icon: '✅', text: 'Complete', color: '#52c41a' }
     };
 
-    const currentStageDisplay = getStageDisplay(refreshStage);
+    const currentStageDisplay = refreshStageDisplay[refreshStage] || refreshStageDisplay.idle;
+
 
     // Handle no active scenario
     if (!scenarioData) {
@@ -228,43 +161,6 @@ const CashflowAnalysis = () => {
         );
     }
 
-    // // Handle transformation errors
-    // if (transformError) {
-    //     return (
-    //         <div style={{ padding: '20px' }}>
-    //             <Row justify="space-between" align="middle">
-    //                 <Col>
-    //                     <Title level={2}>Cashflow Analysis</Title>
-    //                 </Col>
-    //                 <Col>
-    //                     <Button
-    //                         type="primary"
-    //                         icon={<ReloadOutlined />}
-    //                         onClick={handleRefresh}
-    //                         loading={loading}
-    //                     >
-    //                         Retry
-    //                     </Button>
-    //                 </Col>
-    //             </Row>
-
-    //             <Card>
-    //                 <Alert
-    //                     message="Data Transformation Error"
-    //                     description={transformError}
-    //                     type="error"
-    //                     showIcon
-    //                     action={
-    //                         <Button size="small" onClick={handleRefresh} loading={loading}>
-    //                             Retry
-    //                         </Button>
-    //                     }
-    //                 />
-    //             </Card>
-    //         </div>
-    //     );
-    // }
-
     // Get enabled cards sorted by order
     const enabledCards = Object.entries(CASHFLOW_CARD_REGISTRY)
         .filter(([cardId, config]) => cardVisibility[cardId] && config.enabled)
@@ -280,70 +176,42 @@ const CashflowAnalysis = () => {
                 <Col>
                     <Space>
                         {/* NEW: Enhanced status display with stage info */}
-                        {isRefreshing && (
+                        {isLoading && (
                             <Alert
                                 message={
-                                    <Space size="small">
-                                        <span>{currentStageDisplay.icon}</span>
-                                        <span>{currentStageDisplay.text}...</span>
+                                    <Space size="large" style={{ fontSize: '12px', color: '#666' }}>
+                                        <span style={{ color: currentStageDisplay.color }}>
+                                            {currentStageDisplay.icon} {currentStageDisplay.text}...
+                                        </span>
+                                        {refreshStage !== 'distributions' && (
+                                            <span style={{ color: '#52c41a' }}>✅ Previous stages complete</span>
+                                        )}
                                     </Space>
                                 }
                                 type="info"
-                                size="small"
                                 showIcon={false}
-                                style={{
-                                    borderColor: currentStageDisplay.color,
-                                    backgroundColor: `${currentStageDisplay.color}10`
-                                }}
+                                style={{ marginBottom: 0, padding: '4px 8px' }}
                             />
                         )}
+
                         <Button
                             type="primary"
                             icon={<ReloadOutlined />}
                             onClick={handleRefresh}
-                            loading={isRefreshing}
-                            disabled={isRefreshing}
+                            loading={isLoading}
+                            disabled={isLoading}
                         >
-                            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+                            {isLoading ? 'Refreshing...' : 'Refresh Data'}
                         </Button>
                     </Space>
                 </Col>
             </Row>
 
-            {/* Description and Controls */}
-            <FormSection>
-                <Paragraph>
-                    This dashboard analyzes project cash flows using Monte Carlo simulation results with
-                    escalation and other multiplier effects. Use the percentile selector to adjust confidence
-                    levels for different data sources.
-                </Paragraph>
+            <Paragraph>
+                Comprehensive financial analysis including cash flow timeline, debt service coverage,
+                and investment metrics across multiple percentile scenarios.
+            </Paragraph>
 
-                {/* NEW: Enhanced status text with stage progression */}
-                <div style={{ marginTop: '8px' }}>
-                    {isRefreshing ? (
-                        <Space size="large" style={{ fontSize: '12px', color: '#666' }}>
-                            <span style={{ color: currentStageDisplay.color }}>
-                                {currentStageDisplay.icon} {currentStageDisplay.text}...
-                            </span>
-                            {refreshStage !== 'distributions' && (
-                                <span style={{ color: '#52c41a' }}>✅ Previous stages complete</span>
-                            )}
-                        </Space>
-                    ) : sourceData ? (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                            ✅ Data ready - last refreshed: {new Date().toLocaleTimeString()}
-                        </Text>
-                    ) : (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
-                            Click "Refresh Data" to initialize the cashflow analysis
-                        </Text>
-                    )}
-                </div>
-            </FormSection>
-
-            <Divider />
-
-            {/* Percentile Selection Section */}
             <FormSection title="Percentile Selection" level={4}>
                 <ResponsiveFieldRow layout="twoColumn">
                     <PercentileSelector />
@@ -437,6 +305,8 @@ const CashflowAnalysis = () => {
                                             //cashflowData={sourceData}
                                             selectedPercentiles={selectedPercentile}
                                             cardConfig={cardConfig}
+                                            // MINIMAL ADDITION: Add percentileInfo prop
+                                            percentileInfo={percentileInfo}
                                         />
                                     ) : (
                                         <PlaceholderCard cardConfig={cardConfig} />
@@ -447,28 +317,6 @@ const CashflowAnalysis = () => {
                     })}
                 </Row>
             )}
-
-            {/* Debug Information (Development Only) */}
-            {/* {process.env.NODE_ENV === 'development' && cashflowData && (
-                <>
-                    <Divider />
-                    <FormSection title="Debug Information" level={4}>
-                        <Card size="small">
-                            <pre style={{ fontSize: '12px', overflow: 'auto', maxHeight: '200px' }}>
-                                {JSON.stringify({
-                                    metadata: cashflowData.metadata,
-                                    lineItemCount: cashflowData.lineItems?.length,
-                                    aggregationKeys: Object.keys(cashflowData.aggregations || {}),
-                                    financeMetricKeys: Object.keys(cashflowData.financeMetrics || {}),
-                                    selectedPercentiles,
-                                    refreshStage,
-                                    isRefreshing
-                                }, null, 2)}
-                            </pre>
-                        </Card>
-                    </FormSection>
-                </>
-            )} */}
         </div>
     );
 };

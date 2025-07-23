@@ -363,12 +363,12 @@ export const useCubeMetrics = () => {
         };
 
         // Add label column with proper width
-        config.columns.push({
-            key: 'label',
-            title: 'Metric',
-            fixed: 'left', // FIXED: Should be 'left', not 'center'
-            width: 160 // Slightly wider for longer labels
-        });
+        // config.columns.push({
+        //     key: 'label',
+        //     title: 'Metric',
+        //     fixed: 'left', // FIXED: Should be 'left', not 'center'
+        //     width: 160 // Slightly wider for longer labels
+        // });
 
         // Add percentile columns with explicit configuration
         percentiles.forEach(percentile => {

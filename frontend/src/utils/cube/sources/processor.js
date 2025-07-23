@@ -219,7 +219,7 @@ const validateSourceType = (source) => {
  * @returns {Array} Source data with added custom percentile (0) entry
  */
 const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
-    if (!Array.isArray(sourceData)) return sourceData;
+    if (!Array.isArray(sourceData) || customPercentile == {}) return sourceData;
 
     const targetPercentile = customPercentile[sourceId];
     if (!targetPercentile) return sourceData;

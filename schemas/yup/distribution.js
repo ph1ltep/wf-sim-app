@@ -9,7 +9,7 @@ const DataPointSchema = Yup.object().shape({
 
 // Schema for percentile configuration
 const PercentileSchema = Yup.object().shape({
-    value: Yup.number().min(1).max(99).default(50).required('Value is required'),
+    value: Yup.number().min(0).max(99).default(50).required('Value is required'),
     description: Yup.string().default('primary'),
     // Note: 'label' getter isn’t replicated in Yup; it’s a Mongoose-specific feature
 });
