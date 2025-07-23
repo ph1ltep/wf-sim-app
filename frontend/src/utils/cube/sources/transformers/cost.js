@@ -9,7 +9,7 @@ const Yup = require('yup');
  * @returns {Array} Array of SimResultsSchema objects for contract fees
  */
 export const contractFees = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences } = context;
 
     // Get global references
     const projectLife = allReferences.projectLife || 20;
@@ -57,7 +57,7 @@ export const contractFees = (sourceData, context) => {
     console.log(`📋 contractFees: ${contractFeesData.length} years, $${totalContractFees.toLocaleString()}`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(contractFeesData, availablePercentiles, 'contractFees', customPercentile, addAuditEntry);
+    return normalizeIntoSimResults(contractFeesData, percentileInfo, 'contractFees', customPercentile, addAuditEntry);
 };
 
 /**
@@ -67,7 +67,7 @@ export const contractFees = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for major repair costs
  */
 export const majorRepairs = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile } = context;
+    const { addAuditEntry, percentileInfo, customPercentile } = context;
 
     // Validate input - Major repair events schema
     const MajorRepairEventsSchema = Yup.array().of(Yup.object().shape({
@@ -115,7 +115,7 @@ export const majorRepairs = (sourceData, context) => {
     console.log(`🔧 majorRepairs: ${annualCosts.length} events, $${totalRepairCosts.toLocaleString()}`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'majorRepairs', customPercentile, addAuditEntry);
+    return normalizeIntoSimResults(annualCosts, percentileInfo, 'majorRepairs', customPercentile, addAuditEntry);
 };
 
 /**
@@ -125,7 +125,7 @@ export const majorRepairs = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for reserve fund provisions
  */
 export const reserveFunds = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences } = context;
 
     // Get project life from references
     const projectLife = allReferences.projectLife || 20;
@@ -152,5 +152,5 @@ export const reserveFunds = (sourceData, context) => {
     console.log(`💰 reserveFunds: ${provisionData.length} years, $${sourceData.toLocaleString()} total provision`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(provisionData, availablePercentiles, 'reserveFunds', customPercentile, addAuditEntry);
+    return normalizeIntoSimResults(provisionData, percentileInfo, 'reserveFunds', customPercentile, addAuditEntry);
 };

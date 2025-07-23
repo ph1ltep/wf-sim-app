@@ -16,19 +16,6 @@ import { get, set } from 'lodash';
 const CubeContext = createContext();
 export const useCube = () => useContext(CubeContext);
 
-/**
- * Extract sources with percentiles from cube registry (optimized)
- */
-const getPercentileSourcesFromCubeRegistry = (registry) => {
-    return registry.sources
-        .filter(source => source.hasPercentiles)
-        .map(source => ({
-            id: source.id,
-            type: source.metadata.type,
-            category: source.metadata.category
-        }));
-};
-
 export const CubeProvider = ({ children }) => {
     const { scenarioData, getValueByPath, updateByPath } = useScenario();
 
@@ -46,28 +33,6 @@ export const CubeProvider = ({ children }) => {
     const selectedPercentile = percentileInfo?.selected;
     const availablePercentiles = percentileInfo?.available;
     const primaryPercentile = percentileInfo?.primary;
-
-    const getCustomPercentiles = useCallback(() => {
-        if (!sourceData || !percentileInfo) {
-            console.log('⏸️ CubeContext: No sourceData or percentileInfo available');
-            return [];
-        }
-
-        const percentileSources = sourceData.filter(source => source.hasPercentiles === true);
-        const customPercentileArray = percentileInfo.custom || {};
-
-        const result = percentileSources.map(source => {
-            const customEntry = customPercentileArray[source.id];
-            const percentileValue = customEntry || percentileInfo.selected;
-
-            return {
-                sourceId: source.id,
-                percentile: percentileValue
-            };
-        });
-
-        return result;
-    }, [sourceData, percentileInfo]);
 
     // Clean getPercentileData - returns the single object
     const getPercentileData = useCallback(() => {
@@ -89,22 +54,6 @@ export const CubeProvider = ({ children }) => {
             selected: numericPercentile
         }));
     }, [updateByPath]);
-
-    //const selectedPercentile = percentileInfo.selected //getValueByPath(['simulation', 'inputSim', 'cashflow', 'selectedPercentile']);
-    const percentileSources = useMemo(() =>
-        getPercentileSourcesFromCubeRegistry(CASHFLOW_SOURCE_REGISTRY),
-        [] // ✅ Static registry - never changes
-    );
-
-    // Custom percentile configuration
-    const [customPercentile, setCustomPercentile] = useState(null);
-
-    const updateCustomPercentile = useCallback((updates) => {
-        setCustomPercentile(prev => {
-            if (!prev) return updates;
-            return { ...prev, ...updates };
-        });
-    }, []);
 
     // Check if data is out of date (informational only)
     const isDataOutOfDate = useMemo(() => {
@@ -145,7 +94,24 @@ export const CubeProvider = ({ children }) => {
         }
     }, [refreshRequested, scenarioData, getValueByPath]); // ✅ FIXED: No dependencies - same as CashflowContext
 
-    // In CubeContext.jsx - Simple initialization
+
+    const initializeCustomPercentiles = useCallback((existingCustom = {}, primaryPercentile = 50) => {
+        // Get sources with percentiles from registry (always scan registry)
+        const registrySources = CASHFLOW_SOURCE_REGISTRY.sources
+            .filter(source => source.hasPercentiles === true)
+            .map(source => source.id);
+
+        const customPercentiles = {};
+
+        // For each registry source with percentiles
+        registrySources.forEach(sourceId => {
+            // Use existing value if available, otherwise use primary percentile
+            customPercentiles[sourceId] = existingCustom[sourceId] || primaryPercentile;
+        });
+
+        return customPercentiles;
+    }, []);
+
     const initializePercentileInfo = useCallback(async (force = false) => {
         console.log('🔄 CubeContext: Stage 1 - Initializing percentile info...');
 
@@ -160,16 +126,19 @@ export const CubeProvider = ({ children }) => {
             // Get available percentiles from scenario settings
             const availableFromSettings = getValueByPath(['settings', 'simulation', 'percentiles'])
             const available = availableFromSettings.map(p => p.value) || [10, 25, 50, 75, 90];
+            const sortedAvailable = available.sort((a, b) => a - b);
 
             // Use center item from available array
-            const centerIndex = Math.floor((available.length - 1) / 2);
-            const defaultPercentile = available[centerIndex];
+            const centerIndex = Math.floor((sortedAvailable.length - 1) / 2);
+            const defaultPercentile = sortedAvailable[centerIndex];
+
+            const initializedCustom = initializeCustomPercentiles({}, defaultPercentile);
 
             const newPercentileData = {
                 selected: defaultPercentile,
-                available: available,
+                available: sortedAvailable,
                 primary: defaultPercentile,
-                custom: null,
+                custom: initializedCustom,
                 strategy: 'unified'
             };
 
@@ -181,9 +150,7 @@ export const CubeProvider = ({ children }) => {
             console.log('✅ CubeContext: Loaded existing percentile data from scenario');
         }
 
-        // Set as single source of truth for CubeContext
-        setPercentileInfo(existingPercentileData);
-        setRefreshStage('dependencies');
+        return existingPercentileData;
     }, [getValueByPath, updateByPath, scenarioData?.settings?.simulation?.percentiles]);
 
     /**
@@ -201,7 +168,8 @@ export const CubeProvider = ({ children }) => {
                         setSourceData(null);
                         setMetricsData(null);
 
-                        await initializePercentileInfo();
+                        const percentileData = await initializePercentileInfo();
+                        setPercentileInfo(percentileData);
 
                         setRefreshStage('dependencies');
                         break;
@@ -231,9 +199,8 @@ export const CubeProvider = ({ children }) => {
                         try {
                             const computedSourceData = await computeSourceData(
                                 CASHFLOW_SOURCE_REGISTRY,
-                                percentileInfo?.available,
+                                percentileInfo,
                                 getValueByPath,
-                                percentileInfo?.custom,
                             );
                             setSourceData(computedSourceData);
                             console.log('✅ CubeContext: Source data computed successfully');
@@ -249,10 +216,9 @@ export const CubeProvider = ({ children }) => {
                         try {
                             const computedMetricsData = await computeMetricsData(
                                 METRICS_REGISTRY,
-                                percentileInfo?.available,
+                                percentileInfo,
                                 getValueByPath,
                                 getData, // Use existing getData function as getSourceData
-                                percentileInfo?.custom || {},
                             );
                             setMetricsData(computedMetricsData);
                             console.log(`✅ CubeContext: ${computedMetricsData.length} metrics computed successfully`);
@@ -526,14 +492,6 @@ export const CubeProvider = ({ children }) => {
         // Data
         sourceData,
         metricsData,
-        //selectedPercentile,
-        percentileSources,
-
-        // Custom percentile management
-        customPercentile,
-        setCustomPercentile,
-        updateCustomPercentile,
-        getCustomPercentiles,
 
         // State - ✅ Same interface as CashflowContext
         isLoading,

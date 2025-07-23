@@ -173,11 +173,11 @@ export const useCubeMetrics = () => {
     }, [metricsData]);
 
     /**
- * Helper to get nested value using dot notation
- * @param {Object} obj - Object to extract from
- * @param {string} path - Dot notation path (e.g., 'stats.stdev')
- * @returns {any} Extracted value
- */
+     * Helper to get nested value using dot notation
+     * @param {Object} obj - Object to extract from
+     * @param {string} path - Dot notation path (e.g., 'stats.stdev')
+     * @returns {any} Extracted value
+     */
     const getNestedValue = (obj, path) => {
         return get(obj, path);
     };
@@ -361,14 +361,6 @@ export const useCubeMetrics = () => {
             primaryPercentile: `P${colConfig?.primaryPercentile || primaryPercentile || null}`,
             columns: []
         };
-
-        // Add label column with proper width
-        // config.columns.push({
-        //     key: 'label',
-        //     title: 'Metric',
-        //     fixed: 'left', // FIXED: Should be 'left', not 'center'
-        //     width: 160 // Slightly wider for longer labels
-        // });
 
         // Add percentile columns with explicit configuration
         percentiles.forEach(percentile => {

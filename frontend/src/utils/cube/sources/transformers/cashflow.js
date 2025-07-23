@@ -7,7 +7,8 @@ import { filterCubeSourceData, aggregateCubeSourceData, adjustSourceDataValues, 
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const netCashflow = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Find totalRevenue and totalCost sources
     const totalRevenueSources = filterCubeSourceData(processedData, { sourceId: 'totalRevenue' });
@@ -59,7 +60,7 @@ export const netCashflow = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for cumulative cashflow
  */
 export const cumulativeCashflow = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, processedData } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, processedData } = context;
 
     // Get net cashflow source
     const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });
@@ -100,7 +101,8 @@ export const cumulativeCashflow = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for project cashflow
  */
 export const projectCashflow = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, processedData, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, processedData, allReferences } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get required sources
     const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });
@@ -128,11 +130,11 @@ export const projectCashflow = (sourceData, context) => {
     const result = [];
 
     // Get all effective percentiles
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
+    // const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
+    //     ? [...availablePercentiles, 0]
+    //     : availablePercentiles;
 
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Extract data for this percentile
         const netCashflowData = extractPercentileData(netCashflow.percentileSource, percentile);
         const totalCapexData = extractPercentileData(totalCapex.percentileSource, percentile);
@@ -179,7 +181,8 @@ export const projectCashflow = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for equity cashflow
  */
 export const equityCashflow = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, processedData, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, processedData, allReferences } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get financing parameters
     const financing = allReferences.financing;
@@ -219,11 +222,11 @@ export const equityCashflow = (sourceData, context) => {
     const result = [];
 
     // Get all effective percentiles
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
+    // const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
+    //     ? [...availablePercentiles, 0]
+    //     : availablePercentiles;
 
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Extract data for this percentile
         const netCashflowData = extractPercentileData(netCashflow.percentileSource, percentile);
         const debtServiceData = extractPercentileData(debtService.percentileSource, percentile);

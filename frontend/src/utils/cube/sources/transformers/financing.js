@@ -9,7 +9,8 @@ import { filterCubeSourceData, aggregateCubeSourceData, normalizeIntoSimResults,
  * @returns {Array} Array of SimResultsSchema objects for IDC
  */
 export const interestDuringConstruction = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences, processedData } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences, processedData } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get financing data from references
     const financing = allReferences.financing;
@@ -108,7 +109,8 @@ export const interestDuringConstruction = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for operational interest payments
  */
 export const operationalInterest = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences, processedData } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences, processedData } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get financing data from references
     const financing = allReferences.financing;
@@ -207,7 +209,8 @@ export const operationalInterest = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for operational principal payments
  */
 export const operationalPrincipal = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences, processedData } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences, processedData } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get financing data from references
     const financing = allReferences.financing;
@@ -331,7 +334,8 @@ export const operationalPrincipal = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for debt service
  */
 export const debtService = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, processedData } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, processedData } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get already calculated operational interest and principal data
     const interestSources = filterCubeSourceData(processedData, { sourceId: 'operationalInterest' });
@@ -375,7 +379,8 @@ export const debtService = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for DSCR by year
  */
 export const dscr = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, processedData, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, processedData, allReferences } = context;
+    const availablePercentiles = percentileInfo.available;
 
     // Get net cashflow and debt service sources
     const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });

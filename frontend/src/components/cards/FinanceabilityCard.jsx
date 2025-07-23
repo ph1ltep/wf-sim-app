@@ -236,18 +236,18 @@ const FinanceabilityCard = () => {
                 extra={
                     <Space>
                         <Button
-                            icon={<AuditOutlined />}
-                            size="small"
-                            onClick={() => setAuditTrailVisible(true)}
-                        >
-                            Audit Trail
-                        </Button>
-                        <Button
                             icon={<InfoCircleOutlined />}
                             size="small"
                             type="text"
                         >
                             P{percentileInfo.selected || percentileInfo.primary}
+                        </Button>
+                        <Button
+                            icon={<AuditOutlined />}
+                            size="small"
+                            onClick={() => setAuditTrailVisible(true)}
+                        >
+                            Audit Trail
                         </Button>
                     </Space>
                 }

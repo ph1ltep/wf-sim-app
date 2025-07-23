@@ -367,7 +367,9 @@ export const adjustSourceDataValues = (sourceData, adjustFunction, addAuditEntry
  * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Array} Array of SimResultsSchema objects {name, data, percentile}
  */
-export const normalizeIntoSimResults = (dataPoints, availablePercentiles, name, customPercentile = null, addAuditEntry = null) => {
+export const normalizeIntoSimResults = (dataPoints, percentileInfo, name, customPercentile = null, addAuditEntry = null) => {
+    const availablePercentiles = percentileInfo.available;
+
     if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
         return [];
     }

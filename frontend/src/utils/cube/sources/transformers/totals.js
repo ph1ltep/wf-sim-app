@@ -7,7 +7,7 @@ import { filterCubeSourceData, aggregateCubeSourceData, normalizeIntoSimResults 
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const totalCost = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
 
     // Filter to cost sources only
     const costSources = filterCubeSourceData(processedData, {
@@ -23,7 +23,7 @@ export const totalCost = (sourceData, context) => {
     console.log(`📊 Aggregating ${costSources.length} cost sources for totalCost`);
 
     // Aggregate all cost sources with audit trail
-    return aggregateCubeSourceData(costSources, availablePercentiles, {
+    return aggregateCubeSourceData(costSources, percentileInfo.available, {
         operation: 'sum',
         customPercentile
     }, addAuditEntry);
@@ -36,7 +36,7 @@ export const totalCost = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const totalDebt = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
 
     // Filter to debt sources (liability cashflow group or financing category)
     const debtSources = filterCubeSourceData(processedData, {
@@ -61,7 +61,7 @@ export const totalDebt = (sourceData, context) => {
     console.log(`📊 Aggregating ${allDebtSources.length} debt sources for totalDebt`);
 
     // Aggregate all debt-related sources with audit trail
-    return aggregateCubeSourceData(allDebtSources, availablePercentiles, {
+    return aggregateCubeSourceData(allDebtSources, percentileInfo.available, {
         operation: 'sum',
         customPercentile
     }, addAuditEntry);
@@ -74,7 +74,7 @@ export const totalDebt = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const totalCapex = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
 
     // Filter to construction category sources
     const constructionSources = filterCubeSourceData(processedData, {
@@ -89,7 +89,7 @@ export const totalCapex = (sourceData, context) => {
     console.log(`📊 Aggregating ${constructionSources.length} CAPEX sources for totalCapex`);
 
     // Aggregate all CAPEX sources with audit trail
-    return aggregateCubeSourceData(constructionSources, availablePercentiles, {
+    return aggregateCubeSourceData(constructionSources, percentileInfo.available, {
         operation: 'sum',
         customPercentile
     }, addAuditEntry);
@@ -102,7 +102,7 @@ export const totalCapex = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects
  */
 export const totalRevenue = (sourceData, context) => {
-    const { processedData, availablePercentiles, customPercentile, addAuditEntry } = context;
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
 
     // Filter to revenue sources only
     const revenueSources = filterCubeSourceData(processedData, {
@@ -117,7 +117,7 @@ export const totalRevenue = (sourceData, context) => {
     console.log(`📊 Aggregating ${revenueSources.length} revenue sources for totalRevenue`);
 
     // Aggregate all revenue sources
-    return aggregateCubeSourceData(revenueSources, availablePercentiles, {
+    return aggregateCubeSourceData(revenueSources, percentileInfo.available, {
         operation: 'sum',
         customPercentile
     }, addAuditEntry);

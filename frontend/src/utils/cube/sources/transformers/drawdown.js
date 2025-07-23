@@ -7,7 +7,7 @@ import { filterCubeSourceData, aggregateCubeSourceData, normalizeIntoSimResults 
  * @returns {Array} Array of SimResultsSchema objects for CAPEX drawdown
  */
 export const capexDrawdown = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile } = context;
+    const { addAuditEntry, percentileInfo, customPercentile } = context;
 
     addAuditEntry('apply_capex_drawdown_transformation', `transforming ${sourceData.length} construction cost sources`, []);
 
@@ -33,7 +33,7 @@ export const capexDrawdown = (sourceData, context) => {
 
     console.log(`🏗️ capexDrawdown: ${yearlyTotals.size} years, $${totalCapex.toLocaleString()}`);
 
-    return normalizeIntoSimResults(annualCosts, availablePercentiles, 'capexDrawdown', customPercentile, addAuditEntry);
+    return normalizeIntoSimResults(annualCosts, percentileInfo, 'capexDrawdown', customPercentile, addAuditEntry);
 
 };
 
@@ -44,7 +44,7 @@ export const capexDrawdown = (sourceData, context) => {
  * @returns {Array} Array of SimResultsSchema objects for debt drawdown
  */
 export const debtDrawdown = (sourceData, context) => {
-    const { addAuditEntry, availablePercentiles, customPercentile, allReferences } = context;
+    const { addAuditEntry, percentileInfo, customPercentile, allReferences } = context;
 
     // Get financing data from references
     const financing = allReferences.financing;
@@ -92,5 +92,5 @@ export const debtDrawdown = (sourceData, context) => {
     console.log(`💰 debtDrawdown: ${debtDrawdownByYear.size} years, $${totalDebtDrawn.toLocaleString()} (${debtFinancingRatio * 100}% debt ratio)`);
 
     // Transform to SimResultsSchema array using helper
-    return normalizeIntoSimResults(debtDrawdownData, availablePercentiles, 'debtDrawdown', customPercentile, addAuditEntry);
+    return normalizeIntoSimResults(debtDrawdownData, percentileInfo, 'debtDrawdown', customPercentile, addAuditEntry);
 };

@@ -8,14 +8,15 @@ const Yup = require('yup');
 /**
  * Process metrics registry data following metrics processing flow (parallel to computeSourceData)
  * @param {Object} metricsRegistry - CubeMetricsRegistrySchema with references and metrics
- * @param {Array} availablePercentiles - Array of available percentiles [10, 25, 50, 75, 90]
+ * @param {Array} percentileInfo - percentileData object containing available percentiles and custom percentiles
  * @param {Function} getValueByPath - Function to extract data from scenario: (path: string[]) => any
  * @param {Function} getSourceData - Function to retrieve cube source data: (filters) => sourceData
  * @param {Object|null} customPercentile - Custom percentile configuration {sourceId: percentileValue} or null
  * @returns {Array} Array of CubeMetricDataSchema objects
  */
-export const computeMetricsData = (metricsRegistry, availablePercentiles, getValueByPath, getSourceData, customPercentile = null) => {
+export const computeMetricsData = (metricsRegistry, percentileInfo, getValueByPath, getSourceData) => {
     console.log('🔄 Starting metrics data processing...');
+    const { availablePercentiles, customPercentile } = percentileInfo;
     const startTime = performance.now();
 
     // Step 1: Load global references
@@ -56,7 +57,7 @@ export const computeMetricsData = (metricsRegistry, availablePercentiles, getVal
                 metric,
                 processedMetrics,
                 globalReferences,
-                availablePercentiles,
+                percentileInfo,
                 getValueByPath,
                 getSourceData,
                 customPercentile
@@ -193,15 +194,16 @@ const validateMetricDataStructure = (metricData, availablePercentiles) => {
  * @param {Object} metric - CubeMetricRegistryItemSchema
  * @param {Array} processedMetrics - Metrics processed so far in this run
  * @param {Object} globalReferences - Global reference data
- * @param {Array} availablePercentiles - Available percentiles
+ * @param {Array} percentileInfo - percentileData object containing available percentiles and custom
  * @param {Function} getValueByPath - Path extraction function
  * @param {Function} getSourceData - Source data retrieval function
  * @param {Object|null} customPercentile - Custom percentile config
  * @returns {Object} CubeMetricDataSchema
  */
-const processMetric = (metric, processedMetrics, globalReferences, availablePercentiles, getValueByPath, getSourceData, customPercentile) => {
+const processMetric = (metric, processedMetrics, globalReferences, percentileInfo, getValueByPath, getSourceData, customPercentile) => {
     // Initialize audit trail for this metric
     const { addAuditEntry, getTrail, getReferences } = createAuditTrail(metric.id, 50, true);
+    const { available: availablePercentiles } = percentileInfo;
 
     try {
         // Step 4a: Resolve dependencies

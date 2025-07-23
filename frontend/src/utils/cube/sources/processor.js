@@ -8,18 +8,20 @@ const Yup = require('yup');
 /**
  * Process source registry data following PHASE 1 cube processing flow
  * @param {Object} sourceRegistry - CubeSourceRegistrySchema with references and sources
- * @param {Array} availablePercentiles - Array of available percentiles [10, 25, 50, 75, 90]
+ * @param {Array} percentileInfo - percentileData object containing available percentiles and custom percentiles
  * @param {Function} getValueByPath - Function to extract data from scenario: (path: string[]) => any
  * @param {Object|null} customPercentile - Custom percentile configuration {sourceId: percentileValue} or null
  * @returns {Array} Array of CubeSourceDataSchema objects (processedData)
  */
-export const computeSourceData = (sourceRegistry, availablePercentiles, getValueByPath, customPercentile = null) => {
+export const computeSourceData = (sourceRegistry, percentileInfo, getValueByPath) => {
     console.log('🔄 Starting PHASE 1 cube data processing...');
+    const availablePercentiles = percentileInfo.available;
+    const useCustomPercentile = percentileInfo.strategy === 'unified' ? false : true;
     const startTime = performance.now();
 
     // Modify availablePercentiles if customPercentile is enabled
-    const effectivePercentiles = customPercentile
-        ? [...availablePercentiles, ...Object.values(customPercentile)]
+    const effectivePercentiles = useCustomPercentile
+        ? [...availablePercentiles, 0]
         : availablePercentiles;
 
     // Step 1: Load global references
@@ -93,8 +95,8 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
                     //sourceData = sourceData.results;
 
                     // Handle custom percentile for sources with percentiles
-                    if (customPercentile && source.hasPercentiles && sourceData) {
-                        sourceData = addCustomPercentileData(sourceData, source.id, customPercentile);
+                    if (useCustomPercentile && source.hasPercentiles && sourceData) {
+                        sourceData = addCustomPercentileData(sourceData, source.id, percentileInfo.custom);
                     }
 
                     console.log(`📥 Source data extracted for '${source.id}'`);
@@ -118,7 +120,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             let transformedData;
             if (source.transformer) {
                 try {
-                    transformedData = applyTransformer(sourceData, source, effectivePercentiles, allReferences, processedData, customPercentile, auditTrail.addAuditEntry);
+                    transformedData = applyTransformer(sourceData, source, percentileInfo, allReferences, processedData, percentileInfo.custom, auditTrail.addAuditEntry);
                     console.log(`🔄 Transformer applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Transformer failed for '${source.id}':`, error.message);
@@ -134,7 +136,7 @@ export const computeSourceData = (sourceRegistry, availablePercentiles, getValue
             let multipliedData;
             if (source.multipliers && source.multipliers.length > 0) {
                 try {
-                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, customPercentile, auditTrail.addAuditEntry);
+                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, percentileInfo.custom, auditTrail.addAuditEntry);
                     console.log(`🔢 ${source.multipliers.length} multipliers applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Multipliers failed for '${source.id}':`, error.message);
@@ -311,14 +313,15 @@ const validateSourceDataStructure = (sourceData, hasPercentiles, availablePercen
  * @param {Object|null} customPercentile - Custom percentile configuration
  * @returns {Array} Array of SimResultsSchema objects
  */
-const applyTransformer = (sourceData, source, availablePercentiles, allReferences, processedData, customPercentile, addAuditEntry) => {
+const applyTransformer = (sourceData, source, percentileInfo, allReferences, processedData, customPercentile, addAuditEntry) => {
     const context = {
-        availablePercentiles,
+        availablePercentiles: percentileInfo.available,
+        percentileInfo,
         allReferences,
         processedData,
         hasPercentiles: source.hasPercentiles,
         metadata: source.metadata,
-        customPercentile,
+        customPercentile, // This is the custom percentile for this particular source.
         addAuditEntry // Pass audit function to transformer
     };
 
@@ -326,7 +329,7 @@ const applyTransformer = (sourceData, source, availablePercentiles, allReference
     const transformerResult = source.transformer(sourceData, context);
 
     // Validate and normalize transformer output
-    return validateSourceDataStructure(transformerResult, source.hasPercentiles, availablePercentiles);
+    return validateSourceDataStructure(transformerResult, source.hasPercentiles, percentileInfo.available);
 };
 
 /**
