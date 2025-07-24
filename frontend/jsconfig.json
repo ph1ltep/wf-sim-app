@@ -1,10 +1,18 @@
 {
     "compilerOptions": {
+        "checkJs": false,
+        "strict": false,
+        "target": "esnext",
+        "module": "esnext",
         "baseUrl": "src",
         "paths": {
             "schemas/*": [
                 "../../schemas/*"
             ]
         }
-    }
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
 }

@@ -306,6 +306,14 @@ const SettingsSchema = Yup.object().shape({
     }),
 });
 
+const PercentileDataSchema = Yup.object().shape({
+    selected: Yup.number().min(0).max(100).default(50),
+    available: Yup.array().of(Yup.number()).default([10, 25, 50, 75, 90]),
+    custom: Yup.mixed().nullable().default(null), // Custom percentiles per source
+    primary: Yup.number().min(0).max(100).default(50),
+    strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
+});
+
 // InputSim Schema
 const InputSimSchema = Yup.object().shape({
     distributionAnalysis: Yup.object().shape({
@@ -316,13 +324,7 @@ const InputSimSchema = Yup.object().shape({
         escalationRate: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
-        percentileData: Yup.object().shape({
-            selected: Yup.number().min(0).max(100).default(50),
-            available: Yup.array().of(Yup.number()).default([10, 25, 50, 75, 90]),
-            custom: Yup.mixed().nullable().default(null), // Custom percentiles per source
-            primary: Yup.number().min(0).max(100).default(50),
-            strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
-        }).nullable().default(null),
+        percentileData: PercentileDataSchema.nullable().default(null),
         selectedPercentile: Yup.object().shape({
             strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
             value: Yup.number().min(0).max(100).default(50),

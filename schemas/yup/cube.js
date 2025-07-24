@@ -45,17 +45,6 @@ const CubeReferenceRegistryItemSchema = Yup.object().shape({ // global reference
     path: Yup.array().of(Yup.string()).required('reference path is required')
 });
 
-const xCubeSourceMetadataSchema = Yup.object().shape({
-    name: Yup.string().optional(),
-    type: Yup.string().oneOf(['direct', 'indirect', 'virtual']).default('direct'),
-    cashflowGroup: Yup.string().oneOf(['cost', 'revenue', 'asset', 'liability', 'risk', 'opportunity', 'none']).default('none'), //will be used to group how variables affect cashflow table.
-    category: Yup.string().required('Category is required'),
-    description: Yup.string().required('Description is required'),
-    formatter: Yup.mixed().optional(), //function to format number/precision/unit and return string.
-    customPercentile: Yup.string().default(50),
-});
-
-
 const CubeSourceMetadataSchema = Yup.object().shape({
     name: Yup.string().optional(),
     type: Yup.string().oneOf(['direct', 'indirect', 'virtual']).default('direct'),

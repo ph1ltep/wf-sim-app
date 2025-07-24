@@ -72,9 +72,9 @@ export const filterCubeSourceData = (processedData, filters = {}) => {
         if (name && source.metadata.name !== name) {
             return false;
         }
-        if (customPercentile && source.metadata.customPercentile !== customPercentile) {
-            return false;
-        }
+        // if (customPercentile && source.metadata.customPercentile !== customPercentile) {
+        //     return false;
+        // }
 
         // Filter by custom metadata (least selective, done last)
         if (metadataFilters && typeof metadataFilters === 'object') {
@@ -106,17 +106,17 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
         return [];
     }
 
-    // Determine effective percentiles
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
+    // REMOVED: effectivePercentiles logic since availablePercentiles already includes 0 when needed
 
     // Create result array - one SimResultsSchema per percentile
     const result = [];
 
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Create aggregation map for this percentile: year -> value
         const aggregationMap = new Map();
+
+        // ADDED: Merge customPercentile metadata from all sources
+        const mergedCustomPercentile = {};
 
         // Process each source for this percentile
         sources.forEach(source => {
@@ -127,50 +127,15 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
             source.percentileSource.forEach(simResult => {
                 let targetPercentile = simResult.percentile.value;
 
-                // Handle custom percentile for percentile 0
-                if (targetPercentile === 0 && customPercentile) {
-                    // Look up actual percentile to use for this source
-                    const customPercentileValue = customPercentile[source.id];
-                    if (customPercentileValue !== undefined) {
-                        // Find the corresponding data with the custom percentile value
-                        const customData = source.percentileSource.find(dataItem =>
-                            dataItem.percentile.value === customPercentileValue
-                        );
-
-                        if (customData) {
-                            // Use the custom percentile data but maintain output percentile as 0
-                            if (targetPercentile === 0) {
-                                customData.data.forEach(dataPoint => {
-                                    const currentValue = aggregationMap.get(dataPoint.year) || 0;
-                                    switch (operation) {
-                                        case 'sum':
-                                            aggregationMap.set(dataPoint.year, currentValue + dataPoint.value);
-                                            break;
-                                        case 'subtract':
-                                            aggregationMap.set(dataPoint.year, currentValue - dataPoint.value);
-                                            break;
-                                        case 'multiply':
-                                            aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue * dataPoint.value);
-                                            break;
-                                        case 'divide':
-                                            aggregationMap.set(dataPoint.year, currentValue === 0 ? dataPoint.value : currentValue / dataPoint.value);
-                                            break;
-                                        default:
-                                            aggregationMap.set(dataPoint.year, currentValue + dataPoint.value);
-                                    }
-                                });
-                            }
-                            return; // Skip normal processing for this simResult
-                        }
-                    }
-                    // If no custom percentile found, fall back to default (percentile 0)
-                }
-
-                // Normal aggregation - only process if this simResult matches our target percentile
+                // Normal processing for matching percentiles
                 if (targetPercentile === percentile) {
+                    // ADDED: Merge customPercentile metadata if it exists
+                    if (simResult.metadata && simResult.metadata.customPercentile) {
+                        Object.assign(mergedCustomPercentile, simResult.metadata.customPercentile);
+                    }
+
                     simResult.data.forEach(dataPoint => {
                         const currentValue = aggregationMap.get(dataPoint.year) || 0;
-
                         switch (operation) {
                             case 'sum':
                                 aggregationMap.set(dataPoint.year, currentValue + dataPoint.value);
@@ -192,32 +157,34 @@ export const aggregateCubeSourceData = (sources, availablePercentiles, options =
             });
         });
 
-        // Convert aggregation map to DataPointSchema array for this percentile
-        const dataPoints = Array.from(aggregationMap.entries())
-            .map(([year, value]) => ({
-                year: parseInt(year, 10),
-                value: value
-            }))
+        // Convert aggregation map back to data array
+        const aggregatedData = Array.from(aggregationMap.entries())
+            .map(([year, value]) => ({ year, value }))
             .sort((a, b) => a.year - b.year);
 
-        // Create one SimResultsSchema for this percentile
+        // ADDED: Build metadata with merged customPercentile
+        const metadata = {};
+        if (Object.keys(mergedCustomPercentile).length > 0) {
+            metadata.customPercentile = mergedCustomPercentile;
+        }
+
+        // Create result entry for this percentile
         result.push({
-            name: `aggregated_${operation}`, // Generic name for aggregated result
-            data: dataPoints,
-            percentile: { value: percentile }
+            name: `aggregated_${operation}`,
+            percentile: { value: percentile },
+            data: aggregatedData,
+            metadata
         });
     });
 
-    // Track dependencies for audit trail
-    const dependencies = sources.map(source => source.id);
-
     // Add audit entry if function provided
     if (addAuditEntry) {
+        const sourceIds = sources.map(s => s.id);
         addAuditEntry(
             'apply_aggregation',
-            `aggregating ${sources.length} sources (${operation})`,
-            dependencies,
-            result, // No source data for aggregation
+            `aggregated ${sources.length} sources using ${operation} operation`,
+            sourceIds,
+            result,
             'aggregate',
             operation
         );
@@ -369,6 +336,7 @@ export const adjustSourceDataValues = (sourceData, adjustFunction, addAuditEntry
  */
 export const normalizeIntoSimResults = (dataPoints, percentileInfo, name, customPercentile = null, addAuditEntry = null) => {
     const availablePercentiles = percentileInfo.available;
+    const useCustomPercentile = percentileInfo.strategy === 'perSource';
 
     if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
         return [];
@@ -381,18 +349,17 @@ export const normalizeIntoSimResults = (dataPoints, percentileInfo, name, custom
         result.push({
             name,
             data: [...dataPoints], // Same data array for each percentile
+            metadata: {
+                // Only add customPercentile metadata for percentile 0
+                //...(percentile === 0 && customPercentile && {
+                customPercentile: {
+                    ['fixed']: 100  // Dynamic-key array: sourceId → percentile value
+                }
+                //})
+            },
             percentile: { value: percentile }
         });
     });
-
-    // Add custom percentile entry if configured
-    if (customPercentile && customPercentile != {}) {
-        result.push({
-            name,
-            data: [...dataPoints], // Same data array
-            percentile: { value: 0 }
-        });
-    }
 
     // Add audit entry if function provided
     if (addAuditEntry) {

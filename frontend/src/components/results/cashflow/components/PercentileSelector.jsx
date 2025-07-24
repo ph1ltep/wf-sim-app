@@ -12,7 +12,7 @@ const PercentileSelector = () => {
     const { updateByPath } = useScenario();
 
     // Get percentile data from CubeContext
-    const { getPercentileData, setSelectedPercentile, sourceData } = useCube();
+    const { getPercentileData, setSelectedPercentile, getSourceMetadata, updatePercentileData } = useCube();
     const percentileInfo = getPercentileData();
 
     // Extract values from percentileInfo (reactive to changes)
@@ -24,15 +24,40 @@ const PercentileSelector = () => {
 
     // Get sources that have percentiles for custom mode (from CubeContext, not discovery)
     const percentileSources = React.useMemo(() => {
-        if (!sourceData) return [];
-        return sourceData
-            .filter(source => source.hasPercentiles === true)
-            .map(source => ({
-                id: source.id,
-                name: source.metadata?.displayName || source.id
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [sourceData]);
+        // Get source IDs from customPercentiles keys
+        const customSourceIds = Object.keys(customPercentiles);
+
+        if (customSourceIds.length === 0) {
+            console.log('📋 No custom percentile sources configured');
+            return [];
+        }
+
+        try {
+            // Get metadata for all custom sources using the new getSourceMetadata function
+            const sourceMetadata = getSourceMetadata({ sourceIds: customSourceIds });
+
+            // Map to the expected format
+            return customSourceIds
+                .map(sourceId => {
+                    const metadata = sourceMetadata[sourceId];
+                    if (!metadata) {
+                        console.warn(`⚠️ Metadata not found for source: ${sourceId}`);
+                        return null;
+                    }
+
+                    return {
+                        id: sourceId,
+                        name: metadata.name || sourceId
+                    };
+                })
+                .filter(Boolean) // Remove null entries
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+        } catch (error) {
+            console.error('❌ Error getting source metadata:', error);
+            return [];
+        }
+    }, [customPercentiles, getSourceMetadata]);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [form] = Form.useForm();
@@ -42,41 +67,38 @@ const PercentileSelector = () => {
         setSelectedPercentile(value);
     };
 
-    // Update strategy and custom percentiles
-    const updatePercentileSelection = async (newSelection) => {
-        console.log('🎯 Percentile selection changed:', newSelection);
-
-        // Update the entire percentileData object in scenario
-        const updatedPercentileData = {
-            ...percentileInfo,
-            selected: newSelection.strategy === 'unified' ? newSelection.value : selectedPercentile,
-            strategy: newSelection.strategy,
-            custom: newSelection.strategy === 'perSource' ? newSelection.customPercentile : {}
-        };
-
-        try {
-            await updateByPath(['simulation', 'inputSim', 'cashflow', 'percentileData'], updatedPercentileData);
-            console.log('⚡ Percentile configuration updated');
-            return true;
-        } catch (error) {
-            console.error('Failed to update percentile configuration:', error);
-            return false;
-        }
-    };
-
     const handleAdvancedSubmit = async () => {
         try {
             const values = await form.validateFields();
             const { strategy, unified, ...perSourceValues } = values;
 
-            const newSelection = {
-                strategy,
-                value: unified || primaryPercentile,
-                customPercentile: strategy === 'perSource' ? perSourceValues : {}
+            console.log('💾 Form values received:', values);
+            console.log('📊 Strategy:', strategy);
+            console.log('🎯 Per-source values:', perSourceValues);
+
+            // FIXED: Build the correct update object based on PercentileDataSchema
+            const updates = {
+                strategy: strategy
             };
 
-            if (await updatePercentileSelection(newSelection)) {
+            // Add selected and custom based on strategy
+            if (strategy === 'unified') {
+                updates.selected = unified || primaryPercentile;
+            } else if (strategy === 'perSource') {
+                // Keep current selected value for perSource mode
+                // updates.selected stays unchanged
+                updates.selected = 0; // Use the virtual 0 for perSource
+                updates.custom = perSourceValues; // This is the object like {energyRevenue: 75, escalationRate: 25}
+            }
+
+            console.log('🚀 Updating percentileData with:', updates);
+
+            // FIXED: Use the new updatePercentileData function from CubeContext
+            if (await updatePercentileData(updates)) {
                 setModalVisible(false);
+                console.log('✅ Percentile configuration saved successfully');
+            } else {
+                console.error('❌ Failed to save percentile configuration');
             }
         } catch (error) {
             console.error('Form validation failed:', error);
@@ -90,13 +112,12 @@ const PercentileSelector = () => {
             unified: selectedPercentile || primaryPercentile
         };
 
-        // Add custom percentile values
-        if (strategy === 'perSource') {
-            percentileSources.forEach(source => {
-                formValues[source.id] = customPercentiles[source.id] || primaryPercentile;
-            });
-        }
+        // Add custom percentile values - FIXED: Always populate from customPercentiles
+        percentileSources.forEach(source => {
+            formValues[source.id] = customPercentiles[source.id] || primaryPercentile;
+        });
 
+        console.log('📋 Setting form values:', formValues); // Debug log
         form.setFieldsValue(formValues);
         setModalVisible(true);
     };

@@ -65,7 +65,7 @@ const FinanceabilityCard = () => {
             };
         }
 
-        console.log('🏦 FinanceabilityCard: Computing all data from cube refresh');
+        console.log('🏦 FinanceabilityCard: loading all data from cube');
 
         // ✅ Get fresh percentileInfo inside useMemo
         const percentileInfo = getPercentileData();
@@ -96,9 +96,7 @@ const FinanceabilityCard = () => {
         // Prepare metrics table data
         const metricsTableData = prepareMetricsTable({
             metricIds: cardMetricIds,
-            percentiles: percentileInfo.available,
-            selectedPercentile: percentileInfo.selected,
-            primaryPercentile: percentileInfo.primary,
+            percentileInfo: percentileInfo,
             rowConfig,
             colConfig
         });

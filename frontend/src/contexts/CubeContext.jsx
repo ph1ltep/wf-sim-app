@@ -45,15 +45,64 @@ export const CubeProvider = ({ children }) => {
             ? Number(percentile.slice(1))
             : Number(percentile);
 
-        // Update ScenarioContext (persistent)
-        await updateByPath(['simulation', 'inputSim', 'cashflow', 'percentileData', 'selected'], numericPercentile);
-
-        // Update local object (performance)
-        setPercentileInfo(prev => ({
-            ...prev,
-            selected: numericPercentile
-        }));
+        if (await updatePercentileData({ selected: numericPercentile })) {
+            console.log(`✅ Percentile ${numericPercentile} selected successfully`);
+        } else {
+            console.error(`❌ Failed to select percentile ${numericPercentile}`);
+        }
     }, [updateByPath]);
+
+    /**
+     * Update percentileData with partial or full updates
+     * @param {Object} updates - Partial or full percentileData object to merge
+     * @returns {Promise<boolean>} Success status
+     * 
+     * Examples:
+     * await updatePercentileData({ selected: 75 });
+     * await updatePercentileData({ strategy: 'perSource', custom: { energyRevenue: 90 } });
+     * await updatePercentileData({ selected: 50, strategy: 'unified', custom: {} });
+     */
+    const updatePercentileData = useCallback(async (updates = {}) => {
+        try {
+            // Get current percentileData
+            const currentPercentileData = percentileInfo || getValueByPath(['simulation', 'inputSim', 'cashflow', 'percentileData']);
+
+            if (!currentPercentileData) {
+                console.warn('updatePercentileData: No existing percentileData found');
+                return false;
+            }
+
+            // Merge updates with existing data
+            const mergedData = {
+                ...currentPercentileData,
+                ...updates
+            };
+
+            // Special handling for custom percentiles - deep merge if both are objects
+            if (updates.custom !== undefined && currentPercentileData.custom &&
+                typeof updates.custom === 'object' && typeof currentPercentileData.custom === 'object' &&
+                updates.custom !== null && currentPercentileData.custom !== null) {
+
+                mergedData.custom = {
+                    ...currentPercentileData.custom,
+                    ...updates.custom
+                };
+            }
+
+            // Save to ScenarioContext (persistent)
+            await updateByPath(['simulation', 'inputSim', 'cashflow', 'percentileData'], mergedData);
+
+            // Update local state (performance)
+            setPercentileInfo(mergedData);
+
+            console.log('✅ updatePercentileData: Updated', Object.keys(updates));
+            return true;
+
+        } catch (error) {
+            console.error('❌ updatePercentileData: Failed to update:', error);
+            return false;
+        }
+    }, [percentileInfo, getValueByPath, updateByPath, setPercentileInfo]);
 
     // Check if data is out of date (informational only)
     const isDataOutOfDate = useMemo(() => {
@@ -419,6 +468,87 @@ export const CubeProvider = ({ children }) => {
         return result;
     }, [sourceData]);
 
+
+    // In CubeContext.jsx - Add this function
+
+    /**
+     * Get source metadata with flexible filtering options
+     * @param {Object} filters - Filter parameters
+     * @param {string} [filters.sourceId] - Single source ID
+     * @param {string[]} [filters.sourceIds] - Multiple source IDs
+     * @param {Object} [filters.metadata] - Filter by metadata fields (exact matches)
+     * @returns {Object} Dynamic-key object where key=sourceId, value=CubeSourceMetadataSchema
+     * @throws {Error} If no filter parameters provided
+     * 
+     * Examples:
+     * const energyMeta = getSourceMetadata({ sourceId: 'energyRevenue' });
+     * const revenueMeta = getSourceMetadata({ sourceIds: ['energyRevenue', 'capacityRevenue'] });
+     * const costMeta = getSourceMetadata({ metadata: { cashflowGroup: 'cost' } });
+     */
+    const getSourceMetadata = useCallback((filters = {}) => {
+        const { sourceId, sourceIds, metadata: metadataFilters } = filters;
+
+        // Validation - require at least one filter parameter
+        if (!sourceId && !sourceIds && !metadataFilters) {
+            throw new Error('getSourceMetadata requires at least one filter parameter: sourceId, sourceIds, or metadata');
+        }
+
+        // Use registry as source of truth for metadata (always available, even before sourceData)
+        const registrySources = CASHFLOW_SOURCE_REGISTRY.sources;
+
+        if (!registrySources || !Array.isArray(registrySources)) {
+            console.warn('⚠️ getSourceMetadata: Registry sources not available');
+            return {};
+        }
+
+        // Optimized filtering - apply most selective filters first
+        let filteredSources = registrySources;
+
+        // Apply sourceId filter first (most selective) - single source
+        if (sourceId) {
+            filteredSources = filteredSources.filter(source => source.id === sourceId);
+            // Early return if no source found
+            if (filteredSources.length === 0) return {};
+        }
+        // Apply sourceIds filter (multiple sources with OR logic)
+        else if (sourceIds && Array.isArray(sourceIds)) {
+            if (sourceIds.length === 0) return {}; // Empty array = no results
+
+            // Use Set for O(1) lookup performance
+            const sourceIdSet = new Set(sourceIds);
+            filteredSources = filteredSources.filter(source => sourceIdSet.has(source.id));
+
+            // Early return if no sources found
+            if (filteredSources.length === 0) return {};
+        }
+
+        // Apply metadata filters (moderately selective)
+        if (metadataFilters && typeof metadataFilters === 'object') {
+            const filterEntries = Object.entries(metadataFilters);
+            if (filterEntries.length > 0) {
+                filteredSources = filteredSources.filter(source => {
+                    return filterEntries.every(([key, value]) =>
+                        source.metadata && source.metadata[key] === value
+                    );
+                });
+                // Early return if no sources match metadata filters
+                if (filteredSources.length === 0) return {};
+            }
+        }
+
+        // Build result object with sourceId as key, metadata as value
+        const result = {};
+        filteredSources.forEach(source => {
+            result[source.id] = {
+                ...source.metadata, // Spread the metadata object
+                // sourceId: source.id, // Add sourceId for convenience
+                // hasPercentiles: source.hasPercentiles // Add hasPercentiles flag
+            };
+        });
+
+        return result;
+    }, []); // No dependencies - registry is static
+
     /**
      * Get audit trails for specific sources
      * @param {Array} sourceIds - Array of source IDs to get audit trails for
@@ -508,12 +638,13 @@ export const CubeProvider = ({ children }) => {
         // Data access
         getData,
         getAuditTrail,
-
+        getSourceMetadata,
         getPercentileData,
         getCubeStatus,
 
         //Data set
-        setSelectedPercentile
+        setSelectedPercentile,
+        updatePercentileData
 
     };
 

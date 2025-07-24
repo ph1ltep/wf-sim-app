@@ -99,24 +99,42 @@ export const createFinanceabilityRowConfig = (localCurrency = 'USD') => ({
 /**
  * Column configuration for FinanceabilityCard metrics table
  */
-export const createFinanceabilityColConfig = (percentileInfo, onColumnSelect, token) => ({
-    showHeader: true,
-    size: 'small',
-    onColumnSelect,
-    //selectedColumn: `P${percentileInfo.selected || percentileInfo.primary}`,
-    columns: percentileInfo.available.map(p => ({
-        key: `P${p}`,
-        label: `P${p}`,
-        width: 80, // Explicit width
-        selectable: true,
-        primary: p === percentileInfo.primary,
-        marker: p === percentileInfo.primary ? {
-            type: 'primary',
-            color: getSemanticColor('primary', 5, token), // Use token-aware colors
-            tag: 'Primary'
-        } : null,
-    }))
-});
+export const createFinanceabilityColConfig = (percentileInfo, onColumnSelect, token) => {
+
+    const results = {
+        showHeader: true,
+        size: 'small',
+        onColumnSelect,
+        columns: [...percentileInfo.available, 0].map(p => ({
+            key: `P${p}`,
+            label: (p === 0) ? 'Per-Source' : `P${p}`,
+            width: 80, // Explicit width
+            selectable: true,
+            primary: p === percentileInfo.primary,
+            marker: p === percentileInfo.primary ? {
+                type: 'primary',
+                color: getSemanticColor('primary', 5, token), // Use token-aware colors
+                tag: 'Primary'
+            } : null,
+        }))
+    };
+
+    // results.columns.push({
+    //     key: `P0`,
+    //     label: `Per-Source`,
+    //     width: 80, // Explicit width
+    //     selectable: true,
+    //     primary: 0 === percentileInfo.primary,
+    //     marker: 0 === percentileInfo.primary ? {
+    //         type: 'primary',
+    //         color: getSemanticColor('primary', 5, token), // Use token-aware colors
+    //         tag: 'Primary'
+    //     } : null,
+    // });
+
+    return results;
+
+};
 
 /**
  * Create DSCR chart configuration using cube source and metrics data

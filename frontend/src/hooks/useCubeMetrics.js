@@ -182,15 +182,12 @@ export const useCubeMetrics = () => {
         return get(obj, path);
     };
 
-    const prepareMetricsTable = useCallback(({
-        metricIds = [],
-        percentiles = [],
-        rowConfig = null,
-        colConfig = null,
-        selectedPercentile = null,
-        primaryPercentile = null
-    }) => {
+    const prepareMetricsTable = useCallback(({ metricIds = [], percentileInfo, rowConfig = null, colConfig = null, }) => {
         const errors = [];
+        const primaryPercentile = percentileInfo?.primary || 50; // Default to 50 if not set
+        const selectedPercentile = percentileInfo?.selected;
+        const percentiles = (percentileInfo.strategy == 'perSource') ? [...percentileInfo?.available, 0] : percentileInfo?.available
+
 
         // Validation
         if (!Array.isArray(metricIds) || metricIds.length === 0) {
@@ -351,7 +348,7 @@ export const useCubeMetrics = () => {
             });
         });
 
-        // Generate column configuration - ENSURE widths are applied
+        // Generate column configuration 
         const config = {
             showHeader: colConfig?.showHeader ?? true,
             size: colConfig?.size || 'small',

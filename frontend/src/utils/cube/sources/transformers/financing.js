@@ -42,12 +42,7 @@ export const interestDuringConstruction = (sourceData, context) => {
     // Process each percentile separately and create one SimResultsSchema per percentile
     const result = [];
 
-    // Get all effective percentiles (including custom percentile 0 if applicable)
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
-
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Extract debt drawdown data for this percentile
         const debtDrawdownData = extractPercentileData(debtDrawdownSource.percentileSource, percentile);
 
@@ -140,12 +135,7 @@ export const operationalInterest = (sourceData, context) => {
     // Process each percentile separately
     const result = [];
 
-    // Get all effective percentiles
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
-
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Extract principal payment data for this percentile
         const principalData = extractPercentileData(principalSource.percentileSource, percentile);
 
@@ -254,11 +244,8 @@ export const operationalPrincipal = (sourceData, context) => {
     const result = [];
 
     // Get all effective percentiles
-    const effectivePercentiles = customPercentile !== null && customPercentile !== undefined
-        ? [...availablePercentiles, 0]
-        : availablePercentiles;
 
-    effectivePercentiles.forEach(percentile => {
+    availablePercentiles.forEach(percentile => {
         // Extract debt drawdown and IDC data for this percentile
         const debtDrawdownData = extractPercentileData(debtDrawdownSource.percentileSource, percentile);
         const idcData = extractPercentileData(idcSource.percentileSource, percentile);
@@ -306,7 +293,10 @@ export const operationalPrincipal = (sourceData, context) => {
         result.push({
             name: 'operationalPrincipal',
             data: principalPayments, // Array of DataPointSchema
-            percentile: { value: percentile }
+            percentile: { value: percentile },
+            metadata: {
+                customPercentile: {},
+            }
         });
     });
 

@@ -19,6 +19,9 @@ const SimResultsSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
     percentile: PercentileSchema.required(),
     data: Yup.array().of(DataPointSchema).required(),
+    metadata: Yup.object().shape({
+        customPercentile: Yup.mixed().nullable().default(null),
+    }).default({}),
 });
 
 // Schema for distribution parameters with number types

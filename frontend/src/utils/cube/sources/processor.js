@@ -2,6 +2,7 @@
 import { CubeSourceDataSchema } from 'schemas/yup/cube';
 import { SimResultsSchema, DataPointSchema, SimulationInfoSchema } from 'schemas/yup/distribution';
 import { createAuditTrail } from '../audit';
+import { use } from 'react';
 
 const Yup = require('yup');
 
@@ -23,6 +24,15 @@ export const computeSourceData = (sourceRegistry, percentileInfo, getValueByPath
     const effectivePercentiles = useCustomPercentile
         ? [...availablePercentiles, 0]
         : availablePercentiles;
+
+    const effectivePercentileInfo = (useCustomPercentile) ? {
+        available: effectivePercentiles,
+        strategy: percentileInfo.strategy,
+        custom: useCustomPercentile ? percentileInfo.custom : null,
+        selected: percentileInfo.selected,
+        primary: percentileInfo.primary
+    } : percentileInfo;
+
 
     // Step 1: Load global references
     const globalReferences = {};
@@ -80,13 +90,6 @@ export const computeSourceData = (sourceRegistry, percentileInfo, getValueByPath
             // Step 3c: Combine global + local references (local overrides global)
             const allReferences = { ...globalReferences, ...localReferences };
 
-            // Add audit entry for reference loading
-            // auditTrail.addAuditEntry(
-            //     'apply_reference_loading',
-            //     `loaded ${Object.keys(allReferences).length} references`,
-            //     Object.keys(allReferences)
-            // );
-
             // Step 3d: Extract source data
             let sourceData = null;
             if (source.path) {
@@ -120,7 +123,7 @@ export const computeSourceData = (sourceRegistry, percentileInfo, getValueByPath
             let transformedData;
             if (source.transformer) {
                 try {
-                    transformedData = applyTransformer(sourceData, source, percentileInfo, allReferences, processedData, percentileInfo.custom, auditTrail.addAuditEntry);
+                    transformedData = applyTransformer(sourceData, source, effectivePercentileInfo, allReferences, processedData, percentileInfo.custom, auditTrail.addAuditEntry);
                     console.log(`🔄 Transformer applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Transformer failed for '${source.id}':`, error.message);
@@ -136,7 +139,7 @@ export const computeSourceData = (sourceRegistry, percentileInfo, getValueByPath
             let multipliedData;
             if (source.multipliers && source.multipliers.length > 0) {
                 try {
-                    multipliedData = applyMultipliers(transformedData, source.multipliers, allReferences, processedData, percentileInfo.custom, auditTrail.addAuditEntry);
+                    multipliedData = applyMultipliers(transformedData, source.multipliers, effectivePercentileInfo, allReferences, processedData, auditTrail.addAuditEntry);
                     console.log(`🔢 ${source.multipliers.length} multipliers applied to '${source.id}'`);
                 } catch (error) {
                     console.error(`❌ Multipliers failed for '${source.id}':`, error.message);
@@ -242,7 +245,9 @@ const addCustomPercentileData = (sourceData, sourceId, customPercentile) => {
         percentile: { value: 0 },
         metadata: {
             ...sourceItem.metadata,
-            customPercentile: targetPercentile
+            customPercentile: {
+                [sourceId]: targetPercentile  // Dynamic-key array: sourceId → percentile value
+            }
         }
     };
 
@@ -336,12 +341,16 @@ const applyTransformer = (sourceData, source, percentileInfo, allReferences, pro
  * Apply multipliers to transformed data
  * @param {Array} transformedData - Array of SimResultsSchema objects
  * @param {Array} multipliers - Array of multiplier configurations
+ * @param {Object} percentileInfo - Percentile configuration object
  * @param {Object} allReferences - Combined references
  * @param {Array} processedData - Previously processed data
- * @param {Object|null} customPercentile - Custom percentile configuration
- * @returns {Object} { data: Array<SimResultsSchema>, appliedMultipliers: Array<AppliedMultiplierSchema> }
+ * @param {Function} addAuditEntry - Audit trail function
+ * @returns {Array} Array of SimResultsSchema objects with multipliers applied
  */
-const applyMultipliers = (transformedData, multipliers, allReferences, processedData, customPercentile, addAuditEntry) => {
+const applyMultipliers = (transformedData, multipliers, percentileInfo, allReferences, processedData, addAuditEntry) => {
+    const customPercentile = percentileInfo.custom || null;
+    const useCustomPercentile = percentileInfo.strategy === 'perSource';
+
     let resultData = [...transformedData];
 
     // Process each multiplier in array order
@@ -349,48 +358,64 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
         const multiplierValues = findMultiplierValues(multiplier.id, processedData, allReferences);
 
         if (multiplierValues) {
-
             // Create optimized value lookup function
             const getMultiplierValue = createValueLookup(multiplierValues, customPercentile, multiplier.id);
 
-            resultData = resultData.map(simResult => ({
-                ...simResult,
-                data: simResult.data.map(dataPoint => {
-                    // Apply filter if exists - filter operates on source data (year, value, percentile)
-                    if (multiplier.filter && !multiplier.filter(dataPoint.year, dataPoint.value, simResult.percentile.value)) {
-                        return dataPoint;
+            resultData = resultData.map(simResult => {
+                // Prepare metadata for custom percentile tracking
+                let resultMetadata = { ...simResult.metadata };
+
+                // Add custom percentile metadata when using custom percentiles
+                if (useCustomPercentile && customPercentile && customPercentile[multiplier.id]) {
+                    // Initialize customPercentile object if it doesn't exist
+                    if (!resultMetadata.customPercentile) {
+                        resultMetadata.customPercentile = {};
                     }
 
-                    // Get multiplier value for this data point
-                    const multiplierValue = getMultiplierValue(dataPoint.year, simResult.percentile.value);
-                    if (multiplierValue === null) return dataPoint;
+                    // Add the multiplier sourceId and its custom percentile value
+                    resultMetadata.customPercentile[multiplier.id] = customPercentile[multiplier.id];
+                }
 
-                    let newValue;
-                    const baseYear = multiplier.baseYear || 1;
+                return {
+                    ...simResult,
+                    metadata: resultMetadata,
+                    data: simResult.data.map(dataPoint => {
+                        // Apply filter if exists - filter operates on source data (year, value, percentile)
+                        if (multiplier.filter && !multiplier.filter(dataPoint.year, dataPoint.value, simResult.percentile.value)) {
+                            return dataPoint;
+                        }
 
-                    switch (multiplier.operation) {
-                        case 'multiply':
-                            newValue = dataPoint.value * multiplierValue;
-                            break;
-                        case 'compound':
-                            newValue = dataPoint.value * Math.pow(1 + multiplierValue, dataPoint.year - baseYear);
-                            break;
-                        case 'simple':
-                            newValue = dataPoint.value * (1 + multiplierValue * (dataPoint.year - baseYear));
-                            break;
-                        case 'summation':
-                            newValue = dataPoint.value + multiplierValue;
-                            break;
-                        default:
-                            throw new Error(`Unknown multiplier operation: ${multiplier.operation}`);
-                    }
+                        // Get multiplier value for this data point
+                        const multiplierValue = getMultiplierValue(dataPoint.year, simResult.percentile.value);
+                        if (multiplierValue === null) return dataPoint;
 
-                    return {
-                        ...dataPoint,
-                        value: newValue
-                    };
-                })
-            }));
+                        let newValue;
+                        const baseYear = multiplier.baseYear || 1;
+
+                        switch (multiplier.operation) {
+                            case 'multiply':
+                                newValue = dataPoint.value * multiplierValue;
+                                break;
+                            case 'compound':
+                                newValue = dataPoint.value * Math.pow(1 + multiplierValue, dataPoint.year - baseYear);
+                                break;
+                            case 'simple':
+                                newValue = dataPoint.value * (1 + multiplierValue * (dataPoint.year - baseYear));
+                                break;
+                            case 'summation':
+                                newValue = dataPoint.value + multiplierValue;
+                                break;
+                            default:
+                                throw new Error(`Unknown multiplier operation: ${multiplier.operation}`);
+                        }
+
+                        return {
+                            ...dataPoint,
+                            value: newValue
+                        };
+                    })
+                };
+            });
 
             // Determine multiplier value type for audit
             const valueType = typeof multiplierValues === 'number' ? 'scalar' :
@@ -405,8 +430,6 @@ const applyMultipliers = (transformedData, multipliers, allReferences, processed
                 'multiply', // Type of operation
                 multiplier.operation // Type of operation for audit
             );
-
-
         }
     });
 

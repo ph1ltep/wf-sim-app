@@ -16,8 +16,14 @@ const Yup = require('yup');
  */
 export const computeMetricsData = (metricsRegistry, percentileInfo, getValueByPath, getSourceData) => {
     console.log('🔄 Starting metrics data processing...');
-    const { availablePercentiles, customPercentile } = percentileInfo;
+    //const availablePercentiles = percentileInfo.available;
+    //const useCustomPercentile = percentileInfo.strategy === 'unified' ? false : true;
     const startTime = performance.now();
+
+    // Modify availablePercentiles if customPercentile is enabled
+    // const effectivePercentiles = useCustomPercentile
+    //     ? [...availablePercentiles, 0]
+    //     : availablePercentiles;
 
     // Step 1: Load global references
     const globalReferences = {};
@@ -59,8 +65,7 @@ export const computeMetricsData = (metricsRegistry, percentileInfo, getValueByPa
                 globalReferences,
                 percentileInfo,
                 getValueByPath,
-                getSourceData,
-                customPercentile
+                getSourceData
             );
 
             processedMetrics.push(processedMetric);
@@ -197,13 +202,19 @@ const validateMetricDataStructure = (metricData, availablePercentiles) => {
  * @param {Array} percentileInfo - percentileData object containing available percentiles and custom
  * @param {Function} getValueByPath - Path extraction function
  * @param {Function} getSourceData - Source data retrieval function
- * @param {Object|null} customPercentile - Custom percentile config
  * @returns {Object} CubeMetricDataSchema
  */
-const processMetric = (metric, processedMetrics, globalReferences, percentileInfo, getValueByPath, getSourceData, customPercentile) => {
+const processMetric = (metric, processedMetrics, globalReferences, percentileInfo, getValueByPath, getSourceData) => {
     // Initialize audit trail for this metric
     const { addAuditEntry, getTrail, getReferences } = createAuditTrail(metric.id, 50, true);
     const { available: availablePercentiles } = percentileInfo;
+    const useCustomPercentile = percentileInfo.strategy === 'unified' ? false : true;
+    const customPercentile = percentileInfo.custom;
+
+    // Modify availablePercentiles if customPercentile is enabled
+    const effectivePercentiles = useCustomPercentile
+        ? [...availablePercentiles, 0]
+        : availablePercentiles;
 
     try {
         // Step 4a: Resolve dependencies
@@ -222,7 +233,7 @@ const processMetric = (metric, processedMetrics, globalReferences, percentileInf
             aggregationResults = applyAggregations(
                 metric.aggregations,
                 dependencies, // ✅ Pass full dependencies object
-                availablePercentiles,
+                effectivePercentiles,
                 addAuditEntry
             );
         }
@@ -233,7 +244,7 @@ const processMetric = (metric, processedMetrics, globalReferences, percentileInf
                 metric.transformer,
                 dependencies, // ✅ Pass full dependencies object
                 aggregationResults,
-                availablePercentiles,
+                effectivePercentiles,
                 customPercentile,
                 addAuditEntry
             );
@@ -244,7 +255,7 @@ const processMetric = (metric, processedMetrics, globalReferences, percentileInf
             transformerResults,
             aggregationResults,
             metric.aggregations,
-            availablePercentiles
+            effectivePercentiles
         );
 
         // Step 4e: Apply operations
