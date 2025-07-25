@@ -1,4 +1,5 @@
 // schemas/yup/distribution.js
+//const { metadata } = require('utils/cashflow/metrics/foundational/debtService');
 const Yup = require('yup');
 
 // Schema for a data point with year and value
@@ -62,6 +63,16 @@ const DistributionTypeSchema = Yup.object().shape({
     timeSeriesMode: Yup.boolean().default(false),
     parameters: DistributionParametersSchema.required('Parameters are required').default({}),
     timeSeriesParameters: DistributionTimeSeriesParametersSchema.required('Parameters are required').default({}),
+    metadata: Yup.object().shape({
+        percentileDirection: Yup.string()
+            .oneOf(['ascending', 'descending'])
+            .default('ascending')
+            .meta({
+                description: 'Defines relationship between percentile values and actual values',
+                ascending: 'Higher percentiles = higher values (costs, risks)',
+                descending: 'Higher percentiles = lower values (revenues, opportunities)'
+            })
+    }).default(() => ({ percentileDirection: 'ascending' }))
 });
 
 const FitDistributionSchema = Yup.object().shape({

@@ -12,7 +12,7 @@ const PercentileSelector = () => {
     const { updateByPath } = useScenario();
 
     // Get percentile data from CubeContext
-    const { getPercentileData, setSelectedPercentile, getSourceMetadata, updatePercentileData } = useCube();
+    const { getPercentileData, setSelectedPercentile, getSourceMetadata, updatePercentileData, refreshCubeData } = useCube();
     const percentileInfo = getPercentileData();
 
     // Extract values from percentileInfo (reactive to changes)
@@ -72,29 +72,31 @@ const PercentileSelector = () => {
             const values = await form.validateFields();
             const { strategy, unified, ...perSourceValues } = values;
 
-            console.log('💾 Form values received:', values);
-            console.log('📊 Strategy:', strategy);
-            console.log('🎯 Per-source values:', perSourceValues);
-
-            // FIXED: Build the correct update object based on PercentileDataSchema
+            // Build the update object
             const updates = {
                 strategy: strategy
             };
 
-            // Add selected and custom based on strategy
             if (strategy === 'unified') {
                 updates.selected = unified || primaryPercentile;
             } else if (strategy === 'perSource') {
-                // Keep current selected value for perSource mode
-                // updates.selected stays unchanged
-                updates.selected = 0; // Use the virtual 0 for perSource
-                updates.custom = perSourceValues; // This is the object like {energyRevenue: 75, escalationRate: 25}
+                updates.custom = perSourceValues;
+                updates.selected = 0; // Reset selected to 0 for perSource mode
             }
 
-            console.log('🚀 Updating percentileData with:', updates);
+            // STEP 1: Save the percentile data
+            const saveSuccessful = await updatePercentileData(updates);
 
-            // FIXED: Use the new updatePercentileData function from CubeContext
-            if (await updatePercentileData(updates)) {
+            if (saveSuccessful) {
+                // STEP 2: Trigger cube refresh ONLY if switching to perSource or modifying custom percentiles
+                const needsRefresh = strategy === 'perSource' ||
+                    (strategy === 'perSource' && JSON.stringify(customPercentiles) !== JSON.stringify(perSourceValues));
+
+                if (needsRefresh) {
+                    console.log('🔄 Triggering cube refresh for custom percentile changes...');
+                    refreshCubeData(true); // Force refresh to recompute percentile 0 data
+                }
+
                 setModalVisible(false);
                 console.log('✅ Percentile configuration saved successfully');
             } else {

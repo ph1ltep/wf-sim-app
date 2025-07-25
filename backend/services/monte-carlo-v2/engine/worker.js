@@ -146,7 +146,12 @@ class DistributionWorker {
 
             for (let year = 0; year < years; year++) {
                 const yearValues = yearlyData[year];
-                const percentileResult = percentiles.calculatePercentile(yearValues, percentileConfig.value);
+
+                // ADDED: Check percentileDirection metadata
+                const isDescending = this.distribution.metadata?.percentileDirection === 'descending';
+                const targetPercentile = isDescending ? (100 - percentileConfig.value) : percentileConfig.value;
+
+                const percentileResult = percentiles.calculatePercentile(yearValues, targetPercentile);
 
                 result.data.push({
                     year: year + 1,

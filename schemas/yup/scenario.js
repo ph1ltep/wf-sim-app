@@ -207,6 +207,9 @@ const SettingsSchema = Yup.object().shape({
                 parameters: {
                     value: 100000,
                     stdDev: 10
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower production = more conservative
                 }
             })),
             electricityPrice: DistributionTypeSchema.default(() => ({
@@ -218,6 +221,9 @@ const SettingsSchema = Yup.object().shape({
                     drift: 4,
                     volatility: 2,
                     timeStep: 1
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower prices = more conservative
                 }
             })),
             revenueDegradationRate: Yup.number().default(0.5),
@@ -229,6 +235,9 @@ const SettingsSchema = Yup.object().shape({
                     value: 90,
                     sigma: 0.3,
                     mu: Math.round(Math.log(90) * 100) / 100,
+                },
+                metadata: {
+                    percentileDirection: 'ascending' // Higher percentiles = more downtime = more conservative (cost-like)
                 }
             })),
             // Updated to use GBM type
@@ -240,6 +249,9 @@ const SettingsSchema = Yup.object().shape({
                     value: 7.5,
                     scale: 7.9,
                     shape: 1.8
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
                 }
             })),
             turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
