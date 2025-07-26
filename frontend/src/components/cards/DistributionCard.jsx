@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Card, Space, Typography, Empty, Tooltip, Badge, Alert, Button } from 'antd';
-import { InfoCircleOutlined, TableOutlined, SwapOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, TableOutlined, SwapOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import PercentileChart from '../charts/PercentileChart';
 import StatisticsChart from '../charts/StatisticsChart';
 import { generateDistributionMetadata } from '../../utils/chartUtils';
@@ -43,6 +43,27 @@ const DistributionCard = ({
     const [dataTableVisible, setDataTableVisible] = useState(false);
     const [chartMode, setChartMode] = useState('percentiles');
 
+    /**
+     * Get percentile direction icon and tooltip based on distribution metadata
+     * @param {Object} distribution - Distribution object with metadata
+     * @returns {Object} Icon component and tooltip text
+     */
+    const getPercentileDirectionIndicator = (distribution) => {
+        const direction = distribution?.metadata?.percentileDirection || 'ascending';
+
+        if (direction === 'ascending') {
+            return {
+                icon: <ArrowUpOutlined style={{ color: '#ff4d4f' }} />,
+                tooltip: 'Higher percentiles = higher values (costs, risks)'
+            };
+        } else {
+            return {
+                icon: <ArrowDownOutlined style={{ color: '#52c41a' }} />,
+                tooltip: 'Higher percentiles = lower values (revenues, opportunities)'
+            };
+        }
+    };
+
     // Handle null simulationInfo
     if (!simulationInfo) {
         return (
@@ -63,6 +84,9 @@ const DistributionCard = ({
         .map(([key, value]) => `${key}: ${typeof value === 'number' ? value.toFixed(precision || 2) : value} `)
         .join(', ');
 
+    // Get percentile direction indicator
+    const { icon: directionIcon, tooltip: directionTooltip } = getPercentileDirectionIndicator(distribution);
+
     // Compute card title
     const cardTitle = title || distMetadata.name || 'Distribution Analysis';
 
@@ -77,6 +101,16 @@ const DistributionCard = ({
     // Render card extra with metadata and controls
     const cardExtra = (
         <Space>
+            {showMetadata && (
+                <Tooltip title={directionTooltip} placement="top">
+                    <Space size={4}>
+                        {directionIcon}
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                            {distribution?.metadata?.percentileDirection || 'ascending'}
+                        </Text>
+                    </Space>
+                </Tooltip>
+            )}
             {showMetadata && (
                 <Tooltip title={`${iterations.toLocaleString()} iterations, ${timeElapsed.toFixed(2)}ms execution time`}>
                     <Space>

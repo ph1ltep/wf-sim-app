@@ -128,7 +128,8 @@ export function generateStatisticsTableData(statistics, color, precision) {
 export function prepareSummaryData(results, primaryPercentile, precision, t0Value) {
     if (!results || !results.length) return [];
 
-    return results.map(result => {
+    // Calculate mean for each result and sort by actual result values (lowest to highest)
+    const resultsWithMeans = results.map(result => {
         const mean = result.data.reduce((sum, point) => sum + point.value, 0) / (result.data.length || 1);
         return {
             percentile: result.percentile.value,
@@ -137,6 +138,9 @@ export function prepareSummaryData(results, primaryPercentile, precision, t0Valu
             t0Value
         };
     });
+
+    // Sort by mean value (ascending)
+    return resultsWithMeans.sort((a, b) => b.mean - a.mean); // switch a and b to sort descending
 }
 
 /**
