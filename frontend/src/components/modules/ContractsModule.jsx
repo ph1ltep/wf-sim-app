@@ -174,7 +174,7 @@ const ContractsModule = () => {
       render: (value, record) => {
         const timeSeries = record.fixedFeeTimeSeries || [];
         const hasTimeSeries = timeSeries.length > 0;
-        
+
         return (
           <div>
             <div style={{ fontWeight: 500 }}>
@@ -275,7 +275,7 @@ const ContractsModule = () => {
       path={['escalation', 'useMin']}
       label="Use min limit"
     />,
-    
+
     <PercentageField
       key="escalation.minValue"
       path={['escalation', 'minValue']}
@@ -284,13 +284,13 @@ const ContractsModule = () => {
       max={0}
       step={0.1}
     />,
-    
+
     <CheckboxField
       key="escalation.useMax"
       path={['escalation', 'useMax']}
       label="Use max limit"
     />,
-    
+
     <PercentageField
       key="escalation.maxValue"
       path={['escalation', 'maxValue']}
@@ -301,16 +301,47 @@ const ContractsModule = () => {
     />
   ];
 
+  const handleContractBeforeSave = (itemToSave, context) => {
+    const { fixedFee, isPerTurbine, years } = itemToSave;
+
+    // Reset the fixedFeeTimeSeries array
+    const processedItem = {
+      ...itemToSave,
+      fixedFeeTimeSeries: []
+    };
+
+    // Only populate if we have fixedFee, years, and the logic conditions are met
+    if (fixedFee && years && Array.isArray(years) && years.length > 0) {
+      let valuePerEntry;
+
+      if (isPerTurbine) {
+        // If per turbine, use the fixedFee value directly
+        valuePerEntry = fixedFee;
+      } else {
+        // If not per turbine, divide by number of turbines
+        valuePerEntry = Math.round(fixedFee / numWTGs);
+      }
+
+      // Create time series entries for all years in the years array
+      processedItem.fixedFeeTimeSeries = years.map(year => ({
+        year: year,
+        value: valuePerEntry
+      }));
+    }
+
+    return processedItem;
+  };
+
   // Calculate average of time series values for expanded row display
   const calculateTimeSeriesAverage = (timeSeries) => {
     if (!timeSeries || timeSeries.length === 0) return 0;
-    
+
     const values = timeSeries
       .map(dp => parseFloat(dp.value))
       .filter(val => !isNaN(val));
-    
+
     if (values.length === 0) return 0;
-    
+
     const sum = values.reduce((acc, val) => acc + val, 0);
     return Math.round(sum / values.length);
   };
@@ -320,7 +351,7 @@ const ContractsModule = () => {
     // Find the associated scope
     const scope = oemScopes.find(s => s.key === record.oemScopeId);
     const timeSeries = record.fixedFeeTimeSeries || [];
-    
+
     if (!scope) return <Typography.Text>No scope details available</Typography.Text>;
 
     return (
@@ -425,6 +456,7 @@ const ContractsModule = () => {
                   formLayout="horizontal"
                   formCompact={true}
                   formResponsive={true}
+                  onBeforeSave={handleContractBeforeSave}
                 />
               </FieldCard>
 

@@ -130,6 +130,7 @@ export const getTableConfiguration = (
                 const year = colData.year;
                 const timeSeries = contract[selectedDataField] || [];
                 const dataPoint = timeSeries.find(dp => dp.year === year);
+
                 return {
                     value: dataPoint?.value,
                     rowIndex: rowData.index,
@@ -223,7 +224,8 @@ export const generateTableColumns = (
     handleCellValidation,
     handleCellModification,
     selectedColumn = null,
-    primaryColumn = null
+    primaryColumn = null,
+    styleOptions = {}
 ) => {
     // First column (fixed) - OPTIMIZED
     const firstColumn = {
@@ -245,7 +247,8 @@ export const generateTableColumns = (
                 },
                 states: {},
                 marker: null,
-                orientation
+                orientation,
+                styleOptions
             });
 
             return { className: headerClasses };
@@ -264,7 +267,8 @@ export const generateTableColumns = (
                 },
                 states: {},
                 marker,
-                orientation
+                orientation,
+                styleOptions
             });
 
             return {
@@ -340,7 +344,8 @@ export const generateTableColumns = (
                     },
                     states: columnStates,
                     marker,
-                    orientation
+                    orientation,
+                    styleOptions
                 });
 
                 return {
@@ -361,7 +366,8 @@ export const generateTableColumns = (
                     },
                     states: columnStates,
                     marker,
-                    orientation
+                    orientation,
+                    styleOptions
                 });
 
                 return {

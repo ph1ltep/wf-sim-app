@@ -10,24 +10,49 @@ export const isSingleObjectMode = (data) => {
 /**
  * Normalize time series data for editing
  */
-export const normalizeTimeSeriesData = (contracts, selectedField, fieldConfig, yearColumns) => {
-    if (!contracts || !Array.isArray(contracts)) return [];
+export const normalizeTimeSeriesData = (data, selectedField, fieldConfig, yearColumns) => {
+    return data.map(item => {
+        const normalizedItem = { ...item };
+        const timeSeries = item[selectedField] || [];
 
-    return contracts.map(contract => {
-        const timeSeries = contract[selectedField] || [];
-        const defaultValue = fieldConfig?.defaultValueField ?
-            (contract[fieldConfig.defaultValueField] || 0) : 0;
-        const normalizedSeries = [];
+        // Skip normalization if the field already exists and is not empty
+        if (timeSeries.length > 0) {
+            return normalizedItem; // Return item unchanged
+        }
 
-        yearColumns.forEach(year => {
-            const existing = timeSeries.find(dp => dp.year === year);
-            normalizedSeries.push(existing || {
-                year,
-                value: defaultValue
-            });
+        // Determine which years to use for this specific item
+        let yearsToNormalize = yearColumns;
+
+        if (fieldConfig?.defaultTimeSeriesField) {
+            // Use the array from the specified field within this data object
+            const defaultYears = item[fieldConfig.defaultTimeSeriesField];
+            if (Array.isArray(defaultYears)) {
+                yearsToNormalize = defaultYears;
+            }
+        }
+
+        // Create normalized time series with only the specified years for this item
+        const normalizedTimeSeries = yearsToNormalize.map(year => {
+            const existingPoint = timeSeries.find(dp => dp.year === year);
+
+            if (existingPoint) {
+                // Found existing data point, use it
+                return existingPoint;
+            } else {
+                // Not found in timeSeries, use default value
+                let defaultValue = null;
+
+                if (fieldConfig?.defaultValueField) {
+                    // Use value from the specified field in the item
+                    defaultValue = item[fieldConfig.defaultValueField];
+                }
+
+                return { year, value: defaultValue };
+            }
         });
 
-        return { ...contract, [selectedField]: normalizedSeries };
+        normalizedItem[selectedField] = normalizedTimeSeries;
+        return normalizedItem;
     });
 };
 

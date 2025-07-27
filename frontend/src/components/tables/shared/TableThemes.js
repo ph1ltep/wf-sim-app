@@ -246,7 +246,8 @@ export const createThemeStyles = (themeName, token) => {
                 minWidth: '100px',
                 padding: '8px 10px',
                 fontWeight: 600,
-                backgroundColor: '#fafafa'
+                backgroundColor: '#fafafa',
+                width: '100%'
             },
             '.content-header.marker-primary': {
                 //borderBottom: '2px solid var(--marker-color, #52c41a)',

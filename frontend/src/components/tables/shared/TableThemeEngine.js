@@ -9,59 +9,82 @@ const { useToken } = theme;
  * Detect cell position based on indices and totals
  * PROPERLY CORRECTED: Real header vs subheader based on orientation
  */
-export const detectCellPosition = (position = {}) => {
+export const detectCellPosition = (position, styleOptions = {}) => {
     const {
-        rowIndex = 0,
-        colIndex = 0,
-        totalRows = 1,
-        totalCols = 1,
-        isHeaderRow = false,
-        isHeaderCol = false,
-        orientation = 'horizontal'
+        rowIndex,
+        colIndex,
+        totalRows,
+        totalCols,
+        isHeaderRow,
+        isHeaderCol,
+        orientation
     } = position;
 
-    // CORRECTED: Real header detection based on orientation
-    const isHeader = (orientation === 'horizontal' && isHeaderRow) ||
-        (orientation === 'vertical' && isHeaderCol);
+    // Ensure defaults for all styleOptions properties
+    const {
+        header = true,
+        subHeader = true,
+        summary = false,
+        totals = false
+    } = styleOptions;
 
-    // CORRECTED: Subheader detection based on orientation (mutually exclusive with header)
-    const isSubheader = (orientation === 'horizontal' && colIndex === 0 && !isHeaderRow) ||
-        (orientation === 'vertical' && rowIndex === 0 && !isHeaderCol);
+    const isLastRow = rowIndex === totalRows - 1;
+    const isLastCol = colIndex === totalCols - 1;
 
-    // Regular position detection (excluding headers and subheaders)
-    const isSummary = !isHeader && !isSubheader && rowIndex === totalRows - 1 && totalRows > 1;
-    const isTotals = !isHeader && !isSubheader && colIndex === totalCols - 1 && totalCols > 1;
-    const isCell = !isHeader && !isSubheader && !isSummary && !isTotals;
-
-    return {
-        isHeader,        // Real headers: top row (horizontal) or first column (vertical)
-        isSubheader,     // Subheaders: first column (horizontal) or top row (vertical)
-        isSummary,       // Bottom row (excluding headers/subheaders)
-        isTotals,        // Right column (excluding headers/subheaders)
-        isCell           // Regular data cells
+    const detected = {
+        isCell: false,
+        isHeader: false,
+        isSubheader: false,
+        isSummary: false,
+        isTotals: false
     };
+
+    // Header detection (if enabled)
+    if (header && isHeaderRow) {
+        detected.isHeader = true;
+    }
+
+    // Subheader detection (if enabled and not already a header)
+    if (subHeader && !detected.isHeader && isHeaderCol) {
+        detected.isSubheader = true;
+    }
+
+    // Summary and totals can only be applied if NOT a header or subheader
+    if (!detected.isHeader && !detected.isSubheader) {
+        // Summary detection (if enabled)
+        if (summary) {
+            if (orientation === 'horizontal' && isLastCol) detected.isSummary = true;
+            if (orientation === 'vertical' && isLastRow) detected.isSummary = true;
+        }
+
+        // Totals detection (if enabled)
+        if (totals) {
+            if (orientation === 'horizontal' && isLastRow) detected.isTotals = true;
+            if (orientation === 'vertical' && isLastCol) detected.isTotals = true;
+        }
+    }
+
+    // isCell is true only if none of the special types are detected
+    detected.isCell = !detected.isHeader && !detected.isSubheader && !detected.isSummary && !detected.isTotals;
+
+    return detected;
 };
 
 /**
  * Generate content type classes with CORRECTED hierarchy
  * CORRECTED: subheader and header are mutually exclusive
  */
-export const getContentClasses = (position, orientation = 'horizontal') => {
-    const classes = ['table-base', 'content'];
+export const getContentClasses = (detected) => {
+    const classes = ['content'];
 
     // Add cell/row/col classes
     classes.push('content-cell');
 
-    // CORRECTED: Add position-specific classes (mutually exclusive)
-    if (position.isHeader) {
-        classes.push('content-header');
-    } else if (position.isSubheader) {
-        classes.push('content-subheader');  // ONLY if not header
-    } else if (position.isSummary) {
-        classes.push('content-summary');
-    } else if (position.isTotals) {
-        classes.push('content-totals');
-    }
+    if (detected.isHeader) classes.push('content-header');
+    if (detected.isSubheader) classes.push('content-subheader');
+    if (detected.isSummary) classes.push('content-summary');
+    if (detected.isTotals) classes.push('content-totals');
+
     // Note: regular cells just get content-cell, content-row/col
 
     return classes;
@@ -135,32 +158,40 @@ export const getStateClasses = (states = {}, position = {}) => {
 /**
  * Master function: Generate complete cell classes as concatenated string
  */
-export const getCellClasses = (config = {}) => {
+export const getCellClasses = (config) => {
     const {
-        position = {},
+        position,
         states = {},
-        marker = null
+        marker = null,
+        orientation = 'horizontal',
+        styleOptions = {}
     } = config;
 
-    const allClasses = [];
 
-    // 1. Content type classes (includes table-base)
-    const positionDetected = detectCellPosition(position);
-    const contentClasses = getContentClasses(positionDetected);
-    allClasses.push(...contentClasses);
+    // Ensure defaults for all styleOptions properties
+    const completeStyleOptions = {
+        header: true,
+        subHeader: true,
+        summary: false,
+        totals: false,
+        ...styleOptions
+    };
 
-    // 2. Marker classes (before states in hierarchy)
-    if (marker) {
-        const markerClasses = getMarkerClasses(marker);
-        allClasses.push(...markerClasses);
-    }
+    const detected = detectCellPosition(position, completeStyleOptions);
 
-    // 3. State classes (supersede markers via CSS specificity/source order)
-    const stateClasses = getStateClasses(states, positionDetected);
-    allClasses.push(...stateClasses);
+    // Use existing helper functions
+    const contentClasses = getContentClasses(detected);
+    const markerClasses = getMarkerClasses(marker);
+    const stateClasses = getStateClasses(states, detected);
 
-    // Return space-separated string for HTML className
-    return allClasses.join(' ');
+    // Combine all classes
+    const classes = [
+        ...contentClasses,
+        ...markerClasses,
+        ...stateClasses
+    ].filter(Boolean);
+
+    return classes.join(' ');
 };
 
 /**

@@ -57,6 +57,7 @@ const InlineEditTable = ({
     renderControls,
     controlsPlacement = 'internal',
     showDataFieldSelector = true,
+    styleOptions = { header: true, subHeader: true, summary: false, totals: false },
     ...tableProps
 }) => {
     // Validation
@@ -375,7 +376,7 @@ const InlineEditTable = ({
     }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, timelineMarkers]);
 
     const columns = useMemo(() => {
-        return generateTableColumns(
+        const cols = generateTableColumns(
             orientation,
             tableConfig,
             selectedDataField,
@@ -385,26 +386,25 @@ const InlineEditTable = ({
             modifiedCells,
             validationErrors,
             handleCellValidation,
-            handleCellModification
+            handleCellModification,
+            null,
+            null,
+            styleOptions
         );
-    }, [
-        orientation,
-        tableConfig,
-        selectedDataField,
-        isEditing,
-        currentFieldConfig,
-        updateCellValue,
-        modifiedCells,
-        validationErrors,
-        handleCellValidation,
-        handleCellModification
-    ]);
+
+        // console.log('Total columns:', cols.length);
+        // console.log('Column keys:', cols.map(c => c.key));
+        // console.log('Columns with fixed left:', cols.filter(col => col.fixed === 'left'));
+        // console.log('Fixed left count:', cols.filter(col => col.fixed === 'left').length);
+
+        return cols;
+    }, [orientation, tableConfig, selectedDataField, isEditing, currentFieldConfig, updateCellValue, modifiedCells, validationErrors, handleCellValidation, handleCellModification]);
 
     // Ensure data has unique keys using shared utility
     const tableDataWithKeys = useMemo(() => {
         return ensureUniqueKeys(tableConfig.rows, 'key');
     }, [tableConfig.rows]);
-
+    console.log(columns[1]);
     // Generate CSS classes for timeline marker rows (vertical orientation)
     const getTimelineRowClasses = useCallback((record) => {
         if (orientation !== 'vertical' || !record.timelineMarker) return undefined;

@@ -40,6 +40,10 @@ const EditableTable = ({
   formWrapperCol,
   formProps = {},
 
+  // Save hooks - NEW
+  onBeforeSave,
+  onAfterSave,
+
   // Additional props
   modalProps = {},
   tableProps = {}
@@ -90,29 +94,80 @@ const EditableTable = ({
   }, [dataSource, path, updateByPath]);
 
   // Handle saving changes - Generate ID for new items before validation
-  const handleSave = useCallback((formValues) => {
+  // Handle saving changes - with onBeforeSave and onAfterSave hooks
+  const handleSave = useCallback(async (formValues) => {
     try {
       const newArray = [...dataSource];
+      let itemToSave;
 
       if (editingItemIndex !== null && editingItemIndex >= 0) {
-        // Editing existing item - update in place
-        newArray[editingItemIndex] = {
+        // Editing existing item - merge with existing data
+        itemToSave = {
           ...newArray[editingItemIndex],
           ...formValues
         };
       } else {
-        // Adding new item - the ID should already be in formValues from hidden field
-        newArray.push(formValues);
+        // Adding new item - formValues should already contain the ID
+        itemToSave = formValues;
       }
 
-      updateByPath(path, newArray);
-      setModalVisible(false);
-      setEditingItemIndex(null);
+      // Call onBeforeSave hook if provided
+      let processedItem = itemToSave;
+      if (onBeforeSave) {
+        processedItem = await onBeforeSave(itemToSave, {
+          isEdit: editingItemIndex !== null,
+          index: editingItemIndex,
+          originalArray: dataSource,
+          formValues
+        });
+      }
+
+      // Update the array with the processed item
+      if (editingItemIndex !== null && editingItemIndex >= 0) {
+        newArray[editingItemIndex] = processedItem;
+      } else {
+        newArray.push(processedItem);
+      }
+
+      // Save to context
+      const result = await updateByPath(path, newArray);
+
+      // Call onAfterSave hook if provided
+      if (onAfterSave) {
+        onAfterSave({
+          isValid: result?.isValid !== false,
+          savedItem: processedItem,
+          isEdit: editingItemIndex !== null,
+          index: editingItemIndex,
+          newArray,
+          originalFormValues: formValues,
+          result
+        });
+      }
+
+      // Close modal on successful save
+      if (result?.isValid !== false) {
+        setModalVisible(false);
+        setEditingItemIndex(null);
+        setError(null);
+      }
+
     } catch (error) {
       console.error("Save error:", error);
       setError(`Error: ${error.message || "Failed to save"}`);
+
+      // Call onAfterSave with error info
+      if (onAfterSave) {
+        onAfterSave({
+          isValid: false,
+          error: error.message || "Failed to save",
+          isEdit: editingItemIndex !== null,
+          index: editingItemIndex,
+          originalFormValues: formValues
+        });
+      }
     }
-  }, [dataSource, editingItemIndex, path, updateByPath]);
+  }, [dataSource, editingItemIndex, path, updateByPath, onBeforeSave, onAfterSave]);
 
   // Handle modal cancel
   const handleCancel = useCallback(() => {
