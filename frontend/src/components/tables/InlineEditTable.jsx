@@ -44,6 +44,9 @@ const InlineEditTable = ({
     onAfterSave,
     onCancel,
     orientation = 'horizontal',
+    calcSummary, // (rowOrColData, orientation, styleOptions) => value
+    calcTotals,  // (rowOrColData, orientation, styleOptions) => value
+
     // Updated theme integration options
     theme = 'compact', // Use compact theme by default for inline editing
     customTheme = null,
@@ -51,8 +54,10 @@ const InlineEditTable = ({
     additionalStyles = {}, // CSS-in-JS object overrides
     containerClassName = '', // Allow cards to add container classes
     tableClassName = '', // Allow cards to add table classes
+
     // Timeline marker support
     timelineMarkers = [],
+
     // Existing render props options
     renderControls,
     controlsPlacement = 'internal',
@@ -361,10 +366,281 @@ const InlineEditTable = ({
         }
     }, [saveAttempted, isEditing, validateAllCells]);
 
+
+    const addCalculatedRowsAndColumns = useCallback((tableConfig, calcSummary, calcTotals, orientation) => {
+        if (isEditing) return tableConfig; // No calculations in edit mode
+        if (!calcSummary && !calcTotals) return tableConfig; // No calculations needed
+
+        const newConfig = { ...tableConfig };
+        let { rows, cols } = newConfig;
+
+        // Get the underlying data source
+        const dataSource = isEditing ? formData : contextData;
+        if (!Array.isArray(dataSource) || dataSource.length === 0) {
+            return tableConfig; // No data to calculate
+        }
+
+        const summaryLabel = styleOptions.summaryLabel || 'Summary';
+        const totalsLabel = styleOptions.totalsLabel || 'Totals';
+
+        // Build 2D data map: dataMap[rowIndex][colIndex] = value
+        // This ONLY includes non-calculated rows and columns
+        const dataMap = {};
+
+        dataSource.forEach((contract, rowIndex) => {
+            dataMap[rowIndex] = {};
+            const timeSeries = contract[selectedDataField] || [];
+
+            cols.forEach((col, colIndex) => {
+                // CRITICAL: Only include non-calculated columns
+                if (!col.isCalculated) {
+                    const year = col.year;
+                    const dataPoint = timeSeries.find(dp => dp.year === year);
+                    dataMap[rowIndex][colIndex] = parseFloat(dataPoint?.value) || 0;
+                }
+            });
+        });
+
+        // Helper functions to collect data from the 2D map (ONLY non-calculated data)
+        const collectRowData = (rowIndex) => {
+            if (!dataMap[rowIndex]) return {};
+            const filteredData = {};
+            Object.keys(dataMap[rowIndex]).forEach(colIndex => {
+                const numColIndex = parseInt(colIndex);
+                const col = cols[numColIndex];
+                if (col && !col.isCalculated) {
+                    filteredData[numColIndex] = dataMap[rowIndex][colIndex];
+                }
+            });
+            return filteredData;
+        };
+
+        const collectColData = (colIndex) => {
+            const data = {};
+            Object.keys(dataMap).forEach(rowIndex => {
+                const numRowIndex = parseInt(rowIndex);
+                const row = rows[numRowIndex];
+                if (row && !row.isCalculated && dataMap[numRowIndex] && dataMap[numRowIndex][colIndex] !== undefined) {
+                    data[numRowIndex] = dataMap[numRowIndex][colIndex];
+                }
+            });
+            return data;
+        };
+
+        // NEW: Helper functions that include calculated rows/cols for totals
+        const collectRowDataForTotals = (rowIndex) => {
+            const data = collectRowData(rowIndex);
+
+            // If we have calcSummary, add the summary column value
+            if (calcSummary) {
+                const summaryValue = calcSummary(data, orientation, styleOptions);
+                data[originalColCount] = summaryValue; // Add summary at the end
+            }
+
+            return data;
+        };
+
+        const collectColDataForTotals = (colIndex) => {
+            const data = collectColData(colIndex);
+
+            // If we have calcSummary, add the summary row value
+            if (calcSummary) {
+                const summaryValue = calcSummary(data, orientation, styleOptions);
+                data[originalRowCount] = summaryValue; // Add summary at the end
+            }
+
+            return data;
+        };
+
+        // Store original row/col counts before adding calculated ones
+        const originalRowCount = rows.length;
+        const originalColCount = cols.length;
+
+
+
+        // Add summary column (horizontal) or summary row (vertical)
+        if (calcSummary) {
+            if (orientation === 'horizontal') {
+                // Add summary column - collects data across years for each contract
+                const summaryCol = {
+                    key: 'summary-col',
+                    year: summaryLabel,
+                    timelineMarker: null,
+                    colIndex: cols.length,
+                    totalCols: cols.length + 1,
+                    orientation,
+                    isCalculated: true
+                };
+
+                cols = [...cols, summaryCol];
+
+                // Update totalCols for existing columns
+                cols.forEach(col => {
+                    if (!col.isCalculated) col.totalCols = cols.length;
+                });
+            } else {
+                // Add summary row - collects data across contracts for each year
+                const summaryRow = {
+                    key: 'summary-row',
+                    year: summaryLabel,
+                    timelineMarker: null,
+                    rowIndex: rows.length,
+                    totalRows: rows.length + 1,
+                    orientation,
+                    isCalculated: true
+                };
+
+                rows = [...rows, summaryRow];
+
+                // Update totalRows for existing rows
+                rows.forEach(row => {
+                    if (!row.isCalculated) row.totalRows = rows.length;
+                });
+            }
+        }
+
+        // Add totals row (horizontal) or totals column (vertical)
+        if (calcTotals) {
+            if (orientation === 'horizontal') {
+                const totalsRow = {
+                    key: 'totals-row',
+                    index: rows.length,
+                    item: { name: totalsLabel },
+                    name: totalsLabel,
+                    rowIndex: rows.length,
+                    totalRows: rows.length + 1,
+                    orientation,
+                    isCalculated: true
+                };
+
+                rows = [...rows, totalsRow];
+                rows.forEach(row => {
+                    if (!row.isCalculated) row.totalRows = rows.length;
+                });
+            } else {
+                const totalsCol = {
+                    key: 'totals-col',
+                    index: cols.length,
+                    item: { name: totalsLabel },
+                    title: totalsLabel,
+                    colIndex: cols.length,
+                    totalCols: cols.length + 1,
+                    orientation,
+                    isCalculated: true
+                };
+
+                cols = [...cols, totalsCol];
+                cols.forEach(col => {
+                    if (!col.isCalculated) col.totalCols = cols.length;
+                });
+            }
+        }
+
+        // Update the config with new rows/cols
+        newConfig.rows = rows;
+        newConfig.cols = cols;
+
+        // Enhance getCellData to handle calculated cells using the 2D data map
+        const originalGetCellData = newConfig.getCellData;
+        newConfig.getCellData = (rowData, colData) => {
+            if (rowData.isCalculated && colData.isCalculated) {
+                // This is the intersection cell (bottom-right)
+                if ((rowData.key === 'totals-row' && colData.key === 'summary-col') ||
+                    (rowData.key === 'summary-row' && colData.key === 'totals-col')) {
+
+                    // Sum all the summary values
+                    let grandTotal = 0;
+
+                    if (orientation === 'horizontal') {
+                        // Sum all contract summary values
+                        for (let i = 0; i < originalRowCount; i++) {
+                            const rowData = collectRowData(i);
+                            if (Object.keys(rowData).length > 0) {
+                                const summaryValue = calcSummary(rowData, orientation, styleOptions);
+                                grandTotal += summaryValue || 0;
+                            }
+                        }
+                    } else {
+                        // Sum all year summary values
+                        for (let i = 0; i < originalColCount; i++) {
+                            const colData = collectColData(i);
+                            if (Object.keys(colData).length > 0) {
+                                const summaryValue = calcSummary(colData, orientation, styleOptions);
+                                grandTotal += summaryValue || 0;
+                            }
+                        }
+                    }
+
+                    return {
+                        value: grandTotal,
+                        isCalculated: true,
+                        className: 'content content-totals',
+                        formatter: styleOptions.cellFormatter // Use cellFormatter instead of totalsFormatter
+                    };
+                }
+            }
+
+            // Handle calculated summary cells
+            if (colData.isCalculated && calcSummary) {
+                if (orientation === 'horizontal') {
+                    // This is a summary column cell - collect data for this contract row
+                    const contractIndex = rowData.index;
+                    if (contractIndex !== undefined && contractIndex < originalRowCount) {
+                        const data = collectRowData(contractIndex);
+                        const value = calcSummary(data, orientation, styleOptions);
+                        return { value, isCalculated: true, className: 'content content-summary', formatter: styleOptions.summaryFormatter };
+                    }
+                }
+            }
+
+            if (rowData.isCalculated && calcSummary) {
+                if (orientation === 'vertical') {
+                    // This is a summary row cell - collect data for this contract column
+                    const contractIndex = colData.index;
+                    if (contractIndex !== undefined && contractIndex < originalColCount) {
+                        const data = collectColData(contractIndex);
+                        const value = calcSummary(data, orientation, styleOptions);
+                        return { value, isCalculated: true, className: 'content content-summary', formatter: styleOptions.summaryFormatter };
+                    }
+                }
+            }
+
+            // Handle calculated totals cells
+            if (rowData.isCalculated && calcTotals) {
+                if (orientation === 'horizontal') {
+                    // This is a totals row cell - collect data for this year column
+                    const yearColIndex = colData.colIndex;
+                    if (yearColIndex !== undefined && yearColIndex < originalColCount) {
+                        const data = collectColData(yearColIndex);
+                        const value = calcTotals(data, orientation, styleOptions);
+                        return { value, isCalculated: true, className: 'content content-totals', formatter: styleOptions.totalsFormatter };
+                    }
+                }
+            }
+
+            if (colData.isCalculated && calcTotals) {
+                if (orientation === 'vertical') {
+                    // This is a totals column cell - collect data for this year row
+                    const yearRowIndex = rowData.rowIndex;
+                    if (yearRowIndex !== undefined && yearRowIndex < originalRowCount) {
+                        const data = collectRowData(yearRowIndex);
+                        const value = calcTotals(data, orientation, styleOptions);
+                        return { value, isCalculated: true, className: 'content content-totals', formatter: styleOptions.totalsFormatter };
+                    }
+                }
+            }
+
+            // Regular cell - use original logic
+            return originalGetCellData(rowData, colData);
+        };
+
+        return newConfig;
+    }, [isEditing, formData, contextData, selectedDataField, styleOptions]);
+
     // Table configuration and columns
     const tableConfig = useMemo(() => {
         const baseData = isEditing ? formData : contextData;
-        return getTableConfiguration(
+        const baseConfig = getTableConfiguration(
             orientation,
             yearColumns,
             baseData,
@@ -373,7 +649,10 @@ const InlineEditTable = ({
             isEditing,
             timelineMarkers || []
         );
-    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, timelineMarkers]);
+
+        // Add calculated rows/columns if needed
+        return addCalculatedRowsAndColumns(baseConfig, calcSummary, calcTotals, orientation);
+    }, [orientation, yearColumns, isEditing, formData, contextData, selectedDataField, hideEmptyItems, timelineMarkers, calcSummary, calcTotals, addCalculatedRowsAndColumns]);
 
     const columns = useMemo(() => {
         const cols = generateTableColumns(
@@ -389,7 +668,9 @@ const InlineEditTable = ({
             handleCellModification,
             null,
             null,
-            styleOptions
+            styleOptions,
+            calcSummary,
+            calcTotals
         );
 
         // console.log('Total columns:', cols.length);
@@ -398,7 +679,7 @@ const InlineEditTable = ({
         // console.log('Fixed left count:', cols.filter(col => col.fixed === 'left').length);
 
         return cols;
-    }, [orientation, tableConfig, selectedDataField, isEditing, currentFieldConfig, updateCellValue, modifiedCells, validationErrors, handleCellValidation, handleCellModification]);
+    }, [orientation, tableConfig, selectedDataField, isEditing, currentFieldConfig, updateCellValue, modifiedCells, validationErrors, handleCellValidation, handleCellModification, styleOptions, calcSummary, calcTotals]);
 
     // Ensure data has unique keys using shared utility
     const tableDataWithKeys = useMemo(() => {

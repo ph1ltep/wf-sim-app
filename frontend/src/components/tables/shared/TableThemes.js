@@ -237,7 +237,7 @@ export const createThemeStyles = (themeName, token) => {
                 textAlign: 'center'
             },
             '.content-cell': {
-                padding: '8px 10px'
+                padding: '8px 10px',
             },
             '.content-row': {},
             '.content-col': {},
@@ -248,6 +248,13 @@ export const createThemeStyles = (themeName, token) => {
                 fontWeight: 600,
                 backgroundColor: '#fafafa',
                 width: '100%'
+            },
+            '.content-summary': {
+                position: 'sticky',
+                right: 0,
+            },
+            '.content-totals': {
+                borderLeft: '1px solid #a01b1bff',
             },
             '.content-header.marker-primary': {
                 //borderBottom: '2px solid var(--marker-color, #52c41a)',
@@ -308,8 +315,13 @@ export const createThemeStyles = (themeName, token) => {
             '.content-cell': {},
             '.content-row': {},
             '.content-col': {},
+            '.content-summary': {
+                position: 'sticky',
+                right: 0,
+            },
+            '.content-totals': {},
             '.content-subheader': {
-                fontWeight: 500,
+                fontWeight: 500
             },
             '.content-header': {
                 minWidth: '100px',

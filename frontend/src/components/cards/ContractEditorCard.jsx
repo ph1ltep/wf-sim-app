@@ -88,6 +88,34 @@ const ContractFeeScheduleCard = ({
         }
     }, [onError]);
 
+    /**
+     * Calculate summary (sum across time dimension)
+     * Horizontal: sum all years for a contract row
+     * Vertical: sum all contracts for a year row
+     */
+    const calculateSummary = useCallback((data, orientation, styleOptions) => {
+        if (!data || typeof data !== 'object') return 0;
+
+        return Object.values(data).reduce((sum, value) => {
+            const numValue = parseFloat(value) || 0;
+            return sum + numValue;
+        }, 0);
+    }, []);
+
+    /**
+     * Calculate totals (sum across data dimension)
+     * Horizontal: sum all contracts for a year column
+     * Vertical: sum all years for a contract column
+     */
+    const calculateTotals = useCallback((data, orientation, styleOptions) => {
+        if (!data || typeof data !== 'object') return 0;
+
+        return Object.values(data).reduce((sum, value) => {
+            const numValue = parseFloat(value) || 0;
+            return sum + numValue;
+        }, 0);
+    }, []);
+
     return (
         <Card
             title={
@@ -141,7 +169,19 @@ const ContractFeeScheduleCard = ({
                 affectedMetrics={affectedMetrics}
                 showMetadata={true}
                 orientation="horizontal"
-                styleOptions={{ header: true, subHeader: true, summary: false, totals: false }}
+                calcSummary={calculateSummary}  // Sum all years for each contract
+                calcTotals={calculateTotals}
+                styleOptions={{
+                    header: true,
+                    subHeader: true,
+                    summary: true,
+                    totals: true,
+                    summaryLabel: 'Totals',
+                    totalsLabel: 'Annual Totals',
+                    cellFormatter: (value) => `$${value.toLocaleString()}`,
+                    summaryFormatter: (value) => `$${value.toLocaleString()}`,
+                    totalsFormatter: (value) => `$${value.toLocaleString()}`
+                }}
                 {...tableProps}
             />
         </Card>

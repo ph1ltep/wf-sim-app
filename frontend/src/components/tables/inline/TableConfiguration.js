@@ -7,6 +7,7 @@ import {
     getCellClasses,
     getMarkerStyles
 } from '../shared/TableThemeEngine';
+import { max } from 'lodash';
 
 const { Text } = Typography;
 
@@ -166,7 +167,80 @@ export const renderTableCell = (
     handleCellModification,
     states = {}
 ) => {
-    const { value, rowIndex, year } = cellData;
+    const { value, rowIndex, year, isCalculated, className, formatter, isIntersection } = cellData;
+
+    let formattedValue = value;
+
+    // For intersection cells, only show the value, no header
+    if (isIntersection) {
+        if (value === null || value === undefined || value === '') {
+            return (
+                <div className="content-inner">
+                    <Text type="secondary">-</Text>
+                </div>
+            );
+        }
+
+        // Use custom formatter if provided (for data, summary, or totals cells)
+        if (formatter && typeof formatter === 'function') {
+            try {
+                formattedValue = formatter(value);
+            } catch (error) {
+                console.error('Formatter error:', error);
+                formattedValue = value;
+            }
+        } else {
+            // Default formatting only for non-calculated cells
+            if (!isCalculated) {
+                if (currentFieldConfig?.type === 'currency') {
+                    formattedValue = `${value.toLocaleString()}`;
+                } else if (currentFieldConfig?.type === 'percentage') {
+                    formattedValue = `${value}%`;
+                }
+            }
+        }
+
+        return (
+            <div className="content-inner">
+                {formattedValue}
+            </div>
+        );
+    }
+
+    if (!isEditing || isCalculated) {
+        if (value === null || value === undefined || value === '') {
+            return (
+                <div className="content-inner">
+                    <Text type="secondary">-</Text>
+                </div>
+            );
+        }
+
+        let formattedValue = value;
+
+        // Use custom formatter if provided
+        if (formatter && typeof formatter === 'function') {
+            try {
+                formattedValue = formatter(value);
+            } catch (error) {
+                console.error('Formatter error:', error);
+                formattedValue = value; // Fallback to original value
+            }
+        } else {
+            // Default formatting
+            if (currentFieldConfig?.type === 'currency') {
+                formattedValue = `${value.toLocaleString()}`;
+            } else if (currentFieldConfig?.type === 'percentage') {
+                formattedValue = `${value}%`;
+            }
+        }
+
+        return (
+            <div className="content-inner">
+                {formattedValue}
+            </div>
+        );
+    }
 
     // NOTE: Cell styling applied via onCell, not here
     if (!isEditing) {
@@ -225,8 +299,32 @@ export const generateTableColumns = (
     handleCellModification,
     selectedColumn = null,
     primaryColumn = null,
-    styleOptions = {}
+    styleOptions = {},
+    calcSummary = null,
+    calcTotals = null
 ) => {
+    // Prepare styleOptions with isEditing logic
+    const processedStyleOptions = {
+        header: true,
+        subHeader: true,
+        // Default summary/totals to true if calc functions are provided, BUT force false in edit mode
+        summary: isEditing ? false : (styleOptions.summary !== undefined ? styleOptions.summary : !!calcSummary),
+        totals: isEditing ? false : (styleOptions.totals !== undefined ? styleOptions.totals : !!calcTotals),
+        summaryLabel: styleOptions.summaryLabel || 'Summary',
+        totalsLabel: styleOptions.totalsLabel || 'Totals',
+        cellFormatter: styleOptions.cellFormatter || null,
+        summaryFormatter: styleOptions.summaryFormatter || null,
+        totalsFormatter: styleOptions.totalsFormatter || null,
+
+        // Include any other styleOptions
+        ...styleOptions,
+        // FORCE these to false in edit mode - no overrides allowed
+        ...(isEditing && {
+            summary: false,
+            totals: false
+        })
+    };
+
     // First column (fixed) - OPTIMIZED
     const firstColumn = {
         title: orientation === 'vertical' ? 'Year' : 'Contract',
@@ -248,7 +346,7 @@ export const generateTableColumns = (
                 states: {},
                 marker: null,
                 orientation,
-                styleOptions
+                styleOptions: processedStyleOptions
             });
 
             return { className: headerClasses };
@@ -268,7 +366,7 @@ export const generateTableColumns = (
                 states: {},
                 marker,
                 orientation,
-                styleOptions
+                styleOptions: processedStyleOptions
             });
 
             return {
@@ -280,7 +378,6 @@ export const generateTableColumns = (
             if (orientation === 'vertical') {
                 const marker = record.timelineMarker;
 
-                // OPTIMIZED: Minimal inner styling, no duplicate classes
                 return (
                     <div className="content-inner">
                         <span>{formatYear(record.year)}</span>
@@ -292,7 +389,16 @@ export const generateTableColumns = (
                     </div>
                 );
             } else {
-                // OPTIMIZED: Simple content wrapper
+                // Handle calculated rows (like totals row)
+                if (record.isCalculated) {
+                    return (
+                        <div className="content-inner">
+                            {record.name || record.item?.name || ''}
+                        </div>
+                    );
+                }
+
+                // Regular contract rows
                 return (
                     <div className="content-inner">
                         {record.item?.name || value || `Contract ${record.index + 1}`}
@@ -319,17 +425,22 @@ export const generateTableColumns = (
             title: orientation === 'vertical' ?
                 colConfig.title :
                 (
-                    <div className="content-inner">
-                        <span>{formatYear(colConfig.year)}</span>
-                        {marker && (
-                            <Tag className="content-tag" color={marker.color} size="small">
-                                {marker.tag}
-                            </Tag>
-                        )}
-                    </div>
+                    // Check if this is a calculated column (summary/totals)
+                    colConfig.isCalculated ?
+                        colConfig.year : // Just show the label, no formatting
+                        (
+                            <div className="content-inner">
+                                <span>{formatYear(colConfig.year)}</span>
+                                {marker && (
+                                    <Tag className="content-tag" color={marker.color} size="small">
+                                        {marker.tag}
+                                    </Tag>
+                                )}
+                            </div>
+                        )
                 ),
             key: columnKey,
-            width: 120,
+            //width: 100,
             align: 'center',
             onHeaderCell: () => {
                 const headerClasses = getCellClasses({
@@ -345,7 +456,7 @@ export const generateTableColumns = (
                     states: columnStates,
                     marker,
                     orientation,
-                    styleOptions
+                    styleOptions: processedStyleOptions
                 });
 
                 return {
@@ -354,6 +465,16 @@ export const generateTableColumns = (
                 };
             },
             onCell: (record, recordIndex) => {
+                // Get cell data to check if it's calculated
+                const cellData = tableConfig.getCellData(record, colConfig);
+
+                // If this is a calculated cell, use the pre-determined classes
+                if (cellData.isCalculated && cellData.className) {
+                    return {
+                        className: cellData.className,
+                        style: getMarkerStyles(marker)
+                    };
+                }
                 const cellClasses = getCellClasses({
                     position: {
                         rowIndex: recordIndex || 0,
@@ -362,7 +483,7 @@ export const generateTableColumns = (
                         totalCols: (tableConfig.cols?.length || 0) + 1,
                         isHeaderRow: false,
                         isHeaderCol: false,
-                        orientation
+                        styleOptions: processedStyleOptions
                     },
                     states: columnStates,
                     marker,
