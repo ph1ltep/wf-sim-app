@@ -313,11 +313,6 @@ export const CubeProvider = ({ children }) => {
     }, [refreshCubeData]);
 
     /**
-     * ✅ REMOVED: No auto-initialization in context
-     * Initialization will happen in CashflowAnalysis.jsx like CashflowContext
-     */
-
-    /**
      * Get filtered cube data with flexible filtering options
      * @param {Object} filters - Filter parameters
      * @param {number} [filters.percentile] - Filter by percentile value
