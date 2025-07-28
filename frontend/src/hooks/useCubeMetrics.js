@@ -58,6 +58,7 @@ export const useCubeMetrics = () => {
                 result[pm.percentile.value] = {
                     value: pm.value,
                     stats: pm.stats,
+                    thresholds: pm.thresholds,
                     metadata
                 };
             }
@@ -87,6 +88,7 @@ export const useCubeMetrics = () => {
                     result[metric.id] = {
                         value: percentileResult.value,
                         stats: percentileResult.stats,
+                        thresholds: percentileResult.thresholds,
                         metadata: metric.metadata
                     };
                 }
@@ -106,6 +108,7 @@ export const useCubeMetrics = () => {
                         [metric.id]: {
                             value: percentileMetrics[i].value,
                             stats: percentileMetrics[i].stats,
+                            thresholds: percentileMetrics[i].thresholds,
                             metadata: metric.metadata
                         }
                     };
@@ -131,6 +134,7 @@ export const useCubeMetrics = () => {
                         result[metric.id] = {
                             value: percentileMetrics[j].value,
                             stats: percentileMetrics[j].stats,
+                            thresholds: percentileMetrics[j].thresholds,
                             metadata: metric.metadata
                         };
                         break;
@@ -160,6 +164,7 @@ export const useCubeMetrics = () => {
                     metricData[pm.percentile.value] = {
                         value: pm.value,
                         stats: pm.stats,
+                        thresholds: pm.thresholds,
                         metadata
                     };
                 }
@@ -328,8 +333,9 @@ export const useCubeMetrics = () => {
                     const percentileData = metricCubeData[percentile];
 
                     if (percentileData && typeof percentileData === 'object') {
+
                         row[`P${percentile}`] = {
-                            ...percentileData, // { value, metadata, stats }
+                            ...percentileData, // { value, metadata, stats, thresholds }
                             _extractedField: row.valueField, // Store which field to extract
                             _formatter: row.formatter // Store formatter for this cell
                         };

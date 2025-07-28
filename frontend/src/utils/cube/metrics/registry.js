@@ -100,6 +100,10 @@ export const METRICS_REGISTRY = {
                 description: 'Debt service coverage ratio statistics',
                 formatter: (value) => `${value.toFixed(2)}x`
             },
+            thresholds: [
+                { when: 'below', priority: 6, styleRule: (value, limits) => value < limits.financing.minimumDSCR ? { color: '#ff4d4f', fontWeight: 600 } : null },
+                { when: 'between', priority: 5, styleRule: (value, limits) => value >= (limits.financing.minimumDSCR - 0.0) && value <= (limits.financing.minimumDSCR + 0.1) ? { color: '#faad14' } : null }
+            ],
             sensitivity: {
                 enabled: true,
                 excludeSources: [],
@@ -176,7 +180,8 @@ export const METRICS_REGISTRY = {
             id: 'projectIRR',
             priority: 100,
             dependencies: [
-                { id: 'projectCashflow', type: 'source' }
+                { id: 'projectCashflow', type: 'source' },
+                { id: 'projectIRRTarget', type: 'reference', path: ['settings', 'modules', 'financing', 'projectIRRTarget'] }
             ],
             aggregations: [],
             transformer: calculateProjectIRR,
@@ -191,6 +196,12 @@ export const METRICS_REGISTRY = {
                 description: 'Internal rate of return for project cash flows',
                 formatter: (value) => `${value.toFixed(2)}%`
             },
+            thresholds: [
+                { when: 'above', priority: 5, styleRule: (value, limits) => value > limits.projectIRRTarget ? { color: '#52c41a' } : null },
+                { when: 'below', priority: 6, styleRule: (value, limits) => value < limits.projectIRRTarget ? { color: '#ff4d4f', fontWeight: 600 } : null },
+                { when: 'equal', priority: 7, styleRule: (value, limits) => value === limits.projectIRRTarget ? { color: '#faad14' } : null },
+                { when: 'notEqual', priority: 8, styleRule: (value, limits) => value !== limits.projectIRRTarget ? { color: '#1890ff' } : null },
+                { when: 'between', priority: 4, styleRule: (value, limits) => value >= (limits.projectIRRTarget - 0.25) && value <= (limits.projectIRRTarget + 0.25) ? { color: '#faad14' } : null }],
             sensitivity: {
                 enabled: true,
                 excludeSources: ['reserveFunds'],
@@ -216,6 +227,11 @@ export const METRICS_REGISTRY = {
                 description: 'Internal rate of return for equity investors',
                 formatter: (value) => `${value.toFixed(2)}%`
             },
+            thresholds: [
+                { when: 'above', priority: 5, styleRule: (value, limits) => value > limits.financing.equityIRRTarget ? { color: '#52c41a' } : null },
+                { when: 'below', priority: 6, styleRule: (value, limits) => value < limits.financing.equityIRRTarget ? { color: '#ff4d4f', fontWeight: 600 } : null },
+                { when: 'between', priority: 4, styleRule: (value, limits) => value >= (limits.financing.equityIRRTarget - 0.25) && value <= (limits.financing.equityIRRTarget + 0.25) ? { color: '#faad14' } : null }
+            ],
             sensitivity: {
                 enabled: true,
                 excludeSources: ['reserveFunds'],

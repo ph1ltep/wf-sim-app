@@ -132,6 +132,15 @@ const CubeSourceDataResponseSchema = Yup.object().shape({
     );
 });
 
+// THRESHOLD SCHEMAS
+
+// Threshold comparison configuration for metrics
+const CubeMetricThresholdComparisonSchema = Yup.object().shape({
+    when: Yup.string().required('When condition is required'), // 'above', 'below', 'equal', 'notEqual', 'between', etc.
+    priority: Yup.number().default(10), // Priority for this comparison rule (higher = applied first)
+    styleRule: Yup.mixed().required('Style rule function is required') // Function type: (value, limits) => styleObject
+});
+
 // METRIC DATA SCHEMAS
 
 // Metric value type union - scalar or object
@@ -148,7 +157,13 @@ const CubeMetricResultSchema = Yup.object().shape({
     value: Yup.number().required('Metric value is required'), // Only number
     stats: Yup.object().test('dynamic-stats', 'Stats must have number values', (value) => {
         return Object.values(value || {}).every(val => typeof val === 'number');
-    }).default(() => ({})) // Dynamic keys like stats.min, stats.max
+    }).default(() => ({})), // Dynamic keys like stats.min, stats.max
+    thresholds: Yup.object().shape({
+        triggers: Yup.object().test('dynamic-triggers', 'Triggers must have number priority values', (value) => {
+            return Object.values(value || {}).every(val => typeof val === 'number');
+        }).default(() => ({})), // Dynamic keys: { [when]: priority } e.g., { above: 5, between: 3 }
+        style: Yup.object().default(() => ({})) // Concatenated CSS style object from triggered rules
+    }).optional() // thresholds is optional - only exists when metric has threshold processing
 });
 
 // Metric dependency specification
@@ -184,6 +199,7 @@ const CubeMetricRegistryItemSchema = Yup.object().shape({
     operations: Yup.array().of(CubeMetricOperationSchema).default([]),
     references: Yup.array().of(CubeReferenceRegistryItemSchema).default([]),
     metadata: CubeSourceMetadataSchema.required('Metadata is required'),
+    thresholds: Yup.array().of(CubeMetricThresholdComparisonSchema).default([]),
     sensitivity: Yup.object().shape({
         enabled: Yup.boolean().default(true),
         excludeSources: Yup.array().of(Yup.string()).default([]),
@@ -279,6 +295,9 @@ module.exports = {
     CubeReferenceDataSchema,
     CubeSourceDataResponseSchema,
     AuditTrailEntrySchema,
+
+    // Threashold schemas
+    CubeMetricThresholdComparisonSchema, // New export
 
     // Metrics schemas
     CubeMetricValueSchema,

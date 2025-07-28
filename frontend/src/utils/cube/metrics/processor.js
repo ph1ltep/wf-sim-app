@@ -270,12 +270,23 @@ const processMetric = (metric, processedMetrics, globalReferences, percentileInf
             );
         }
 
-        // Step 4f: Build CubeMetricDataSchema
+        // Step 4f: Apply thresholds (NEW)
+        let thresholdResults = operationResults;
+        if (metric.thresholds && metric.thresholds.length > 0) {
+            thresholdResults = applyThresholds(
+                metric.thresholds,
+                operationResults,
+                dependencies,
+                addAuditEntry
+            );
+        }
+
+        // Step 4g: Build CubeMetricDataSchema
         const trail = getTrail();
         const cubeMetricData = {
             id: metric.id,
             valueType: 'scalar', // Always scalar since value is number in schema
-            percentileMetrics: operationResults,
+            percentileMetrics: thresholdResults,
             metadata: metric.metadata,
             audit: {
                 trail: trail,
@@ -717,6 +728,125 @@ const applyOperations = (operationConfigs, baseResults, dependencies, addAuditEn
         `applied ${operationConfigs.length} operations`,
         operationConfigs.map(config => config.id),
         results);
+
+    return results;
+};
+
+/**
+ * Apply thresholds to metric results using references and metrics
+ * @param {Array} thresholdConfigs - Array of CubeMetricThresholdComparisonSchema
+ * @param {Array} baseResults - Base metric results after operations
+ * @param {Object} dependencies - Resolved dependencies object with consolidated references and metrics
+ * @param {Function} addAuditEntry - Audit trail function
+ * @returns {Array} Array of CubeMetricResultSchema with threshold data added
+ */
+const applyThresholds = (thresholdConfigs, baseResults, dependencies, addAuditEntry) => {
+    if (!thresholdConfigs || thresholdConfigs.length === 0) {
+        return baseResults;
+    }
+
+    addAuditEntry('thresholds_start',
+        `processing ${thresholdConfigs.length} threshold rules`,
+        [],
+        null);
+
+    // Sort thresholds by priority (higher number = applied first, so that 0 is the highest)
+    const sortedThresholds = [...thresholdConfigs].sort((a, b) => (b.priority || 10) - (a.priority || 10));
+
+    // Process each percentile result
+    const results = baseResults.map(result => {
+        const metricValue = result.value;
+        const percentile = result.percentile.value;
+
+        // Build limits object with all available references and metrics
+        const limits = { ...dependencies.references };
+
+        // Add metric values for this percentile to limits
+        Object.entries(dependencies.metrics).forEach(([metricId, metricData]) => {
+            if (metricData && metricData.percentileMetrics) {
+                const percentileResult = metricData.percentileMetrics.find(
+                    pm => pm.percentile.value === percentile
+                );
+                if (percentileResult) {
+                    limits[metricId] = percentileResult.value;
+                }
+            }
+        });
+
+        // Process thresholds for this result
+        const triggeredRules = [];
+        const appliedStyles = [];
+
+        sortedThresholds.forEach(threshold => {
+            const { when, priority, styleRule } = threshold;
+
+            try {
+                // Execute styleRule function
+                const style = styleRule(metricValue, limits);
+
+                if (style && typeof style === 'object') {
+                    // Style rule was triggered
+                    triggeredRules.push({
+                        when: when,
+                        priority: priority || 10
+                    });
+                    appliedStyles.push(style);
+
+                    // Add audit entry for each triggered threshold with style as data
+                    addAuditEntry('threshold_triggered',
+                        `'${when}' condition triggered at percentile ${percentile} (priority: ${priority || 10})`,
+                        [when], // Use 'when' condition as source reference
+                        style); // CSS style object as data
+                }
+            } catch (error) {
+                addAuditEntry('threshold_error',
+                    `styleRule failed for '${when}' at percentile ${percentile}: ${error.message}`,
+                    [when],
+                    { error: error.message, when, percentile });
+                // Continue processing other thresholds
+            }
+        });
+
+        // Only add thresholds object if rules were triggered
+        if (triggeredRules.length > 0) {
+            // Build triggers object: { [when]: priority }
+            const triggers = {};
+            triggeredRules.forEach(rule => {
+                triggers[rule.when] = rule.priority;
+            });
+
+            // Merge all applied styles (later styles override earlier ones)
+            const mergedStyle = appliedStyles.reduce((merged, style) => ({ ...merged, ...style }), {});
+
+            // Add audit entry for final merged style
+            addAuditEntry('threshold_style_merged',
+                `final merged style for percentile ${percentile}`,
+                Object.keys(triggers), // All triggered 'when' conditions as sources
+                mergedStyle); // Final merged CSS style as data
+
+            // Build final result with thresholds
+            return {
+                ...result,
+                thresholds: {
+                    triggers,
+                    style: mergedStyle
+                }
+            };
+        }
+
+        // No thresholds triggered, return original result
+        return result;
+    });
+
+    const triggeredCount = results.filter(r => r.thresholds).length;
+    addAuditEntry('thresholds_complete',
+        `processed ${thresholdConfigs.length} threshold rules, ${triggeredCount} results have triggered thresholds`,
+        [],
+        {
+            totalRules: thresholdConfigs.length,
+            triggeredResults: triggeredCount,
+            percentileCount: baseResults.length
+        });
 
     return results;
 };

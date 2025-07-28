@@ -230,6 +230,7 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                 const extractField = cellData._extractedField || 'value';
                 const formatter = cellData._formatter;
                 const rawValue = get(cellData, extractField);
+                const thresholdStyles = cellData.thresholds?.style || {};                    // Extract threshold styles from cellData
 
                 return (
                     <div className="content-inner">
@@ -240,6 +241,7 @@ export const generateMetricsTableColumns = (data, config, handleColumnSelect) =>
                             columnConfig={columnConfig}
                             isSelected={isSelected}
                             isPrimary={columnConfig.primary}
+                            style={thresholdStyles}
                             position={{
                                 rowIndex: rowIndex || 0,
                                 colIndex: colIndex + 1,

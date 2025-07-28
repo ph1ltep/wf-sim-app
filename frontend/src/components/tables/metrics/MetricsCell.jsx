@@ -80,37 +80,6 @@ export const MetricsCell = ({
         return formatValue(value, columnConfig, rowData);
     }, [value, formatter, columnConfig, rowData]); // Add formatter to deps
 
-    // KEEP EVERYTHING ELSE EXACTLY THE SAME
-    // Evaluate thresholds for styling (HIGHEST PRECEDENCE - supersedes all theme styling)
-    const thresholdStyles = useMemo(() => {
-        const thresholds = rowData.thresholds || columnConfig.thresholds;
-
-        if (!thresholds || !Array.isArray(thresholds) || thresholds.length === 0) {
-            return {};
-        }
-
-        if (!rowData.thresholds || !Array.isArray(rowData.thresholds) || rowData.thresholds.length === 0) {
-            if (rowData.key === 'dscr') {
-                console.log('❌ DSCR: No thresholds found');
-            }
-            return {};
-        }
-
-        const result = evaluateThresholds(rowData, rowData.thresholds, value);
-
-        // DEBUG: Log threshold evaluation
-        if (process.env.NODE_ENV === 'development' && Object.keys(result).length > 0) {
-            // console.log('Threshold applied:', {
-            //     rowKey: rowData.key,
-            //     value,
-            //     thresholds: columnConfig.thresholds,
-            //     appliedStyles: result
-            // });
-        }
-
-        return result;
-    }, [rowData, columnConfig.thresholds, value]);
-
     // UPDATED: Minimal base styling - let semantic classes handle most styling
     const cellStyle = useMemo(() => {
         const baseStyle = {
@@ -119,12 +88,9 @@ export const MetricsCell = ({
             // Removed: fontWeight, textAlign - handled by semantic classes
         };
 
-        // Apply threshold styles (remove internal properties for DOM)
-        const { _appliedRules, _priority, ...domThresholdStyles } = thresholdStyles;
-
         // Threshold styles override everything (highest precedence)
-        return { ...baseStyle, ...domThresholdStyles };
-    }, [thresholdStyles]);
+        return { ...baseStyle, ...style };
+    }, [value]); // Remove thresholdStyles from dependencies, add value
 
     // Handle empty or invalid values
     if (formattedValue === null || formattedValue === undefined || formattedValue === '') {
