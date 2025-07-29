@@ -269,5 +269,33 @@ export const METRICS_REGISTRY = {
                 analyses: ['tornado', 'correlation']
             }
         },
+        {
+            id: 'paybackPeriod',
+            priority: 220,
+            dependencies: [
+                { id: 'cumulativeCashflow', type: 'source' }
+            ],
+            aggregations: [], // No aggregations - use transformer
+            transformer: calculatePaybackPeriod,
+            operations: [],
+            metadata: {
+                name: 'Payback Period',
+                type: 'direct',
+                visualGroup: 'profitability',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Simple payback period in years (when cumulative cashflow becomes positive)',
+                formatter: (value) => value > 0 ? `${value} years` : 'No payback'
+            },
+            thresholds: [
+                {
+                    when: 'below', priority: 8, styleRule: (value, limits) => {
+                        return value > 0 && value <= limits.financing?.maxPaybackPeriod ? { color: '#52c41a', fontWeight: 600 } : null;
+                    }
+                }
+            ],
+            sensitivity: { enabled: false }
+        },
     ]
 };

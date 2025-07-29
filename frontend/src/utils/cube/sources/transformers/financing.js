@@ -420,3 +420,209 @@ export const dscr = (sourceData, context) => {
 
     return result;
 };
+
+/**
+ * Calculate Loan Life Coverage Ratio time series
+ * LLCR = NPV of remaining cash flows / Outstanding debt at each year
+ * @param {null} sourceData - Not used for virtual sources
+ * @param {Object} context - Transformer context
+ * @returns {Array} Array of SimResultsSchema objects for LLCR by year
+ */
+export const llcr = (sourceData, context) => {
+    const { addAuditEntry, percentileInfo, customPercentile, processedData, allReferences } = context;
+    const availablePercentiles = percentileInfo.available;
+
+    // Get required source data
+    const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });
+    const debtServiceSources = filterCubeSourceData(processedData, { sourceId: 'debtService' });
+
+    // Get financing data from references
+    const financing = allReferences.financing;
+    if (!financing) {
+        console.warn('⚠️ LLCR: No financing data available in references');
+        return [];
+    }
+
+    if (netCashflowSources.length === 0 || debtServiceSources.length === 0) {
+        console.warn(`⚠️ Missing sources for LLCR: netCashflow(${netCashflowSources.length}), debtService(${debtServiceSources.length})`);
+        return [];
+    }
+
+    console.log('📊 Calculating LLCR: NPV remaining cashflows / Outstanding debt');
+
+    // Track dependencies for audit trail
+    const dependencies = ['netCashflow', 'debtService'];
+
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_llcr_calculation',
+            'calculating LLCR: NPV of remaining cashflows / outstanding debt by year',
+            dependencies
+        );
+    }
+
+    // Get sources
+    const netCashflow = netCashflowSources[0];
+    const debtService = debtServiceSources[0];
+
+    // Get discount rate from financing parameters
+    const discountRate = (financing.costOfOperationalDebt || 5) / 100;
+    const loanStart = 1 + (financing.gracePeriod || 1);
+    const loanEnd = financing.loanDuration || 15;
+
+    // Process each percentile separately
+    const result = [];
+
+    availablePercentiles.forEach(percentile => {
+        // Extract data for this percentile
+        const netCashflowData = extractPercentileData(netCashflow.percentileSource, percentile);
+        const debtServiceData = extractPercentileData(debtService.percentileSource, percentile);
+
+        if (netCashflowData.length === 0 || debtServiceData.length === 0) {
+            return; // Skip if no data
+        }
+
+        // Create debt service lookup map
+        const debtServiceMap = new Map(debtServiceData.map(d => [d.year, d.value]));
+
+        // Calculate LLCR for each operational year
+        const llcrData = [];
+
+        // Sort cashflow data by year
+        const sortedCashflows = [...netCashflowData].sort((a, b) => a.year - b.year);
+
+        sortedCashflows.forEach(({ year }) => {
+            if (year < loanStart || year > loanEnd) return; // Skip non-loan years
+
+            // Calculate NPV of remaining cashflows from this year forward
+            const remainingCashflows = sortedCashflows.filter(cf => cf.year >= year);
+            const npvRemaining = remainingCashflows.reduce((npv, cf) => {
+                const yearsFromCurrent = cf.year - year;
+                const presentValue = cf.value / Math.pow(1 + discountRate, yearsFromCurrent);
+                return npv + presentValue;
+            }, 0);
+
+            // Calculate outstanding debt (sum of remaining debt service payments)
+            const remainingDebtService = debtServiceData
+                .filter(ds => ds.year >= year)
+                .reduce((sum, ds) => sum + ds.value, 0);
+
+            // Calculate LLCR
+            const llcrValue = remainingDebtService > 0 ? npvRemaining / remainingDebtService : 0;
+
+            llcrData.push({
+                year,
+                value: Math.max(0, llcrValue) // Ensure non-negative
+            });
+        });
+
+        // Create SimResultsSchema for this percentile
+        if (llcrData.length > 0) {
+            result.push({
+                name: 'llcr',
+                data: llcrData,
+                percentile: { value: percentile }
+            });
+        }
+    });
+
+    console.log(`✅ LLCR calculated for ${result.length} percentiles, discount rate: ${(discountRate * 100).toFixed(1)}%`);
+
+    return result;
+};
+
+/**
+ * Calculate Interest Coverage Ratio time series
+ * ICR = EBITDA (net cashflow proxy) / Interest payments
+ * @param {null} sourceData - Not used for virtual sources
+ * @param {Object} context - Transformer context
+ * @returns {Array} Array of SimResultsSchema objects for ICR by year
+ */
+export const icr = (sourceData, context) => {
+    const { addAuditEntry, percentileInfo, customPercentile, processedData, allReferences } = context;
+    const availablePercentiles = percentileInfo.available;
+
+    // Get required source data
+    const netCashflowSources = filterCubeSourceData(processedData, { sourceId: 'netCashflow' });
+    const operationalInterestSources = filterCubeSourceData(processedData, { sourceId: 'operationalInterest' });
+
+    // Get financing data from references
+    const financing = allReferences.financing;
+    if (!financing) {
+        console.warn('⚠️ ICR: No financing data available in references');
+        return [];
+    }
+
+    if (netCashflowSources.length === 0 || operationalInterestSources.length === 0) {
+        console.warn(`⚠️ Missing sources for ICR: netCashflow(${netCashflowSources.length}), operationalInterest(${operationalInterestSources.length})`);
+        return [];
+    }
+
+    console.log('📊 Calculating ICR: netCashflow / operationalInterest');
+
+    // Track dependencies for audit trail
+    const dependencies = ['netCashflow', 'operationalInterest'];
+
+    if (addAuditEntry) {
+        addAuditEntry(
+            'apply_icr_calculation',
+            'calculating ICR: net cashflow / interest payments by year',
+            dependencies
+        );
+    }
+
+    // Get sources
+    const netCashflow = netCashflowSources[0];
+    const operationalInterest = operationalInterestSources[0];
+
+    const loanStart = 1 + (financing.gracePeriod || 1);
+    const loanEnd = financing.loanDuration || 15;
+
+    // Process each percentile separately
+    const result = [];
+
+    availablePercentiles.forEach(percentile => {
+        // Extract data for this percentile
+        const netCashflowData = extractPercentileData(netCashflow.percentileSource, percentile);
+        const interestData = extractPercentileData(operationalInterest.percentileSource, percentile);
+
+        if (netCashflowData.length === 0 || interestData.length === 0) {
+            return; // Skip if no data
+        }
+
+        // Create interest payment lookup map
+        const interestMap = new Map(interestData.map(d => [d.year, d.value]));
+
+        // Calculate ICR for each year with both cashflow and interest data
+        const icrData = [];
+
+        netCashflowData.forEach(({ year, value: cashflow }) => {
+            if (year < loanStart || year > loanEnd) return; // Skip non-operational years
+
+            const interestPayment = interestMap.get(year);
+            if (!interestPayment || interestPayment <= 0) return; // Skip years with no/zero interest
+
+            // Calculate ICR
+            const icrValue = cashflow / interestPayment;
+
+            icrData.push({
+                year,
+                value: Math.max(0, icrValue) // Ensure non-negative
+            });
+        });
+
+        // Create SimResultsSchema for this percentile
+        if (icrData.length > 0) {
+            result.push({
+                name: 'icr',
+                data: icrData,
+                percentile: { value: percentile }
+            });
+        }
+    });
+
+    console.log(`✅ ICR calculated for ${result.length} percentiles`);
+
+    return result;
+};
+

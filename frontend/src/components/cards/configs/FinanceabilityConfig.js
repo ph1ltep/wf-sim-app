@@ -367,77 +367,252 @@ export const getBankabilityRiskLevel = (metrics) => {
 };
 
 /**
- * Create financial thresholds configuration
- * @param {Object} financingData - Financial metrics data
- * @param {Object} scenarioData - Scenario configuration
- * @returns {Object} Threshold configurations by metric
+ * Create financeability chart configuration with dual percentiles
+ * @param {Object} context - Chart context
+ * @returns {Object} Chart configuration
  */
-// const createFinancialThresholds = (financingData, scenarioData) => {
-//     const financing = scenarioData?.settings?.modules?.financing || {};
+export const createFinanceabilityChartConfig = (context) => {
+    const {
+        primaryData,
+        selectedData,
+        percentileInfo,        // Use this instead of selectedChartPercentile
+        staticConfig,
+        primaryPayback,
+        selectedPayback,
+        token
+    } = context;
 
-//     return {
-//         dscr: [
-//             {
-//                 field: 'covenantThreshold',
-//                 comparison: 'below',
-//                 colorRule: (value, threshold) => value < threshold ? { color: '#ff4d4f', fontWeight: 600 } : null,
-//                 priority: 10,
-//                 description: 'DSCR below covenant threshold'
-//             }
-//         ],
-//         irr: [
-//             {
-//                 field: 'target_irr',
-//                 comparison: 'below',
-//                 colorRule: (value, threshold) => value < (financing.targetIRR || 10) ? { color: '#ff4d4f' } : null,
-//                 priority: 8,
-//                 description: 'Project IRR below target'
-//             }
-//         ],
-//         equityIRR: [
-//             {
-//                 field: 'target_equity_irr',
-//                 comparison: 'below',
-//                 colorRule: (value, threshold) => value < (financing.targetEquityIRR || 12) ? { color: '#ff4d4f' } : null,
-//                 priority: 8,
-//                 description: 'Equity IRR below target'
-//             }
-//         ],
-//         npv: [
-//             {
-//                 field: 'npv_positive',
-//                 comparison: 'above',
-//                 colorRule: (value) => value > 0 ? { color: '#52c41a' } : { color: '#ff4d4f' },
-//                 priority: 10,
-//                 description: 'NPV positive/negative indicator'
-//             }
-//         ],
-//         avgDSCR: [
-//             {
-//                 field: 'covenantThreshold',
-//                 comparison: 'below',
-//                 colorRule: (value, threshold) => value < threshold ? { color: '#faad14' } : null,
-//                 priority: 7,
-//                 description: 'Average DSCR below covenant'
-//             }
-//         ],
-//         llcr: [
-//             {
-//                 field: 'llcr_minimum',
-//                 comparison: 'below',
-//                 colorRule: (value) => value < 1.5 ? { color: '#faad14' } : null,
-//                 priority: 6,
-//                 description: 'LLCR below recommended minimum'
-//             }
-//         ],
-//         icr: [
-//             {
-//                 field: 'icr_minimum',
-//                 comparison: 'below',
-//                 colorRule: (value) => value < 2.0 ? { color: '#faad14' } : null,
-//                 priority: 6,
-//                 description: 'ICR below recommended minimum'
-//             }
-//         ]
-//     };
-// };
+    return {
+        primaryData,
+        selectedData,
+        percentileInfo,        // Pass the whole object
+        projectLife: staticConfig.projectLife,
+        covenantThreshold: staticConfig.covenantThreshold,
+        primaryPayback,
+        selectedPayback,
+        token
+    };
+};
+
+/**
+ * Prepare financeability chart data for Plotly - dual percentiles, solid lines, different shades
+ * @param {Object} chartConfig - Chart configuration
+ * @returns {Object} Plotly chart data and layout
+ */
+export const prepareFinanceabilityChartData = (chartConfig) => {
+    const {
+        primaryData,
+        selectedData,
+        percentileInfo,        // Use this for both primary and selected
+        covenantThreshold,
+        projectLife,
+        primaryPayback,
+        selectedPayback,
+        token
+    } = chartConfig;
+
+    // Get percentiles from the percentileInfo object
+    const primaryPercentile = percentileInfo.primary;
+    const selectedPercentile = percentileInfo.selected;
+    const showBothPercentiles = selectedPercentile !== primaryPercentile;
+
+    const traces = [];
+
+    // Validate that we have at least some data
+    if ((!primaryData || Object.keys(primaryData).length === 0) &&
+        (!selectedData || Object.keys(selectedData).length === 0)) {
+        console.error('❌ prepareFinanceabilityChartData: No data provided');
+        return { data: [], layout: {}, error: 'No chart data available' };
+    }
+
+    // Get effective percentiles
+    const effectiveSelectedPercentile = percentileInfo.selected;
+
+    // Colors - primary uses primary color shades, selected uses warning color shades
+    const primaryBaseColor = getSemanticColor('neutral', 5, token);
+    const selectedBaseColor = getSemanticColor('accent', 5, token);
+    const covenantColor = getSemanticColor('primary', 6, token);
+
+    // Helper function to add traces for a percentile
+    const addTracesForPercentile = (sourceData, percentile, baseColor, label) => {
+        if (!sourceData || Object.keys(sourceData).length === 0) {
+            console.warn(`⚠️ No source data for ${label} P${percentile}`);
+            return;
+        }
+
+        // Calculate color variations using proper shade parameter
+        const colorType = label === 'Primary' ? 'neutral' : 'accent';
+        const dscrColor = getSemanticColor(colorType, 6);  // Main shade
+        const llcrColor = getSemanticColor(colorType, 3);  // Lighter shade  
+        const icrColor = getSemanticColor(colorType, 1);   // Darker shade
+
+        // DSCR trace (solid line, circle markers)
+        if (sourceData.dscr && sourceData.dscr.data && sourceData.dscr.data.length > 0) {
+            traces.push({
+                x: sourceData.dscr.data.map(d => d.year),
+                y: sourceData.dscr.data.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `DSCR P${percentile}${showBothPercentiles ? ` (${label})` : ''}`,
+                line: { color: dscrColor, width: 3 },
+                marker: {
+                    color: dscrColor,
+                    size: 8,
+                    symbol: 'circle'
+                },
+                hovertemplate: 'Year: %{x}<br>DSCR: %{y:.2f}x<extra></extra>'
+            });
+        }
+
+        // LLCR trace (solid line, square markers)
+        if (sourceData.llcr && sourceData.llcr.data && sourceData.llcr.data.length > 0) {
+            traces.push({
+                x: sourceData.llcr.data.map(d => d.year),
+                y: sourceData.llcr.data.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `LLCR P${percentile}${showBothPercentiles ? ` (${label})` : ''}`,
+                line: { color: llcrColor, width: 3 },
+                marker: {
+                    color: llcrColor,
+                    size: 7,
+                    symbol: 'square'
+                },
+                hovertemplate: 'Year: %{x}<br>LLCR: %{y:.2f}x<extra></extra>'
+            });
+        }
+
+        // ICR trace (solid line, diamond markers)
+        if (sourceData.icr && sourceData.icr.data && sourceData.icr.data.length > 0) {
+            traces.push({
+                x: sourceData.icr.data.map(d => d.year),
+                y: sourceData.icr.data.map(d => d.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `ICR P${percentile}${showBothPercentiles ? ` (${label})` : ''}`,
+                line: { color: icrColor, width: 3 },
+                marker: {
+                    color: icrColor,
+                    size: 7,
+                    symbol: 'diamond'
+                },
+                hovertemplate: 'Year: %{x}<br>ICR: %{y:.2f}x<extra></extra>'
+            });
+        }
+    };
+
+    // Add traces for primary percentile
+    if (primaryData) {
+        addTracesForPercentile(primaryData, primaryPercentile, primaryBaseColor, 'Primary');
+    }
+
+    // Add traces for selected percentile (only if different from primary)
+    if (selectedData && showBothPercentiles) {
+        addTracesForPercentile(selectedData, effectiveSelectedPercentile, selectedBaseColor, 'Selected');
+    }
+
+    // Calculate Y-axis range for reference lines
+    const allYValues = traces.flatMap(trace => trace.y || []);
+    const maxY = allYValues.length > 0 ? Math.max(...allYValues) : 3;
+    const minY = 0;
+
+    // Add covenant threshold line (horizontal, dashed) - DSCR is universal
+    if (traces.length > 0 && covenantThreshold) {
+        traces.push({
+            x: [0, projectLife || 20],
+            y: [covenantThreshold, covenantThreshold],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'DSCR Covenant',
+            line: { color: covenantColor, width: 2, dash: 'dash' },
+            hovertemplate: 'Covenant: %{y:.2f}x<extra></extra>',
+            showlegend: true
+        });
+    }
+
+    // Add payback period lines (vertical, dashed) - both percentiles
+    if (primaryPayback && primaryPayback > 0 && primaryPayback <= (projectLife || 20)) {
+        traces.push({
+            x: [primaryPayback, primaryPayback],
+            y: [minY, Math.max(maxY * 1.1, 3)],
+            type: 'scatter',
+            mode: 'lines',
+            name: `Payback P${primaryPercentile}${showBothPercentiles ? ' (Primary)' : ''} (${primaryPayback.toFixed(1)}y)`,
+            line: { color: primaryBaseColor, width: 2, dash: 'dash' },
+            hovertemplate: `Payback P${primaryPercentile}: Year %{x:.1f}<extra></extra>`,
+            showlegend: true
+        });
+    }
+
+    if (selectedPayback && selectedPayback > 0 && selectedPayback <= (projectLife || 20) && showBothPercentiles) {
+        traces.push({
+            x: [selectedPayback, selectedPayback],
+            y: [minY, Math.max(maxY * 1.1, 3)],
+            type: 'scatter',
+            mode: 'lines',
+            name: `Payback P${effectiveSelectedPercentile} (Selected) (${selectedPayback.toFixed(1)}y)`,
+            line: { color: selectedBaseColor, width: 2, dash: 'dash' },
+            hovertemplate: `Payback P${effectiveSelectedPercentile}: Year %{x:.1f}<extra></extra>`,
+            showlegend: true
+        });
+    }
+
+    // Check if we actually have any traces to display
+    if (traces.length === 0) {
+        console.warn('⚠️ prepareFinanceabilityChartData: No valid traces generated');
+        return {
+            data: [],
+            layout: {},
+            error: 'No valid chart data - check that DSCR, LLCR, or ICR sources contain data'
+        };
+    }
+
+    const layout = {
+        title: {
+            //text: 'Debt Service Coverage Analysis',
+            font: { size: 16, color: '#333' }
+        },
+        xaxis: {
+            title: {
+                text: 'Year',
+                font: { size: 14, color: '#666' }
+            },
+            dtick: 1,
+            range: [0, projectLife || 20],
+            showline: false,
+            showgrid: true,
+            gridcolor: 'rgba(128,128,128,0.2)',
+            tickfont: { size: 12, color: '#666' },
+            zerolinecolor: 'rgba(128,128,128,0.3)'
+        },
+        yaxis: {
+            title: {
+                text: 'Coverage Ratio (x)',
+                font: { size: 14, color: '#666' }
+            },
+            rangemode: 'tozero',
+            showline: false,
+            showgrid: true,
+            gridcolor: 'rgba(128,128,128,0.2)',
+            tickfont: { size: 12, color: '#666' },
+            zerolinecolor: 'rgba(128,128,128,0.3)'
+        },
+        showlegend: true,
+        legend: {
+            x: 1.02,
+            y: 1,
+            xanchor: 'left',
+            bgcolor: 'rgba(255,255,255,0.9)',
+            bordercolor: 'rgba(0,0,0,0.1)',
+            borderwidth: 1,
+            font: { size: 11, color: '#333' }
+        },
+        margin: { t: 60, r: 150, b: 60, l: 70 },
+        hovermode: 'x unified',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)'
+    };
+
+    console.log(`✅ prepareFinanceabilityChartData: Generated ${traces.length} traces - Primary: P${primaryPercentile}, Selected: P${effectiveSelectedPercentile}, ShowBoth: ${showBothPercentiles}`);
+    return { data: traces, layout };
+};

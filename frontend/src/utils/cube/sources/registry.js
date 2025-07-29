@@ -17,7 +17,9 @@ import {
     dscr,
     cumulativeCashflow,
     projectCashflow,
-    equityCashflow
+    equityCashflow,
+    llcr,
+    icr,
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -449,6 +451,52 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 description: 'Cumulative net cashflow by year',
                 customPercentile: 50,
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        // Add these to CASHFLOW_SOURCE_REGISTRY.sources array, with priorities after existing sources
+
+        {
+            id: 'llcr',
+            priority: 905,
+            path: null,
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: llcr,
+            multipliers: [],
+            metadata: {
+                name: 'LLCR',
+                type: 'virtual',
+                visualGroup: 'financing',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Loan Life Coverage Ratio by year (NPV remaining cashflows / Outstanding debt)',
+                customPercentile: 50,
+                formatter: (value) => `${value.toFixed(2)}x`
+            }
+        },
+        {
+            id: 'icr',
+            priority: 906,
+            path: null,
+            hasPercentiles: false,
+            references: [
+                { id: 'financing', path: ['settings', 'modules', 'financing'] }
+            ],
+            transformer: icr,
+            multipliers: [],
+            metadata: {
+                name: 'ICR',
+                type: 'virtual',
+                visualGroup: 'financing',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Interest Coverage Ratio by year (EBITDA / Interest payments)',
+                customPercentile: 50,
+                formatter: (value) => `${value.toFixed(2)}x`
             }
         }
     ]

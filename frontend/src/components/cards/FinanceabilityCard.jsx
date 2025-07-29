@@ -10,12 +10,15 @@ import {
 import Plot from 'react-plotly.js';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { useCubeMetrics } from '../../hooks/useCubeMetrics';
+import { useCubeSources } from '../../hooks/useCubeSources';
 import { useCube } from '../../contexts/CubeContext';
 import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
 import { MetricsTable } from '../tables';
 import {
     createFinanceabilityRowConfig,
     createFinanceabilityColConfig,
+    createFinanceabilityChartConfig, // NEW: Import chart config function
+    prepareFinanceabilityChartData,  // NEW: Import chart data function
     calculateCovenantAnalysis,
     getBankabilityRiskLevel
 } from './configs/FinanceabilityConfig';
@@ -27,27 +30,30 @@ const { useToken } = theme;
 
 const FinanceabilityCard = () => {
     const [auditTrailVisible, setAuditTrailVisible] = useState(false);
-    const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
+    //const [selectedChartPercentile, setSelectedChartPercentile] = useState(null);
     const { token } = useToken();
     const { getPercentileData, setSelectedPercentile } = useCube();
 
     // Use cube metrics hook
     const { getMetric, prepareMetricsTable, cubeStatus, isLoading, hasError, isReady } = useCubeMetrics();
     const { getValueByPath } = useScenario();
-    //const percentileInfo = getPercentileData();
+    const { getData: getSourceData } = useCubeSources();
 
+    // Constants
+    const chartSourceIds = ['dscr', 'llcr', 'icr'];
+    const cardMetricIds = ['projectIRR', 'equityIRR', 'projectNPV', 'dscrMetrics', 'paybackPeriod'];
 
-    // Define required metric IDs - static array
-    const cardMetricIds = [
-        'projectIRR',
-        'equityIRR',
-        'projectNPV',
-        'dscrMetrics',
-        //'avgDSCR',
-        //'minLLCR',
-        //'minICR',
-        //'covenantBreaches'
-    ];
+    // Static configuration - separate useMemo
+    const staticConfig = useMemo(() => ({
+        localCurrency: getValueByPath(['settings', 'project', 'currency', 'local']) || 'USD',
+        projectLife: getValueByPath(['settings', 'general', 'projectLife']) || 20,
+        covenantThreshold: getValueByPath(['settings', 'modules', 'financing', 'minimumDSCR']) || 1.3
+    }), [getValueByPath]);
+
+    // Percentile information - separate useMemo
+    const percentileInfo = useMemo(() => {
+        return getPercentileData();
+    }, [getPercentileData]);
 
     // Everything depends ONLY on cube refresh - all data is computed together
     const cardData = useMemo(() => {
@@ -67,25 +73,13 @@ const FinanceabilityCard = () => {
 
         console.log('🏦 FinanceabilityCard: loading all data from cube');
 
-        // ✅ Get fresh percentileInfo inside useMemo
-        const percentileInfo = getPercentileData();
-
-        // Get static configuration
-        const staticConfig = {
-            localCurrency: getValueByPath(['settings', 'project', 'currency', 'local']) || 'USD',
-            projectLife: getValueByPath(['settings', 'general', 'projectLife']) || 20,
-            covenantThreshold: getValueByPath(['settings', 'modules', 'financing', 'minimumDSCR']) || 1.3
-        };
-
-
         // Create table configurations
         const rowConfig = createFinanceabilityRowConfig(staticConfig.localCurrency);
         const colConfig = createFinanceabilityColConfig(
             percentileInfo,
             (percentile, columnKey, rowData) => {
                 console.log(`📊 Column selected: ${percentile} for ${rowData?.key}`);
-                setSelectedChartPercentile(percentile);
-                setSelectedPercentile(percentile);
+                setSelectedPercentile(percentile); // Only update global selection
             },
             token
         );
@@ -163,20 +157,89 @@ const FinanceabilityCard = () => {
         getValueByPath,
         getPercentileData,
         prepareMetricsTable,
-        getMetric
+        getMetric,
+        staticConfig,      // Now depends on separate useMemo
+        percentileInfo,
     ]);
 
-    // Chart data - only updates when cube refreshes or chart selection changes
+    // Chart data - simplified to use only global percentile selection
     const chartData = useMemo(() => {
-        // TODO: We need source data (DSCR time series) for charts
-        return {
-            data: [],
-            layout: {},
-            error: 'Chart integration pending - need source data access'
-        };
+        if (!isReady) {
+            return { data: [], layout: {}, error: 'Loading...' };
+        }
+
+        try {
+            // Use global percentile selection directly (like CashflowTimelineCard)
+            const primaryPercentile = percentileInfo.primary;
+            const selectedPercentile = percentileInfo.selected;
+
+            console.log(`🔄 FinanceabilityCard: Getting chart data - Primary: P${primaryPercentile}, Selected: P${selectedPercentile}`);
+
+            // Always get primary data
+            const primaryData = getSourceData({
+                sourceIds: chartSourceIds,
+                percentile: primaryPercentile
+            });
+
+            // Get selected data
+            const selectedData = getSourceData({
+                sourceIds: chartSourceIds,
+                percentile: selectedPercentile
+            });
+
+            // Validate that we have at least some data
+            const hasPrimaryData = primaryData && Object.keys(primaryData).length > 0;
+            const hasSelectedData = selectedData && Object.keys(selectedData).length > 0;
+
+            if (!hasPrimaryData && !hasSelectedData) {
+                return {
+                    data: [],
+                    layout: {},
+                    error: 'Source data not available - check that financing sources (DSCR, LLCR, ICR) are enabled and contain data'
+                };
+            }
+
+            // Get payback periods for both percentiles
+            let primaryPayback = null;
+            let selectedPayback = null;
+            try {
+                const paybackMetric = getMetric({ metricIds: ['paybackPeriod'] });
+                primaryPayback = paybackMetric?.paybackPeriod?.[primaryPercentile]?.value || null;
+                selectedPayback = paybackMetric?.paybackPeriod?.[selectedPercentile]?.value || null;
+            } catch (error) {
+                console.warn('⚠️ Could not get payback periods:', error);
+            }
+
+            // Create chart config with both datasets
+            const chartConfig = createFinanceabilityChartConfig({
+                primaryData: hasPrimaryData ? primaryData : null,
+                selectedData: hasSelectedData ? selectedData : null,
+                percentileInfo, // Pass the whole percentileInfo object
+                staticConfig,
+                primaryPayback,
+                selectedPayback,
+                token
+            });
+
+            return prepareFinanceabilityChartData(chartConfig);
+
+        } catch (error) {
+            console.error('❌ FinanceabilityCard: Chart preparation failed:', error);
+            return {
+                data: [],
+                layout: {},
+                error: `Chart error: ${error.message}`
+            };
+        }
     }, [
         cubeStatus.lastRefresh,
-        selectedChartPercentile
+        isReady,
+        getSourceData,
+        getMetric,
+        staticConfig,
+        percentileInfo.primary,     // Primary percentile changes
+        percentileInfo.selected,    // Global selected percentile changes (updated by MetricsTable)
+        token
     ]);
 
     // Error states
@@ -209,7 +272,7 @@ const FinanceabilityCard = () => {
         );
     }
 
-    const { metricsTableData, covenantAnalysis, bankabilityRisk, staticConfig, percentileInfo } = cardData;
+    const { metricsTableData, covenantAnalysis, bankabilityRisk } = cardData;
 
     // Show preparation errors if any
     if (metricsTableData.errors?.length > 0) {
@@ -300,26 +363,26 @@ const FinanceabilityCard = () => {
                 {/* DSCR Timeline Chart */}
                 <div style={{ marginBottom: 16 }}>
                     <Title level={5} style={{ margin: '0 0 12px 0' }}>
-                        Debt Service Coverage Timeline
+                        Debt Service Coverage Analysis
                         <span style={{ fontSize: '12px', color: '#666', fontWeight: 'normal' }}>
-                            {' '}(DSCR, LLCR, ICR - Years 1+)
+                            {' '}(DSCR, LLCR, ICR - P{percentileInfo.selected || percentileInfo.selected})
                         </span>
-                        {selectedChartPercentile && (
+                        {percentileInfo.selected && (
                             <Button
                                 size="small"
                                 type="link"
-                                onClick={() => setSelectedChartPercentile(null)}
+                                onClick={() => setSelectedPercentile(null)}
                                 style={{ marginLeft: 8, fontSize: '11px' }}
                             >
-                                Show All Percentiles
+                                Reset to P{percentileInfo.selected}
                             </Button>
                         )}
                     </Title>
                     {chartData.error ? (
                         <Alert
                             type="info"
-                            message={`Chart: ${chartData.error}`}
-                            description="Source data integration needed for DSCR timeline visualization"
+                            message={chartData.error}
+                            description="Enable financing module and ensure debt service data is available"
                         />
                     ) : (
                         <Plot
