@@ -241,47 +241,69 @@ const CubeMetricDataResponseSchema = Yup.object().shape({
 
 // SENSITIVITY ANALYSIS SCHEMAS
 
-// Sensitivity analysis configuration in registry
-const CubeSensitivityRegistryItemSchema = Yup.object().shape({
-    id: Yup.string().required('Analysis ID is required'),
+// Individual matrix result per percentile
+const CubeSensitivityMatrixResultSchema = Yup.object().shape({
+    percentile: Yup.number().required('Percentile is required'),
+
+    // Core matrix data - unified storage
+    correlationMatrix: Yup.mixed().required('Correlation matrix Map is required'), // Map<string, number>
+    covarianceMatrix: Yup.array().of(Yup.array().of(Yup.number())).required('Covariance matrix is required'),
+
+    // Matrix metadata for efficient access
+    matrixMetadata: Yup.object().shape({
+        enabledMetrics: Yup.array().of(Yup.string()).required('Enabled sensitivity metrics from registry'),
+        dimensions: Yup.number().required('Matrix dimension (n x n)'),
+        computedAt: Yup.date().required('Computation timestamp')
+    }).required('Matrix metadata is required'),
+
+    // Pre-computed statistics
+    statistics: Yup.object().shape({
+        avgCorrelation: Yup.number().required('Average correlation across all pairs'),
+        maxCorrelation: Yup.number().required('Maximum correlation value'),
+        minCorrelation: Yup.number().required('Minimum correlation value'),
+        significantPairs: Yup.number().required('Count of correlations above threshold'),
+        totalVariance: Yup.number().required('Total variance across all metrics')
+    }).required('Statistics are required')
+});
+
+// Main sensitivity data schema (following CubeSourceDataSchema pattern)
+const CubeSensitivityDataSchema = Yup.object().shape({
+    id: Yup.string().required('Sensitivity analysis ID is required'), // Always 'sensitivity'
+    percentileMatrices: Yup.array().of(SensitivityMatrixResultSchema).default([]),
+    metadata: CubeSensitivityMetadataSchema.required('Metadata is required'),
+    audit: Yup.object().shape({
+        trail: Yup.array().of(AuditTrailEntrySchema).default([]),
+        dependencies: Yup.object().shape({
+            enabledMetrics: Yup.array().of(Yup.string()).default([]),
+            computationMethod: Yup.string().default('pearson')
+        }).default({})
+    }).required('Audit trail is required')
+});
+
+// Input schema for sensitivity queries
+const CubeSensitivityQuerySchema = Yup.object().shape({
+    percentiles: Yup.array().of(Yup.number()).min(1, 'At least one percentile required'),
+    analysisType: Yup.string().oneOf(['tornado', 'correlation', 'impact', 'custom']).required(),
+    targetMetrics: Yup.array().of(Yup.string()).optional(),
+    format: Yup.string().optional(), // Validated against transformer registry
+    parameters: Yup.object().default(() => ({}))
+});
+
+// Analysis transformer registry schema
+const CubeSensitivityAnalysesRegistrySchema = Yup.object().shape({
+    analysisType: Yup.string().required('Analysis type is required'),
     name: Yup.string().required('Analysis name is required'),
-    description: Yup.string().required('Description is required'),
     transformer: Yup.mixed().required('Transformer function is required'),
     enabled: Yup.boolean().default(true),
-    schema: Yup.mixed().required('Validation schema is required'), // Yup schema for this analysis type
-    config: Yup.object().default(() => ({})) // Analysis-specific configuration
+    priority: Yup.number().default(100),
+    supportedFormats: Yup.array().of(Yup.object().shape({
+        format: Yup.string().required('Format name is required'),
+        transformer: Yup.mixed().required('Format transformer function is required'),
+        description: Yup.string().required('Format description is required')
+    })).default([]),
+    defaultConfig: Yup.object().default(() => ({}))
 });
 
-// Sensitivity analysis registry
-const CubeSensitivityRegistrySchema = Yup.object().shape({
-    analyses: Yup.array().of(CubeSensitivityRegistryItemSchema).default([])
-});
-
-// Base sensitivity data configuration
-const CubeSensitivityConfigSchema = Yup.object().shape({
-    computedMetrics: Yup.array().of(Yup.string()).required('Computed metrics list is required'),
-    baselinePercentiles: Yup.array().of(Yup.number()).required('Baseline percentiles are required'),
-    enabledAnalyses: Yup.array().of(Yup.string()).required('Enabled analyses list is required'),
-    lastComputed: Yup.date().required('Last computed timestamp is required')
-});
-
-// Main sensitivity data schema (metric-root structure)
-const CubeSensitivityDataSchema = Yup.object().shape({
-    config: CubeSensitivityConfigSchema.required('Configuration is required')
-    // Dynamic metric keys validated by registry schemas
-    // Structure: { [metricId]: { [analysisId]: analysisResults } }
-}).test('dynamic-metric-keys', 'Invalid metric-analysis structure', function (value) {
-    // Validate that all non-config keys are valid metric IDs
-    // and their analysis data matches registry schemas
-    const { config } = value;
-    if (!config) return false;
-
-    const nonConfigKeys = Object.keys(value).filter(key => key !== 'config');
-    return nonConfigKeys.every(metricId =>
-        config.computedMetrics.includes(metricId) &&
-        typeof value[metricId] === 'object'
-    );
-});
 
 
 
@@ -311,10 +333,10 @@ module.exports = {
     CubeMetricDataResponseSchema,
 
     // Sensitivity schemas
-    CubeSensitivityRegistryItemSchema,
-    CubeSensitivityRegistrySchema,
-    CubeSensitivityConfigSchema,
+    CubeSensitivityMatrixResultSchema,
     CubeSensitivityDataSchema,
+    CubeSensitivityQuerySchema,
+    CubeSensitivityAnalysesRegistrySchema,
 
     // re-export existing schemas
     SimResultsSchema,

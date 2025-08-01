@@ -6,6 +6,8 @@ import { computeSourceData } from '../utils/cube/sources/processor';
 import { CASHFLOW_SOURCE_REGISTRY } from '../utils/cube/sources/registry';
 import { computeMetricsData } from '../utils/cube/metrics/processor';
 import { METRICS_REGISTRY } from '../utils/cube/metrics/registry';
+import { computeSensitivityMatrices } from 'utils/cube/sensitivity/processor';
+import { SENSITIVITY_ANALYSES_REGISTRY } from 'utils/cube/sensitivity/registry';
 import {
     isDistributionsComplete,
     isConstructionSourcesComplete
@@ -22,6 +24,7 @@ export const CubeProvider = ({ children }) => {
     // ✅ FIXED: Sequential refresh state management
     const [sourceData, setSourceData] = useState(null);
     const [metricsData, setMetricsData] = useState(null);
+    const [sensitivityData, setSensitivityData] = useState(null); // CubeSensitivityDataSchema
     const [percentileInfo, setPercentileInfo] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshRequested, setRefreshRequested] = useState(false);
@@ -271,9 +274,27 @@ export const CubeProvider = ({ children }) => {
                             );
                             setMetricsData(computedMetricsData);
                             console.log(`✅ CubeContext: ${computedMetricsData.length} metrics computed successfully`);
-                            setRefreshStage('complete');
+                            setRefreshStage('sensitivity');
                         } catch (error) {
                             console.error('❌ CubeContext: Failed to compute metrics data:', error);
+                            throw error;
+                        }
+                        break;
+
+                    case 'sensitivity':
+                        console.log('🔄 CubeContext: Stage 4 - Computing sensitivity matrices...');
+                        try {
+                            const computedSensitivityData = await computeSensitivityMatrices(
+                                getMetric, // Access to all computed metrics
+                                SENSITIVITY_ANALYSES_REGISTRY,
+                                percentileInfo.available, // Use same percentiles as metrics system
+                                METRICS_REGISTRY // Access to sensitivity configuration
+                            );
+                            setSensitivityData(computedSensitivityData);
+                            console.log('✅ CubeContext: Sensitivity matrices computed successfully');
+                            setRefreshStage('complete');
+                        } catch (error) {
+                            console.error('❌ CubeContext: Failed to compute sensitivity data:', error);
                             throw error;
                         }
                         break;

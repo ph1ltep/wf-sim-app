@@ -409,7 +409,7 @@ The sensitivity analysis integrates as a new stage in the CubeContext pipeline, 
 
 ```javascript
 // Individual matrix result per percentile
-const SensitivityMatrixResultSchema = Yup.object().shape({
+const CubeSensitivityMatrixResultSchema = Yup.object().shape({
   percentile: Yup.number().required('Percentile is required'),
   
   // Core matrix data - unified storage
@@ -452,7 +452,7 @@ const CubeSensitivityDataSchema = Yup.object().shape({
 
 ```javascript
 // Input schema for sensitivity queries
-const SensitivityQuerySchema = Yup.object().shape({
+const CubeSensitivityQuerySchema = Yup.object().shape({
   percentiles: Yup.array().of(Yup.number()).min(1, 'At least one percentile required'),
   analysisType: Yup.string().oneOf(['tornado', 'correlation', 'impact', 'custom']).required(),
   targetMetrics: Yup.array().of(Yup.string()).optional(),
@@ -461,7 +461,7 @@ const SensitivityQuerySchema = Yup.object().shape({
 });
 
 // Analysis transformer registry schema
-const SensitivityTransformerRegistrySchema = Yup.object().shape({
+const CubeSensitivityAnalysesRegistrySchema = Yup.object().shape({
   analysisType: Yup.string().required('Analysis type is required'),
   name: Yup.string().required('Analysis name is required'),
   transformer: Yup.mixed().required('Transformer function is required'),
@@ -742,7 +742,7 @@ case 'sensitivity':
  * Provides unified interface for tornado, correlation, and custom sensitivity analyses
  * @returns {Object} Sensitivity analysis interface
  */
-export const useSensitivityCube = () => {
+export const useCubeSensitivity = () => {
   const { sensitivityData, percentileInfo, isLoading } = useCube();
 
   /**

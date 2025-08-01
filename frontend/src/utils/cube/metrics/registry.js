@@ -43,7 +43,9 @@ export const METRICS_REGISTRY = {
                 description: 'Net present value of all project costs',
                 formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             },
-            sensitivity: { enabled: false } // Building block metric
+            sensitivity: {
+                enabled: true
+            }
         },
 
         // NPV of Energy Production (building block for LCOE)
@@ -73,7 +75,9 @@ export const METRICS_REGISTRY = {
                 description: 'Net present value of energy production in MWh',
                 formatter: (value) => `${(value / 1000).toFixed(0)}k MWh`
             },
-            sensitivity: { enabled: false } // Building block metric
+            sensitivity: {
+                enabled: false,
+            }
         },
 
         // DSCR Metrics using virtual source + aggregations
@@ -106,8 +110,12 @@ export const METRICS_REGISTRY = {
             ],
             sensitivity: {
                 enabled: true,
-                excludeSources: [],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
 
@@ -133,12 +141,14 @@ export const METRICS_REGISTRY = {
             },
             sensitivity: {
                 enabled: true,
-                excludeSources: ['reserveFunds'],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
-
-        // LCOE using operations between NPV metrics
         {
             id: 'lcoe',
             priority: 250,
@@ -172,8 +182,12 @@ export const METRICS_REGISTRY = {
             },
             sensitivity: {
                 enabled: true,
-                excludeSources: ['reserveFunds'],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
         {
@@ -204,8 +218,12 @@ export const METRICS_REGISTRY = {
                 { when: 'between', priority: 4, styleRule: (value, limits) => value >= (limits.projectIRRTarget - 0.25) && value <= (limits.projectIRRTarget + 0.25) ? { color: '#faad14' } : null }],
             sensitivity: {
                 enabled: true,
-                excludeSources: ['reserveFunds'],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
         {
@@ -234,8 +252,12 @@ export const METRICS_REGISTRY = {
             ],
             sensitivity: {
                 enabled: true,
-                excludeSources: ['reserveFunds'],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
         {
@@ -265,8 +287,12 @@ export const METRICS_REGISTRY = {
             },
             sensitivity: {
                 enabled: true,
-                excludeSources: ['reserveFunds'],
-                analyses: ['tornado', 'correlation']
+                analyses: ['tornado', 'correlation'], // Which analyses this metric participates in
+                interpolation: { method: 'linear' },
+                customConfig: {
+                    tornadoWeight: 1.0, // Optional analysis-specific settings
+                    correlationGroup: 'financial' // Optional grouping for analysis
+                }
             }
         },
         {

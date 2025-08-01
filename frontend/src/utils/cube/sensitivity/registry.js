@@ -1,129 +1,145 @@
 // utils/cube/sensitivity/registry.js
-import { computeTornadoAnalysis, computeCorrelationAnalysis } from './transformers';
+import { computeTornadoFromMatrix, formatTornadoRaw, formatTornadoChart, formatTornadoTable } from './transformers/tornado';
 
 /**
  * Sensitivity analysis registry following CubeSensitivityRegistrySchema
  * Defines available analysis types with transformers and validation schemas
  */
-export const SENSITIVITY_REGISTRY = {
+export const SENSITIVITY_ANALYSES_REGISTRY = {
+    // Global configuration for all analyses
+    config: {
+        correlationMethod: 'pearson',
+        significanceThreshold: 0.3,
+        varianceEstimationMethod: 'simplified',
+        excludeMinorImpacts: true,
+        impactThreshold: 0.01
+    },
+
     analyses: [
         {
-            id: 'tornado',
+            analysisType: 'tornado',
             name: 'Tornado Analysis',
-            description: 'Single-variable sensitivity impact ranking',
-            transformer: computeTornadoAnalysis,
+            description: 'Variable impact ranking from correlation matrix',
+            transformer: computeTornadoFromMatrix,
             enabled: true,
-            schema: Yup.object().shape({
-                // Per-metric tornado results
-                rankings: Yup.array().of(Yup.object().shape({
-                    sourceId: Yup.string().required(),
-                    impact: Yup.number().required(),
-                    elasticity: Yup.number().required(),
-                    rank: Yup.number().required(),
-                    baseline: Yup.object().shape({
-                        percentile: Yup.number().required(),
-                        value: Yup.number().required()
-                    }).required(),
-                    perturbed: Yup.object().shape({
-                        percentile: Yup.number().required(),
-                        value: Yup.number().required()
-                    }).required()
-                })).required(),
-                chartData: Yup.array().of(Yup.object().shape({
-                    sourceId: Yup.string().required(),
-                    low: Yup.number().required(),
-                    high: Yup.number().required(),
-                    impact: Yup.number().required()
-                })).required()
-            }),
-            config: {
-                percentileShift: 1, // How many percentile levels to shift for impact calculation
-                rankingMetric: 'impact', // 'impact' | 'elasticity' | 'absolute'
-                excludeMinorImpacts: true, // Filter out impacts below threshold
-                impactThreshold: 0.01 // 1% minimum impact to include
+            priority: 100,
+            supportedFormats: [
+                {
+                    format: 'raw',
+                    transformer: formatTornadoRaw,
+                    description: 'Raw ranking data with correlations and impacts'
+                },
+                {
+                    format: 'chart',
+                    transformer: formatTornadoChart,
+                    description: 'Chart-ready data for tornado visualization'
+                },
+                {
+                    format: 'table',
+                    transformer: formatTornadoTable,
+                    description: 'Sortable table format with cross-percentile data'
+                }
+            ],
+            defaultConfig: {
+                rankingMethod: 'correlation', // 'correlation' | 'impact' | 'absolute'
+                impactThreshold: 0.01,        // Minimum correlation to include
+                maxResults: 10,               // Maximum results to return
+                excludeMinorImpacts: true,    // Filter out impacts below threshold
+                includeNegativeCorrelations: true
             }
         },
 
+        // Placeholder for correlation analysis (to be implemented later)
         {
-            id: 'correlation',
+            analysisType: 'correlation',
             name: 'Correlation Analysis',
-            description: 'Multi-variable correlation matrix and heatmap data',
-            transformer: computeCorrelationAnalysis,
-            enabled: true,
-            schema: Yup.object().shape({
-                matrix: Yup.mixed().required(), // Map object with correlation pairs
-                heatmapData: Yup.object().shape({
-                    sources: Yup.array().of(Yup.string()).required(),
-                    correlations: Yup.array().of(Yup.array().of(Yup.number())).required() // 2D correlation matrix
-                }).required(),
-                statistics: Yup.object().shape({
-                    avgCorrelation: Yup.number().required(),
-                    maxCorrelation: Yup.number().required(),
-                    significantPairs: Yup.number().required() // Count of correlations above threshold
-                }).required()
-            }),
-            config: {
-                method: 'pearson', // 'pearson' | 'spearman' | 'kendall'
-                significanceThreshold: 0.3, // Minimum correlation to consider significant
-                heatmapFormat: true, // Whether to generate heatmap-ready data
-                includeMetricSelf: false // Whether to include metric correlation with itself
-            }
-        },
-
-        // Future analysis placeholder
-        {
-            id: 'sobol',
-            name: 'Sobol Sensitivity Indices',
-            description: 'Global sensitivity analysis using Sobol indices',
-            transformer: null, // Not implemented yet
-            enabled: false,
-            schema: Yup.object().shape({
-                firstOrder: Yup.object().required(), // First-order indices
-                totalOrder: Yup.object().required(), // Total-order indices
-                interactions: Yup.object().required() // Second-order interactions
-            }),
-            config: {
-                sampleSize: 1000,
-                confidenceLevel: 0.95,
-                bootstrapSamples: 100
+            description: 'Cross-metric correlation analysis from matrix',
+            transformer: null, // To be implemented
+            enabled: false,    // Disabled until implemented
+            priority: 200,
+            supportedFormats: [
+                {
+                    format: 'raw',
+                    transformer: null,
+                    description: 'Raw correlation matrix data'
+                },
+                {
+                    format: 'heatmap',
+                    transformer: null,
+                    description: 'Heatmap-ready data structure'
+                },
+                {
+                    format: 'network',
+                    transformer: null,
+                    description: 'Network graph data for correlation visualization'
+                }
+            ],
+            defaultConfig: {
+                significanceThreshold: 0.3,
+                includeInsignificant: false,
+                clustered: true
             }
         }
     ]
 };
 
 /**
- * Get analysis configuration by ID
- * @param {string} analysisId - Analysis ID to lookup
+ * Get analysis configuration by type
+ * @param {string} analysisType - Analysis type to lookup
  * @returns {Object|null} Analysis configuration or null if not found
  */
-export const getAnalysisConfig = (analysisId) => {
-    return SENSITIVITY_REGISTRY.analyses.find(analysis => analysis.id === analysisId) || null;
+export const getAnalysisConfig = (analysisType) => {
+    return SENSITIVITY_ANALYSES_REGISTRY.analyses.find(
+        analysis => analysis.analysisType === analysisType && analysis.enabled
+    ) || null;
 };
 
 /**
- * Get enabled analyses
- * @returns {Array} Array of enabled analysis configurations
+ * Get format transformer for analysis type and format
+ * @param {string} analysisType - Analysis type
+ * @param {string} format - Format type
+ * @returns {Function|null} Format transformer function or null if not found
  */
-export const getEnabledAnalyses = () => {
-    return SENSITIVITY_REGISTRY.analyses.filter(analysis => analysis.enabled);
+export const getFormatTransformer = (analysisType, format) => {
+    const analysisConfig = getAnalysisConfig(analysisType);
+    if (!analysisConfig) return null;
+
+    const formatConfig = analysisConfig.supportedFormats.find(
+        f => f.format === format
+    );
+
+    return formatConfig?.transformer || null;
 };
 
 /**
- * Validate analysis schema for results
- * @param {string} analysisId - Analysis ID
- * @param {Object} results - Results to validate
- * @returns {Object} { isValid: boolean, errors: string[] }
+ * Get all supported formats for an analysis type
+ * @param {string} analysisType - Analysis type
+ * @returns {string[]} Array of supported format names
  */
-export const validateAnalysisResults = (analysisId, results) => {
-    const config = getAnalysisConfig(analysisId);
-    if (!config) {
-        return { isValid: false, errors: [`Unknown analysis: ${analysisId}`] };
-    }
+export const getSupportedFormats = (analysisType) => {
+    const analysisConfig = getAnalysisConfig(analysisType);
+    if (!analysisConfig) return [];
 
-    try {
-        config.schema.validateSync(results);
-        return { isValid: true, errors: [] };
-    } catch (error) {
-        return { isValid: false, errors: [error.message] };
-    }
+    return analysisConfig.supportedFormats.map(f => f.format);
+};
+
+/**
+ * Validate if analysis type and format combination is supported
+ * @param {string} analysisType - Analysis type
+ * @param {string} format - Format type
+ * @returns {boolean} True if combination is supported
+ */
+export const isAnalysisFormatSupported = (analysisType, format) => {
+    const supportedFormats = getSupportedFormats(analysisType);
+    return supportedFormats.includes(format);
+};
+
+/**
+ * Get all enabled analysis types
+ * @returns {string[]} Array of enabled analysis type names
+ */
+export const getEnabledAnalysisTypes = () => {
+    return SENSITIVITY_ANALYSES_REGISTRY.analyses
+        .filter(analysis => analysis.enabled)
+        .map(analysis => analysis.analysisType);
 };
