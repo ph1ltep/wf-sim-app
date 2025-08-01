@@ -205,13 +205,13 @@ const getMetricValuesForPercentile = (getMetric, enabledMetrics, percentile) => 
     for (const metricId of enabledMetrics) {
         const metricData = allMetricsData[metricId];
 
-        if (!metricData || typeof metricData.value !== 'number' || isNaN(metricData.value)) {
+        if (!metricData || typeof metricData[percentile].value !== 'number' || isNaN(metricData[percentile].value)) {
             console.warn(`⚠️ Missing or invalid value for metric '${metricId}' at P${percentile}`);
             missingMetrics.push(metricId);
             continue;
         }
 
-        metricValues[metricId] = metricData.value;
+        metricValues[metricId] = metricData[percentile].value;
     }
 
     // Validate we have enough metrics for correlation analysis

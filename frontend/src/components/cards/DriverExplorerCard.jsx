@@ -31,8 +31,8 @@ const DriverExplorerCard = ({
         getSensitivity,
         getTornadoAnalysis,
         isLoading,
-        isDataAvailable,
-        availablePercentiles
+        isReady,
+        cubeStatus
     } = useCubeSensitivity();
 
     const { getValueByPath } = useScenario();
@@ -80,7 +80,7 @@ const DriverExplorerCard = ({
 
     // Get tornado analysis data
     const tornadoData = useMemo(() => {
-        if (!isDataAvailable || !targetMetric || analysisPercentiles.length < 2) {
+        if (!isReady || !targetMetric || analysisPercentiles.length < 2) {
             return null;
         }
 
@@ -102,10 +102,12 @@ const DriverExplorerCard = ({
             console.error('❌ DriverExplorerCard: Failed to get tornado analysis:', error);
             return { error: error.message };
         }
-    }, [isDataAvailable, targetMetric, analysisPercentiles, getTornadoAnalysis, maxResults, correlationThreshold]);
+    }, [isReady, targetMetric, analysisPercentiles, getTornadoAnalysis, maxResults, correlationThreshold]);
 
     // Prepare chart data for Plotly with enhanced styling
     const plotlyData = useMemo(() => {
+        const availablePercentiles = percentileInfo.available;
+
         if (!tornadoData?.chartData?.[0]?.data) {
             return { data: [], layout: {} };
         }
@@ -262,11 +264,11 @@ const DriverExplorerCard = ({
         if (!checked) {
             setSliderValue(null);
         } else {
-            const minP = Math.min(...availablePercentiles);
-            const maxP = Math.max(...availablePercentiles);
+            const minP = Math.min(...percentileInfo.available);
+            const maxP = Math.max(...percentileInfo.available);
             setSliderValue(Math.round((minP + maxP) / 2));
         }
-    }, [availablePercentiles]);
+    }, [percentileInfo]);
 
     const handleSliderChange = useCallback((value) => {
         setSliderValue(value);
@@ -286,7 +288,7 @@ const DriverExplorerCard = ({
     }
 
     // Render error state
-    if (!isDataAvailable) {
+    if (!isReady) {
         return (
             <Card
                 title={<Space>{icon}{title}</Space>}
@@ -396,11 +398,11 @@ const DriverExplorerCard = ({
                         </Text>
                         {useSlider && (
                             <Slider
-                                min={Math.min(...availablePercentiles)}
-                                max={Math.max(...availablePercentiles)}
+                                min={Math.min(...percentileInfo.available)}
+                                max={Math.max(...percentileInfo.available)}
                                 value={sliderValue || percentileInfo.selected}
                                 onChange={handleSliderChange}
-                                marks={availablePercentiles.reduce((acc, p) => {
+                                marks={percentileInfo.available.reduce((acc, p) => {
                                     acc[p] = { label: `P${p}`, style: { fontSize: '10px' } };
                                     return acc;
                                 }, {})}

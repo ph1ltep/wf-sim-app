@@ -7,7 +7,7 @@ import { CASHFLOW_SOURCE_REGISTRY } from '../utils/cube/sources/registry';
 import { computeMetricsData } from '../utils/cube/metrics/processor';
 import { METRICS_REGISTRY } from '../utils/cube/metrics/registry';
 import { computeSensitivityMatrices } from 'utils/cube/sensitivity/processor';
-import { SENSITIVITY_ANALYSES_REGISTRY } from 'utils/cube/sensitivity/registry';
+import { SENSITIVITY_ANALYSES_REGISTRY } from '../utils/cube/sensitivity/registry';
 import {
     isDistributionsComplete,
     isConstructionSourcesComplete
@@ -285,7 +285,7 @@ export const CubeProvider = ({ children }) => {
                         console.log('🔄 CubeContext: Stage 4 - Computing sensitivity matrices...');
                         try {
                             const computedSensitivityData = await computeSensitivityMatrices(
-                                //getMetric, // Access to all computed metrics
+                                getMetric, // Access to all computed metrics
                                 SENSITIVITY_ANALYSES_REGISTRY,
                                 percentileInfo, // Use same percentiles as metrics system
                                 METRICS_REGISTRY // Access to sensitivity configuration
@@ -625,7 +625,7 @@ export const CubeProvider = ({ children }) => {
 
                 // Find percentile data
                 const percentileResult = metricDataItem.percentileMetrics.find(
-                    pm => pm.percentile === percentile
+                    pm => pm.percentile.value === percentile
                 );
 
                 if (percentileResult) {
@@ -676,6 +676,7 @@ export const CubeProvider = ({ children }) => {
             lastRefresh,
             sourceDataCount: sourceData?.length || 0,
             metricsDataCount: metricsData?.length || 0,
+            sensitivityDataCount: sensitivityData?.percentileMatrices?.length || 0,
             refreshRequested,
             refreshStage,
             error: cubeError,
@@ -697,6 +698,7 @@ export const CubeProvider = ({ children }) => {
         // Data
         sourceData,
         metricsData,
+        sensitivityData,
 
         // State - ✅ Same interface as CashflowContext
         isLoading,

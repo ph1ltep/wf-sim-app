@@ -42,15 +42,15 @@ export const CASHFLOW_CARD_REGISTRY = {
         category: 'Investment',
         description: 'Bankability metrics, DSCR analysis, and covenant compliance assessment'
     },
-    // driverExplorer: {
-    //     component: DriverExplorerCard,
-    //     enabled: true,
-    //     gridProps: { span: 24 },
-    //     props: {
-    //         title: "Value Driver Analysis",
-    //         showMetricsTable: true
-    //     }
-    // },
+    driverExplorer: {
+        component: DriverExplorerCard,
+        enabled: true,
+        gridProps: { span: 24 },
+        props: {
+            title: "Value Driver Analysis",
+            showMetricsTable: true
+        }
+    },
 };
 
 // Card Error Boundary Component

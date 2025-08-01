@@ -11,7 +11,7 @@ import {
 } from '../utils/cube/sensitivity/registry';
 import { getCorrelationValue } from '../utils/cube/sensitivity/processor';
 import { createAuditTrail } from '../utils/cube/audit';
-import { SensitivityQuerySchema } from 'schemas/yup/cube';
+import { CubeSensitivityQuerySchema } from 'schemas/yup/cube';
 
 /**
  * Hook for accessing sensitivity analysis data with matrix-based operations
@@ -20,7 +20,9 @@ import { SensitivityQuerySchema } from 'schemas/yup/cube';
  * @returns {Object} Sensitivity analysis interface
  */
 export const useCubeSensitivity = () => {
-    const { sensitivityData, percentileInfo, isLoading, isRefreshing } = useCube();
+    const { sensitivityData, getCubeStatus, getPercentileData } = useCube();
+    const cubeStatus = getCubeStatus();
+    const percentileInfo = getPercentileData(); // Get percentile info for configuration
 
     /**
      * Get sensitivity analysis results with flexible filtering and formatting
@@ -35,7 +37,7 @@ export const useCubeSensitivity = () => {
     const getSensitivity = useCallback((filters) => {
         // Step 1: Validate query against schema
         try {
-            SensitivityQuerySchema.validateSync(filters);
+            CubeSensitivityQuerySchema.validateSync(filters);
         } catch (error) {
             throw new Error(`Invalid sensitivity query: ${error.message}`);
         }
@@ -431,10 +433,6 @@ export const useCubeSensitivity = () => {
         return percentileInfo?.available || [];
     }, [percentileInfo]);
 
-    const isDataAvailable = useMemo(() => {
-        return !!(sensitivityData?.percentileMatrices?.length > 0);
-    }, [sensitivityData]);
-
     return {
         // Core access functions
         getSensitivity,
@@ -451,11 +449,12 @@ export const useCubeSensitivity = () => {
         getAvailableAnalyses,
         getSensitivityStatus,
 
-        // State information
-        isLoading,
-        isRefreshing,
-        isDataAvailable,
-        sensitivityData,
-        availablePercentiles
+        cubeStatus,
+        percentileInfo,
+
+        // Convenience flags
+        isLoading: cubeStatus.isLoading,
+        hasError: !!cubeStatus.error,
+        isReady: !cubeStatus.isLoading && !cubeStatus.error && cubeStatus.sensitivityDataCount > 0
     };
 };
