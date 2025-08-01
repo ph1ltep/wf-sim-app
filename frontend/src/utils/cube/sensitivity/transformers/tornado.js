@@ -4,7 +4,7 @@ import { generateMatrixKey, getCorrelationValue } from '../processor';
 /**
  * Standard transformer input interface - all analysis transformers receive this
  * @typedef {Object} AnalysisTransformerContext
- * @property {Object|Object[]} matrixData - SensitivityMatrixResultSchema object(s) 
+ * @property {Object|Object[]} matrixData - CubeSensitivityMatrixResultSchema object(s) 
  * @property {Object} query - Original query parameters from getSensitivity()
  * @property {Object} config - Analysis-specific configuration from registry
  * @property {Function} addAuditEntry - Function to add audit trail entries

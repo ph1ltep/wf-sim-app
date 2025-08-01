@@ -19,4 +19,4 @@ export {
 // Re-export everything for convenience
 export * from './FinanceabilityConfig';
 export * from './CashflowTimelineConfig';
-export * from './DriverExplorerConfig';
+export * from './xDriverExplorerConfig';

@@ -285,9 +285,9 @@ export const CubeProvider = ({ children }) => {
                         console.log('🔄 CubeContext: Stage 4 - Computing sensitivity matrices...');
                         try {
                             const computedSensitivityData = await computeSensitivityMatrices(
-                                getMetric, // Access to all computed metrics
+                                //getMetric, // Access to all computed metrics
                                 SENSITIVITY_ANALYSES_REGISTRY,
-                                percentileInfo.available, // Use same percentiles as metrics system
+                                percentileInfo, // Use same percentiles as metrics system
                                 METRICS_REGISTRY // Access to sensitivity configuration
                             );
                             setSensitivityData(computedSensitivityData);
@@ -604,7 +604,66 @@ export const CubeProvider = ({ children }) => {
         return auditTrails;
     }, [sourceData]);
 
+    // In CubeContext.jsx, add getMetric method (similar to existing getData)
+    const getMetric = useCallback((filters = {}) => {
+        if (!metricsData || metricsData.length === 0) {
+            console.warn('⚠️ CubeContext: No metrics data available');
+            return {};
+        }
 
+        const { metricIds, percentile, percentiles } = filters;
+
+        // If specific percentile requested
+        if (percentile !== undefined) {
+            const result = {};
+
+            metricsData.forEach(metricDataItem => {
+                const metricId = metricDataItem.id;
+
+                // Filter by metricIds if specified
+                if (metricIds && !metricIds.includes(metricId)) return;
+
+                // Find percentile data
+                const percentileResult = metricDataItem.percentileMetrics.find(
+                    pm => pm.percentile === percentile
+                );
+
+                if (percentileResult) {
+                    if (!result[metricId]) result[metricId] = {};
+                    result[metricId][percentile] = {
+                        value: percentileResult.value,
+                        metadata: percentileResult.metadata
+                    };
+                }
+            });
+
+            return result;
+        }
+
+        // If multiple percentiles or all data requested
+        const result = {};
+
+        metricsData.forEach(metricDataItem => {
+            const metricId = metricDataItem.id;
+
+            // Filter by metricIds if specified
+            if (metricIds && !metricIds.includes(metricId)) return;
+
+            result[metricId] = {};
+
+            metricDataItem.percentileMetrics.forEach(pm => {
+                // Filter by percentiles if specified
+                if (percentiles && !percentiles.includes(pm.percentile)) return;
+
+                result[metricId][pm.percentile] = {
+                    value: pm.value,
+                    metadata: pm.metadata
+                };
+            });
+        });
+
+        return result;
+    }, [metricsData]);
 
     /**
      * Get comprehensive cube status for monitoring
@@ -653,6 +712,7 @@ export const CubeProvider = ({ children }) => {
 
         // Data access
         getData,
+        getMetric,
         getAuditTrail,
         getSourceMetadata,
         getPercentileData,

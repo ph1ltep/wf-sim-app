@@ -266,10 +266,75 @@ const CubeSensitivityMatrixResultSchema = Yup.object().shape({
     }).required('Statistics are required')
 });
 
+// In schemas/yup/cube.js, add this schema definition
+
+/**
+ * Schema for sensitivity analysis metadata - tracks configuration and computation stats
+ */
+const CubeSensitivityMetadataSchema = Yup.object().shape({
+    // Analysis identification
+    name: Yup.string().default('Sensitivity Matrix Analysis'),
+    analysisType: Yup.string().default('matrix'),
+
+    // Matrix computation configuration
+    matrixConfig: Yup.object().shape({
+        correlationMethod: Yup.string().oneOf(['pearson', 'spearman']).default('pearson'),
+        significanceThreshold: Yup.number().min(0).max(1).default(0.3),
+        varianceEstimationMethod: Yup.string().oneOf(['simplified', 'bias-corrected']).default('simplified'),
+        excludeMinorImpacts: Yup.boolean().default(true),
+        impactThreshold: Yup.number().min(0).max(1).default(0.01),
+        onlyEnabledMetrics: Yup.boolean().default(true)
+    }).required('Matrix configuration is required'),
+
+    // Computation performance statistics
+    computationStats: Yup.object().shape({
+        computationTime: Yup.number().positive('Computation time must be positive'),
+        memoryUsage: Yup.number().positive('Memory usage must be positive'),
+        matrixOperations: Yup.number().integer().min(0).default(0),
+        enabledMetricsCount: Yup.number().integer().min(0).default(0),
+        totalCorrelationPairs: Yup.number().integer().min(0).default(0),
+        percentileCount: Yup.number().integer().min(1).default(1)
+    }).default({}),
+
+    // Analysis registry information
+    registryInfo: Yup.object().shape({
+        availableAnalyses: Yup.array().of(Yup.string()).default([]),
+        enabledAnalyses: Yup.array().of(Yup.string()).default([]),
+        registryVersion: Yup.string().nullable().default(null)
+    }).default({}),
+
+    // Data quality and validation info
+    dataQuality: Yup.object().shape({
+        dataCompleteness: Yup.number().min(0).max(1).default(1.0), // Percentage of complete data
+        correlationQuality: Yup.object().shape({
+            validPairs: Yup.number().integer().min(0).default(0),
+            invalidPairs: Yup.number().integer().min(0).default(0),
+            averageSignificance: Yup.number().min(0).max(1).nullable().default(null)
+        }).default({}),
+        outlierDetection: Yup.object().shape({
+            outliersDetected: Yup.number().integer().min(0).default(0),
+            outlierThreshold: Yup.number().positive().nullable().default(null),
+            outlierMethod: Yup.string().nullable().default(null)
+        }).default({})
+    }).default({}),
+
+    // Timestamps and versioning
+    computedAt: Yup.date().required('Computation timestamp is required'),
+    lastRefreshAt: Yup.date().nullable().default(null),
+    version: Yup.string().default('1.0.0'),
+
+    // Integration metadata
+    dependencies: Yup.object().shape({
+        cubeRefreshId: Yup.string().nullable().default(null),
+        metricsVersion: Yup.string().nullable().default(null),
+        sourcesVersion: Yup.string().nullable().default(null)
+    }).default({})
+});
+
 // Main sensitivity data schema (following CubeSourceDataSchema pattern)
 const CubeSensitivityDataSchema = Yup.object().shape({
     id: Yup.string().required('Sensitivity analysis ID is required'), // Always 'sensitivity'
-    percentileMatrices: Yup.array().of(SensitivityMatrixResultSchema).default([]),
+    percentileMatrices: Yup.array().of(CubeSensitivityMatrixResultSchema).default([]),
     metadata: CubeSensitivityMetadataSchema.required('Metadata is required'),
     audit: Yup.object().shape({
         trail: Yup.array().of(AuditTrailEntrySchema).default([]),

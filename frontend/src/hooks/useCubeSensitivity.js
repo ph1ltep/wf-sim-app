@@ -11,7 +11,7 @@ import {
 } from '../utils/cube/sensitivity/registry';
 import { getCorrelationValue } from '../utils/cube/sensitivity/processor';
 import { createAuditTrail } from '../utils/cube/audit';
-import { SensitivityQuerySchema } from '../schemas/yup/cube';
+import { SensitivityQuerySchema } from 'schemas/yup/cube';
 
 /**
  * Hook for accessing sensitivity analysis data with matrix-based operations
@@ -19,7 +19,7 @@ import { SensitivityQuerySchema } from '../schemas/yup/cube';
  * Integration Pattern: Similar to useCubeMetrics(), interfaces with CubeContext state
  * @returns {Object} Sensitivity analysis interface
  */
-export const useSensitivityCube = () => {
+export const useCubeSensitivity = () => {
     const { sensitivityData, percentileInfo, isLoading, isRefreshing } = useCube();
 
     /**
