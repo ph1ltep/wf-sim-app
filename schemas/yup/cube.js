@@ -274,9 +274,8 @@ const CubeSensitivityMatrixResultSchema = Yup.object().shape({
 const CubeSensitivityMetadataSchema = Yup.object().shape({
     // Analysis identification
     name: Yup.string().default('Sensitivity Matrix Analysis'),
+    description: Yup.string().default(''),
     analysisType: Yup.string().default('matrix'),
-
-    // Matrix computation configuration
     matrixConfig: Yup.object().shape({
         correlationMethod: Yup.string().oneOf(['pearson', 'spearman']).default('pearson'),
         significanceThreshold: Yup.number().min(0).max(1).default(0.3),
@@ -290,10 +289,9 @@ const CubeSensitivityMetadataSchema = Yup.object().shape({
     computationStats: Yup.object().shape({
         computationTime: Yup.number().positive('Computation time must be positive'),
         memoryUsage: Yup.number().positive('Memory usage must be positive'),
-        matrixOperations: Yup.number().integer().min(0).default(0),
+        matrixSize: Yup.number().integer().min(0).default(0),
         enabledMetricsCount: Yup.number().integer().min(0).default(0),
         totalCorrelationPairs: Yup.number().integer().min(0).default(0),
-        percentileCount: Yup.number().integer().min(1).default(1)
     }).default({}),
 
     // Analysis registry information
@@ -303,32 +301,6 @@ const CubeSensitivityMetadataSchema = Yup.object().shape({
         registryVersion: Yup.string().nullable().default(null)
     }).default({}),
 
-    // Data quality and validation info
-    dataQuality: Yup.object().shape({
-        dataCompleteness: Yup.number().min(0).max(1).default(1.0), // Percentage of complete data
-        correlationQuality: Yup.object().shape({
-            validPairs: Yup.number().integer().min(0).default(0),
-            invalidPairs: Yup.number().integer().min(0).default(0),
-            averageSignificance: Yup.number().min(0).max(1).nullable().default(null)
-        }).default({}),
-        outlierDetection: Yup.object().shape({
-            outliersDetected: Yup.number().integer().min(0).default(0),
-            outlierThreshold: Yup.number().positive().nullable().default(null),
-            outlierMethod: Yup.string().nullable().default(null)
-        }).default({})
-    }).default({}),
-
-    // Timestamps and versioning
-    computedAt: Yup.date().required('Computation timestamp is required'),
-    lastRefreshAt: Yup.date().nullable().default(null),
-    version: Yup.string().default('1.0.0'),
-
-    // Integration metadata
-    dependencies: Yup.object().shape({
-        cubeRefreshId: Yup.string().nullable().default(null),
-        metricsVersion: Yup.string().nullable().default(null),
-        sourcesVersion: Yup.string().nullable().default(null)
-    }).default({})
 });
 
 // Main sensitivity data schema (following CubeSourceDataSchema pattern)
