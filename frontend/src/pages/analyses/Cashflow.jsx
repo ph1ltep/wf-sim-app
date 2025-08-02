@@ -3,9 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Space, Typography, Divider, Button, Alert, Spin } from 'antd';
 import {
     ReloadOutlined,
-    BarChartOutlined,
     SettingOutlined,
-    InfoCircleOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { useCube } from '../../contexts/CubeContext';
@@ -15,8 +13,6 @@ import PercentileSelector from '../../components/forms/selectors/PercentileSelec
 // Import card components
 import CashflowTimelineCard from '../../components/cards/CashflowTimelineCard';
 import FinanceabilityCard from '../../components/cards/FinanceabilityCard';
-import DriverExplorerCard from '../../components/cards/DriverExplorerCard';
-
 const { Title, Paragraph, Text } = Typography;
 
 // Simplified card registry
@@ -89,16 +85,13 @@ const Cashflow = () => {
         isLoading,
         refreshStage,
         refreshCubeData,
-        getPercentileData,
-        cubeError
+        getPercentileData
     } = useCube();
 
     // Set up clean local percentile variables from cube
     const percentileInfo = getPercentileData();
     const selectedPercentile = percentileInfo?.selected;
     const availablePercentiles = percentileInfo?.available || [];
-    const primaryPercentile = percentileInfo?.primary;
-    const percentileStrategy = percentileInfo?.strategy;
 
     // Auto-initialize on first access if not already initialized (restored from original)
     useEffect(() => {

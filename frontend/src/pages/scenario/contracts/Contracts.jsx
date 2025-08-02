@@ -1,11 +1,9 @@
 // frontend/src/pages/scenario/contracts/Contracts.jsx
 import React, { useEffect } from 'react';
-import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space, Table } from 'antd';
+import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space } from 'antd';
 import {
   FileTextOutlined,
-  InfoCircleOutlined,
   ReloadOutlined,
-  ExclamationCircleOutlined,
   DollarCircleOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined
@@ -17,11 +15,7 @@ import { renderScopeTags } from 'utils/oemScopeUtils';
 
 // Import context field components
 import {
-  FormSection,
-  FormRow,
-  FormCol,
   TextField,
-  NumberField,
   SelectField,
   CheckboxField,
   CurrencyField,
@@ -35,7 +29,6 @@ import EditableTable from 'components/tables/EditableTable';
 import {
   createTextColumn,
   createCustomTagsColumn,
-  createCurrencyColumn,
   createIconColumn
 } from 'components/tables/columns';
 
@@ -49,7 +42,7 @@ const ContractsModule = () => {
   const contractsPath = ['settings', 'modules', 'contracts', 'oemContracts'];
 
   // Get scenario context and OEM scopes
-  const { scenarioData, getValueByPath, updateByPath } = useScenario();
+  const { scenarioData, getValueByPath } = useScenario();
   const { oemScopes, loading: loadingScopes, fetchScopes } = useOEMScopes();
 
   // Current project life for year range
