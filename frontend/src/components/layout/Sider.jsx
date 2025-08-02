@@ -198,24 +198,9 @@ const Sider = ({ collapsed }) => {
           ]
         },
         {
-          key: '/scenario/contracts',
-          icon: <BankOutlined />,
-          label: 'Contracts'
-        },
-        {
           key: '/scenario/financing',
           icon: <FundOutlined />,
           label: 'Financing'
-        },
-        {
-          key: '/scenario/cost',
-          icon: <ShoppingCartOutlined />,
-          label: 'Cost'
-        },
-        {
-          key: '/scenario/revenue',
-          icon: <RiseOutlined />,
-          label: 'Revenue'
         },
         {
           key: '/scenario/risk',

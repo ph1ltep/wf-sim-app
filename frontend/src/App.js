@@ -20,11 +20,7 @@ import MarketFactors from './pages/scenario/economics/MarketFactors';
 import ServiceContracts from './pages/scenario/operations/ServiceContracts';
 import OperatingCosts from './pages/scenario/operations/OperatingCosts';
 import Performance from './pages/scenario/operations/Performance';
-
-import Contracts from './pages/scenario/contracts/Contracts';
 import Financing from './pages/scenario/financing/Financing';
-import Cost from './pages/scenario/cost/Cost';
-import Revenue from './pages/scenario/revenue/Revenue';
 import Risk from './pages/scenario/risk/Risk';
 
 // Simulations pages
@@ -83,10 +79,7 @@ function App() {
                     <Route path="operating-costs" element={<OperatingCosts />} />
                     <Route path="performance" element={<Performance />} />
                   </Route>
-                  <Route path="contracts" element={<Contracts />} />
                   <Route path="financing" element={<Financing />} />
-                  <Route path="cost" element={<Cost />} />
-                  <Route path="revenue" element={<Revenue />} />
                   <Route path="risk" element={<Risk />} />
                   <Route index element={<Navigate to="/scenario/economics" replace />} />
                 </Route>
