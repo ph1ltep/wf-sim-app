@@ -36,7 +36,6 @@ const CostModule = () => {
   const basePath = ['settings', 'modules', 'cost'];
 
   // Get values from context for conditional rendering
-  const oemTerm = scenarioData?.settings?.modules?.cost?.oemTerm || 0;
   const projectLife = scenarioData?.settings?.general?.projectLife || 20;
   const capex = getValueByPath(['settings', 'modules', 'financing', 'capex'], 0);
 
@@ -293,43 +292,6 @@ const CostModule = () => {
                   { value: 'normal', label: 'Normal Distribution' },
                   { value: 'uniform', label: 'Uniform Distribution' }
                 ]}
-              />
-            </FormCol>
-          </FormRow>
-        </FormSection>
-      )
-    },
-    {
-      key: "oemContract",
-      label: (
-        <span>
-          <ToolOutlined /> OEM Contract
-        </span>
-      ),
-      children: (
-        <FormSection title="OEM Contract" style={{ marginBottom: 24 }}>
-          <FormRow>
-            <FormCol>
-              <NumberField
-                path={[...basePath, 'oemTerm']}
-                label="OEM Term (Years)"
-                tooltip="Duration of OEM service contract"
-                min={0}
-                max={projectLife}
-                step={1}
-              />
-            </FormCol>
-          </FormRow>
-          <FormRow>
-            <FormCol>
-              <CurrencyField
-                path={[...basePath, 'fixedOMFee']}
-                label="Fixed O&M Fee during OEM Term"
-                tooltip="Annual fee paid during OEM contract period"
-                min={0}
-                step={10000}
-                currencyOverride={currency}
-                disabled={oemTerm <= 0}
               />
             </FormCol>
           </FormRow>

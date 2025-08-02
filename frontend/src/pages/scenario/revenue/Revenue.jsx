@@ -53,7 +53,7 @@ const RevenueModule = () => {
         <FormSection title="Energy Production" style={{ marginBottom: 24 }}>
           <FormRow>
             <FormCol >
-              <p>Configure the annual energy production and its variability.</p>
+              <p>Configure the gross annual energy production and its variability. This is the gross AEP at the Primary Percentile (do not deduct losses, downtime, and contractual availability).</p>
 
               <DistributionFieldV3
                 path={[...basePath, 'energyProduction']}

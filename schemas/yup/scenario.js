@@ -182,9 +182,6 @@ const SettingsSchema = Yup.object().shape({
                     drift: 2.5
                 }
             })),
-            // Removed escalationDistribution as requested
-            oemTerm: Yup.number().default(5),
-            fixedOMFee: Yup.number().default(4000000),
             failureEventProbability: Yup.number().default(5),
             failureEventCost: Yup.number().default(200000),
             majorRepairEvents: Yup.array().of(Yup.object().shape({
