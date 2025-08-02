@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Modal, Segmented, Typography } from 'antd';
 import { AuditOutlined, PartitionOutlined } from '@ant-design/icons';
 import TreeAuditView from './components/TreeAuditView';
-import AuditTrailGraph from './AuditTrail';
+import AuditTrail from './';
 
 const { Title } = Typography;
 
@@ -59,7 +59,7 @@ const AuditTrailViewer = ({ sourceIds, visible, onClose }) => {
                         <TreeAuditView sourceIds={sourceIds} />
                     </div>
                 ) : (
-                    <AuditTrailGraph sourceIds={sourceIds} />
+                    <AuditTrail sourceIds={sourceIds} />
                 )}
             </div>
         </Modal>

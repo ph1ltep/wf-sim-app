@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Tree, Descriptions, Typography, Space, Tag, Card, Alert, Collapse, Timeline } from 'antd';
 import { AuditOutlined, CalculatorOutlined, ClockCircleOutlined, LinkOutlined, DatabaseOutlined } from '@ant-design/icons';
-import { useCube } from '../../../../contexts/CubeContext';
+import { useCube } from '../../../contexts/CubeContext';
 
 const { Text, Title } = Typography;
 const { Panel } = Collapse;
