@@ -2,7 +2,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ScenarioProvider } from './contexts/ScenarioContext';
-import { CashflowProvider } from './contexts/CashflowContext';
 import { CubeProvider } from './contexts/CubeContext';
 import { ConfigProvider, theme } from 'antd';
 import MainLayout from './layouts/MainLayout';
@@ -29,9 +28,6 @@ import OperationalRisks from './pages/simulations/OperationalRisks';
 import Cashflow from './pages/analyses/Cashflow';
 import Sensitivity from './pages/analyses/Sensitivity';
 
-// Scenario management component
-import ScenarioList from './components/scenarios/ScenarioList';
-
 import './index.css';
 
 function App() {
@@ -52,8 +48,6 @@ function App() {
               <Route path="/" element={<MainLayout />}>
                 {/* Default redirect to simulation config */}
                 <Route index element={<Navigate to="/config/general/simulation" replace />} />
-
-                <Route path="scenarios" element={<ScenarioList />} />
 
                 {/* Configuration routes */}
                 <Route path="config">

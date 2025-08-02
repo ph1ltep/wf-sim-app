@@ -8,7 +8,6 @@ import {
     InfoCircleOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { useCashflow } from '../../contexts/CashflowContext';
 import { useCube } from '../../contexts/CubeContext';
 import { FormSection, ResponsiveFieldRow } from '../../components/contextFields/layouts';
 import PercentileSelector from '../../components/forms/selectors/PercentileSelector';
