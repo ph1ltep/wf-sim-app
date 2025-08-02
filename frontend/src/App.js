@@ -14,6 +14,7 @@ import ProjectSettings from './pages/config/project/ProjectSettings';
 import ScenarioSettings from './pages/config/scenario/ScenarioSettings';
 
 // Scenario pages
+import Economics from './pages/scenario/economics/Economics';
 import Contracts from './pages/scenario/contracts/Contracts';
 import Financing from './pages/scenario/financing/Financing';
 import Cost from './pages/scenario/cost/Cost';
@@ -64,12 +65,13 @@ function App() {
 
                 {/* Scenario routes */}
                 <Route path="scenario">
+                  <Route path="economics" element={<Economics />} />
                   <Route path="contracts" element={<Contracts />} />
                   <Route path="financing" element={<Financing />} />
                   <Route path="cost" element={<Cost />} />
                   <Route path="revenue" element={<Revenue />} />
                   <Route path="risk" element={<Risk />} />
-                  <Route index element={<Navigate to="/scenario/contracts" replace />} />
+                  <Route index element={<Navigate to="/scenario/economics" replace />} />
                 </Route>
 
                 {/* Simulations routes */}

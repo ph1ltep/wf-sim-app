@@ -15,7 +15,7 @@ import {
   FieldTimeOutlined,
   AreaChartOutlined,
   FundProjectionScreenOutlined,
-  FundOutlined,
+  FundOutlined, // Added this import
   DotChartOutlined,
   AppstoreOutlined,
   DatabaseOutlined,
@@ -153,13 +153,18 @@ const Sider = ({ collapsed }) => {
       label: 'Scenario',
       children: [
         {
+          key: '/scenario/economics',
+          icon: <DollarOutlined />,
+          label: 'Economics'
+        },
+        {
           key: '/scenario/contracts',
           icon: <BankOutlined />,
           label: 'Contracts'
         },
         {
           key: '/scenario/financing',
-          icon: <DollarOutlined />,
+          icon: <FundOutlined />,
           label: 'Financing'
         },
         {
