@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/index.js
+// frontend/src/components/AuditTrail/components/CustomNodes/index.js
 import RegistrySourceNode from './RegistrySourceNode';
 import OutputSourceNode from './OutputSourceNode';
 import RealRootNode from './RealRootNode';

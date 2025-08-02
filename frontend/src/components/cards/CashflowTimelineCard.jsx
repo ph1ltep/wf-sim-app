@@ -5,7 +5,7 @@ import { LineChartOutlined, InfoCircleOutlined, AuditOutlined, SettingOutlined }
 import Plot from 'react-plotly.js';
 import { useCube } from '../../contexts/CubeContext';
 import { useScenario } from '../../contexts/ScenarioContext';
-import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
+import AuditTrailViewer from '../AuditTrail';
 import { useCubeSources } from '../../hooks/useCubeSources';
 import {
     createTimelineChartConfig,

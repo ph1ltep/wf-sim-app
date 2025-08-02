@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/TreeAuditView.jsx - Extracted from original AuditTrailViewer
+// frontend/src/components/AuditTrail/components/TreeAuditView.jsx
 import React, { useState, useMemo } from 'react';
 import { Tree, Descriptions, Typography, Space, Tag, Card, Alert, Collapse, Timeline } from 'antd';
 import { AuditOutlined, CalculatorOutlined, ClockCircleOutlined, LinkOutlined, DatabaseOutlined } from '@ant-design/icons';

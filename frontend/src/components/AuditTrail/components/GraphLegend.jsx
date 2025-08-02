@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/GraphLegend.jsx
+// frontend/src/components/AuditTrail/components/GraphLegend.jsx
 import React from 'react';
 import { Card, Space, Typography } from 'antd';
 import { DatabaseOutlined, CalculatorOutlined, CheckCircleOutlined, FunctionOutlined } from '@ant-design/icons';

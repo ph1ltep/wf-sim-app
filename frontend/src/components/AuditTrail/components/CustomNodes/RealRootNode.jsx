@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/RealRootNode.jsx
+// frontend/src/components/AuditTrail/components/CustomNodes/RealRootNode.jsx
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { FunctionOutlined, BarChartOutlined, NumberOutlined } from '@ant-design/icons';

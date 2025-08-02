@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/RegistrySourceNode.jsx
+// frontend/src/components/AuditTrail/components/CustomNodes/RegistrySourceNode.jsx
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { DatabaseOutlined, CalculatorOutlined, FunctionOutlined } from '@ant-design/icons';

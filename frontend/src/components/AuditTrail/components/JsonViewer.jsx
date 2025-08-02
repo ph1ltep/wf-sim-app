@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/JsonViewer.jsx
+// frontend/src/components/AuditTrail/components/JsonViewer.jsx
 import React, { useState } from 'react';
 import { Modal, Button, Typography, Tag, Space, Tooltip } from 'antd';
 import {

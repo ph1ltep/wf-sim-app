@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/StepDetailsPanel.jsx
+// frontend/src/components/AuditTrail/components/StepDetailsPanel.jsx
 import React, { useState } from 'react';
 import { Card, Timeline, Typography, Tag, Space, Descriptions, Button, Collapse } from 'antd';
 import {
@@ -15,7 +15,7 @@ import {
     CaretRightOutlined,
     FileTextOutlined
 } from '@ant-design/icons';
-import { JsonTag, JsonButton } from '../../JsonViewer';
+import { JsonTag, JsonButton } from './JsonViewer';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;

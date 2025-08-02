@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/ReferenceNode.jsx
+// frontend/src/components/AuditTrail/components/CustomNodes/ReferenceNode.jsx
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { LinkOutlined } from '@ant-design/icons';

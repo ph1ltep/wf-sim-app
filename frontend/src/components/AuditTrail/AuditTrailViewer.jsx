@@ -1,9 +1,9 @@
-// frontend/src/components/results/cashflow/components/AuditTrailViewer.jsx
+// frontend/src/components/AuditTrail/AuditTrailViewer.jsx
 import React, { useState } from 'react';
 import { Modal, Segmented, Typography } from 'antd';
 import { AuditOutlined, PartitionOutlined } from '@ant-design/icons';
-import TreeAuditView from './TreeAuditView';
-import AuditTrailGraph from './AuditTrailGraph';
+import TreeAuditView from './components/TreeAuditView';
+import AuditTrailGraph from './AuditTrail';
 
 const { Title } = Typography;
 

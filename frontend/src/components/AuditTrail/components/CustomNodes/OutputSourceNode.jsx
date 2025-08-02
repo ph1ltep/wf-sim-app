@@ -1,43 +1,19 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/CustomNodes/RootSourceNode.jsx
+// frontend/src/components/AuditTrail/components/CustomNodes/OutputSourceNode.jsx
 import React from 'react';
 import { Handle, Position } from 'reactflow';
-import { DatabaseOutlined, FunctionOutlined, BarChartOutlined, NumberOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined } from '@ant-design/icons';
 
-const RootSourceNode = ({ data, selected }) => {
-    const rootType = data.rootSourceType || 'scalar';
-
-    // Different icons but same green color family
-    const typeConfig = {
-        complex: {
-            icon: <FunctionOutlined />,
-            color: '#289e0d',      // Darker green
-            lightColor: '#63d13d', // Medium green
-            label: 'Complex'
-        },
-        distribution: {
-            icon: <BarChartOutlined />,
-            color: '#42c41a',      // Standard green
-            lightColor: '#85de64', // Light green
-            label: 'Distribution'
-        },
-        scalar: {
-            icon: <NumberOutlined />,
-            color: '#137804',      // Darkest green
-            lightColor: '#a7eb8f', // Lightest green
-            label: 'Scalar'
-        }
-    };
-
-    const config = typeConfig[rootType];
+const OutputSourceNode = ({ data, selected }) => {
     const hasReferences = data.referenceDependencyCount > 0;
+    const hasDependencies = data.dataDependencyCount > 0;
 
     return (
         <div style={{
-            background: selected ? config.color : config.lightColor,
-            border: selected ? `2px solid ${config.color}` : `1px solid ${config.color}`,
-            borderRadius: '50%',
-            width: '80px',
-            height: '80px',
+            background: selected ? '#b37feb' : '#d3adf7',
+            border: selected ? '2px solid #722ed1' : '1px solid #b37feb',
+            borderRadius: '8px',
+            width: '120px',
+            height: '70px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -45,17 +21,16 @@ const RootSourceNode = ({ data, selected }) => {
             fontSize: '10px',
             fontWeight: 'bold',
             color: '#fff',
-            boxShadow: selected ? `0 4px 12px ${config.color}40` : '0 2px 8px rgba(0,0,0,0.1)',
+            boxShadow: selected ? '0 4px 12px rgba(114, 46, 209, 0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
             cursor: 'pointer',
             position: 'relative'
         }}>
-            <div style={{ fontSize: '16px', marginBottom: '2px' }}>
-                {config.icon}
-            </div>
+            <CheckCircleOutlined style={{ fontSize: '16px', marginBottom: '4px' }} />
             <div style={{ textAlign: 'center', lineHeight: '10px' }}>
                 <div>{data.label}</div>
                 <div style={{ fontSize: '8px', opacity: 0.8 }}>
-                    {config.label}
+                    {data.steps} steps
+                    {hasDependencies && ` • ${data.dataDependencyCount} deps`}
                 </div>
             </div>
 
@@ -80,12 +55,26 @@ const RootSourceNode = ({ data, selected }) => {
                 </div>
             )}
 
-            {/* Output handle */}
+            {/* Input handle - only show if this output has dependencies */}
+            {hasDependencies && (
+                <Handle
+                    type="target"
+                    position={Position.Top}
+                    style={{
+                        background: '#722ed1',
+                        border: '2px solid #fff',
+                        width: '8px',
+                        height: '8px'
+                    }}
+                />
+            )}
+
+            {/* Output handle - always show for output sources that might be dependencies for others */}
             <Handle
                 type="source"
                 position={Position.Bottom}
                 style={{
-                    background: config.color,
+                    background: '#722ed1',
                     border: '2px solid #fff',
                     width: '8px',
                     height: '8px'
@@ -95,4 +84,4 @@ const RootSourceNode = ({ data, selected }) => {
     );
 };
 
-export default RootSourceNode;
+export default OutputSourceNode;

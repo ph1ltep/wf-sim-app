@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/components/RealRootDetailsPanel.jsx
+// frontend/src/components/AuditTrail/components/RealRootDetailsPanel.jsx
 import React, { useState, useEffect } from 'react';
 import { Card, Typography, Tag, Space, Descriptions, Button, Spin, Alert } from 'antd';
 import {
@@ -9,8 +9,8 @@ import {
     NumberOutlined,
     ReloadOutlined
 } from '@ant-design/icons';
-import { JsonViewer } from '../../JsonViewer';
-import { useScenario } from '../../../../../../contexts/ScenarioContext';
+import { JsonViewer } from './JsonViewer';
+import { useScenario } from '../../../contexts/ScenarioContext';
 
 const { Title, Text } = Typography;
 

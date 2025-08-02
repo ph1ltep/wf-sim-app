@@ -1,8 +1,8 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/hooks/useDependencyResolver.js
+// frontend/src/components/AuditTrail/hooks/useDependencyResolver.js
 import { useMemo } from 'react';
-import { useCube } from '../../../../../../contexts/CubeContext';
-import { buildDependencyGraph } from '../../../../../../utils/audit/dependencyResolver';
-import { CASHFLOW_SOURCE_REGISTRY } from '../../../../../../utils/cube/sources/registry'; // Import registry
+import { useCube } from '../../../contexts/CubeContext';
+import { buildDependencyGraph } from '../../../utils/audit/dependencyResolver';
+import { CASHFLOW_SOURCE_REGISTRY } from '../../../utils/cube/sources/registry'; // Import registry
 
 export const useDependencyResolver = (sourceIds) => {
     const { getAuditTrail } = useCube();

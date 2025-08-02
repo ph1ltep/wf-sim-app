@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import { Row, Col, Select, Typography, Space } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { discoverPercentiles, createPercentileOptions } from '../../../../utils/finance';
+import { discoverPercentiles, createPercentileOptions } from '../../../utils/finance';
 
 const { Text } = Typography;
 

@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/utils/graphLayout.js
+// frontend/src/components/AuditTrail/utils/graphLayout.js
 import dagre from 'dagre';
 
 /**

@@ -12,7 +12,7 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { useCubeMetrics } from '../../hooks/useCubeMetrics';
 import { useCubeSources } from '../../hooks/useCubeSources';
 import { useCube } from '../../contexts/CubeContext';
-import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
+import AuditTrailViewer from '../AuditTrail';
 import { MetricsTable } from '../tables';
 import {
     createFinanceabilityRowConfig,

@@ -1,4 +1,4 @@
-// frontend/src/components/results/cashflow/components/AuditTrailGraph/index.jsx
+// frontend/src/components/AuditTrail/index.jsx
 import React, { useCallback, useState, useMemo } from 'react';
 import ReactFlow, {
     Controls,
@@ -22,7 +22,7 @@ const { Text } = Typography;
 // ✅ FIXED: Define edge types outside component to prevent re-creation
 const edgeTypes = {};
 
-const AuditTrailGraph = ({ sourceIds }) => {
+const AuditTrail = ({ sourceIds }) => {
     const { nodes: rawNodes, edges: rawEdges, auditData, summaryStats, isLoading, error } = useDependencyResolver(sourceIds);
     const [selectedNode, setSelectedNode] = useState(null);
 
@@ -250,4 +250,4 @@ const AuditTrailGraph = ({ sourceIds }) => {
     );
 };
 
-export default AuditTrailGraph;
+export default AuditTrail;
