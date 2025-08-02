@@ -1,9 +1,8 @@
 // frontend/src/components/cards/FinanceabilityCard.jsx - Simplified to only refresh when cube refreshes
-import React, { use, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, Empty, Alert, Space, Typography, Tag, Button } from 'antd';
 import {
     DollarOutlined,
-    SafetyOutlined,
     InfoCircleOutlined,
     AuditOutlined
 } from '@ant-design/icons';
@@ -12,7 +11,7 @@ import { useScenario } from '../../contexts/ScenarioContext';
 import { useCubeMetrics } from '../../hooks/useCubeMetrics';
 import { useCubeSources } from '../../hooks/useCubeSources';
 import { useCube } from '../../contexts/CubeContext';
-import AuditTrailViewer from '../results/cashflow/components/AuditTrailViewer';
+import AuditTrailViewer from '../AuditTrail/AuditTrailViewer';
 import { MetricsTable } from '../tables';
 import {
     createFinanceabilityRowConfig,
@@ -23,7 +22,7 @@ import {
     getBankabilityRiskLevel
 } from './configs/FinanceabilityConfig';
 import { theme } from 'antd';
-import { set } from 'lodash';
+//import { set } from 'lodash';
 
 const { Text, Title } = Typography;
 const { useToken } = theme;

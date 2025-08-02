@@ -2,7 +2,6 @@
 import React, { useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { Empty, Spin } from 'antd';
-import { calculateContractFeesForYear } from '../../utils/cashflow/contractUtils';
 
 /**
  * Data transformation strategies for different visualization modes

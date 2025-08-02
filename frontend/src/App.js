@@ -2,43 +2,31 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ScenarioProvider } from './contexts/ScenarioContext';
-import { CashflowProvider } from './contexts/CashflowContext'; // Add this import
-import { CubeProvider } from './contexts/CubeContext'; // Add CubeProvider import
+import { CubeProvider } from './contexts/CubeContext';
 import { ConfigProvider, theme } from 'antd';
 import MainLayout from './layouts/MainLayout';
 
-// Config components
-import ProjectSettings from './components/config/ProjectSettings';
-import SimulationSettings from './components/general/SimulationSettings';
-import LocationDefaults from './components/general/LocationDefaults';
-import OEMScopes from './components/general/OEMScopes';
-import ContractsModule from './components/modules/ContractsModule';
-import ScenarioSettings from './components/config/ScenarioSettings';
+// Configuration pages
+import AppSettings from './pages/config/app/AppSettings';
+import Locations from './pages/config/defaults/Locations';
+import OMScopes from './pages/config/defaults/OMScopes';
+import ProjectSettings from './pages/config/project/ProjectSettings';
+import ScenarioSettings from './pages/config/scenario/ScenarioSettings';
 
-// Module configuration components
-import CostModule from './components/modules/CostModule';
-import RevenueModule from './components/modules/RevenueModule';
-import FinancingModule from './components/modules/FinancingModule';
-import RiskModule from './components/modules/RiskModule';
+// Scenario pages
+import Contracts from './pages/scenario/contracts/Contracts';
+import Financing from './pages/scenario/financing/Financing';
+import Cost from './pages/scenario/cost/Cost';
+import Revenue from './pages/scenario/revenue/Revenue';
+import Risk from './pages/scenario/risk/Risk';
 
-// Input analysis components
-import CashflowAnalysis from './components/analysis/CashflowAnalysis';
-import RiskAnalysis from './components/analysis/RiskAnalysis';
-import DistributionAnalysis from 'components/analysis/DistributionAnalysis';
+// Simulations pages
+import ExternalFactors from './pages/simulations/ExternalFactors';
+import OperationalRisks from './pages/simulations/OperationalRisks';
 
-// Results components
-import Overview from './components/results/Overview';
-import CostBreakdown from './components/results/CostBreakdown';
-import RevenueAnalysis from './components/results/RevenueAnalysis';
-// REMOVED: import CashFlowChart from './components/results/CashFlowChart';
-import IRRDistribution from './components/results/IRRDistribution';
-import ScenarioComparison from './components/results/ScenarioComparison';
-
-// NEW: Import our new cashflow analysis component
-import NewCashflowAnalysis from './components/results/cashflow/CashflowAnalysis';
-
-// Scenario management component
-import ScenarioList from './components/scenarios/ScenarioList';
+// Analyses pages  
+import Cashflow from './pages/analyses/Cashflow';
+import Sensitivity from './pages/analyses/Sensitivity';
 
 import './index.css';
 
@@ -49,8 +37,7 @@ function App() {
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#1677ff', // Your primary color
-          // ... other token overrides
+          colorPrimary: '#1677ff',
         },
       }}
     >
@@ -59,52 +46,46 @@ function App() {
           <Router basename={basename}>
             <Routes>
               <Route path="/" element={<MainLayout />}>
-                {/* Default redirect to simulation config */}
-                <Route index element={<Navigate to="/config/general/simulation" replace />} />
-
-                <Route path="scenarios" element={<ScenarioList />} />
+                {/* Default redirect to app settings */}
+                <Route index element={<Navigate to="/config/app-settings" replace />} />
 
                 {/* Configuration routes */}
                 <Route path="config">
-                  <Route path="general">
-                    <Route path="simulation" element={<SimulationSettings />} />
-                    <Route path="locations" element={<LocationDefaults />} />
-                    <Route path="oemscopes" element={<OEMScopes />} />
-                    <Route index element={<Navigate to="/config/general/simulation" replace />} />
+                  <Route path="app-settings" element={<AppSettings />} />
+                  <Route path="defaults">
+                    <Route path="locations" element={<Locations />} />
+                    <Route path="omscopes" element={<OMScopes />} />
+                    <Route index element={<Navigate to="/config/defaults/locations" replace />} />
                   </Route>
-                  <Route path="project" element={<ProjectSettings />} />
-                  <Route path="scenario">
-                    <Route path="settings" element={<ScenarioSettings />} />
-                    <Route path="oemcontracts" element={<ContractsModule />} />
-                    <Route index element={<Navigate to="/config/scenario/settings" replace />} />
-                  </Route>
-
-                  {/* Module configuration routes */}
-                  <Route path="modules">
-                    <Route path="cost" element={<CostModule />} />
-                    <Route path="revenue" element={<RevenueModule />} />
-                    <Route path="financing" element={<FinancingModule />} />
-                    <Route path="risk" element={<RiskModule />} />
-                  </Route>
+                  <Route path="project-settings" element={<ProjectSettings />} />
+                  <Route path="scenario-settings" element={<ScenarioSettings />} />
+                  <Route index element={<Navigate to="/config/app-settings" replace />} />
                 </Route>
 
-                {/* Input analysis routes */}
-                <Route path="input">
-                  <Route path="cashflow" element={<CashflowAnalysis />} />
-                  <Route path="risk" element={<RiskAnalysis />} />
-                  <Route path="distribution" element={<DistributionAnalysis />} />
+                {/* Scenario routes */}
+                <Route path="scenario">
+                  <Route path="contracts" element={<Contracts />} />
+                  <Route path="financing" element={<Financing />} />
+                  <Route path="cost" element={<Cost />} />
+                  <Route path="revenue" element={<Revenue />} />
+                  <Route path="risk" element={<Risk />} />
+                  <Route index element={<Navigate to="/scenario/contracts" replace />} />
                 </Route>
 
-                {/* Results routes */}
-                <Route path="results">
-                  <Route path="overview" element={<Overview />} />
-                  <Route path="cost" element={<CostBreakdown />} />
-                  <Route path="revenue" element={<RevenueAnalysis />} />
-                  {/* REPLACED: Use new cashflow analysis component */}
-                  <Route path="cashflow" element={<NewCashflowAnalysis />} />
-                  <Route path="irr" element={<IRRDistribution />} />
-                  <Route path="scenarios" element={<ScenarioComparison />} />
+                {/* Simulations routes */}
+                <Route path="simulations">
+                  <Route path="external-factors" element={<ExternalFactors />} />
+                  <Route path="operational-risks" element={<OperationalRisks />} />
+                  <Route index element={<Navigate to="/simulations/external-factors" replace />} />
                 </Route>
+
+                {/* Analyses routes */}
+                <Route path="analyses">
+                  <Route path="cashflow" element={<Cashflow />} />
+                  <Route path="sensitivity" element={<Sensitivity />} />
+                  <Route index element={<Navigate to="/analyses/cashflow" replace />} />
+                </Route>
+
               </Route>
             </Routes>
           </Router>

@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { Layout } from 'antd';
 import { Outlet } from 'react-router-dom';
-import Header from '../components/common/Header';
-import Sider from '../components/common/Sider';
+import Header from '../components/layout/Header';
+import Sider from '../components/layout/Sider';
 //import { useBeforeUnloadProtection } from '../hooks/useNavigationProtection';
 
 const { Content } = Layout;
