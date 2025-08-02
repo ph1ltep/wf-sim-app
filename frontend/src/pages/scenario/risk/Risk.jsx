@@ -1,8 +1,8 @@
-// src/components/modules/RiskModule.jsx
+// frontend/src/pages/scenario/risk/Risk.jsx
 import React from 'react';
 import { Typography, Alert, Card, Tabs, Switch } from 'antd';
 import { SafetyOutlined, InsuranceOutlined, BankOutlined } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 
 // Import context field components
 import {
@@ -14,7 +14,7 @@ import {
   SwitchField,
   PercentageField,
   FormDivider
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title } = Typography;
 const { TabPane } = Tabs;
@@ -22,13 +22,13 @@ const { TabPane } = Tabs;
 const RiskModule = () => {
   // Define base path for risk module
   const basePath = ['settings', 'modules', 'risk'];
-  
+
   // Get scenario data and context functions
   const { scenarioData, getValueByPath } = useScenario();
 
   // Get insurance enabled state for conditional rendering
   const insuranceEnabled = getValueByPath([...basePath, 'insuranceEnabled'], false);
-  
+
   // Helper function to check if we have valid scenario
   const hasValidScenario = () => scenarioData && scenarioData.settings?.modules?.risk;
 
@@ -36,10 +36,10 @@ const RiskModule = () => {
     return (
       <div>
         <Title level={2}>Risk Mitigation</Title>
-        <Alert 
-          message="No Active Scenario" 
-          description="Please create or load a scenario first." 
-          type="warning" 
+        <Alert
+          message="No Active Scenario"
+          description="Please create or load a scenario first."
+          type="warning"
         />
       </div>
     );
@@ -49,14 +49,14 @@ const RiskModule = () => {
     <div>
       <Title level={2}>Risk Mitigation</Title>
       <p>Configure risk mitigation strategies including insurance and reserve funds.</p>
-      
+
       <Tabs defaultActiveKey="insurance" type="card">
-        <TabPane 
+        <TabPane
           tab={
             <span>
               <InsuranceOutlined /> Insurance
             </span>
-          } 
+          }
           key="insurance"
         >
           <FormSection title="Insurance Coverage" style={{ marginBottom: 24 }}>
@@ -69,11 +69,11 @@ const RiskModule = () => {
                 />
               </FormCol>
             </FormRow>
-            
+
             {insuranceEnabled && (
               <>
                 <FormDivider orientation="left">Insurance Parameters</FormDivider>
-                
+
                 <FormRow>
                   <FormCol>
                     <CurrencyField
@@ -94,7 +94,7 @@ const RiskModule = () => {
                     />
                   </FormCol>
                 </FormRow>
-                
+
                 <FormRow>
                   <FormCol>
                     <PercentageField
@@ -120,13 +120,13 @@ const RiskModule = () => {
             )}
           </FormSection>
         </TabPane>
-        
-        <TabPane 
+
+        <TabPane
           tab={
             <span>
               <BankOutlined /> Reserve Funds
             </span>
-          } 
+          }
           key="reserves"
         >
           <FormSection title="Reserve Funds" style={{ marginBottom: 24 }}>
@@ -152,7 +152,7 @@ const RiskModule = () => {
                 />
               </FormCol>
             </FormRow>
-            
+
             <FormRow>
               <FormCol>
                 <CurrencyField
@@ -176,13 +176,13 @@ const RiskModule = () => {
             </FormRow>
           </FormSection>
         </TabPane>
-        
-        <TabPane 
+
+        <TabPane
           tab={
             <span>
               <SafetyOutlined /> Other Mitigations
             </span>
-          } 
+          }
           key="other"
         >
           <FormSection title="Other Risk Mitigations" style={{ marginBottom: 24 }}>
@@ -202,7 +202,7 @@ const RiskModule = () => {
                 />
               </FormCol>
             </FormRow>
-            
+
             <FormRow>
               <FormCol>
                 <PercentageField

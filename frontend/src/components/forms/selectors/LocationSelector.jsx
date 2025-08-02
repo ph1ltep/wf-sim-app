@@ -1,4 +1,4 @@
-// src/components/config/projectSettings/LocationSelector.jsx
+// frontend/src/components/forms/selectors/LocationSelector.jsx
 import React, { useState } from 'react';
 import { Card, Row, Col, Select, Button, Tag } from 'antd';
 import { GlobalOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -8,28 +8,28 @@ const { Option } = Select;
 /**
  * Component for selecting location defaults
  */
-const LocationSelector = ({ 
-  locations = [], 
+const LocationSelector = ({
+  locations = [],
   loading = false,
-  selectedLocation, 
-  onLocationChange, 
-  onLoadDefaults 
+  selectedLocation,
+  onLocationChange,
+  onLoadDefaults
 }) => {
   const [defaultsLoaded, setDefaultsLoaded] = useState(false);
-  
+
   const handleLoadDefaults = () => {
     onLoadDefaults();
     setDefaultsLoaded(true);
   };
 
   return (
-    <Card 
+    <Card
       title={
         <span>
           <GlobalOutlined style={{ marginRight: 8 }} />
           Location Selection
         </span>
-      } 
+      }
       style={{ marginBottom: 24 }}
       extra={selectedLocation && defaultsLoaded && (
         <Tag color="green" icon={<CheckCircleOutlined />}>
@@ -39,7 +39,7 @@ const LocationSelector = ({
     >
       <Row gutter={16}>
         <Col span={18}>
-          <Select 
+          <Select
             placeholder="Select a location to load defaults"
             style={{ width: '100%' }}
             onChange={(value) => {
@@ -58,8 +58,8 @@ const LocationSelector = ({
           </Select>
         </Col>
         <Col span={6}>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             onClick={handleLoadDefaults}
             disabled={!selectedLocation || loading}
             loading={loading}
@@ -69,7 +69,7 @@ const LocationSelector = ({
         </Col>
       </Row>
       <p style={{ marginTop: 8, color: 'rgba(0, 0, 0, 0.45)' }}>
-        Loading a location will override capacity factor, electricity price, inflation rate, 
+        Loading a location will override capacity factor, electricity price, inflation rate,
         local currency, foreign currency, and exchange rate settings with country-specific defaults.
       </p>
     </Card>

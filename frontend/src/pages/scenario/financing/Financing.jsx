@@ -1,8 +1,8 @@
-// src/components/modules/FinancingModule.jsx
+// frontend/src/pages/scenario/financing/Financing.jsx
 import React from 'react';
 import { Typography, Alert, Tabs, Statistic, Row, Col, Card } from 'antd';
 import { BankOutlined, LineChartOutlined, CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 
 // Import context field components
 import {
@@ -13,7 +13,7 @@ import {
   ResponsiveFieldRow,
   CompactFieldGroup,
   SwitchField
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title, Paragraph } = Typography;
 

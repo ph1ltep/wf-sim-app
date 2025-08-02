@@ -1,9 +1,9 @@
-// src/components/config/oemScopes/oemScopeColumns.js
+// frontend/src/components/forms/OMScopes/oemScopeColumns.js
 import React from 'react';
 import { Space, Button, Popconfirm, Tooltip } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import OEMScopeTag from './OEMScopeTag';
-import { getTagTooltip, renderScopeTags } from '../../../utils/oemScopeUtils';
+import { getTagTooltip, renderScopeTags } from 'utils/oemScopeUtils';
 
 /**
  * Generate table columns for OEM scopes
@@ -23,7 +23,7 @@ export const getOEMScopeColumns = (handleEdit, handleDelete) => [
     key: 'scope',
     render: (_, record) => {
       const tags = renderScopeTags(record, OEMScopeTag);
-      
+
       return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
           {tags.map(tag => (
@@ -43,9 +43,9 @@ export const getOEMScopeColumns = (handleEdit, handleDelete) => [
     render: (_, record) => {
       return (
         <Space size="small">
-          <Button 
-            icon={<EditOutlined />} 
-            type="text" 
+          <Button
+            icon={<EditOutlined />}
+            type="text"
             onClick={() => handleEdit(record)}
           />
           <Popconfirm
@@ -54,10 +54,10 @@ export const getOEMScopeColumns = (handleEdit, handleDelete) => [
             okText="Yes"
             cancelText="No"
           >
-            <Button 
-              icon={<DeleteOutlined />} 
-              type="text" 
-              danger 
+            <Button
+              icon={<DeleteOutlined />}
+              type="text"
+              danger
             />
           </Popconfirm>
         </Space>

@@ -1,8 +1,8 @@
-// src/components/config/locations/locationColumns.js
+// frontend/src/components/forms/locations/locationColumns.js
 import React from 'react';
 import { Space, Button, Popconfirm } from 'antd';
 import { EditOutlined, DeleteOutlined, BankOutlined, LineChartOutlined, PieChartOutlined, FileTextOutlined, RiseOutlined } from '@ant-design/icons';
-import { createIconColumn } from '../../tables/columns';
+import { createIconColumn } from 'components/tables/columns';
 
 /**
  * Generate table columns for location data

@@ -1,4 +1,4 @@
-// src/components/config/oemScopes/OEMScopeForm.jsx
+// frontend/src/components/forms/OMScopes/OEMScopeForm.jsx
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Row, Col, Button, Checkbox, Divider, Typography, InputNumber, Select } from 'antd';
 

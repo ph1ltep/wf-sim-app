@@ -1,4 +1,4 @@
-// src/components/config/locations/LocationForm.jsx
+// frontend/src/components/forms/locations/LocationForm.jsx
 import React, { useEffect } from 'react';
 import { Form, Input, InputNumber, Select } from 'antd';
 
@@ -8,7 +8,7 @@ import {
   ResponsiveFieldRow,
   FormRow,
   FormCol
-} from '../../contextFields';
+} from 'components/contextFields';
 
 const { Option } = Select;
 

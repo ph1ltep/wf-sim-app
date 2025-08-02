@@ -1,6 +1,4 @@
-// frontend/src/components/results/cashflow/components/SensitivityRangeSelector.jsx
-// Simplified sensitivity range selection
-
+// frontend/src/components/forms/selectors/SensitivityRangeSelector.jsx
 import React, { useMemo } from 'react';
 import { Row, Col, Select, Typography, Space } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';

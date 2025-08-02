@@ -1,4 +1,4 @@
-// src/components/config/oemScopes/OEMScopeDetails.jsx
+// frontend/src/components/forms/OMScopes/OEMScopeDetails.jsx
 import React from 'react';
 import { Row, Col, Typography, Descriptions, Tag } from 'antd';
 
@@ -46,7 +46,7 @@ const OEMScopeDetails = ({ record }) => {
           </ul>
         </Col>
       </Row>
-      
+
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={12}>
           <Title level={5}>Crane Coverage</Title>
@@ -64,7 +64,7 @@ const OEMScopeDetails = ({ record }) => {
             <Tag color="red">Not Covered</Tag>
           )}
         </Col>
-        
+
         <Col span={12}>
           <Title level={5}>Major Components</Title>
           {record.correctiveMajor ? (

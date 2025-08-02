@@ -1,4 +1,4 @@
-// src/components/forms/selectors/PercentileSelector.jsx - Updated for new percentileData system
+// frontend/src/components/forms/selectors/PercentileSelector.jsx
 import React, { useState, useEffect } from 'react';
 import { Select, Button, Modal, Form, Row, Col, Typography, Space, Tag, Alert } from 'antd';
 import { SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';

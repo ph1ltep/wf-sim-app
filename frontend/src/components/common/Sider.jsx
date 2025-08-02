@@ -16,7 +16,16 @@ import {
   AreaChartOutlined,
   FundProjectionScreenOutlined,
   FundOutlined,
-  DotChartOutlined
+  DotChartOutlined,
+  AppstoreOutlined,
+  DatabaseOutlined,
+  ProjectOutlined,
+  BankOutlined,
+  ShoppingCartOutlined,
+  FileTextOutlined,
+  ThunderboltOutlined,
+  ControlOutlined,
+  BugOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -97,7 +106,7 @@ const Sider = ({ collapsed }) => {
     navigate(targetPath);
   };
 
-  // Define menu items using the new format - CLEANED UP VERSION
+  // Define menu items - WITH UNIQUE ICONS
   const items = [
     {
       key: 'config',
@@ -105,65 +114,68 @@ const Sider = ({ collapsed }) => {
       label: 'Configuration',
       children: [
         {
-          key: '/config/general',
-          label: 'General Settings',
+          key: '/config/app-settings',
+          icon: <AppstoreOutlined />,
+          label: 'App Settings'
+        },
+        {
+          key: 'config-defaults',
+          icon: <DatabaseOutlined />,
+          label: 'Defaults',
           children: [
             {
-              key: '/config/general/simulation',
-              icon: <SettingOutlined />,
-              label: 'Simulation'
-            },
-            {
-              key: '/config/general/locations',
+              key: '/config/defaults/locations',
               icon: <GlobalOutlined />,
-              label: 'Location Defaults'
+              label: 'Locations'
             },
             {
-              key: '/config/general/oemscopes',
+              key: '/config/defaults/omscopes',
               icon: <ToolOutlined />,
-              label: 'OEM Scopes'
+              label: 'O&M Scopes'
             }
           ]
         },
         {
-          key: '/config/project',
+          key: '/config/project-settings',
+          icon: <ProjectOutlined />,
           label: 'Project Settings'
         },
         {
-          key: '/config/scenario',
-          label: 'Scenario Settings',
-          children: [
-            {
-              key: '/config/scenario/settings',
-              icon: <SettingOutlined />,
-              label: 'General Settings'
-            },
-            {
-              key: '/config/scenario/oemcontracts',
-              icon: <ToolOutlined />,
-              label: 'OEM Contracts'
-            },
-            {
-              key: '/config/modules/financing',
-              icon: <DollarOutlined />,
-              label: 'Financing Module'
-            },
-            {
-              key: '/config/modules/cost',
-              icon: <DollarOutlined />,
-              label: 'Cost Module'
-            },
-            {
-              key: '/config/modules/revenue',
-              icon: <RiseOutlined />,
-              label: 'Revenue Module'
-            },
-            {
-              key: '/config/modules/risk',
-              icon: <SafetyOutlined />,
-              label: 'Risk Mitigation'
-            }
-          ]
+          key: '/config/scenario-settings',
+          icon: <ControlOutlined />,
+          label: 'Scenario Settings'
+        }
+      ]
+    },
+    {
+      key: 'scenario',
+      icon: <FileTextOutlined />,
+      label: 'Scenario',
+      children: [
+        {
+          key: '/scenario/contracts',
+          icon: <BankOutlined />,
+          label: 'Contracts'
+        },
+        {
+          key: '/scenario/financing',
+          icon: <DollarOutlined />,
+          label: 'Financing'
+        },
+        {
+          key: '/scenario/cost',
+          icon: <ShoppingCartOutlined />,
+          label: 'Cost'
+        },
+        {
+          key: '/scenario/revenue',
+          icon: <RiseOutlined />,
+          label: 'Revenue'
+        },
+        {
+          key: '/scenario/risk',
+          icon: <SafetyOutlined />,
+          label: 'Risk'
         }
       ]
     },
@@ -179,7 +191,7 @@ const Sider = ({ collapsed }) => {
         },
         {
           key: '/simulations/operational-risks',
-          icon: <FieldTimeOutlined />,
+          icon: <BugOutlined />,
           label: 'Operational Risks'
         }
       ]
@@ -223,7 +235,7 @@ const Sider = ({ collapsed }) => {
           openKeys={openKeys}
           onOpenChange={onOpenChange}
           onClick={handleMenuClick}
-          defaultSelectedKeys={['/config/general/simulation']}
+          defaultSelectedKeys={['/config/app-settings']}
           items={items}
           style={{ height: '100%', borderRight: 0 }}
         />

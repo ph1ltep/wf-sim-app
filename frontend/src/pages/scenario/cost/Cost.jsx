@@ -1,4 +1,4 @@
-// src/components/modules/CostModule.jsx
+// frontend/src/pages/scenario/cost/Cost.jsx
 import React, { useMemo } from 'react';
 import { Typography, Alert, Tabs } from 'antd';
 import {
@@ -8,9 +8,9 @@ import {
   ScheduleOutlined,
   BuildOutlined
 } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
-import CapexDrawdownCard from '../cards/CapexDrawdownCard';
+import CapexDrawdownCard from 'components/cards/CapexDrawdownCard';
 
 // Import context field components
 import {
@@ -24,7 +24,7 @@ import {
   FormCol,
   EditableTable,
   ResponsiveFieldRow
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title } = Typography;
 

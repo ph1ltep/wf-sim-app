@@ -1,7 +1,7 @@
-// src/components/config/ScenarioSettings.jsx
+// frontend/src/pages/config/scenario/ScenarioSettings.jsx
 import React from 'react';
 import { Typography, Alert, Input } from 'antd';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 
 // Import context field components
 import {
@@ -13,7 +13,7 @@ import {
   TextAreaField,
   CompactFieldGroup,
   ResponsiveFieldRow
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title } = Typography;
 

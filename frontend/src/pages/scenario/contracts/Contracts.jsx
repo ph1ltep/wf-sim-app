@@ -1,4 +1,4 @@
-// src/components/modules/ContractsModule.jsx
+// frontend/src/pages/scenario/contracts/Contracts.jsx
 import React, { useEffect } from 'react';
 import { Typography, Alert, Spin, Card, Tag, Tooltip, Button, Space, Table } from 'antd';
 import {
@@ -10,10 +10,10 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined
 } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
-import useOEMScopes from '../../hooks/useOEMScopes';
-import OEMScopeTag from '../config/oemScopes/OEMScopeTag';
-import { renderScopeTags } from '../../utils/oemScopeUtils';
+import { useScenario } from 'contexts/ScenarioContext';
+import useOEMScopes from 'hooks/useOEMScopes';
+import OEMScopeTag from 'components/forms/OMScopes/OEMScopeTag';
+import { renderScopeTags } from 'utils/oemScopeUtils';
 
 // Import context field components
 import {
@@ -28,8 +28,8 @@ import {
   PercentageField,
   FormDivider,
   FieldCard
-} from '../contextFields';
-import EditableTable from '../../components/tables/EditableTable';
+} from 'components/contextFields';
+import EditableTable from 'components/tables/EditableTable';
 
 // Import column utilities
 import {
@@ -37,10 +37,10 @@ import {
   createCustomTagsColumn,
   createCurrencyColumn,
   createIconColumn
-} from '../tables/columns';
+} from 'components/tables/columns';
 
 // Import the cards
-import { ContractScopeCard, ContractEditorCard } from '../cards';
+import { ContractScopeCard, ContractEditorCard } from 'components/cards';
 
 const { Title, Text } = Typography;
 

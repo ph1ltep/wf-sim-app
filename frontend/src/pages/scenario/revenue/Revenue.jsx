@@ -1,4 +1,4 @@
-// src/components/modules/RevenueModule.jsx
+// frontend/src/pages/scenario/revenue/Revenue.jsx
 import React from 'react';
 import { Typography, Alert, Tabs } from 'antd';
 import {
@@ -7,7 +7,7 @@ import {
   FieldTimeOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 
 // Import context field components
 import {
@@ -15,7 +15,7 @@ import {
   FormSection,
   FormRow,
   FormCol
-} from '../contextFields';
+} from 'components/contextFields';
 import { DistributionFieldV3 } from 'components/distributionFields';
 
 const { Title } = Typography;

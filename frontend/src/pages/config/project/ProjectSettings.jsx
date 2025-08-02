@@ -1,13 +1,13 @@
-// src/components/config/ProjectSettings.jsx
+// frontend/src/pages/config/project/ProjectSettings.jsx
 import React, { useState, useEffect } from 'react';
 import { Typography, Alert } from 'antd';
-import { useScenario } from '../../contexts/ScenarioContext';
+import { useScenario } from 'contexts/ScenarioContext';
 import { GlobalOutlined } from '@ant-design/icons';
-import { getAllLocations } from '../../api/locations';
+import { getAllLocations } from 'api/locations';
 
 // Import project-specific components
-import LocationSelector from './projectSettings/LocationSelector';
-import ProjectMetrics from './projectSettings/ProjectMetrics';
+import LocationSelector from 'components/forms/selectors/LocationSelector';
+import ProjectMetrics from 'components/cards/ProjectMetrics';
 
 // Import context field components
 import {
@@ -24,7 +24,7 @@ import {
   FieldGroup,
   CompactFieldGroup,
   FieldCard
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title } = Typography;
 

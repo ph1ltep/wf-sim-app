@@ -1,4 +1,4 @@
-// src/components/config/locations/currencyConstants.js
+// frontend/src/components/forms/locations/currencyConstants.js
 
 /**
  * List of major world currencies for use in selection dropdowns

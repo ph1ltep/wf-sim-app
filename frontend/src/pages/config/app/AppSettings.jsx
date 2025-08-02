@@ -1,9 +1,9 @@
-// src/components/general/SimulationSettings.jsx
+// frontend/src/pages/config/app/AppSettings.jsx
 import React, { useState } from 'react';
 import { Typography, Alert, Button } from 'antd';
-import { useScenario } from '../../contexts/ScenarioContext';
-import EditableTable from '../../components/tables/EditableTable';
-import { createTextColumn, createPercentileColumn } from '../../components/tables/columns';
+import { useScenario } from 'contexts/ScenarioContext';
+import EditableTable from 'components/tables/EditableTable';
+import { createTextColumn, createPercentileColumn } from 'components/tables/columns';
 
 // Import enhanced context field components with layouts
 import {
@@ -14,7 +14,7 @@ import {
   TextField,
   PercentileField,
   PrimaryPercentileSelectField
-} from '../contextFields';
+} from 'components/contextFields';
 
 const { Title } = Typography;
 

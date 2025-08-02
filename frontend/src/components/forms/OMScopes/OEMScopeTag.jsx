@@ -1,4 +1,4 @@
-// src/components/config/oemScopes/OEMScopeTag.jsx
+// frontend/src/components/forms/OMScopes/OEMScopeTag.jsx
 import React from 'react';
 
 /**
@@ -7,11 +7,11 @@ import React from 'react';
  */
 const OEMScopeTag = ({ children, color }) => {
   return (
-    <span 
-      style={{ 
-        backgroundColor: color, 
-        color: '#fff', 
-        padding: '2px 8px', 
+    <span
+      style={{
+        backgroundColor: color,
+        color: '#fff',
+        padding: '2px 8px',
         borderRadius: '4px',
         display: 'inline-block',
         fontSize: '12px',
