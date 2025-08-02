@@ -25,7 +25,8 @@ import {
   FileTextOutlined,
   ThunderboltOutlined,
   ControlOutlined,
-  BugOutlined
+  BugOutlined,
+  BuildOutlined,
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -153,9 +154,48 @@ const Sider = ({ collapsed }) => {
       label: 'Scenario',
       children: [
         {
-          key: '/scenario/economics',
+          key: 'scenario-economics',
           icon: <DollarOutlined />,
-          label: 'Economics'
+          label: 'Economics',
+          children: [
+            {
+              key: '/scenario/economics/investment',
+              icon: <BuildOutlined />,
+              label: 'Investment'
+            },
+            {
+              key: '/scenario/economics/revenue',
+              icon: <RiseOutlined />,
+              label: 'Revenue'
+            },
+            {
+              key: '/scenario/economics/market-factors',
+              icon: <AreaChartOutlined />,
+              label: 'Market Factors'
+            }
+          ]
+        },
+        {
+          key: 'scenario-operations',
+          icon: <ToolOutlined />,
+          label: 'Operations',
+          children: [
+            {
+              key: '/scenario/operations/service-contracts',
+              icon: <BankOutlined />,
+              label: 'Service Contracts'
+            },
+            {
+              key: '/scenario/operations/operating-costs',
+              icon: <ShoppingCartOutlined />,
+              label: 'Operating Costs'
+            },
+            {
+              key: '/scenario/operations/performance',
+              icon: <ThunderboltOutlined />,
+              label: 'Performance'
+            }
+          ]
         },
         {
           key: '/scenario/contracts',
