@@ -27,6 +27,7 @@ const useInputSim = () => {
             // Extract required distribution objects from scenario data
             const energyProduction = scenarioData.settings.modules.revenue.energyProduction;
             const electricityPrice = scenarioData.settings.modules.revenue.electricityPrice;
+            const escalationRate = scenarioData.settings.modules.cost.escalationRate;
             const downtimePerEvent = scenarioData.settings.modules.revenue.downtimePerEvent;
             const windVariability = scenarioData.settings.modules.revenue.windVariability;
 
@@ -40,6 +41,7 @@ const useInputSim = () => {
                 distributions: [
                     normalizeDistribution(energyProduction),
                     normalizeDistribution(electricityPrice),
+                    normalizeDistribution(escalationRate),
                     normalizeDistribution(downtimePerEvent),
                     normalizeDistribution(windVariability)
                 ],

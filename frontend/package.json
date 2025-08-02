@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ant-design/colors": "^7.2.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@hookform/resolvers": "^4.1.3",
@@ -12,6 +13,7 @@
     "@testing-library/user-event": "^13.5.0",
     "antd": "^5.24.3",
     "axios": "^1.8.2",
+    "dagre": "^0.8.5",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
     "formik-antd": "^3.0.0-beta.9",
@@ -28,6 +30,7 @@
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^7.3.0",
     "react-scripts": "5.0.1",
+    "reactflow": "^11.11.4",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

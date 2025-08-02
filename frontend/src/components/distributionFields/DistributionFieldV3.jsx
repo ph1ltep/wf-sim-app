@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin, message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField } from '../contextFields';
+import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField, RadioGroupField, SwitchField } from '../contextFields';
 import DistributionPlot from './DistributionPlot';
 import renderParameterFields from './renderParameterFields';
 import renderTimeSeriesFields from './renderTimeSeriesFields';
@@ -245,18 +245,30 @@ const DistributionFieldV3 = ({
           </Col>
           {showTimeSeriesToggle && (
             <Col flex="none" style={{ marginLeft: 16 }}>
-              <Space>
-                <Text>Time Series Mode:</Text>
-                <Switch
-                  checked={timeSeriesMode}
-                  onChange={(checked) => {
-                    setTimeout(() => handleTimeSeriesModeChange(checked), 0);
-                  }}
-                  disabled={fittingDistribution}
-                />
-              </Space>
+              <SwitchField
+                path={timeSeriesModePath}
+                label="Time Series Mode"
+                disabled={fittingDistribution}
+                onChange={(checked) => {
+                  setTimeout(() => handleTimeSeriesModeChange(checked), 0);
+                }}
+              />
             </Col>
           )}
+          <Col flex="none" style={{ marginLeft: 16 }}>
+            <RadioGroupField
+              path={[...path, 'metadata', 'percentileDirection']}
+              label="Percentile Direction"
+              tooltip="Defines how percentiles relate to values. Cost/Risk: higher percentiles = higher values (P90 > P10). Revenue/Benefit: higher percentiles = lower values (P90 < P10)."
+              options={[
+                { value: 'ascending', label: 'P90 > P10' },
+                { value: 'descending', label: 'P90 < P10' }
+              ]}
+              optionType="button"
+              defaultValue="ascending"
+              size="small"
+            />
+          </Col>
         </Row>
         <Divider style={{ margin: '8px 0' }} />
         <Row gutter={16} align="top">

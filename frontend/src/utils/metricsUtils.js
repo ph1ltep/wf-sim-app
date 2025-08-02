@@ -42,6 +42,46 @@ export const calculateWACC = (financingParams, currencyParams = null) => {
 };
 
 /**
+ * Calculate development start year relative to COD
+ * @param {Object} windFarmParams - Wind farm parameters
+ * @returns {number} Development start year relative to COD
+ */
+export const calculateDevYear = (windFarmParams) => {
+    if (!windFarmParams) return -5;
+
+    const { devDate, codDate } = windFarmParams;
+    if (!devDate || !codDate) return -5;
+
+    return devDate.getFullYear() - codDate.getFullYear();
+};
+
+/**
+ * Calculate NTP year relative to COD
+ * @param {Object} windFarmParams - Wind farm parameters
+ * @returns {number} NTP year relative to COD
+ */
+export const calculateNtpYear = (windFarmParams) => {
+    if (!windFarmParams) return -3;
+
+    const { ntpDate, codDate } = windFarmParams;
+    if (!ntpDate || !codDate) return -3;
+
+    return ntpDate.getFullYear() - codDate.getFullYear();
+};
+
+/**
+ * Calculate total CAPEX from construction cost sources
+ * @param {Object} costParams - Cost module parameters
+ * @returns {number} Total CAPEX amount
+ */
+export const calculateTotalCapex = (costParams) => {
+    if (!costParams || !costParams.constructionPhase) return 0;
+
+    const costSources = costParams.constructionPhase.costSources || [];
+    return costSources.reduce((total, source) => total + (source.totalAmount || 0), 0);
+};
+
+/**
  * Calculate total project megawatts
  * @param {Object} windFarmParams - Wind farm parameters
  * @returns {number} Total MW capacity
@@ -157,6 +197,21 @@ const METRIC_CALCULATORS = {
         calculator: calculateDebtToEquityRatio,
         dependencies: ['settings.modules.financing'],
         storePath: ['settings', 'metrics', 'debtToEquityRatio']
+    },
+    devYear: {
+        calculator: calculateDevYear,
+        dependencies: ['settings.project.windFarm'],
+        storePath: ['settings', 'metrics', 'devYear']
+    },
+    ntpYear: {
+        calculator: calculateNtpYear,
+        dependencies: ['settings.project.windFarm'],
+        storePath: ['settings', 'metrics', 'ntpYear']
+    },
+    totalCapex: {
+        calculator: calculateTotalCapex,
+        dependencies: ['settings.modules.cost'],
+        storePath: ['settings', 'metrics', 'totalCapex']
     }
 };
 

@@ -1,4 +1,5 @@
 // schemas/yup/distribution.js
+//const { metadata } = require('utils/cashflow/metrics/foundational/debtService');
 const Yup = require('yup');
 
 // Schema for a data point with year and value
@@ -9,7 +10,7 @@ const DataPointSchema = Yup.object().shape({
 
 // Schema for percentile configuration
 const PercentileSchema = Yup.object().shape({
-    value: Yup.number().min(1).max(99).default(50).required('Value is required'),
+    value: Yup.number().min(0).max(99).default(50).required('Value is required'),
     description: Yup.string().default('primary'),
     // Note: 'label' getter isn’t replicated in Yup; it’s a Mongoose-specific feature
 });
@@ -19,6 +20,9 @@ const SimResultsSchema = Yup.object().shape({
     name: Yup.string().required('Name is required'),
     percentile: PercentileSchema.required(),
     data: Yup.array().of(DataPointSchema).required(),
+    metadata: Yup.object().shape({
+        customPercentile: Yup.mixed().nullable().default(null),
+    }).default({}),
 });
 
 // Schema for distribution parameters with number types
@@ -59,6 +63,16 @@ const DistributionTypeSchema = Yup.object().shape({
     timeSeriesMode: Yup.boolean().default(false),
     parameters: DistributionParametersSchema.required('Parameters are required').default({}),
     timeSeriesParameters: DistributionTimeSeriesParametersSchema.required('Parameters are required').default({}),
+    metadata: Yup.object().shape({
+        percentileDirection: Yup.string()
+            .oneOf(['ascending', 'descending'])
+            .default('ascending')
+            .meta({
+                description: 'Defines relationship between percentile values and actual values',
+                ascending: 'Higher percentiles = higher values (costs, risks)',
+                descending: 'Higher percentiles = lower values (revenues, opportunities)'
+            })
+    }).default(() => ({ percentileDirection: 'ascending' }))
 });
 
 const FitDistributionSchema = Yup.object().shape({
@@ -129,6 +143,7 @@ module.exports = {
     SimulationInfoSchema,
     SimRequestSchema,
     SimResponseSchema,
+    SimResultsSchema,
     FitDistributionSchema,
     SimulationInfoSchema
 };

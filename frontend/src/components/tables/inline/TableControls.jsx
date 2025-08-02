@@ -1,4 +1,4 @@
-// src/components/tables/inline/TableControls.jsx - Reusable table control components
+// src/components/tables/inline/TableControls.jsx - Enhanced for external rendering
 import React from 'react';
 import { Button, Space, Typography, Select } from 'antd';
 import { EditOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
@@ -8,22 +8,16 @@ const { Text } = Typography;
 
 /**
  * Data field selector dropdown
- * @param {Array} dataFieldOptions - Available field options
- * @param {string} selectedDataField - Currently selected field
- * @param {Function} onChange - Change handler
- * @param {boolean} disabled - Whether selector is disabled
- * @param {boolean} hasUnsavedChanges - Whether there are unsaved changes
- * @returns {JSX.Element|null} Field selector or null if single option
  */
-export const DataFieldSelector = ({ 
-    dataFieldOptions = [], 
-    selectedDataField, 
-    onChange, 
+export const DataFieldSelector = ({
+    dataFieldOptions = [],
+    selectedDataField,
+    onChange,
     disabled = false,
-    hasUnsavedChanges = false 
+    hasUnsavedChanges = false
 }) => {
     if (dataFieldOptions.length <= 1) return null;
-    
+
     return (
         <Space>
             <Text>Field:</Text>
@@ -50,8 +44,6 @@ export const DataFieldSelector = ({
 
 /**
  * Edit mode controls with save/cancel buttons and metadata
- * @param {Object} props - Control properties
- * @returns {JSX.Element} Edit controls
  */
 export const EditModeControls = ({
     onSave,
@@ -63,15 +55,18 @@ export const EditModeControls = ({
     modifiedCellsCount = 0,
     validationErrorsCount = 0,
     totalCells = 0,
-    isEditing = false
+    isEditing = false,
+    showMetadata = true
 }) => (
     <Space>
-        <TableHeaderMetadata
-            changeCount={modifiedCellsCount}
-            errorCount={validationErrorsCount}
-            totalCells={totalCells}
-            isEditing={isEditing}
-        />
+        {showMetadata && (
+            <TableHeaderMetadata
+                changeCount={modifiedCellsCount}
+                errorCount={validationErrorsCount}
+                totalCells={totalCells}
+                isEditing={isEditing}
+            />
+        )}
         <Button
             icon={<CloseOutlined />}
             onClick={onCancel}
@@ -96,8 +91,6 @@ export const EditModeControls = ({
 
 /**
  * View mode controls with edit button
- * @param {Object} props - Control properties
- * @returns {JSX.Element} View controls
  */
 export const ViewModeControls = ({
     onEdit,
@@ -113,3 +106,81 @@ export const ViewModeControls = ({
         Edit {fieldLabel}
     </Button>
 );
+
+/**
+ * Combined table controls - can be rendered internally or externally
+ */
+export const TableControls = ({
+    isEditing,
+    dataFieldOptions,
+    selectedDataField,
+    onDataFieldChange,
+    onEdit,
+    onSave,
+    onCancel,
+    canSave,
+    saveLoading,
+    hasValidationErrors,
+    saveAttempted,
+    modifiedCellsCount,
+    validationErrorsCount,
+    totalCells,
+    hasUnsavedChanges,
+    fieldLabel,
+    showDataFieldSelector = true,
+    showMetadata = true,
+    layout = 'horizontal' // 'horizontal' or 'vertical'
+}) => {
+    const dataFieldSelector = showDataFieldSelector ? (
+        <DataFieldSelector
+            dataFieldOptions={dataFieldOptions}
+            selectedDataField={selectedDataField}
+            onChange={onDataFieldChange}
+            disabled={isEditing && saveLoading}
+            hasUnsavedChanges={isEditing && hasUnsavedChanges}
+        />
+    ) : null;
+
+    const editControls = isEditing ? (
+        <EditModeControls
+            onSave={onSave}
+            onCancel={onCancel}
+            canSave={canSave}
+            saveLoading={saveLoading}
+            hasValidationErrors={hasValidationErrors}
+            saveAttempted={saveAttempted}
+            modifiedCellsCount={modifiedCellsCount}
+            validationErrorsCount={validationErrorsCount}
+            totalCells={totalCells}
+            isEditing={isEditing}
+            showMetadata={showMetadata}
+        />
+    ) : (
+        <ViewModeControls
+            onEdit={onEdit}
+            disabled={!dataFieldOptions || dataFieldOptions.length === 0}
+            fieldLabel={fieldLabel}
+        />
+    );
+
+    if (layout === 'vertical') {
+        return (
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                {dataFieldSelector}
+                {editControls}
+            </Space>
+        );
+    }
+
+    return (
+        <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            width: '100%'
+        }}>
+            {dataFieldSelector}
+            {editControls}
+        </div>
+    );
+};

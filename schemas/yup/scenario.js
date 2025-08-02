@@ -99,6 +99,12 @@ const FailureModelSchema = Yup.object().shape({
         })).default([]),
     }),
 });
+const CostSourcesSchema = Yup.object().shape({
+    id: Yup.string().required('ID is required'),
+    name: Yup.string().required('Name is required'),
+    totalAmount: Yup.number().default(0),
+    drawdownSchedule: Yup.array().of(DataPointSchema).default([])
+});
 
 // Settings Schema
 const SettingsSchema = Yup.object().shape({
@@ -115,8 +121,27 @@ const SettingsSchema = Yup.object().shape({
             capacityFactor: Yup.number().default(35),
             curtailmentLosses: Yup.number().default(0),
             electricalLosses: Yup.number().default(0),
-            ntpDate: Yup.date(),
-            codDate: Yup.date(),
+            // Project timeline dates - set relative to today
+            devDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() - 2); // 2 years ago (4 years before default COD)
+                return date;
+            }),
+            ntpDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear()); // Current year (2 years before default COD)
+                return date;
+            }),
+            codDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() + 2); // 2 years from now
+                return date;
+            }),
+            baseDate: Yup.date().default(() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear()); // 2 years from now
+                return date;
+            }),
         }),
         currency: Yup.object().shape({
             local: Yup.string().default('USD'),
@@ -127,17 +152,23 @@ const SettingsSchema = Yup.object().shape({
     }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
-            capex: Yup.number().default(50000000),
-            devex: Yup.number().default(10000000),
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
             loanDuration: Yup.number().default(15),
             minimumDSCR: Yup.number().default(1.3),
             costOfConstructionDebt: Yup.number().default(4),
             costOfOperationalDebt: Yup.number().default(5),
-            debtRatio: Yup.number().default(70),
+            debtFinancingRatio: Yup.number().min(0).max(100).default(70),
             effectiveTaxRate: Yup.number().default(25),
             costOfEquity: Yup.number().default(5),
             gracePeriod: Yup.number().default(1),
+
+            idcCapitalization: Yup.boolean().default(true),
+            equityTiming: Yup.string().oneOf(['upfront', 'progressive', 'atCOD']).default('progressive'),
+            amortizationType: Yup.string().oneOf(['bullet', 'amortizing']).default('amortizing'),
+
+            equityIRRTarget: Yup.number().default(12),
+            projectIRRTarget: Yup.number().default(10),
+            targetPaybackPeriod: Yup.number().default(8),
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),
@@ -151,9 +182,6 @@ const SettingsSchema = Yup.object().shape({
                     drift: 2.5
                 }
             })),
-            // Removed escalationDistribution as requested
-            oemTerm: Yup.number().default(5),
-            fixedOMFee: Yup.number().default(4000000),
             failureEventProbability: Yup.number().default(5),
             failureEventCost: Yup.number().default(200000),
             majorRepairEvents: Yup.array().of(Yup.object().shape({
@@ -164,6 +192,9 @@ const SettingsSchema = Yup.object().shape({
             contingencyCost: Yup.number().default(0),
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
             failureModels: Yup.array().of(FailureModelSchema).default([]),
+            constructionPhase: Yup.object().shape({
+                costSources: Yup.array().of(CostSourcesSchema).default([])
+            }),
         }),
         revenue: Yup.object().shape({
             energyProduction: DistributionTypeSchema.default(() => ({
@@ -173,6 +204,9 @@ const SettingsSchema = Yup.object().shape({
                 parameters: {
                     value: 100000,
                     stdDev: 10
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower production = more conservative
                 }
             })),
             electricityPrice: DistributionTypeSchema.default(() => ({
@@ -184,6 +218,9 @@ const SettingsSchema = Yup.object().shape({
                     drift: 4,
                     volatility: 2,
                     timeStep: 1
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower prices = more conservative
                 }
             })),
             revenueDegradationRate: Yup.number().default(0.5),
@@ -195,6 +232,9 @@ const SettingsSchema = Yup.object().shape({
                     value: 90,
                     sigma: 0.3,
                     mu: Math.round(Math.log(90) * 100) / 100,
+                },
+                metadata: {
+                    percentileDirection: 'ascending' // Higher percentiles = more downtime = more conservative (cost-like)
                 }
             })),
             // Updated to use GBM type
@@ -206,6 +246,9 @@ const SettingsSchema = Yup.object().shape({
                     value: 7.5,
                     scale: 7.9,
                     shape: 1.8
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
                 }
             })),
             turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
@@ -256,6 +299,9 @@ const SettingsSchema = Yup.object().shape({
         netAEP: Yup.number().default(214032), // Matches getDefaultSettings
         debtToEquityRatio: Yup.number().default(1.5), // Matches getDefaultSettings
         wacc: Yup.number().default(5), // Matches getDefaultSettings
+        totalCapex: Yup.number().default(0),
+        devYear: Yup.number().default(-4),
+        ntpYear: Yup.number().default(-2),
         componentQuantities: Yup.object().shape({
             blades: Yup.number().default(60), // Matches getDefaultSettings
             bladeBearings: Yup.number().default(60), // Matches getDefaultSettings
@@ -269,15 +315,34 @@ const SettingsSchema = Yup.object().shape({
     }),
 });
 
+const PercentileDataSchema = Yup.object().shape({
+    selected: Yup.number().min(0).max(100).default(50),
+    available: Yup.array().of(Yup.number()).default([10, 25, 50, 75, 90]),
+    custom: Yup.mixed().nullable().default(null), // Custom percentiles per source
+    primary: Yup.number().min(0).max(100).default(50),
+    strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
+});
+
 // InputSim Schema
 const InputSimSchema = Yup.object().shape({
     distributionAnalysis: Yup.object().shape({
         energyProduction: SimulationInfoSchema.nullable().default(null),
         electricityPrice: SimulationInfoSchema.nullable().default(null),
         windVariability: SimulationInfoSchema.nullable().default(null),
-        downtimePerEvent: SimulationInfoSchema.nullable().default(null)
+        downtimePerEvent: SimulationInfoSchema.nullable().default(null),
+        escalationRate: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
+        percentileData: PercentileDataSchema.nullable().default(null),
+        selectedPercentile: Yup.object().shape({
+            strategy: Yup.string().oneOf(['unified', 'perSource']).default('unified'),
+            value: Yup.number().min(0).max(100).default(50),
+            customPercentile: Yup.mixed().default({}), // Custom percentiles per source, empty by default
+            // customPercentile: Yup.array().of(Yup.object().shape({
+            //     key: Yup.string().required('Source key is required'),
+            //     value: Yup.mixed().required('Custom percentile value is required')
+            // })).default([]),
+        }),
         annualCosts: Yup.object().shape({
             components: Yup.object().shape({
                 baseOM: PercentileSchema.default(() => ({})),
@@ -354,5 +419,6 @@ module.exports = {
     YearlyResponsibilitySchema,
     AdjustmentSchema,
     FailureModelSchema,
-    ScenarioListingSchema
+    ScenarioListingSchema,
+    CostSourcesSchema
 };

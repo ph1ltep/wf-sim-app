@@ -245,6 +245,7 @@ export const CheckboxField = ({
     tooltip={tooltip}
     component={Checkbox}
     transform={(e) => e?.target?.checked}
+    valuePropName="checked"
     {...rest}
   />
 );

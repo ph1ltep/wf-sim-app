@@ -50,13 +50,14 @@ const VISUALIZATION_STRATEGIES = {
             [1, 'rgba(82,196,26,0.9)']       // Dark green
         ],
         calculateValue: (oemContract, year, context) => {
-            const { numWTGs } = context;
             // Schema: years: Yup.array().of(Yup.number()).required('Years are required')
             if (!oemContract.years?.includes(year)) return null; // Return null for empty years
 
             // Schema: fixedFee: Yup.number().required('Fixed fee is required')
             const baseFee = oemContract.fixedFee || 0;
-            // Always return per-unit fee regardless of isPerTurbine setting
+
+            // For per-unit view, ALWAYS show the base fee (what's configured per unit)
+            // regardless of isPerTurbine setting - this shows the unit cost
             return baseFee;
         },
         formatValue: (value, context) => {

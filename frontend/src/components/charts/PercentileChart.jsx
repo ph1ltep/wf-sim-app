@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Divider, Empty, Table } from 'antd';
 import Plot from 'react-plotly.js';
-import { hexToRgb } from '../../utils/plotUtils';
+import { hexToRgb } from '../../utils/charts';
 import { formatNumber, formatCompactNumber } from '../../utils/formatUtils';
 import {
     generatePercentileTableData,
