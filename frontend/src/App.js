@@ -2,8 +2,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ScenarioProvider } from './contexts/ScenarioContext';
-import { CashflowProvider } from './contexts/CashflowContext'; // Add this import
-import { CubeProvider } from './contexts/CubeContext'; // Add CubeProvider import
+import { CashflowProvider } from './contexts/CashflowContext';
+import { CubeProvider } from './contexts/CubeContext';
 import { ConfigProvider, theme } from 'antd';
 import MainLayout from './layouts/MainLayout';
 
@@ -21,21 +21,13 @@ import RevenueModule from './components/modules/RevenueModule';
 import FinancingModule from './components/modules/FinancingModule';
 import RiskModule from './components/modules/RiskModule';
 
-// Input analysis components
-import CashflowAnalysis from './components/analysis/CashflowAnalysis';
-import RiskAnalysis from './components/analysis/RiskAnalysis';
-import DistributionAnalysis from 'components/analysis/DistributionAnalysis';
+// NEW: Simulations pages
+import ExternalFactors from './pages/simulations/ExternalFactors';
+import OperationalRisks from './pages/simulations/OperationalRisks';
 
-// Results components
-import Overview from './components/results/Overview';
-import CostBreakdown from './components/results/CostBreakdown';
-import RevenueAnalysis from './components/results/RevenueAnalysis';
-// REMOVED: import CashFlowChart from './components/results/CashFlowChart';
-import IRRDistribution from './components/results/IRRDistribution';
-import ScenarioComparison from './components/results/ScenarioComparison';
-
-// NEW: Import our new cashflow analysis component
-import NewCashflowAnalysis from './components/results/cashflow/CashflowAnalysis';
+// NEW: Analyses pages  
+import Cashflow from './pages/analyses/Cashflow';
+import Sensitivity from './pages/analyses/Sensitivity';
 
 // Scenario management component
 import ScenarioList from './components/scenarios/ScenarioList';
@@ -49,8 +41,7 @@ function App() {
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#1677ff', // Your primary color
-          // ... other token overrides
+          colorPrimary: '#1677ff',
         },
       }}
     >
@@ -88,23 +79,20 @@ function App() {
                   </Route>
                 </Route>
 
-                {/* Input analysis routes */}
-                <Route path="input">
-                  <Route path="cashflow" element={<CashflowAnalysis />} />
-                  <Route path="risk" element={<RiskAnalysis />} />
-                  <Route path="distribution" element={<DistributionAnalysis />} />
+                {/* NEW: Simulations routes */}
+                <Route path="simulations">
+                  <Route path="external-factors" element={<ExternalFactors />} />
+                  <Route path="operational-risks" element={<OperationalRisks />} />
+                  <Route index element={<Navigate to="/simulations/external-factors" replace />} />
                 </Route>
 
-                {/* Results routes */}
-                <Route path="results">
-                  <Route path="overview" element={<Overview />} />
-                  <Route path="cost" element={<CostBreakdown />} />
-                  <Route path="revenue" element={<RevenueAnalysis />} />
-                  {/* REPLACED: Use new cashflow analysis component */}
-                  <Route path="cashflow" element={<NewCashflowAnalysis />} />
-                  <Route path="irr" element={<IRRDistribution />} />
-                  <Route path="scenarios" element={<ScenarioComparison />} />
+                {/* NEW: Analyses routes */}
+                <Route path="analyses">
+                  <Route path="cashflow" element={<Cashflow />} />
+                  <Route path="sensitivity" element={<Sensitivity />} />
+                  <Route index element={<Navigate to="/analyses/cashflow" replace />} />
                 </Route>
+
               </Route>
             </Routes>
           </Router>

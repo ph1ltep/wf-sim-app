@@ -5,17 +5,17 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useScenario } from '../../contexts/ScenarioContext';
 import {
   SettingOutlined,
-  FormOutlined,
-  BarChartOutlined,
   DollarOutlined,
-  LineChartOutlined,
   RiseOutlined,
   SafetyOutlined,
-  FundOutlined,
-  WarningOutlined,
   GlobalOutlined,
   ToolOutlined,
   ExclamationCircleOutlined,
+  ExperimentOutlined,
+  FieldTimeOutlined,
+  AreaChartOutlined,
+  FundProjectionScreenOutlined,
+  FundOutlined,
   DotChartOutlined
 } from '@ant-design/icons';
 
@@ -97,8 +97,7 @@ const Sider = ({ collapsed }) => {
     navigate(targetPath);
   };
 
-
-  // Define menu items using the new format
+  // Define menu items using the new format - CLEANED UP VERSION
   const items = [
     {
       key: 'config',
@@ -169,45 +168,36 @@ const Sider = ({ collapsed }) => {
       ]
     },
     {
-      key: 'input',
-      icon: <FormOutlined />,
-      label: 'Input Simulation',
+      key: 'simulations',
+      icon: <ExperimentOutlined />,
+      label: 'Simulations',
       children: [
         {
-          key: '/input/cashflow',
-          icon: <FundOutlined />,
-          label: 'Cashflow Analysis'
+          key: '/simulations/external-factors',
+          icon: <AreaChartOutlined />,
+          label: 'External Factors'
         },
         {
-          key: '/input/risk',
-          icon: <WarningOutlined />,
-          label: 'Risk Analysis'
-        },
-        {
-          key: '/input/distribution',
-          icon: <DotChartOutlined />,
-          label: 'Distribution Analysis'
+          key: '/simulations/operational-risks',
+          icon: <FieldTimeOutlined />,
+          label: 'Operational Risks'
         }
       ]
     },
     {
-      key: 'results',
-      icon: <BarChartOutlined />,
-      label: 'Results',
+      key: 'analyses',
+      icon: <FundProjectionScreenOutlined />,
+      label: 'Analyses',
       children: [
         {
-          key: '/results/overview',
-          label: 'Dashboard Overview'
+          key: '/analyses/cashflow',
+          icon: <FundOutlined />,
+          label: 'Cashflow'
         },
         {
-          key: '/results/cashflow',
-          icon: <BarChartOutlined />,
-          label: 'Cash Flows'
-        },
-        {
-          key: '/results/scenarios',
-          icon: <BarChartOutlined />,
-          label: 'Scenario Comparison'
+          key: '/analyses/sensitivity',
+          icon: <DotChartOutlined />,
+          label: 'Sensitivity'
         }
       ]
     }
