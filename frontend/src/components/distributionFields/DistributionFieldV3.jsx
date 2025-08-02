@@ -1,20 +1,54 @@
-// src/components/distributionFields/DistributionFieldV3.jsx - Updated to use distributionBase
+// src/components/distributionFields/DistributionFieldV3.jsx - Updated with standardized controls
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Typography, Space, Divider, Row, Col, Switch, Alert, Spin, message } from 'antd';
+import { Typography, Space, Divider, Row, Col, Alert, Spin, message } from 'antd';
 import { useScenario } from '../../contexts/ScenarioContext';
-import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField, RadioGroupField, SwitchField } from '../contextFields';
+import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField } from '../contextFields';
 import DistributionPlot from './DistributionPlot';
+import DistributionSettings from './DistributionSettings';
 import renderParameterFields from './renderParameterFields';
 import renderTimeSeriesFields from './renderTimeSeriesFields';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
 import { validateTimeSeriesModeTransition, getAppropriateValue } from '../../utils/distributions/stateTransition';
 import useInputSim from '../../hooks/useInputSim';
+import ThemedIcon from 'components/common/ThemedIcon';
 
 const { Title, Text, Paragraph } = Typography;
 
 /**
- * Enhanced distribution field component with time series support and distributionBase integration
- * @param {Object} props - Component props
+ * Status icons component for distribution field
+ */
+const DistributionStatusIcons = ({
+  timeSeriesMode,
+  percentileDirection,
+  viewMode,
+  showInfoBox
+}) => {
+  return (
+    <Space size={4} style={{ marginLeft: 'auto', marginRight: 8 }}>
+      <ThemedIcon
+        iconKey={timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue'}
+        showEnabled={true}
+      />
+      <ThemedIcon
+        iconKey={`percentileDirection.${percentileDirection}`}
+        showEnabled={true}
+      />
+      <ThemedIcon
+        iconKey={`viewMode.${viewMode}`}
+        showEnabled={true}
+      />
+      {showInfoBox && (
+        <ThemedIcon
+          iconKey="infoBox.shown"
+          showEnabled={true}
+        />
+      )}
+    </Space>
+  );
+};
+
+/**
+ * Enhanced distribution field component with standardized controls
  */
 const DistributionFieldV3 = ({
   path,
@@ -43,11 +77,17 @@ const DistributionFieldV3 = ({
   const parametersPath = [...path, 'parameters'];
   const timeSeriesParametersPath = [...path, 'timeSeriesParameters'];
   const timeSeriesModePath = [...path, 'timeSeriesMode'];
+  const metadataPath = [...path, 'metadata'];
 
   const currentType = (getValueByPath(typePath, 'fixed')).toLowerCase();
   const parameters = getValueByPath(parametersPath, {});
   const timeSeriesParameters = getValueByPath(timeSeriesParametersPath, { value: [] });
   const timeSeriesMode = getValueByPath(timeSeriesModePath, false);
+
+  // Settings state
+  const percentileDirection = getValueByPath([...metadataPath, 'percentileDirection'], 'ascending');
+  const viewMode = getValueByPath([...metadataPath, 'viewMode'], 'pdf');
+  const [showInfoBoxState, setShowInfoBoxState] = useState(showInfoBox);
 
   const [hasFittedParams, setHasFittedParams] = useState(false);
 
@@ -69,17 +109,14 @@ const DistributionFieldV3 = ({
       return getValueByPath(defaultValuePath, 0);
     }
     if (distribution && metadata) {
-      // Find the value parameter in metadata
       const valueParam = metadata.parameters.find(p => p.name === 'value');
       return valueParam?.fieldProps?.defaultValue || 0;
     }
     return 0;
   }, [defaultValuePath, getValueByPath, distribution, metadata]);
 
-  // Current value from parameters or default
   const value = getValueByPath([...parametersPath, 'value'], defaultValue);
 
-  // Time series data from parameters
   const timeSeriesData = useMemo(() => {
     if (timeSeriesMode) {
       const tsData = getValueByPath([...timeSeriesParametersPath, 'value'], []);
@@ -88,7 +125,6 @@ const DistributionFieldV3 = ({
     return [];
   }, [timeSeriesMode, timeSeriesParametersPath, getValueByPath]);
 
-  // We can show the plot if not in time series mode or if we have fitted params
   const canShowPlot = useMemo(() => {
     return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
   }, [timeSeriesMode, hasFittedParams]);
@@ -113,7 +149,7 @@ const DistributionFieldV3 = ({
     }
   }, [defaultValue, parametersPath, timeSeriesParametersPath, updateByPath, value, timeSeriesMode, getValueByPath]);
 
-  // Handle toggling time series mode
+  // Settings handlers
   const handleTimeSeriesModeChange = useCallback(async (checked) => {
     try {
       const currentType = getValueByPath(typePath, 'fixed');
@@ -157,6 +193,18 @@ const DistributionFieldV3 = ({
     }
   }, [defaultValue, timeSeriesParametersPath, parametersPath, timeSeriesModePath, typePath, updateByPath, getValueByPath, hasFittedParams]);
 
+  const handlePercentileDirectionChange = useCallback(async (direction) => {
+    await updateByPath([...metadataPath, 'percentileDirection'], direction);
+  }, [metadataPath, updateByPath]);
+
+  const handleViewModeChange = useCallback(async (mode) => {
+    await updateByPath([...metadataPath, 'viewMode'], mode);
+  }, [metadataPath, updateByPath]);
+
+  const handleShowInfoBoxChange = useCallback((show) => {
+    setShowInfoBoxState(show);
+  }, []);
+
   // Handle fitting distribution to time series data
   const handleFitDistribution = useCallback(async () => {
     if (!timeSeriesData || !Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
@@ -172,7 +220,6 @@ const DistributionFieldV3 = ({
       return;
     }
 
-    // Check if we have enough data points for fitting
     if (validData.length < minRequiredPoints) {
       message.warning(`Need at least ${minRequiredPoints} data points for the ${currentType} distribution.`);
       return;
@@ -185,10 +232,8 @@ const DistributionFieldV3 = ({
       timeSeriesMode: true
     };
 
-    // Use the fitDistributionToData handler from useInputSim
     const fittedParams = await fitDistributionToData(distribution, validData, async (fittedParams) => {
       if (fittedParams) {
-        // Prepare batch updates
         const updates = Object.entries(fittedParams).reduce((acc, [key, value]) => {
           acc[[...parametersPath, key].join('.')] = value;
           return acc;
@@ -207,11 +252,9 @@ const DistributionFieldV3 = ({
     return fittedParams;
   }, [currentType, fitDistributionToData, parameters, parametersPath, timeSeriesData, updateByPath, minRequiredPoints]);
 
-  // Handle clearing fitted parameters
   const handleClearFit = useCallback(async () => {
     if (!metadata || !metadata.parameters) return;
 
-    // Reset parameters to their default values from metadata
     const updates = metadata.parameters
       .filter(param => param.name !== 'value' && param.fieldProps.defaultValue !== undefined)
       .reduce((acc, param) => {
@@ -223,7 +266,6 @@ const DistributionFieldV3 = ({
     setHasFittedParams(false);
   }, [metadata, parametersPath, updateByPath]);
 
-  // Display name for the value parameter
   const displayName = valueName || (metadata?.parameters.find(p => p.name === 'value')?.fieldProps?.label) || 'Value';
 
   return (
@@ -232,6 +274,7 @@ const DistributionFieldV3 = ({
         <Title level={titleLevel}>{label}</Title>
       )}
       <Space direction="vertical" style={{ width: '100%' }}>
+        {/* Header with Distribution Type and Controls */}
         <Row align="middle">
           <Col flex="auto">
             <SelectField
@@ -243,34 +286,33 @@ const DistributionFieldV3 = ({
               {...rest}
             />
           </Col>
-          {showTimeSeriesToggle && (
-            <Col flex="none" style={{ marginLeft: 16 }}>
-              <SwitchField
-                path={timeSeriesModePath}
-                label="Time Series Mode"
-                disabled={fittingDistribution}
-                onChange={(checked) => {
-                  setTimeout(() => handleTimeSeriesModeChange(checked), 0);
-                }}
+          <Col flex="none">
+            <Row align="middle" style={{ height: '100%' }}>
+              <DistributionStatusIcons
+                timeSeriesMode={timeSeriesMode}
+                percentileDirection={percentileDirection}
+                viewMode={viewMode}
+                showInfoBox={showInfoBoxState}
               />
-            </Col>
-          )}
-          <Col flex="none" style={{ marginLeft: 16 }}>
-            <RadioGroupField
-              path={[...path, 'metadata', 'percentileDirection']}
-              label="Percentile Direction"
-              tooltip="Defines how percentiles relate to values. Cost/Risk: higher percentiles = higher values (P90 > P10). Revenue/Benefit: higher percentiles = lower values (P90 < P10)."
-              options={[
-                { value: 'ascending', label: 'P90 > P10' },
-                { value: 'descending', label: 'P90 < P10' }
-              ]}
-              optionType="button"
-              defaultValue="ascending"
-              size="small"
-            />
+              {showTimeSeriesToggle && (
+                <DistributionSettings
+                  timeSeriesMode={timeSeriesMode}
+                  percentileDirection={percentileDirection}
+                  viewMode={viewMode}
+                  showInfoBox={showInfoBoxState}
+                  onTimeSeriesModeChange={handleTimeSeriesModeChange}
+                  onPercentileDirectionChange={handlePercentileDirectionChange}
+                  onViewModeChange={handleViewModeChange}
+                  onShowInfoBoxChange={handleShowInfoBoxChange}
+                  disabled={fittingDistribution}
+                />
+              )}
+            </Row>
           </Col>
         </Row>
+
         <Divider style={{ margin: '8px 0' }} />
+
         <Row gutter={16} align="top">
           <Col span={showVisualization ? 12 : 24}>
             <Spin spinning={fittingDistribution} tip="Fitting distribution to data...">
@@ -328,7 +370,7 @@ const DistributionFieldV3 = ({
                       step,
                       colSpan,
                       renderValueSeparately: true,
-                      currentParameters: { value: parameters.value } // Pass the current value from parameters
+                      currentParameters: { value: parameters.value }
                     }).map((field, index) => (
                       <FormCol span={colSpan} key={index}>
                         {field}
@@ -364,12 +406,13 @@ const DistributionFieldV3 = ({
                   showMarkers={true}
                   showSummary={false}
                   showPercentiles={true}
+                  useCdf={viewMode === 'cdf'}
                 />
               )}
             </Col>
           )}
         </Row>
-        {showInfoBox && metadata && !timeSeriesMode && (
+        {showInfoBoxState && metadata && !timeSeriesMode && (
           <Alert
             type="info"
             message={metadata.name || currentType}
