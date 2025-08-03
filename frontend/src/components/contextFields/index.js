@@ -1,6 +1,6 @@
 // src/components/contextFields/index.js - Updated with new layout components
 import React from 'react';
-import { Input, InputNumber, Select, Switch, Radio, Checkbox, DatePicker, Slider } from 'antd';
+import { Input, InputNumber, Select, Switch, Radio, Checkbox, DatePicker, Slider, Space } from 'antd';
 import { ContextField } from './ContextField';
 import { useScenario } from '../../contexts/ScenarioContext';
 import dayjs from 'dayjs';
@@ -269,11 +269,25 @@ export const RadioGroupField = ({
     {options.map((option) => (
       optionType === 'button' ? (
         <Radio.Button key={option.value} value={option.value}>
-          {option.label}
+          {option.icon ? (
+            <Space size={4}>
+              {option.icon}
+              {option.label}
+            </Space>
+          ) : (
+            option.label
+          )}
         </Radio.Button>
       ) : (
         <Radio key={option.value} value={option.value}>
-          {option.label}
+          {option.icon ? (
+            <Space size={4}>
+              {option.icon}
+              {option.label}
+            </Space>
+          ) : (
+            option.label
+          )}
         </Radio>
       )
     ))}

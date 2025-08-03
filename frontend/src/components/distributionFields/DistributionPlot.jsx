@@ -1,4 +1,4 @@
-// src/components/distributionFields/DistributionPlot.jsx - Updated to use defaultCurve
+// src/components/distributionFields/DistributionPlot.jsx - Updated to support external control
 import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { Typography, Alert, Switch, Space } from 'antd';
@@ -19,6 +19,8 @@ const { Text, Paragraph } = Typography;
  * @param {boolean} showSummary - Whether to show parameter summary
  * @param {boolean} showPercentiles - Whether to show percentile bands from scenario settings
  * @param {boolean} allowCurveToggle - Whether to allow toggling between PDF and CDF
+ * @param {string} externalViewMode - External control for view mode ('pdf' or 'cdf')
+ * @param {Function} onViewModeChange - Callback when view mode changes externally
  * @param {string} baseColor - Base color for the distribution curve and percentiles
  * @param {Object} style - Additional styling
  */
@@ -32,6 +34,8 @@ const DistributionPlot = ({
     showSummary = false,
     showPercentiles = true, // Default to true
     allowCurveToggle = true,
+    externalViewMode = null, // New prop for external control
+    onViewModeChange = null, // New prop for external control callback
     baseColor = 'rgb(31, 119, 180)',
     style = {}
 }) => {
@@ -39,8 +43,8 @@ const DistributionPlot = ({
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
 
-    // Track whether we're showing CDF or PDF
-    const [showCdf, setShowCdf] = useState(false);
+    // Internal state for view mode - can be controlled externally
+    const [internalShowCdf, setInternalShowCdf] = useState(false);
 
     // Get scenario context for percentiles
     const { getValueByPath } = useScenario();
@@ -56,12 +60,37 @@ const DistributionPlot = ({
         [distribution, distributionType, parameters]
     );
 
-    // Determine default curve type from metadata
-    useEffect(() => {
-        if (metadata && metadata.defaultCurve) {
-            setShowCdf(metadata.defaultCurve === 'cdf');
+    // Determine effective view mode (external takes priority)
+    const effectiveShowCdf = useMemo(() => {
+        if (externalViewMode !== null) {
+            return externalViewMode === 'cdf';
         }
-    }, [metadata]);
+        return internalShowCdf;
+    }, [externalViewMode, internalShowCdf]);
+
+    // Initialize from metadata default curve
+    useEffect(() => {
+        if (metadata && metadata.defaultCurve && externalViewMode === null) {
+            setInternalShowCdf(metadata.defaultCurve === 'cdf');
+        }
+    }, [metadata, externalViewMode]);
+
+    // Sync external view mode changes to internal state (for consistency)
+    useEffect(() => {
+        if (externalViewMode !== null) {
+            setInternalShowCdf(externalViewMode === 'cdf');
+        }
+    }, [externalViewMode]);
+
+    // Handle internal toggle change
+    const handleInternalToggle = (checked) => {
+        setInternalShowCdf(checked);
+
+        // If external callback is provided, notify parent
+        if (onViewModeChange) {
+            onViewModeChange(checked ? 'cdf' : 'pdf');
+        }
+    };
 
     // Get percentiles and primary percentile from scenario settings
     const percentiles = useMemo(() => {
@@ -99,7 +128,7 @@ const DistributionPlot = ({
                 percentiles,
                 primaryPercentile,
                 baseColor,
-                useCdf: showCdf // Pass current curve selection
+                useCdf: effectiveShowCdf // Use effective view mode
             };
 
             // Use the distribution utilities to generate plot data
@@ -129,7 +158,7 @@ const DistributionPlot = ({
                 yaxis: {
                     title: { text: plotInfo.yaxisTitle, standoff: 30 },
                     // Set fixed y-axis range for CDF curves
-                    ...(showCdf ? { range: [0, 1.05] } : {})
+                    ...(effectiveShowCdf ? { range: [0, 1.05] } : {})
                 },
                 annotations: plotInfo.annotations,
                 shapes: plotInfo.shapes,
@@ -152,7 +181,7 @@ const DistributionPlot = ({
         percentiles,
         primaryPercentile,
         baseColor,
-        showCdf,
+        effectiveShowCdf, // Use effective view mode
         distribution
     ]);
 
@@ -189,17 +218,17 @@ const DistributionPlot = ({
     }
 
     // Determine the current curve type name for the toggle label
-    const curveTypeLabel = showCdf ? "CDF" : "PDF";
+    const curveTypeLabel = effectiveShowCdf ? "CDF" : "PDF";
 
     return (
         <div style={{ width: '100%', ...style }}>
-            {allowCurveToggle && (
+            {allowCurveToggle && externalViewMode === null && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
                     <Space>
                         <Text>View:</Text>
                         <Switch
-                            checked={showCdf}
-                            onChange={setShowCdf}
+                            checked={internalShowCdf}
+                            onChange={handleInternalToggle}
                             checkedChildren="CDF"
                             unCheckedChildren="PDF"
                             size="small"

@@ -21,7 +21,8 @@ const DistributionStatusIcons = ({
   timeSeriesMode,
   percentileDirection,
   viewMode,
-  showInfoBox
+  showInfoBox,
+  allowCurveToggle = true
 }) => {
   return (
     <Space size={4} style={{ marginLeft: 'auto', marginRight: 8 }}>
@@ -35,14 +36,12 @@ const DistributionStatusIcons = ({
       />
       <ThemedIcon
         iconKey={`viewMode.${viewMode}`}
-        showEnabled={true}
+        showEnabled={allowCurveToggle}
       />
-      {showInfoBox && (
-        <ThemedIcon
-          iconKey="infoBox.shown"
-          showEnabled={true}
-        />
-      )}
+      <ThemedIcon
+        iconKey="infoBox.shown"
+        showEnabled={showInfoBox}
+      />
     </Space>
   );
 };
@@ -66,6 +65,7 @@ const DistributionFieldV3 = ({
   showInfoBox = false,
   infoBoxTitle,
   showTimeSeriesToggle = true,
+  allowCurveToggle = true,  // Add this prop with default value
   style = {},
   step,
   ...rest
@@ -86,8 +86,8 @@ const DistributionFieldV3 = ({
 
   // Settings state
   const percentileDirection = getValueByPath([...metadataPath, 'percentileDirection'], 'ascending');
-  const viewMode = getValueByPath([...metadataPath, 'viewMode'], 'pdf');
   const [showInfoBoxState, setShowInfoBoxState] = useState(showInfoBox);
+  const [viewModeState, setViewModeState] = useState('pdf');
 
   const [hasFittedParams, setHasFittedParams] = useState(false);
 
@@ -102,6 +102,15 @@ const DistributionFieldV3 = ({
   // Get metadata from distribution
   const metadata = useMemo(() =>
     DistributionUtils.getMetadata(currentType, parameters), [currentType, parameters]);
+
+  // Initialize view mode from metadata default curve
+  useEffect(() => {
+    if (metadata && metadata.defaultCurve) {
+      setViewModeState(metadata.defaultCurve);
+    } else {
+      setViewModeState('pdf');
+    }
+  }, [metadata]);
 
   // Ensure we have the default value from defaultValuePath or distribution metadata
   const defaultValue = useMemo(() => {
@@ -201,10 +210,6 @@ const DistributionFieldV3 = ({
     await updateByPath([...metadataPath, 'viewMode'], mode);
   }, [metadataPath, updateByPath]);
 
-  const handleShowInfoBoxChange = useCallback((show) => {
-    setShowInfoBoxState(show);
-  }, []);
-
   // Handle fitting distribution to time series data
   const handleFitDistribution = useCallback(async () => {
     if (!timeSeriesData || !Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
@@ -275,39 +280,43 @@ const DistributionFieldV3 = ({
       )}
       <Space direction="vertical" style={{ width: '100%' }}>
         {/* Header with Distribution Type and Controls */}
-        <Row align="middle">
-          <Col flex="auto">
+        <Row align="middle" gutter={16}>
+          <Col flex="none" style={{ width: 350, minWidth: 350 }}>
             <SelectField
               path={typePath}
               label={`Distribution Type`}
               tooltip={tooltip}
               options={options}
               defaultValue={currentType}
+              style={{ width: '100%' }}
+              componentProps={{
+                style: { width: '100%' },
+                dropdownMatchSelectWidth: false
+              }}
               {...rest}
             />
           </Col>
-          <Col flex="none">
-            <Row align="middle" style={{ height: '100%' }}>
+          <Col flex="auto">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: '32px' }}>
               <DistributionStatusIcons
                 timeSeriesMode={timeSeriesMode}
                 percentileDirection={percentileDirection}
-                viewMode={viewMode}
+                viewMode={viewModeState}
                 showInfoBox={showInfoBoxState}
+                allowCurveToggle={allowCurveToggle}
               />
               {showTimeSeriesToggle && (
                 <DistributionSettings
-                  timeSeriesMode={timeSeriesMode}
-                  percentileDirection={percentileDirection}
-                  viewMode={viewMode}
+                  basePath={path}
+                  viewMode={viewModeState}
+                  onViewModeChange={setViewModeState}
                   showInfoBox={showInfoBoxState}
-                  onTimeSeriesModeChange={handleTimeSeriesModeChange}
-                  onPercentileDirectionChange={handlePercentileDirectionChange}
-                  onViewModeChange={handleViewModeChange}
-                  onShowInfoBoxChange={handleShowInfoBoxChange}
+                  onShowInfoBoxChange={setShowInfoBoxState}
+                  allowCurveToggle={allowCurveToggle}
                   disabled={fittingDistribution}
                 />
               )}
-            </Row>
+            </div>
           </Col>
         </Row>
 
@@ -406,7 +415,9 @@ const DistributionFieldV3 = ({
                   showMarkers={true}
                   showSummary={false}
                   showPercentiles={true}
-                  useCdf={viewMode === 'cdf'}
+                  allowCurveToggle={allowCurveToggle}
+                  externalViewMode={showVisualization ? viewModeState : null}
+                  onViewModeChange={setViewModeState}
                 />
               )}
             </Col>
