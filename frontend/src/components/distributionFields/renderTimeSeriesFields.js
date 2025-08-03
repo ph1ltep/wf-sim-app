@@ -98,6 +98,7 @@ const renderTimeSeriesFields = (
                     <Tooltip title={!hasEnoughData ? `Need at least ${minRequiredPoints} data points` : ''}>
                         <Button
                             type="primary"
+                            size="small"
                             icon={isFitting ? <LoadingOutlined /> : <LineChartOutlined />}
                             onClick={onFitDistribution}
                             disabled={!hasEnoughData || isFitting}
@@ -119,26 +120,31 @@ const renderTimeSeriesFields = (
                                 <Text strong>Fitted Parameters:</Text>
                                 <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
                                     {/* Display all parameters from the parameters object */}
-                                    {Object.entries(parameters).map(([key, value]) => {
-                                        // Get parameter display name from metadata if available
-                                        const paramMeta = metadata.parameters?.find(p => p.name === key);
-                                        const displayName = paramMeta ?
-                                            (paramMeta.fieldProps.label || paramMeta.name) : key;
+                                    {Object.entries(parameters)
+                                        .filter(([key, value]) => {
+                                            // Only show parameters that are defined for this distribution
+                                            return metadata.parameters?.some(p => p.name === key);
+                                        })
+                                        .map(([key, value]) => {
+                                            // Get parameter display name from metadata if available
+                                            const paramMeta = metadata.parameters?.find(p => p.name === key);
+                                            const displayName = paramMeta ?
+                                                (paramMeta.fieldProps.label || paramMeta.name) : key;
 
-                                        // Format the value appropriately
-                                        const formattedValue = typeof value === 'number' ?
-                                            value.toFixed(String(paramMeta.fieldProps.step).length - 1) : (value === null ? 'null' : String(value));
+                                            // Format the value appropriately
+                                            const formattedValue = typeof value === 'number' ?
+                                                value.toFixed(String(paramMeta.fieldProps.step).length - 1) : (value === null ? 'null' : String(value));
 
-                                        // Display description if available
-                                        const description = paramMeta?.description ?
-                                            ` - ${paramMeta.description}` : '';
+                                            // Display description if available
+                                            const description = paramMeta?.description ?
+                                                ` - ${paramMeta.description}` : '';
 
-                                        return (
-                                            <li key={key}>
-                                                <Text code>{displayName}</Text>: {formattedValue}{description}
-                                            </li>
-                                        );
-                                    })}
+                                            return (
+                                                <li key={key}>
+                                                    <Text code>{displayName}</Text>: {formattedValue}{description}
+                                                </li>
+                                            );
+                                        })}
                                 </ul>
                             </div>
 
