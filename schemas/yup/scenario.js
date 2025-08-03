@@ -180,6 +180,9 @@ const SettingsSchema = Yup.object().shape({
                 parameters: {
                     value: 1,
                     drift: 2.5
+                },
+                metadata: {
+                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
                 }
             })),
             failureEventProbability: Yup.number().default(5),

@@ -120,7 +120,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             references: [],
             transformer: contractFees,
             multipliers: [
-                { id: 'escalationRate', operation: 'multiply', baseYear: 1 } // already a compound time-series
+                { id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 } // already a compound time-series
             ],
             metadata: {
                 name: 'Contract Fees',
@@ -141,7 +141,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             references: [],
             transformer: majorRepairs,
             multipliers: [
-                { id: 'escalationRate', operation: 'multiply', baseYear: 1 } // already a compound time-series
+                { id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 } // already a compound time-series
             ],
             metadata: {
                 name: 'Major Repairs',
@@ -184,7 +184,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             transformer: null,
             multipliers: [
                 { id: 'electricityPrice', operation: 'multiply', baseYear: 1 },
-                { id: 'escalationRate', operation: 'multiply', baseYear: 1 } //already a compound time-series
+                //{ id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 } 
             ],
             metadata: {
                 name: 'Energy Revenue',
