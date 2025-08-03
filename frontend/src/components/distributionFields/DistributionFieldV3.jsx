@@ -1,6 +1,7 @@
-// src/components/distributionFields/DistributionFieldV3.jsx - Updated with standardized controls
+// src/components/distributionFields/DistributionFieldV3.jsx - Updated with optimized layout
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Typography, Space, Divider, Row, Col, Alert, Spin, message } from 'antd';
+import { Typography, Space, Divider, Row, Col, Alert, Spin, message, Popover, Button } from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField } from '../contextFields';
 import DistributionPlot from './DistributionPlot';
@@ -10,7 +11,7 @@ import renderTimeSeriesFields from './renderTimeSeriesFields';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
 import { validateTimeSeriesModeTransition, getAppropriateValue } from '../../utils/distributions/stateTransition';
 import useInputSim from '../../hooks/useInputSim';
-import ThemedIcon from 'components/common/ThemedIcon';
+import ThemedIcon from '../common/ThemedIcon';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -21,33 +22,124 @@ const DistributionStatusIcons = ({
   timeSeriesMode,
   percentileDirection,
   viewMode,
-  showInfoBox,
-  allowCurveToggle = true
+  allowCurveToggle = true,
+  vertical = false
 }) => {
+  const iconStyle = {
+    fontSize: '16px',
+    cursor: 'default'
+  };
+
+  const icons = [
+    {
+      iconKey: timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue',
+      enabled: true
+    },
+    {
+      iconKey: `percentileDirection.${percentileDirection}`,
+      enabled: true
+    },
+    {
+      iconKey: `viewMode.${viewMode}`,
+      enabled: allowCurveToggle
+    }
+  ];
+
+  if (vertical) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+        {icons.map((icon, index) => (
+          <ThemedIcon
+            key={index}
+            iconKey={icon.iconKey}
+            showEnabled={icon.enabled}
+            style={iconStyle}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <Space size={4} style={{ marginLeft: 'auto', marginRight: 8 }}>
-      <ThemedIcon
-        iconKey={timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue'}
-        showEnabled={true}
-      />
-      <ThemedIcon
-        iconKey={`percentileDirection.${percentileDirection}`}
-        showEnabled={true}
-      />
-      <ThemedIcon
-        iconKey={`viewMode.${viewMode}`}
-        showEnabled={allowCurveToggle}
-      />
-      <ThemedIcon
-        iconKey="infoBox.shown"
-        showEnabled={showInfoBox}
-      />
+    <Space size={8}>
+      {icons.map((icon, index) => (
+        <ThemedIcon
+          key={index}
+          iconKey={icon.iconKey}
+          showEnabled={icon.enabled}
+          style={{ ...iconStyle, marginRight: index < icons.length - 1 ? 8 : 0 }}
+        />
+      ))}
     </Space>
   );
 };
 
 /**
- * Enhanced distribution field component with standardized controls
+ * Info popover component for distribution information
+ */
+const DistributionInfoPopover = ({ metadata, distributionType }) => {
+  // Remove the metadata check - always show the button
+  const infoContent = (
+    <div style={{ maxWidth: 400 }}>
+      {metadata ? (
+        <div style={{ fontSize: '0.9em' }}>
+          <Paragraph style={{ marginBottom: '12px' }}>
+            <Text strong>{metadata.name || distributionType}</Text>
+          </Paragraph>
+          <Paragraph style={{ marginBottom: '12px' }}>
+            {metadata.description}
+          </Paragraph>
+          <Paragraph style={{ marginBottom: '8px' }}>
+            <Text strong>Applications:</Text> {metadata.applications}
+          </Paragraph>
+          <Paragraph style={{ marginBottom: '8px' }}>
+            <Text strong>Examples:</Text> {metadata.examples}
+          </Paragraph>
+          <Paragraph style={{ marginBottom: '8px' }}>
+            <Text strong>Parameters:</Text>
+          </Paragraph>
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            {metadata.parameters && metadata.parameters.map((param, index) => (
+              <li key={index}>
+                <Text code>{param.fieldProps.label || param.name}</Text>: {param.description}
+                {param.required && ' (required)'}
+                {param.fieldProps.min !== undefined && `, min: ${param.fieldProps.min}`}
+                {param.fieldProps.max !== undefined && `, max: ${param.fieldProps.max}`}
+              </li>
+            ))}
+          </ul>
+          {metadata?.nonNegativeSupport && (
+            <Paragraph style={{ marginBottom: '2px', marginTop: '8px' }}>
+              <Text strong>Note:</Text> This distribution only supports non-negative values.
+            </Paragraph>
+          )}
+        </div>
+      ) : (
+        <Text>No distribution information available</Text>
+      )}
+    </div>
+  );
+
+  return (
+    <Popover
+      content={infoContent}
+      title="Distribution Information"
+      trigger="click"
+      placement="bottomLeft"
+      overlayStyle={{ maxWidth: 450 }}
+    >
+      <Button
+        type="text"
+        size="small"
+        icon={<InfoCircleOutlined style={{ color: '#1890ff' }} />}
+        style={{ padding: '0 4px', marginLeft: 0 }}
+      />
+    </Popover>
+  );
+};
+
+/**
+ * Enhanced distribution field component with optimized layout
  */
 const DistributionFieldV3 = ({
   path,
@@ -65,7 +157,7 @@ const DistributionFieldV3 = ({
   showInfoBox = false,
   infoBoxTitle,
   showTimeSeriesToggle = true,
-  allowCurveToggle = true,  // Add this prop with default value
+  allowCurveToggle = true,
   style = {},
   step,
   ...rest
@@ -86,7 +178,6 @@ const DistributionFieldV3 = ({
 
   // Settings state
   const percentileDirection = getValueByPath([...metadataPath, 'percentileDirection'], 'ascending');
-  const [showInfoBoxState, setShowInfoBoxState] = useState(showInfoBox);
   const [viewModeState, setViewModeState] = useState('pdf');
 
   const [hasFittedParams, setHasFittedParams] = useState(false);
@@ -158,58 +249,6 @@ const DistributionFieldV3 = ({
     }
   }, [defaultValue, parametersPath, timeSeriesParametersPath, updateByPath, value, timeSeriesMode, getValueByPath]);
 
-  // Settings handlers
-  const handleTimeSeriesModeChange = useCallback(async (checked) => {
-    try {
-      const currentType = getValueByPath(typePath, 'fixed');
-      const currentParameters = getValueByPath(parametersPath, {});
-      const currentTimeSeriesParameters = getValueByPath(timeSeriesParametersPath, { value: [] });
-      const currentIsTimeSeriesMode = getValueByPath(timeSeriesModePath, false);
-
-      const currentDistribution = {
-        type: currentType,
-        timeSeriesMode: currentIsTimeSeriesMode,
-        parameters: currentParameters,
-        timeSeriesParameters: currentTimeSeriesParameters
-      };
-
-      const { isValid, message: validationMessage, distribution: updatedDistribution } =
-        validateTimeSeriesModeTransition(currentDistribution, checked, defaultValue);
-
-      if (validationMessage) {
-        console.log(`Time series mode transition: ${validationMessage}`);
-      }
-
-      if (checked !== currentIsTimeSeriesMode) {
-        await updateByPath(timeSeriesModePath, checked);
-
-        if (updatedDistribution.parameters.value !== currentParameters.value) {
-          await updateByPath([...parametersPath, 'value'], updatedDistribution.parameters.value);
-        }
-
-        if (JSON.stringify(updatedDistribution.timeSeriesParameters.value) !==
-          JSON.stringify(currentTimeSeriesParameters.value)) {
-          await updateByPath([...timeSeriesParametersPath, 'value'], updatedDistribution.timeSeriesParameters.value);
-        }
-
-        if (!checked && hasFittedParams) {
-          setHasFittedParams(false);
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling time series mode:', error);
-      message.error('Failed to toggle time series mode');
-    }
-  }, [defaultValue, timeSeriesParametersPath, parametersPath, timeSeriesModePath, typePath, updateByPath, getValueByPath, hasFittedParams]);
-
-  const handlePercentileDirectionChange = useCallback(async (direction) => {
-    await updateByPath([...metadataPath, 'percentileDirection'], direction);
-  }, [metadataPath, updateByPath]);
-
-  const handleViewModeChange = useCallback(async (mode) => {
-    await updateByPath([...metadataPath, 'viewMode'], mode);
-  }, [metadataPath, updateByPath]);
-
   // Handle fitting distribution to time series data
   const handleFitDistribution = useCallback(async () => {
     if (!timeSeriesData || !Array.isArray(timeSeriesData) || timeSeriesData.length === 0) {
@@ -278,190 +317,271 @@ const DistributionFieldV3 = ({
       {showTitle && (
         <Title level={titleLevel}>{label}</Title>
       )}
-      <Space direction="vertical" style={{ width: '100%' }}>
-        {/* Header with Distribution Type and Controls */}
-        <Row align="middle" gutter={16}>
-          <Col flex="none" style={{ width: 350, minWidth: 350 }}>
-            <SelectField
-              path={typePath}
-              label={`Distribution Type`}
-              tooltip={tooltip}
-              options={options}
-              defaultValue={currentType}
-              style={{ width: '100%' }}
-              componentProps={{
-                style: { width: '100%' },
-                dropdownMatchSelectWidth: false
-              }}
-              {...rest}
-            />
-          </Col>
-          <Col flex="auto">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: '32px' }}>
-              <DistributionStatusIcons
-                timeSeriesMode={timeSeriesMode}
-                percentileDirection={percentileDirection}
-                viewMode={viewModeState}
-                showInfoBox={showInfoBoxState}
-                allowCurveToggle={allowCurveToggle}
-              />
-              {showTimeSeriesToggle && (
-                <DistributionSettings
-                  basePath={path}
-                  viewMode={viewModeState}
-                  onViewModeChange={setViewModeState}
-                  showInfoBox={showInfoBoxState}
-                  onShowInfoBoxChange={setShowInfoBoxState}
-                  allowCurveToggle={allowCurveToggle}
-                  disabled={fittingDistribution}
-                />
-              )}
+
+      <Row gutter={16} style={{ maxWidth: '1000px' }}>
+        {/* Left Column - Controls and Parameters - Fixed Size */}
+        <Col xs={24} xl={showVisualization ? 12 : 20}>
+          <div style={{ maxWidth: '500px' }}>
+            <Space direction="vertical" style={{ width: '100%', paddingRight: '10px' }} size="small">
+              {/* Distribution Type Row - Fixed size to content */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', flexWrap: 'nowrap', gap: '8px' }}>
+                <div style={{ flex: '0 1 auto', minWidth: 200, maxWidth: 350 }}>
+                  <SelectField
+                    path={typePath}
+                    label="Distribution Type"
+                    tooltip={tooltip}
+                    options={options}
+                    defaultValue={currentType}
+                    componentProps={{
+                      dropdownMatchSelectWidth: false,
+                      style: { minWidth: 200 }
+                    }}
+                    {...rest}
+                  />
+                </div>
+              </div>
+
+              {/* Compact Separator */}
+              <Divider style={{ margin: '0px', marginBottom: '14px' }} />
+
+              {/* Dynamic Content Area */}
+              <div>
+                <Spin spinning={fittingDistribution} tip="Fitting distribution to data...">
+                  {timeSeriesMode ? (
+                    renderTimeSeriesFields(currentType, parametersPath, timeSeriesParametersPath, {
+                      addonAfter,
+                      valueType,
+                      valueName: displayName,
+                      precision: typeof step === 'number' ? String(step).split('.')[1]?.length || 0 : 2,
+                      timeSeriesData,
+                      isFitting: fittingDistribution,
+                      onFitDistribution: handleFitDistribution,
+                      onClearFit: handleClearFit,
+                      hasFittedParams,
+                      metadata,
+                      parameters,
+                      minRequiredPoints
+                    })
+                  ) : (
+                    <>
+                      <FormRow>
+                        <FormCol span={colSpan}>
+                          {valueType === 'percentage' ? (
+                            <PercentageField
+                              path={[...parametersPath, 'value']}
+                              label={displayName}
+                              tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
+                              defaultValue={defaultValue}
+                              required
+                            />
+                          ) : valueType === 'currency' ? (
+                            <CurrencyField
+                              path={[...parametersPath, 'value']}
+                              label={displayName}
+                              tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
+                              defaultValue={defaultValue}
+                              required
+                            />
+                          ) : (
+                            <NumberField
+                              path={[...parametersPath, 'value']}
+                              label={displayName}
+                              tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
+                              addonAfter={addonAfter}
+                              step={step}
+                              defaultValue={defaultValue}
+                              required
+                            />
+                          )}
+                        </FormCol>
+                      </FormRow>
+                      <FormRow>
+                        {renderParameterFields(currentType, parametersPath, {
+                          addonAfter,
+                          step,
+                          colSpan,
+                          renderValueSeparately: true,
+                          currentParameters: { value: parameters.value }
+                        }).map((field, index) => (
+                          <FormCol span={colSpan} key={index}>
+                            {field}
+                          </FormCol>
+                        ))}
+                      </FormRow>
+                    </>
+                  )}
+                </Spin>
+              </div>
+            </Space>
+          </div>
+        </Col>
+
+        {/* Visualization + Icon Column Group - Wrap together as one unit */}
+        {showVisualization && (
+          <Col xs={24} xl={10}>
+            <div style={{ maxWidth: '500px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0px',
+                width: '100%'
+              }}>
+                {/* Visualization */}
+                <div style={{ flex: '1 1 auto', minWidth: 0, paddingRight: '12px', alignItems: 'center' }}>
+                  {timeSeriesMode && !hasFittedParams ? (
+                    <Alert
+                      message="Visualization not available"
+                      description={
+                        <div style={{ fontSize: '0.9em' }}>
+                          <p>Please fit a distribution to your time series data to see the visualization.</p>
+                          <p>You need at least {minRequiredPoints} data points for the {currentType} distribution.</p>
+                        </div>
+                      }
+                      type="info"
+                      showIcon
+                      style={{ width: '100%' }}
+                    />
+                  ) : (
+                    <DistributionPlot
+                      distributionType={currentType}
+                      parameters={parameters}
+                      addonAfter={addonAfter}
+                      showMean={true}
+                      showStdDev={true}
+                      showMarkers={true}
+                      showSummary={false}
+                      showPercentiles={true}
+                      allowCurveToggle={allowCurveToggle}
+                      externalViewMode={showVisualization ? viewModeState : null}
+                      onViewModeChange={setViewModeState}
+                      style={{ marginTop: 0 }}
+                    />
+                  )}
+                </div>
+
+                {/* Icon Column - Always attached to visualization */}
+                <div style={{
+                  flex: '0 0 auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '8px 8px',
+                  height: '100%',
+                  borderLeft: '1px solid #f0f0f0'
+                }}>
+                  {/* Settings Icon */}
+                  <div style={{ display: 'flex', alignItems: 'center', height: '24px' }}>
+                    <DistributionSettings
+                      basePath={path}
+                      viewMode={viewModeState}
+                      onViewModeChange={setViewModeState}
+                      allowCurveToggle={allowCurveToggle}
+                      disabled={fittingDistribution}
+                    />
+                  </div>
+
+                  {/* Info Icon - Grayed out */}
+                  <div style={{ display: 'flex', alignItems: 'center', height: '24px' }}>
+                    <DistributionInfoPopover
+                      metadata={metadata}
+                      distributionType={currentType}
+                    />
+                  </div>
+
+                  {/* Larger Spacer */}
+                  <div style={{ height: '12px' }} />
+
+                  {/* Status Icons - Smaller and more spaced */}
+                  <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                    <ThemedIcon
+                      iconKey={timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue'}
+                      showEnabled={true}
+                      style={{ fontSize: '14px', cursor: 'default' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                    <ThemedIcon
+                      iconKey={`percentileDirection.${percentileDirection}`}
+                      showEnabled={true}
+                      style={{ fontSize: '14px', cursor: 'default' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                    <ThemedIcon
+                      iconKey={`viewMode.${viewModeState}`}
+                      showEnabled={true}
+                      style={{ fontSize: '14px', cursor: 'default' }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </Col>
-        </Row>
-
-        <Divider style={{ margin: '8px 0' }} />
-
-        <Row gutter={16} align="top">
-          <Col span={showVisualization ? 12 : 24}>
-            <Spin spinning={fittingDistribution} tip="Fitting distribution to data...">
-              {timeSeriesMode ? (
-                renderTimeSeriesFields(currentType, parametersPath, timeSeriesParametersPath, {
-                  addonAfter,
-                  valueType,
-                  valueName: displayName,
-                  precision: typeof step === 'number' ? String(step).split('.')[1]?.length || 0 : 2,
-                  timeSeriesData,
-                  isFitting: fittingDistribution,
-                  onFitDistribution: handleFitDistribution,
-                  onClearFit: handleClearFit,
-                  hasFittedParams,
-                  metadata,
-                  parameters,
-                  minRequiredPoints
-                })
-              ) : (
-                <>
-                  <FormRow>
-                    <FormCol span={colSpan}>
-                      {valueType === 'percentage' ? (
-                        <PercentageField
-                          path={[...parametersPath, 'value']}
-                          label={displayName}
-                          tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
-                          defaultValue={defaultValue}
-                          required
-                        />
-                      ) : valueType === 'currency' ? (
-                        <CurrencyField
-                          path={[...parametersPath, 'value']}
-                          label={displayName}
-                          tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
-                          defaultValue={defaultValue}
-                          required
-                        />
-                      ) : (
-                        <NumberField
-                          path={[...parametersPath, 'value']}
-                          label={displayName}
-                          tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
-                          addonAfter={addonAfter}
-                          step={step}
-                          defaultValue={defaultValue}
-                          required
-                        />
-                      )}
-                    </FormCol>
-                  </FormRow>
-                  <FormRow>
-                    {renderParameterFields(currentType, parametersPath, {
-                      addonAfter,
-                      step,
-                      colSpan,
-                      renderValueSeparately: true,
-                      currentParameters: { value: parameters.value }
-                    }).map((field, index) => (
-                      <FormCol span={colSpan} key={index}>
-                        {field}
-                      </FormCol>
-                    ))}
-                  </FormRow>
-                </>
-              )}
-            </Spin>
-          </Col>
-          {showVisualization && (
-            <Col span={12}>
-              {timeSeriesMode && !hasFittedParams ? (
-                <Alert
-                  message="Visualization not available"
-                  description={
-                    <div style={{ fontSize: '0.9em' }}>
-                      <p>Please fit a distribution to your time series data to see the visualization.</p>
-                      <p>You need at least {minRequiredPoints} data points for the {currentType} distribution.</p>
-                    </div>
-                  }
-                  type="info"
-                  showIcon
-                  style={{ width: '100%' }}
-                />
-              ) : (
-                <DistributionPlot
-                  distributionType={currentType}
-                  parameters={parameters}
-                  addonAfter={addonAfter}
-                  showMean={true}
-                  showStdDev={true}
-                  showMarkers={true}
-                  showSummary={false}
-                  showPercentiles={true}
-                  allowCurveToggle={allowCurveToggle}
-                  externalViewMode={showVisualization ? viewModeState : null}
-                  onViewModeChange={setViewModeState}
-                />
-              )}
-            </Col>
-          )}
-        </Row>
-        {showInfoBoxState && metadata && !timeSeriesMode && (
-          <Alert
-            type="info"
-            message={metadata.name || currentType}
-            description={
-              <div style={{ fontSize: '0.8em' }}>
-                <Paragraph style={{ marginBottom: '12px' }}>
-                  {metadata.description}
-                </Paragraph>
-                <Paragraph style={{ marginBottom: '2px' }}>
-                  <Text strong>Applications:</Text> {metadata.applications}
-                </Paragraph>
-                <Paragraph style={{ marginBottom: '2px' }}>
-                  <Text strong>Examples:</Text> {metadata.examples}
-                </Paragraph>
-                <Paragraph style={{ marginBottom: '2px' }}>
-                  <Text strong>Parameters:</Text>
-                  <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                    {metadata.parameters && metadata.parameters.map((param, index) => (
-                      <li key={index}>
-                        <Text code>{param.fieldProps.label || param.name}</Text>: {param.description}
-                        {param.required && ' (required)'}
-                        {param.fieldProps.min !== undefined && `, min: ${param.fieldProps.min}`}
-                        {param.fieldProps.max !== undefined && `, max: ${param.fieldProps.max}`}
-                      </li>
-                    ))}
-                  </ul>
-                </Paragraph>
-                {metadata?.nonNegativeSupport && (
-                  <Paragraph style={{ marginBottom: '2px' }}>
-                    <Text strong>Note:</Text> This distribution only supports non-negative values.
-                  </Paragraph>
-                )}
-              </div>
-            }
-            showIcon
-          />
         )}
-      </Space>
+
+        {/* Icon Column for non-visualization mode only */}
+        {!showVisualization && (
+          <Col xs={24} xl={4}>
+            <div style={{ maxWidth: '100px' }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '8px 8px',
+                borderLeft: '1px solid #f0f0f0',
+                marginTop: 12
+              }}>
+                {/* Settings Icon */}
+                <div style={{ display: 'flex', alignItems: 'center', height: '24px' }}>
+                  <DistributionSettings
+                    basePath={path}
+                    viewMode={viewModeState}
+                    onViewModeChange={setViewModeState}
+                    allowCurveToggle={allowCurveToggle}
+                    disabled={fittingDistribution}
+                  />
+                </div>
+
+                {/* Info Icon - Grayed out */}
+                <div style={{ display: 'flex', alignItems: 'center', height: '24px' }}>
+                  <DistributionInfoPopover
+                    metadata={metadata}
+                    distributionType={currentType}
+                  />
+                </div>
+
+                {/* Larger Spacer */}
+                <div style={{ height: '12px' }} />
+
+                {/* Status Icons */}
+                <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                  <ThemedIcon
+                    iconKey={timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue'}
+                    showEnabled={true}
+                    style={{ fontSize: '14px', cursor: 'default' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                  <ThemedIcon
+                    iconKey={`percentileDirection.${percentileDirection}`}
+                    showEnabled={true}
+                    style={{ fontSize: '14px', cursor: 'default' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', height: '20px' }}>
+                  <ThemedIcon
+                    iconKey={`viewMode.${viewModeState}`}
+                    showEnabled={true}
+                    style={{ fontSize: '14px', cursor: 'default' }}
+                  />
+                </div>
+              </div>
+            </div>
+          </Col>
+        )}
+      </Row>
     </div>
   );
 };

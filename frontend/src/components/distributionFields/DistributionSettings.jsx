@@ -11,10 +11,9 @@ const DistributionSettings = ({
     basePath,
     viewMode = 'pdf',
     onViewModeChange,
-    showInfoBox = false,
-    onShowInfoBoxChange,
     allowCurveToggle = true,
-    disabled = false
+    disabled = false,
+    style = {}
 }) => {
     const timeSeriesModePath = [...basePath, 'timeSeriesMode'];
     const metadataPath = [...basePath, 'metadata'];
@@ -22,7 +21,7 @@ const DistributionSettings = ({
     const settingsContent = (
         <div style={{ width: 250 }}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                {/* Time Series Mode - keep using RadioGroupField since it's context-based */}
+                {/* Time Series Mode */}
                 <div>
                     <div style={{ marginBottom: 8, fontSize: '12px', fontWeight: 500 }}>
                         Data Mode
@@ -51,7 +50,7 @@ const DistributionSettings = ({
                     />
                 </div>
 
-                {/* Percentile Direction - keep using RadioGroupField since it's context-based */}
+                {/* Percentile Direction */}
                 <div>
                     <div style={{ marginBottom: 8, fontSize: '12px', fontWeight: 500 }}>
                         Percentile Direction
@@ -76,11 +75,11 @@ const DistributionSettings = ({
                         size="small"
                         defaultValue="ascending"
                         disabled={disabled}
-                        style={{ width: '100%', display: 'flex' }}
+                        style={{ width: '100%' }}
                     />
                 </div>
 
-                {/* View Mode - use Ant Design Radio.Group for local state control */}
+                {/* View Mode */}
                 {allowCurveToggle && (
                     <div>
                         <div style={{ marginBottom: 8, fontSize: '12px', fontWeight: 500 }}>
@@ -110,35 +109,6 @@ const DistributionSettings = ({
                         </Radio.Group>
                     </div>
                 )}
-
-                {/* Info Box Toggle - use Ant Design Radio.Group for local state control */}
-                <div>
-                    <div style={{ marginBottom: 8, fontSize: '12px', fontWeight: 500 }}>
-                        Information
-                    </div>
-                    <Radio.Group
-                        value={showInfoBox ? 'show' : 'hide'}
-                        onChange={(e) => onShowInfoBoxChange(e.target.value === 'show')}
-                        optionType="button"
-                        buttonStyle="outline"
-                        //size="small"
-                        disabled={disabled}
-                        style={{ width: '100%', display: 'flex' }}
-                    >
-                        <Radio.Button value="hide" style={{ flex: 1, textAlign: 'center' }}>
-                            <Space size={4}>
-                                <ThemedIcon iconKey="infoBox.shown" showEnabled={false} />
-                                Hide
-                            </Space>
-                        </Radio.Button>
-                        <Radio.Button value="show" style={{ flex: 1, textAlign: 'center' }}>
-                            <Space size={4}>
-                                <ThemedIcon iconKey="infoBox.shown" showEnabled={true} />
-                                Show
-                            </Space>
-                        </Radio.Button>
-                    </Radio.Group>
-                </div>
             </Space>
         </div>
     );
@@ -156,7 +126,7 @@ const DistributionSettings = ({
                 size="small"
                 type="text"
                 disabled={disabled}
-                style={{ marginLeft: 8 }}
+                style={style}
             />
         </Popover>
     );

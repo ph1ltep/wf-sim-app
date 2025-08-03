@@ -143,13 +143,13 @@ const DistributionPlot = ({
             // Set plot layout
             const layout = {
                 autosize: true,
-                width: 400,
-                height: 300,
+                width: 350,
+                height: 250,
                 margin: {
                     l: 50,
                     r: 30,
                     b: 50,
-                    t: 30,
+                    t: 10,
                     pad: 4
                 },
                 xaxis: {
