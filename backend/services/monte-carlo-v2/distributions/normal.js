@@ -136,11 +136,11 @@ class NormalDistribution extends DistributionGenerator {
         const stdDev = Math.sqrt(variance);
 
         // Convert stdDev to percentage of mean
-        const stdDevPercent = (stdDev / mean) * 100;
+        const stdDevPercent = mean !== 0 ? (stdDev / mean) * 100 : 0;
 
         return {
             value: mean,
-            stdDev: stdDevPercent > 0 ? stdDevPercent : 10 // Ensure positive standard deviation percentage, default to 10%
+            stdDev: stdDevPercent // Return actual calculated value, including 0
         };
     }
 

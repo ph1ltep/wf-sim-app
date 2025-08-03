@@ -55,7 +55,7 @@ const EditableCell = ({
             }
             handleSave({ ...record, ...values });
         } catch (errInfo) {
-            console.error('Save failed:', errInfo); 
+            console.error('Save failed:', errInfo);
         }
     };
 
@@ -407,7 +407,16 @@ const TimeSeriesTable = ({
                     pagination={false}
                     size="small"
                     summary={summary}
-                    scroll={{ x: 'max-content' }}
+                    scroll={{
+                        x: 'max-content',
+                        y: 200  // Add max height of 300px with vertical scroll
+                    }}
+                    style={{
+                        // Make rows more compact
+                        '& .ant-table-tbody > tr > td': {
+                            padding: '6px 8px'  // Reduce from default padding
+                        }
+                    }}
                 />
             </Space>
         </div>

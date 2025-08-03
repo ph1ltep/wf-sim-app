@@ -59,107 +59,103 @@ const renderTimeSeriesFields = (
 
     const hasEnoughData = timeSeriesData && Array.isArray(timeSeriesData) && timeSeriesData.length >= minRequiredPoints;
 
-    return (
-        <div className="time-series-fields">
-            {/* Data Table */}
-            <TimeSeriesTable
-                path={[...timeSeriesParametersPath, 'value']}
-                valueLabel={valueName}
-                valueType={valueType}
-                precision={precision}
-                addonAfter={addonAfter}
-                disableEditing={isFitting}
-                minRequiredPoints={minRequiredPoints}
-            />
-
-            <Divider style={{ margin: '12px 0' }} />
-
-            {/* Compatibility and Fit Controls */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                    {/* Left column empty - removed compatibility alerts and application notes */}
-                </div>
-
-                <Space>
-                    {hasFittedParams && (
-                        <Popconfirm
-                            title="Clear fitted parameters?"
-                            description="This will revert to manual parameter entry."
-                            onConfirm={onClearFit}
-                            okText="Yes"
-                            cancelText="No"
-                        >
-                            <Button size="small">
-                                Clear Fit
-                            </Button>
-                        </Popconfirm>
-                    )}
-
-                    <Tooltip title={!hasEnoughData ? `Need at least ${minRequiredPoints} data points` : ''}>
-                        <Button
-                            type="primary"
-                            size="small"
-                            icon={isFitting ? <LoadingOutlined /> : <LineChartOutlined />}
-                            onClick={onFitDistribution}
-                            disabled={!hasEnoughData || isFitting}
-                            loading={isFitting}
-                        >
-                            Fit Distribution
-                        </Button>
-                    </Tooltip>
-                </Space>
-            </div>
-
-            {/* Fitted Parameters Display */}
-            {hasFittedParams && (
-                <Alert
-                    message="Distribution parameters have been fitted to your data"
-                    description={
-                        <Space direction="vertical" style={{ width: '100%' }}>
-                            <div>
-                                <Text strong>Fitted Parameters:</Text>
-                                <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
-                                    {/* Display all parameters from the parameters object */}
-                                    {Object.entries(parameters)
-                                        .filter(([key, value]) => {
-                                            // Only show parameters that are defined for this distribution
-                                            return metadata.parameters?.some(p => p.name === key);
-                                        })
-                                        .map(([key, value]) => {
-                                            // Get parameter display name from metadata if available
-                                            const paramMeta = metadata.parameters?.find(p => p.name === key);
-                                            const displayName = paramMeta ?
-                                                (paramMeta.fieldProps.label || paramMeta.name) : key;
-
-                                            // Format the value appropriately
-                                            const formattedValue = typeof value === 'number' ?
-                                                value.toFixed(String(paramMeta.fieldProps.step).length - 1) : (value === null ? 'null' : String(value));
-
-                                            // Display description if available
-                                            const description = paramMeta?.description ?
-                                                ` - ${paramMeta.description}` : '';
-
-                                            return (
-                                                <li key={key}>
-                                                    <Text code>{displayName}</Text>: {formattedValue}{description}
-                                                </li>
-                                            );
-                                        })}
-                                </ul>
-                            </div>
-
-                            <div>
-                                <Text strong>Time Series Data:</Text> {timeSeriesData.length} points used for fitting
-                            </div>
-                        </Space>
-                    }
-                    type="success"
-                    showIcon
-                    style={{ marginTop: 16 }}
+    return {
+        fieldsContent: (
+            <div className="time-series-fields">
+                {/* Data Table */}
+                <TimeSeriesTable
+                    path={[...timeSeriesParametersPath, 'value']}
+                    valueLabel={valueName}
+                    valueType={valueType}
+                    precision={precision}
+                    addonAfter={addonAfter}
+                    disableEditing={isFitting}
+                    minRequiredPoints={minRequiredPoints}
                 />
-            )}
-        </div>
-    );
+
+                <Divider style={{ margin: '12px 0' }} />
+
+                {/* Compatibility and Fit Controls */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                        {/* Left column empty - removed compatibility alerts and application notes */}
+                    </div>
+
+                    <Space>
+                        {hasFittedParams && (
+                            <Popconfirm
+                                title="Clear fitted parameters?"
+                                description="This will revert to manual parameter entry."
+                                onConfirm={onClearFit}
+                                okText="Yes"
+                                cancelText="No"
+                            >
+                                <Button size="small">
+                                    Clear Fit
+                                </Button>
+                            </Popconfirm>
+                        )}
+
+                        <Tooltip title={!hasEnoughData ? `Need at least ${minRequiredPoints} data points` : ''}>
+                            <Button
+                                type="primary"
+                                size='small'
+                                icon={isFitting ? <LoadingOutlined /> : <LineChartOutlined />}
+                                onClick={onFitDistribution}
+                                disabled={!hasEnoughData || isFitting}
+                                loading={isFitting}
+                            >
+                                Fit Distribution
+                            </Button>
+                        </Tooltip>
+                    </Space>
+                </div>
+            </div>
+        ),
+
+        // Return the alert separately for placement in visualization column
+        fittedParamsAlert: hasFittedParams ? (
+            <Alert
+                message="Distribution fitted to data"
+                description={
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                        <div>
+                            <Text strong style={{ fontSize: '12px' }}>Fitted Parameters:</Text>
+                            <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: '11px' }}>
+                                {Object.entries(parameters)
+                                    .filter(([key, value]) => {
+                                        return metadata.parameters?.some(p => p.name === key);
+                                    })
+                                    .map(([key, value]) => {
+                                        const paramMeta = metadata.parameters?.find(p => p.name === key);
+                                        const displayName = paramMeta ?
+                                            (paramMeta.fieldProps.label || paramMeta.name) : key;
+                                        const formattedValue = typeof value === 'number' ?
+                                            value.toFixed(2) : (value === null ? 'null' : String(value));
+                                        const description = paramMeta?.description ?
+                                            ` - ${paramMeta.description}` : '';
+
+                                        return (
+                                            <li key={key} style={{ marginBottom: '2px' }}>
+                                                <Text code style={{ fontSize: '10px' }}>{displayName}</Text>: {formattedValue}
+                                                <Text type="secondary" style={{ fontSize: '10px' }}>{description}</Text>
+                                            </li>
+                                        );
+                                    })}
+                            </ul>
+                        </div>
+                        <div style={{ fontSize: '11px' }}>
+                            <Text strong>Data:</Text> {timeSeriesData.length} points used
+                        </div>
+                    </Space>
+                }
+                type="success"
+                showIcon
+                style={{ fontSize: '11px' }}
+                size="small"
+            />
+        ) : null
+    };
 };
 
 export default renderTimeSeriesFields;

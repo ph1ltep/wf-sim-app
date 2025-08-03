@@ -312,6 +312,27 @@ const DistributionFieldV3 = ({
 
   const displayName = valueName || (metadata?.parameters.find(p => p.name === 'value')?.fieldProps?.label) || 'Value';
 
+  const timeSeriesResult = useMemo(() => {
+    if (timeSeriesMode) {
+      return renderTimeSeriesFields(currentType, parametersPath, timeSeriesParametersPath, {
+        addonAfter,
+        valueType,
+        valueName: displayName,
+        precision: typeof step === 'number' ? String(step).split('.')[1]?.length || 0 : 2,
+        timeSeriesData,
+        isFitting: fittingDistribution,
+        onFitDistribution: handleFitDistribution,
+        onClearFit: handleClearFit,
+        hasFittedParams,
+        metadata,
+        parameters,
+        minRequiredPoints
+      });
+    }
+    return { fieldsContent: null, fittedParamsAlert: null };
+  }, [timeSeriesMode, currentType, parametersPath, timeSeriesParametersPath, addonAfter, valueType, displayName, step, timeSeriesData, fittingDistribution, handleFitDistribution, handleClearFit, hasFittedParams, metadata, parameters, minRequiredPoints]);
+
+
   return (
     <div className="distribution-field-v3" style={style}>
       {showTitle && (
@@ -348,20 +369,7 @@ const DistributionFieldV3 = ({
               <div>
                 <Spin spinning={fittingDistribution} tip="Fitting distribution to data...">
                   {timeSeriesMode ? (
-                    renderTimeSeriesFields(currentType, parametersPath, timeSeriesParametersPath, {
-                      addonAfter,
-                      valueType,
-                      valueName: displayName,
-                      precision: typeof step === 'number' ? String(step).split('.')[1]?.length || 0 : 2,
-                      timeSeriesData,
-                      isFitting: fittingDistribution,
-                      onFitDistribution: handleFitDistribution,
-                      onClearFit: handleClearFit,
-                      hasFittedParams,
-                      metadata,
-                      parameters,
-                      minRequiredPoints
-                    })
+                    timeSeriesResult.fieldsContent
                   ) : (
                     <>
                       <FormRow>
@@ -442,20 +450,29 @@ const DistributionFieldV3 = ({
                       style={{ width: '100%' }}
                     />
                   ) : (
-                    <DistributionPlot
-                      distributionType={currentType}
-                      parameters={parameters}
-                      addonAfter={addonAfter}
-                      showMean={true}
-                      showStdDev={true}
-                      showMarkers={true}
-                      showSummary={false}
-                      showPercentiles={true}
-                      allowCurveToggle={allowCurveToggle}
-                      externalViewMode={showVisualization ? viewModeState : null}
-                      onViewModeChange={setViewModeState}
-                      style={{ marginTop: 0 }}
-                    />
+                    <>
+                      <DistributionPlot
+                        distributionType={currentType}
+                        parameters={parameters}
+                        addonAfter={addonAfter}
+                        showMean={true}
+                        showStdDev={true}
+                        showMarkers={true}
+                        showSummary={false}
+                        showPercentiles={true}
+                        allowCurveToggle={allowCurveToggle}
+                        externalViewMode={showVisualization ? viewModeState : null}
+                        onViewModeChange={setViewModeState}
+                        style={{ marginTop: 0 }}
+                      />
+
+                      {/* Add the fitted parameters alert below the visualization */}
+                      {timeSeriesResult.fittedParamsAlert && (
+                        <div style={{ marginTop: '12px' }}>
+                          {timeSeriesResult.fittedParamsAlert}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
