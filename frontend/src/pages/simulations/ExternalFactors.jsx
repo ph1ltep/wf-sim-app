@@ -7,7 +7,8 @@ import {
     DollarOutlined,
     RiseOutlined,
     AreaChartOutlined,
-    LineChartOutlined
+    LineChartOutlined,
+    CloudOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import useInputSim from '../../hooks/useInputSim';
@@ -46,6 +47,16 @@ const externalFactorsFields = [
         units: 'm/s',
         color: '#eb2f96',
         precision: 1
+    },
+    {
+        name: 'Rainfall Amount',
+        path: ['settings', 'marketFactors', 'rainfallAmount'],
+        contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount'],
+        key: 'rainfallAmount',
+        icon: <CloudOutlined style={{ color: '#1890ff' }} />,
+        units: 'mm',
+        color: '#1890ff',
+        precision: 0
     }
 ];
 

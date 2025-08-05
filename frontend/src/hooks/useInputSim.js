@@ -30,6 +30,7 @@ const useInputSim = () => {
             const escalationRate = scenarioData.settings.modules.cost.escalationRate;
             const downtimePerEvent = scenarioData.settings.modules.revenue.downtimePerEvent;
             const windVariability = scenarioData.settings.modules.revenue.windVariability;
+            const rainfallAmount = scenarioData.settings.marketFactors.rainfallAmount;
 
             // Ensure proper structure for each distribution
             const normalizeDistribution = (dist) => {
@@ -43,7 +44,8 @@ const useInputSim = () => {
                     normalizeDistribution(electricityPrice),
                     normalizeDistribution(escalationRate),
                     normalizeDistribution(downtimePerEvent),
-                    normalizeDistribution(windVariability)
+                    normalizeDistribution(windVariability),
+                    normalizeDistribution(rainfallAmount)
                 ],
                 simulationSettings: {
                     iterations: scenarioData.settings.simulation.iterations || 10000,

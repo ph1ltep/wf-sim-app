@@ -150,6 +150,22 @@ const SettingsSchema = Yup.object().shape({
         }),
         location: Yup.string(),
     }),
+    marketFactors: Yup.object().shape({
+        rainfallAmount: DistributionTypeSchema.default(() => ({
+            key: 'rainfallAmount',
+            type: 'gamma',
+            timeSeriesMode: false,
+            parameters: {
+                value: 1200,
+                scale: 12,
+                shape: 100,
+                stdDev: 10
+            },
+            metadata: {
+                percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
+            }
+        })),
+    }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
@@ -333,7 +349,8 @@ const InputSimSchema = Yup.object().shape({
         electricityPrice: SimulationInfoSchema.nullable().default(null),
         windVariability: SimulationInfoSchema.nullable().default(null),
         downtimePerEvent: SimulationInfoSchema.nullable().default(null),
-        escalationRate: SimulationInfoSchema.nullable().default(null)
+        escalationRate: SimulationInfoSchema.nullable().default(null),
+        rainfallAmount: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
         percentileData: PercentileDataSchema.nullable().default(null),

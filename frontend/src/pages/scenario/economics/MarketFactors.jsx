@@ -4,6 +4,7 @@ import { Typography, Alert } from 'antd';
 import { AreaChartOutlined } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
+import LEPComponent from 'components/common/LEPSim';
 
 // Import context field components
 import {
@@ -76,6 +77,38 @@ const MarketFactors = () => {
                                 { value: 'weibull', label: 'Weibull Distribution' }
                             ]}
                         />
+                    </FormCol>
+                </FormRow>
+            </FormSection>
+
+            <FormSection title="Rainfall Amount" style={{ marginBottom: 24 }}>
+                <FormRow>
+                    <FormCol>
+                        <p>Configure the statistical distribution for rainfall amounts affecting wind farm operations.</p>
+                        <DistributionFieldV3
+                            path={['settings', 'marketFactors', 'rainfallAmount']}
+                            tooltip="Annual rainfall amount distribution for modeling weather-related impacts on operations"
+                            showVisualization={true}
+                            addonAfter="mm"
+                            step={1}
+                            valueType="number"
+                            valueName="Mean Rainfall"
+                            showInfoBox={true}
+                            options={[
+                                { value: 'fixed', label: 'Fixed Value' },
+                                { value: 'normal', label: 'Normal Distribution' },
+                                { value: 'gamma', label: 'Gamma Distribution' }
+                            ]}
+                        />
+                    </FormCol>
+                </FormRow>
+            </FormSection>
+            <FormSection title="Rainfall Amount" style={{ marginBottom: 24 }}>
+                <FormRow>
+                    <FormCol>
+                        <LEPComponent >
+
+                        </LEPComponent>
                     </FormCol>
                 </FormRow>
             </FormSection>
