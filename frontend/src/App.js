@@ -14,6 +14,9 @@ import ProjectSettings from './pages/config/project/ProjectSettings';
 import ScenarioSettings from './pages/config/scenario/ScenarioSettings';
 
 // Scenario pages
+import EquipmentSpecifications from './pages/scenario/equipment/Specifications';
+import EquipmentLeadingEdge from './pages/scenario/equipment/LeadingEdge';
+import EquipmentFailureRates from './pages/scenario/equipment/FailureRates';
 import Investment from './pages/scenario/economics/Investment';
 import EconomicsRevenue from './pages/scenario/economics/Revenue';
 import MarketFactors from './pages/scenario/economics/MarketFactors';
@@ -21,7 +24,8 @@ import ServiceContracts from './pages/scenario/operations/ServiceContracts';
 import OperatingCosts from './pages/scenario/operations/OperatingCosts';
 import Performance from './pages/scenario/operations/Performance';
 import Financing from './pages/scenario/financing/Financing';
-import Risk from './pages/scenario/risk/Risk';
+import RiskMitigations from './pages/scenario/risk/Mitigations';
+import RiskWarranties from './pages/scenario/risk/Warranties';
 
 // Simulations pages
 import ExternalFactors from './pages/simulations/ExternalFactors';
@@ -67,6 +71,12 @@ function App() {
 
                 {/* Scenario routes */}
                 <Route path="scenario">
+                  <Route path="equipment">
+                    <Route index element={<Navigate to="/scenario/equipment/specifications" replace />} />
+                    <Route path="specifications" element={<EquipmentSpecifications />} />
+                    <Route path="leading-edge" element={<EquipmentLeadingEdge />} />
+                    <Route path="failure-rates" element={<EquipmentFailureRates />} />
+                  </Route>
                   <Route path="economics">
                     <Route index element={<Navigate to="/scenario/economics/investment" replace />} />
                     <Route path="investment" element={<Investment />} />
@@ -80,7 +90,11 @@ function App() {
                     <Route path="performance" element={<Performance />} />
                   </Route>
                   <Route path="financing" element={<Financing />} />
-                  <Route path="risk" element={<Risk />} />
+                  <Route path="risk">
+                    <Route path="mitigations" element={<RiskMitigations />} />
+                    <Route path="warranties" element={<RiskWarranties />} />
+                    <Route index element={<Navigate to="/scenario/risk/mitigations" replace />} />
+                  </Route>
                   <Route index element={<Navigate to="/scenario/economics" replace />} />
                 </Route>
 

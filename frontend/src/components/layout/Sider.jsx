@@ -27,6 +27,9 @@ import {
   ControlOutlined,
   BugOutlined,
   BuildOutlined,
+  SecurityScanOutlined,
+  LockOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -154,6 +157,28 @@ const Sider = ({ collapsed }) => {
       label: 'Scenario',
       children: [
         {
+          key: 'scenario-equipment',
+          icon: <ToolOutlined />,
+          label: 'Equipment',
+          children: [
+            {
+              key: '/scenario/equipment/specifications',
+              icon: <SettingOutlined />,
+              label: 'Specifications'
+            },
+            {
+              key: '/scenario/equipment/leading-edge',
+              icon: <ThunderboltOutlined />,
+              label: 'Leading Edge'
+            },
+            {
+              key: '/scenario/equipment/failure-rates',
+              icon: <ExclamationCircleOutlined />,
+              label: 'Failure Rates'
+            }
+          ]
+        },
+        {
           key: 'scenario-economics',
           icon: <DollarOutlined />,
           label: 'Economics',
@@ -177,7 +202,7 @@ const Sider = ({ collapsed }) => {
         },
         {
           key: 'scenario-operations',
-          icon: <ToolOutlined />,
+          icon: <ThunderboltOutlined />,
           label: 'Operations',
           children: [
             {
@@ -203,10 +228,22 @@ const Sider = ({ collapsed }) => {
           label: 'Financing'
         },
         {
-          key: '/scenario/risk',
+          key: 'scenario-risk',
           icon: <SafetyOutlined />,
-          label: 'Risk'
-        }
+          label: 'Risk',
+          children: [
+            {
+              key: '/scenario/risk/mitigations',
+              icon: <LockOutlined />,
+              label: 'Mitigations'
+            },
+            {
+              key: '/scenario/risk/warranties',
+              icon: <SafetyCertificateOutlined />,
+              label: 'Warranties'
+            }
+          ]
+        },
       ]
     },
     {

@@ -7,21 +7,16 @@ import { getAllLocations } from 'api/locations';
 
 // Import project-specific components
 import LocationSelector from 'components/forms/selectors/LocationSelector';
-import ProjectMetrics from 'components/cards/ProjectMetrics';
 
 // Import context field components
 import {
   FormSection,
-  FormRow,
-  FormCol,
   TextField,
   NumberField,
   SelectField,
   DateField,
-  PercentageField,
   ResponsiveFieldRow,
   FormDivider,
-  FieldGroup,
   CompactFieldGroup,
   FieldCard
 } from 'components/contextFields';
@@ -45,7 +40,6 @@ const ProjectSettings = () => {
 
   // State to track fields from locations
   const [fieldsFromLocations, setFieldsFromLocations] = useState({
-    capacityFactor: false,
     currency: false,
     foreignCurrency: false,
     exchangeRate: false
@@ -54,9 +48,6 @@ const ProjectSettings = () => {
   // State for locations
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
-
-  // Get calculated metrics from context (now calculated by metricsUtils)
-  const calculatedMetrics = getValueByPath(['settings', 'metrics'], {});
 
   // Fetch locations
   useEffect(() => {
@@ -128,9 +119,6 @@ const ProjectSettings = () => {
 
     // Prepare all updates in a single object
     const updates = {
-      // Wind farm capacity factor
-      [`${windFarmPath.join('.')}.capacityFactor`]: selectedLocation.capacityFactor,
-
       // Currency information
       [`${currencyPath.join('.')}.local`]: selectedLocation.currency,
       [`${currencyPath.join('.')}.foreign`]: selectedLocation.foreignCurrency,
@@ -160,7 +148,6 @@ const ProjectSettings = () => {
         } else {
           // Mark fields as being from location defaults
           setFieldsFromLocations({
-            capacityFactor: true,
             currency: true,
             foreignCurrency: true,
             exchangeRate: true
@@ -197,7 +184,7 @@ const ProjectSettings = () => {
   if (!scenarioData) {
     return (
       <div>
-        <Title level={2}>Project Specifics</Title>
+        <Title level={2}>Project Settings</Title>
         <Alert
           message="No Active Scenario"
           description="Please create or load a scenario first."
@@ -209,8 +196,8 @@ const ProjectSettings = () => {
 
   return (
     <div>
-      <Title level={2}>Project Specifics</Title>
-      <p>Configure the basic parameters for your wind farm project.</p>
+      <Title level={2}>Project Settings</Title>
+      <p>Configure the fundamental parameters for your wind farm project.</p>
 
       {/* Location selection */}
       <LocationSelector
@@ -221,7 +208,7 @@ const ProjectSettings = () => {
         onLoadDefaults={loadLocationDefaults}
       />
 
-      {/* Project Identification */}
+      {/* Project Configuration */}
       <FieldCard>
         <FormSection title="Project Identification">
           <ResponsiveFieldRow layout="twoColumn">
@@ -318,90 +305,7 @@ const ProjectSettings = () => {
             />
           </CompactFieldGroup>
         </FormSection>
-
-        <FormDivider margin="small" orientation="left" />
-
-        {/* Wind Farm Specifications */}
-        <FormSection title="Wind Farm Specifications">
-          <ResponsiveFieldRow layout="threeColumn">
-            <NumberField
-              path={[...windFarmPath, 'numWTGs']}
-              label="Number of WTGs"
-              tooltip="Number of wind turbine generators in the project"
-              min={1}
-              step={1}
-              required
-              affectedMetrics={['totalMW', 'grossAEP', 'netAEP', 'componentQuantities']}
-            />
-            <NumberField
-              path={[...windFarmPath, 'mwPerWTG']}
-              label="Megawatts per WTG"
-              tooltip="Nameplate capacity of each wind turbine in megawatts"
-              min={0.1}
-              step={0.1}
-              precision={2}
-              required
-              affectedMetrics={['totalMW', 'grossAEP', 'netAEP']}
-            />
-            <SelectField
-              path={[...windFarmPath, 'wtgPlatformType']}
-              label="WTG Platform Type"
-              tooltip="Type of wind turbine generator platform"
-              options={[
-                { value: 'geared', label: 'Geared' },
-                { value: 'direct-drive', label: 'Direct Drive' }
-              ]}
-              required
-              affectedMetrics={['componentQuantities']}
-            />
-          </ResponsiveFieldRow>
-          <ResponsiveFieldRow layout="oneColumn">
-            <NumberField
-              path={[...windFarmPath, 'capacityFactor']}
-              label={
-                fieldsFromLocations.capacityFactor ?
-                  <>Capacity Factor (%) <GlobalOutlined style={{ color: '#1890ff' }} /></> :
-                  "Capacity Factor (%)"
-              }
-              tooltip="Expected capacity factor as a percentage of nameplate capacity"
-              min={1}
-              max={60}
-              step={0.5}
-              precision={2}
-              required
-              affectedMetrics={['grossAEP', 'netAEP']}
-            />
-          </ResponsiveFieldRow>
-
-          <FormDivider margin="small" orientation="left" />
-
-          <ResponsiveFieldRow layout="twoColumn">
-            <PercentageField
-              path={[...windFarmPath, 'curtailmentLosses']}
-              label="Curtailment Losses"
-              tooltip="Energy losses due to grid curtailment or operational restrictions"
-              min={0}
-              max={30}
-              step={0.5}
-              precision={2}
-              affectedMetrics={['netAEP']}
-            />
-            <PercentageField
-              path={[...windFarmPath, 'electricalLosses']}
-              label="Electrical Losses"
-              tooltip="Energy losses in electrical systems, transformers, and transmission"
-              min={0}
-              max={15}
-              step={0.5}
-              precision={2}
-              affectedMetrics={['netAEP']}
-            />
-          </ResponsiveFieldRow>
-        </FormSection>
       </FieldCard>
-
-      {/* Project Metrics */}
-      <ProjectMetrics calculatedValues={calculatedMetrics} />
     </div>
   );
 };

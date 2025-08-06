@@ -1,7 +1,7 @@
-// frontend/src/components/analyses/LEPSim.jsx (FIXED AND IMPROVED)
-import React, { useState, useMemo, useCallback } from 'react';
-import { Card, Row, Col, InputNumber, Typography, Space, Switch, Slider, Select, Tag, Descriptions, Divider } from 'antd';
-import { ExperimentOutlined, ToolOutlined, PercentageOutlined, InfoCircleOutlined } from '@ant-design/icons';
+// frontend/src/components/common/LEPSim.jsx
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Card, Row, Col, Typography, Space, Switch, Select, Divider, Radio, Slider, InputNumber } from 'antd';
+import { ExperimentOutlined, ToolOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { useScenario } from '../../contexts/ScenarioContext';
 import {
@@ -15,34 +15,41 @@ import {
     LEP_SPECIFICATIONS
 } from '../../utils/lepSimUtils';
 import {
-    FormSection
+    FormSection,
+    NumberField,
+    ResponsiveFieldRow
 } from '../contextFields';
 
 const { Text } = Typography;
 const { Option } = Select;
 
 const LEPSim = () => {
-    const { scenarioData, getValueByPath } = useScenario();
+    const { scenarioData, getValueByPath, updateByPath } = useScenario();
 
     // Get project lifetime from context
     const contextLifespan = getValueByPath(['settings', 'general', 'projectLife'], DEFAULT_PARAMETERS.lifespan);
 
-    // State for global parameters
-    const [globalParams, setGlobalParams] = useState({
-        tipSpeed: DEFAULT_PARAMETERS.tipSpeed,
-        bladeLength: DEFAULT_PARAMETERS.bladeLength,
-        velocityExponent: DEFAULT_PARAMETERS.velocityExponent
-    });
+    // Get equipment parameters from updated schema paths
+    const contextTipSpeed = getValueByPath(['settings', 'project', 'equipment', 'blades', 'nominalTipSpeed'], DEFAULT_PARAMETERS.tipSpeed);
+    const contextBladeLength = getValueByPath(['settings', 'project', 'equipment', 'blades', 'bladeLength'], DEFAULT_PARAMETERS.bladeLength);
+    const contextVelocityExponent = getValueByPath(['settings', 'project', 'equipment', 'blades', 'velocityExponent'], 8.0);
+
+    // Get LEP settings from context
+    const selectedLEPType = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepType'], 'No LEP');
+    const lepRepairEnabled = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepRepairEnabled'], false);
+    const lepRepairInterval = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepRepairInterval'], 10);
+    const lepRepairEffectiveness = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepRepairEffectiveness'], 90);
+    const lepLength = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepLength'], 13);
 
     // State for per-LEP-type configurations
     const [lepConfigs, setLepConfigs] = useState(() => {
         const configs = {};
         Object.entries(LEP_SPECIFICATIONS).forEach(([name, spec]) => {
             configs[name] = {
-                lepLength: spec.defaultConfig.lepLength,
-                repairEnabled: spec.defaultConfig.repairEffectiveness > 0,
-                repairInterval: spec.defaultConfig.repairInterval,
-                repairEffectiveness: spec.defaultConfig.repairEffectiveness
+                lepLength: name === selectedLEPType ? lepLength : spec.defaultConfig.lepLength,
+                repairEnabled: lepRepairEnabled,
+                repairInterval: lepRepairInterval,
+                repairEffectiveness: lepRepairEffectiveness / 100
             };
         });
         return configs;
@@ -51,36 +58,83 @@ const LEPSim = () => {
     const [selectedPercentile, setSelectedPercentile] = useState(50);
     const [forceUpdate, setForceUpdate] = useState(0);
 
+    // Handle LEP type selection
+    const handleLEPSelection = useCallback((lepType) => {
+        const currentConfig = lepConfigs[lepType];
+        updateByPath({
+            'settings.project.equipment.blades.lepType': lepType,
+            'settings.project.equipment.blades.lepLength': currentConfig.lepLength
+        });
+    }, [updateByPath, lepConfigs]);
+
+    // Handle repair settings updates
+    const handleRepairSettingsUpdate = useCallback((updates) => {
+        const pathUpdates = {};
+
+        if (updates.repairEnabled !== undefined) {
+            pathUpdates['settings.project.equipment.blades.lepRepairEnabled'] = updates.repairEnabled;
+        }
+        if (updates.repairInterval !== undefined) {
+            pathUpdates['settings.project.equipment.blades.lepRepairInterval'] = updates.repairInterval;
+        }
+        if (updates.repairEffectiveness !== undefined) {
+            pathUpdates['settings.project.equipment.blades.lepRepairEffectiveness'] = updates.repairEffectiveness;
+        }
+
+        updateByPath(pathUpdates);
+    }, [updateByPath]);
+
+    // Handle LEP length updates
+    const updateLepConfig = useCallback((lepType, key, value) => {
+        setLepConfigs(prev => ({
+            ...prev,
+            [lepType]: { ...prev[lepType], [key]: value }
+        }));
+
+        // If updating the selected LEP type's length, save to context
+        if (lepType === selectedLEPType && key === 'lepLength') {
+            updateByPath({
+                'settings.project.equipment.blades.lepLength': value
+            });
+        }
+
+        setForceUpdate(Date.now());
+    }, [selectedLEPType, updateByPath]);
+
+    // Sync context changes to local state
+    useEffect(() => {
+        setLepConfigs(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(name => {
+                updated[name] = {
+                    ...updated[name],
+                    lepLength: name === selectedLEPType ? lepLength : updated[name].lepLength,
+                    repairEnabled: lepRepairEnabled,
+                    repairInterval: lepRepairInterval,
+                    repairEffectiveness: lepRepairEffectiveness / 100
+                };
+            });
+            return updated;
+        });
+        setForceUpdate(Date.now());
+    }, [selectedLEPType, lepRepairEnabled, lepRepairInterval, lepRepairEffectiveness, lepLength]);
+
     // Get simulation inputs
     const simulationInputs = useMemo(() => {
         if (!scenarioData) return { rainfall: DEFAULT_PARAMETERS.annualRainfall, windSpeed: DEFAULT_PARAMETERS.meanWindSpeed };
         return getSimulationInputs(scenarioData, selectedPercentile);
     }, [scenarioData, selectedPercentile]);
 
-    // Effective parameters for calculations
+    // Effective parameters for calculations using context values
     const effectiveParams = useMemo(() => ({
-        ...globalParams,
+        tipSpeed: contextTipSpeed,
+        bladeLength: contextBladeLength,
+        velocityExponent: contextVelocityExponent,
         lifespan: contextLifespan,
         annualRainfall: simulationInputs.rainfall,
         meanWindSpeed: simulationInputs.windSpeed,
         _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed
-    }), [globalParams, simulationInputs, contextLifespan]);
-
-    // Update handlers
-    const updateGlobalParam = useCallback((key, value) => {
-        setGlobalParams(prev => ({ ...prev, [key]: value }));
-        if (['tipSpeed', 'bladeLength', 'velocityExponent'].includes(key)) {
-            setForceUpdate(Date.now());
-        }
-    }, []);
-
-    const updateLepConfig = useCallback((lepType, key, value) => {
-        setLepConfigs(prev => ({
-            ...prev,
-            [lepType]: { ...prev[lepType], [key]: value }
-        }));
-        setForceUpdate(Date.now());
-    }, []);
+    }), [contextTipSpeed, contextBladeLength, contextVelocityExponent, simulationInputs, contextLifespan]);
 
     // Available percentiles
     const availablePercentiles = useMemo(() => {
@@ -114,7 +168,6 @@ const LEPSim = () => {
     }, [effectiveParams, calibratedTypes, lepConfigs, forceUpdate]);
 
     const aepLossPerMeterData = useMemo(() => {
-        console.log('Generating per-meter data with lepConfigs:', lepConfigs);
         return generateAEPLossPerMeterAtEndLife(effectiveParams, calibratedTypes, lepConfigs);
     }, [effectiveParams, calibratedTypes, lepConfigs, forceUpdate]);
 
@@ -123,15 +176,52 @@ const LEPSim = () => {
         [effectiveParams.meanWindSpeed]
     );
 
-    const timeToIEALevels = useMemo(() =>
-        calculateTimeToIEALevels(aepLossTimeData, ieaLevels),
-        [aepLossTimeData, ieaLevels]
-    );
+    // Calculate LEP-adjusted IEA levels based on selected LEP type and length
+    const adjustedIEALevels = useMemo(() => {
+        if (!calibratedTypes[selectedLEPType] || selectedLEPType === 'No LEP') {
+            return ieaLevels; // No adjustment for No LEP
+        }
 
-    // Chart data with IEA levels
+        // Get the selected LEP configuration
+        const selectedConfig = lepConfigs[selectedLEPType];
+        const selectedSpec = LEP_SPECIFICATIONS[selectedLEPType];
+
+        if (!selectedConfig || !selectedSpec) return ieaLevels;
+
+        // Calculate LEP impact based on actual LEP length
+        const lepCoverage = selectedConfig.lepLength / effectiveParams.bladeLength; // Coverage ratio (0-1)
+
+        // Different LEP types have different impact rates per meter
+        const impactPerMeter = {
+            'No LEP': 0,
+            'LEP Tape': 0.01, // Lower impact per meter
+            'LEP Shell': 0.015, // Medium impact per meter  
+            'LEP Coating': 0.005, // Lowest impact per meter
+            'Full Blade Protection': 0.02 // Highest impact per meter
+        };
+
+        const lepTypeImpact = impactPerMeter[selectedLEPType] || 0.01;
+        const totalLEPImpact = selectedConfig.lepLength * lepTypeImpact; // Cumulative impact
+
+        // Adjust IEA levels by adding the cumulative LEP impact
+        return ieaLevels.map(level => ({
+            ...level,
+            value: level.value + totalLEPImpact,
+            originalValue: level.value, // Keep track of original for display
+            lepAdjustment: totalLEPImpact
+        }));
+    }, [ieaLevels, selectedLEPType, lepConfigs, effectiveParams.bladeLength, calibratedTypes]);
+
+    const timeToIEALevels = useMemo(() => {
+        // Use the LEP-adjusted IEA levels instead of the raw ones
+        return calculateTimeToIEALevels(aepLossTimeData, adjustedIEALevels);
+    }, [aepLossTimeData, adjustedIEALevels]); // Changed from ieaLevels to adjustedIEALevels
+
+    // Chart data with LEP-adjusted IEA levels
     const timeChartData = useMemo(() => {
         const traces = Object.entries(aepLossTimeData).map(([name, data]) => {
             const coverage = data.lepLength > 0 ? (data.lepLength / effectiveParams.bladeLength * 100) : 0;
+            const isSelected = name === selectedLEPType;
 
             return {
                 x: data.years,
@@ -139,52 +229,54 @@ const LEPSim = () => {
                 type: 'scatter',
                 mode: 'lines',
                 name: `${name} (${coverage.toFixed(0)}% coverage)`,
-                line: { width: 3, color: data.color }
+                line: {
+                    width: isSelected ? 3 : 2,
+                    color: data.color
+                }
             };
         });
 
-        // Add IEA reference levels L2-L5
+        // Add LEP-adjusted IEA reference levels L2-L5
         const ieaLabels = ['L2', 'L3 (Repair)', 'L4', 'L5 (Critical)'];
-        const ieaColors = ['#d9d9d9', '#faad14', '#d9d9d9', '#ff4d4f'];
+        const ieaColors = ['#d9d9d9', '#faad14', '#d9d9d9', '#fa8c16']; // Orange for L5
 
         [1, 2, 3, 4].forEach((levelIndex, i) => {
-            const level = ieaLevels[levelIndex];
+            const level = adjustedIEALevels[levelIndex];
             traces.push({
                 x: [1, effectiveParams.lifespan],
                 y: [level.value, level.value],
                 type: 'scatter',
                 mode: 'lines',
-                name: ieaLabels[i],
+                name: `${ieaLabels[i]} (Adj: +${(level.value - ieaLevels[levelIndex].value).toFixed(3)}%)`,
                 line: {
                     dash: 'dash',
                     color: ieaColors[i],
-                    width: 1
+                    width: 2
                 },
                 showlegend: false,
-                hoverinfo: 'skip'
+                hovertemplate: `${ieaLabels[i]}: %{y:.3f}%<br>LEP Adjustment: +${(level.value - ieaLevels[levelIndex].value).toFixed(3)}%<extra></extra>`
             });
         });
 
-        return { traces, ieaLevels: ieaLevels.slice(1, 5) };
-    }, [aepLossTimeData, ieaLevels, effectiveParams]);
+        return { traces, ieaLevels: adjustedIEALevels.slice(1, 5) };
+    }, [aepLossTimeData, adjustedIEALevels, ieaLevels, effectiveParams, selectedLEPType]);
 
     const perMeterChartData = useMemo(() => {
-        console.log('Per-meter chart data:', Object.entries(aepLossPerMeterData).map(([name, data]) => ({
-            name,
-            lepLength: data.lepLength,
-            maxContribution: data.maxContribution,
-            pointsCount: data.contributions?.length
-        })));
-
-        return Object.entries(aepLossPerMeterData).map(([name, data]) => ({
-            x: data.positions,
-            y: data.contributions,
-            type: 'scatter',
-            mode: 'lines',
-            name: name,
-            line: { width: 3, color: LEP_SPECIFICATIONS[name].color }
-        }));
-    }, [aepLossPerMeterData]);
+        return Object.entries(aepLossPerMeterData).map(([name, data]) => {
+            const isSelected = name === selectedLEPType;
+            return {
+                x: data.positions,
+                y: data.contributions,
+                type: 'scatter',
+                mode: 'lines',
+                name: name,
+                line: {
+                    width: isSelected ? 3 : 2,
+                    color: LEP_SPECIFICATIONS[name].color
+                }
+            };
+        });
+    }, [aepLossPerMeterData, selectedLEPType]);
 
     return (
         <FormSection title="Blade Leading Edge Protection (LEP) Analysis" style={{ marginTop: 32 }}>
@@ -220,188 +312,205 @@ const LEPSim = () => {
                     <Text><strong>Project Life:</strong> {effectiveParams.lifespan} years</Text>
                     <Text><strong>Rainfall:</strong> {effectiveParams.annualRainfall.toFixed(0)} mm/year</Text>
                     <Text><strong>Wind Speed:</strong> {effectiveParams.meanWindSpeed.toFixed(1)} m/s</Text>
+                    <Text><strong>Selected LEP:</strong> {selectedLEPType}</Text>
                 </Space>
             </Card>
 
-            {/* Global Parameters */}
+            {/* Turbine Configuration using ContextFields */}
             <Card title={<><ExperimentOutlined /> Turbine Configuration</>} size="small" style={{ marginBottom: 16 }}>
-                <Row gutter={[16, 8]}>
-                    <Col xs={24} sm={8}>
-                        <Text>Blade Length (m)</Text>
-                        <InputNumber
-                            value={globalParams.bladeLength}
-                            onChange={(value) => updateGlobalParam('bladeLength', value)}
-                            min={30}
-                            max={200}
-                            step={5}
-                            size="small"
-                            style={{ width: '100%' }}
-                        />
-                    </Col>
-                    <Col xs={24} sm={8}>
-                        <Text>Tip Speed (m/s)</Text>
-                        <InputNumber
-                            value={globalParams.tipSpeed}
-                            onChange={(value) => updateGlobalParam('tipSpeed', value)}
-                            min={60}
-                            max={120}
-                            step={1}
-                            size="small"
-                            style={{ width: '100%' }}
-                        />
-                    </Col>
-                    <Col xs={24} sm={8}>
-                        <Text>Velocity Exponent</Text>
-                        <InputNumber
-                            value={globalParams.velocityExponent}
-                            onChange={(value) => updateGlobalParam('velocityExponent', value)}
-                            min={5}
-                            max={10}
-                            step={0.1}
-                            precision={1}
-                            size="small"
-                            style={{ width: '100%' }}
-                        />
-                    </Col>
-                </Row>
+                <ResponsiveFieldRow layout="threeColumn">
+                    <NumberField
+                        path={['settings', 'project', 'equipment', 'blades', 'bladeLength']}
+                        label="Blade Length (m)"
+                        tooltip="Length of the turbine blade from hub center to tip"
+                        min={10}
+                        max={150}
+                        step={0.5}
+                        precision={1}
+                        required
+                    />
+                    <NumberField
+                        path={['settings', 'project', 'equipment', 'blades', 'nominalTipSpeed']}
+                        label="Nominal Tip Speed (m/s)"
+                        tooltip="The linear speed of the blade tip at nominal operating conditions"
+                        min={50}
+                        max={120}
+                        step={1}
+                        precision={1}
+                        required
+                    />
+                    <NumberField
+                        path={['settings', 'project', 'equipment', 'blades', 'velocityExponent']}
+                        label="Velocity Exponent"
+                        tooltip="Wind shear exponent used in power law wind profile calculations"
+                        min={6}
+                        max={10}
+                        step={0.1}
+                        precision={1}
+                        required
+                    />
+                </ResponsiveFieldRow>
             </Card>
 
-            {/* LEP Type Configurations */}
-            <Card title={<><ToolOutlined /> LEP Protection Configurations</>} size="small" style={{ marginBottom: 24 }}>
-                <Row gutter={[16, 16]}>
-                    {Object.entries(LEP_SPECIFICATIONS).map(([name, spec]) => {
-                        const config = lepConfigs[name];
-                        const coverage = config.lepLength > 0 ? (config.lepLength / globalParams.bladeLength * 100) : 0;
-                        const timeData = aepLossTimeData[name];
-                        const ieaData = timeToIEALevels[name];
-                        const isNoLEP = name === 'No LEP';
+            {/* LEP Type Selection */}
+            <Card title={<><ToolOutlined /> LEP Protection Selection</>} size="small" style={{ marginBottom: 16 }}>
+                <Radio.Group
+                    value={selectedLEPType}
+                    onChange={(e) => handleLEPSelection(e.target.value)}
+                    style={{ width: '100%' }}
+                >
+                    <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                        {Object.entries(LEP_SPECIFICATIONS).map(([name, spec]) => {
+                            const config = lepConfigs[name];
+                            const coverage = config.lepLength > 0 ? (config.lepLength / effectiveParams.bladeLength * 100) : 0;
+                            const timeData = aepLossTimeData[name];
+                            const ieaData = timeToIEALevels[name];
+                            const isSelected = name === selectedLEPType;
 
-                        return (
-                            <Col xs={24} lg={8} key={name}>
-                                <Card
-                                    size="small"
+                            return (
+                                <div
+                                    key={name}
                                     style={{
-                                        height: '100%',
-                                        borderColor: spec.color,
-                                        borderWidth: 2
+                                        border: `2px solid ${isSelected ? spec.color : '#f0f0f0'}`,
+                                        borderRadius: 6,
+                                        padding: 12,
+                                        backgroundColor: isSelected ? `${spec.color}08` : '#fafafa'
                                     }}
-                                    title={
-                                        <Space>
-                                            <div style={{
-                                                width: 12,
-                                                height: 12,
-                                                backgroundColor: spec.color,
-                                                borderRadius: 2
-                                            }} />
-                                            <span>{name}</span>
-                                        </Space>
-                                    }
                                 >
-                                    <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                        {/* LEP Length - disabled for No LEP */}
-                                        {!isNoLEP && (
-                                            <div>
-                                                <Text style={{ fontSize: '12px' }}>LEP Length: {config.lepLength}m</Text>
-                                                <Slider
-                                                    value={config.lepLength}
-                                                    onChange={(value) => updateLepConfig(name, 'lepLength', value)}
-                                                    min={0}
-                                                    max={Math.floor(globalParams.bladeLength * 0.8)}
-                                                    step={1}
-                                                    size="small"
-                                                    style={{ margin: '4px 0' }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Repair Configuration */}
-                                        <div>
-                                            <Space style={{ marginBottom: 4 }}>
-                                                <Switch
-                                                    checked={config.repairEnabled}
-                                                    onChange={(checked) => updateLepConfig(name, 'repairEnabled', checked)}
-                                                    size="small"
-                                                />
-                                                <Text style={{ fontSize: '12px' }}>Repairs</Text>
-                                            </Space>
-
-                                            {config.repairEnabled && (
-                                                <Row gutter={8}>
-                                                    <Col span={12}>
-                                                        <Text style={{ fontSize: '11px' }}>Interval (yr)</Text>
-                                                        <InputNumber
-                                                            value={config.repairInterval}
-                                                            onChange={(value) => updateLepConfig(name, 'repairInterval', value)}
-                                                            min={5}
-                                                            max={15}
-                                                            size="small"
-                                                            style={{ width: '100%' }}
-                                                        />
-                                                    </Col>
-                                                    <Col span={12}>
-                                                        <Text style={{ fontSize: '11px' }}>Effectiveness</Text>
+                                    <Row align="middle" gutter={16}>
+                                        <Col flex="none">
+                                            <Radio value={name} />
+                                        </Col>
+                                        <Col flex="none">
+                                            <div style={{
+                                                width: 16,
+                                                height: 16,
+                                                backgroundColor: spec.color,
+                                                borderRadius: 3
+                                            }} />
+                                        </Col>
+                                        <Col flex="120px">
+                                            <Text strong style={{ fontSize: '14px' }}>{name}</Text>
+                                        </Col>
+                                        <Col flex="auto">
+                                            <Row gutter={24}>
+                                                <Col>
+                                                    <div style={{ textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: spec.color }}>
+                                                            {timeData?.cumulativeAverage?.toFixed(3)}%
+                                                        </div>
+                                                        <div style={{ fontSize: '12px', color: '#666' }}>Avg AEP Loss</div>
+                                                    </div>
+                                                </Col>
+                                                <Col>
+                                                    <div style={{ textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: spec.color }}>
+                                                            {ieaData?.timeToL2 || 'N/A'}
+                                                        </div>
+                                                        <div style={{ fontSize: '12px', color: '#666' }}>Years to L2</div>
+                                                    </div>
+                                                </Col>
+                                                <Col>
+                                                    <div style={{ textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: spec.color }}>
+                                                            {ieaData?.timeToL5 || 'N/A'}
+                                                        </div>
+                                                        <div style={{ fontSize: '12px', color: '#666' }}>Years to L5</div>
+                                                    </div>
+                                                </Col>
+                                                <Col>
+                                                    <div style={{ textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '11px', color: '#888' }}>
+                                                            {coverage.toFixed(0)}% coverage
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: '#888' }}>
+                                                            {calibratedTypes[name]?.P?.toFixed(0)}x protection
+                                                        </div>
+                                                    </div>
+                                                </Col>
+                                                {name !== 'No LEP' && (
+                                                    <Col flex="120px">
+                                                        <div style={{ fontSize: '11px', color: '#666', marginBottom: 4 }}>
+                                                            LEP Length: {config.lepLength}m
+                                                        </div>
                                                         <Slider
-                                                            value={config.repairEffectiveness * 100}
-                                                            onChange={(value) => updateLepConfig(name, 'repairEffectiveness', value / 100)}
+                                                            value={config.lepLength}
+                                                            onChange={(value) => updateLepConfig(name, 'lepLength', value)}
                                                             min={0}
-                                                            max={95}
-                                                            step={5}
+                                                            max={Math.floor(effectiveParams.bladeLength * 0.8)}
+                                                            step={1}
                                                             size="small"
-                                                            tooltip={{ formatter: value => `${value}%` }}
+                                                            style={{ margin: 0 }}
                                                         />
                                                     </Col>
-                                                </Row>
-                                            )}
-                                        </div>
+                                                )}
+                                            </Row>
+                                        </Col>
+                                    </Row>
+                                </div>
+                            );
+                        })}
+                    </Space>
+                </Radio.Group>
+            </Card>
 
-                                        {/* Performance Summary */}
-                                        <div style={{
-                                            background: '#fafafa',
-                                            padding: 8,
-                                            borderRadius: 4,
-                                            fontSize: '11px'
-                                        }}>
-                                            <Row gutter={8}>
-                                                <Col span={8}>
-                                                    <div><strong>{coverage.toFixed(0)}%</strong></div>
-                                                    <div style={{ color: '#666' }}>Coverage</div>
-                                                </Col>
-                                                <Col span={8}>
-                                                    <div><strong>{timeData?.cumulativeAverage?.toFixed(3)}%</strong></div>
-                                                    <div style={{ color: '#666' }}>Avg Loss</div>
-                                                </Col>
-                                                <Col span={8}>
-                                                    <div><strong>{calibratedTypes[name]?.P?.toFixed(0)}x</strong></div>
-                                                    <div style={{ color: '#666' }}>Protection</div>
-                                                </Col>
-                                            </Row>
-                                            <Divider style={{ margin: '6px 0' }} />
-                                            <Row gutter={8}>
-                                                <Col span={12}>
-                                                    <div><strong>{ieaData?.timeToL2}</strong></div>
-                                                    <div style={{ color: '#666' }}>Time to L2</div>
-                                                </Col>
-                                                <Col span={12}>
-                                                    <div><strong>{ieaData?.timeToL5}</strong></div>
-                                                    <div style={{ color: '#666' }}>Time to L5</div>
-                                                </Col>
-                                            </Row>
-                                        </div>
-                                    </Space>
-                                </Card>
+            {/* Global Repair Settings */}
+            <Card title="Repair Settings" size="small" style={{ marginBottom: 24 }}>
+                <Row gutter={16} align="middle">
+                    <Col>
+                        <Space>
+                            <Switch
+                                checked={lepRepairEnabled}
+                                onChange={(checked) => handleRepairSettingsUpdate({ repairEnabled: checked })}
+                            />
+                            <Text>Enable LEP Repairs</Text>
+                        </Space>
+                    </Col>
+                    {lepRepairEnabled && (
+                        <>
+                            <Col>
+                                <Space>
+                                    <Text>Repair Interval:</Text>
+                                    <InputNumber
+                                        value={lepRepairInterval}
+                                        onChange={(value) => handleRepairSettingsUpdate({ repairInterval: value })}
+                                        min={5}
+                                        max={15}
+                                        step={1}
+                                        size="small"
+                                        addonAfter="years"
+                                        style={{ width: 100 }}
+                                    />
+                                </Space>
                             </Col>
-                        );
-                    })}
+                            <Col>
+                                <Space>
+                                    <Text>Repair Effectiveness:</Text>
+                                    <InputNumber
+                                        value={lepRepairEffectiveness}
+                                        onChange={(value) => handleRepairSettingsUpdate({ repairEffectiveness: value })}
+                                        min={0}
+                                        max={95}
+                                        step={5}
+                                        size="small"
+                                        addonAfter="%"
+                                        style={{ width: 80 }}
+                                    />
+                                </Space>
+                            </Col>
+                        </>
+                    )}
                 </Row>
             </Card>
 
-            {/* Charts with IEA Levels */}
+            {/* Charts with LEP-Adjusted IEA Levels */}
             <Row gutter={[24, 24]}>
                 <Col xs={24} xl={12}>
                     <Card title="AEP Loss Over Project Lifetime" size="small">
                         <Plot
                             data={timeChartData.traces}
                             layout={{
+                                title: 'AEP Loss Timeline with IEA Thresholds',
                                 xaxis: {
                                     title: 'Project Year',
                                     showgrid: true
@@ -416,19 +525,19 @@ const LEPSim = () => {
                                     x: 0
                                 },
                                 annotations: timeChartData.ieaLevels.map((level, i) => ({
-                                    x: 1,
+                                    x: effectiveParams.lifespan * 0.95, // Position on right side
                                     y: level.value,
                                     text: ['L2', 'L3', 'L4', 'L5'][i],
                                     showarrow: false,
                                     xanchor: 'left',
-                                    yanchor: 'bottom',
+                                    yanchor: 'middle',
                                     font: { size: 10, color: '#666' },
-                                    bgcolor: 'white',
+                                    bgcolor: 'rgba(255,255,255,0.8)',
                                     bordercolor: '#ddd',
                                     borderwidth: 1
                                 })),
                                 height: 350,
-                                margin: { l: 50, r: 20, t: 20, b: 100 }
+                                margin: { l: 60, r: 40, t: 40, b: 100 }
                             }}
                             config={{ displayModeBar: false, responsive: true }}
                             style={{ width: '100%' }}
@@ -441,13 +550,14 @@ const LEPSim = () => {
                         <Plot
                             data={perMeterChartData}
                             layout={{
+                                title: 'Blade Position Impact Analysis',
                                 xaxis: {
-                                    title: 'Blade Position (m)',
+                                    title: 'Blade Position from Root (m)',
                                     showgrid: true,
                                     range: [0, effectiveParams.bladeLength]
                                 },
                                 yaxis: {
-                                    title: 'AEP Loss (%/m)',
+                                    title: 'AEP Loss Contribution (%/m)',
                                     showgrid: true
                                 },
                                 legend: {
@@ -456,7 +566,7 @@ const LEPSim = () => {
                                     x: 0
                                 },
                                 height: 350,
-                                margin: { l: 50, r: 20, t: 20, b: 100 }
+                                margin: { l: 60, r: 40, t: 40, b: 100 }
                             }}
                             config={{ displayModeBar: false, responsive: true }}
                             style={{ width: '100%' }}

@@ -114,6 +114,18 @@ const SettingsSchema = Yup.object().shape({
         startDate: Yup.date(),
     }),
     project: Yup.object().shape({
+        equipment: Yup.object().shape({
+            blades: Yup.object().shape({
+                bladeLength: Yup.number().default(68),
+                lepType: Yup.string().default('No LEP'),
+                lepRepairEnabled: Yup.boolean().default(false),
+                lepRepairInterval: Yup.number().default(10),
+                lepRepairEffectiveness: Yup.number().default(90),
+                lepLength: Yup.number().default(13),
+                nominalTipSpeed: Yup.number().default(88),
+                velocityExponent: Yup.number().default(8.0),
+            }),
+        }),
         windFarm: Yup.object().shape({
             numWTGs: Yup.number().default(20),
             wtgPlatformType: Yup.string().oneOf(['geared', 'direct-drive']).default('geared'),

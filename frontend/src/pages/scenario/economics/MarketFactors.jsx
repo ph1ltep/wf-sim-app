@@ -103,15 +103,6 @@ const MarketFactors = () => {
                     </FormCol>
                 </FormRow>
             </FormSection>
-            <FormSection title="Rainfall Amount" style={{ marginBottom: 24 }}>
-                <FormRow>
-                    <FormCol>
-                        <LEPComponent >
-
-                        </LEPComponent>
-                    </FormCol>
-                </FormRow>
-            </FormSection>
         </div>
     );
 };
