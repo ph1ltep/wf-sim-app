@@ -20,6 +20,7 @@ import {
     equityCashflow,
     llcr,
     icr,
+    lepTimeSeriesTransformer,
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -498,6 +499,29 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 customPercentile: 50,
                 formatter: (value) => `${value.toFixed(2)}x`
             }
-        }
+        },
+        {
+            id: 'lepTimeSeries',
+            priority: 200,
+            path: null, // Virtual source - no path
+            hasPercentiles: true,
+            references: [
+                { id: 'bladeConfig', path: ['settings', 'project', 'equipment', 'blades'] },
+                { id: 'rainfallData', path: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount', 'results'] },
+                { id: 'windData', path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability', 'results'] }
+            ],
+            transformer: lepTimeSeriesTransformer,
+            multipliers: [],
+            metadata: {
+                name: 'LEP AEP Loss Time Series',
+                type: 'virtual',
+                visualGroup: 'equipment',
+                cashflowType: 'none',
+                accountingClass: 'equipment_performance',
+                projectPhase: 'operations',
+                description: 'Leading Edge Protection impact on Annual Energy Production over project lifetime',
+                formatter: (value) => `${value.toFixed(3)}%`
+            }
+        },
     ]
 };

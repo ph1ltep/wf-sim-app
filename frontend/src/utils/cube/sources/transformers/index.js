@@ -7,6 +7,7 @@ import * as totals from './totals.js';
 import * as cashflow from './cashflow.js';
 import * as cost from './cost.js';
 import * as drawdown from './drawdown.js';
+import * as equipment from './equipment.js';
 
 /**
  * Registry of all available transformer functions
@@ -53,3 +54,4 @@ export * from './totals.js';
 export * from './cashflow.js';
 export * from './cost.js';
 export * from './drawdown.js';
+export * from './equipment.js';

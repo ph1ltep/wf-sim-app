@@ -59,13 +59,6 @@ export const LEP_SPECIFICATIONS = {
     }
 };
 
-// LEP length per type (meters)
-export const LEP_LENGTHS = {
-    'No LEP': 0.0,
-    '3M Tape': 26.0,
-    'Poly Shells': 26.0
-};
-
 // IEA AEP loss mapping table (wind speed -> [L2, L3, L4] levels)
 export const IEA_AEP_TABLE = {
     4.0: [1.0, 1.9, 3.0],
@@ -78,7 +71,7 @@ export const IEA_AEP_TABLE = {
 // Default input parameters
 export const DEFAULT_PARAMETERS = {
     lifespan: 25.0,
-    tipSpeed: 85.0,                 // USER CONFIGURABLE: Operating tip speed
+    tipSpeed: 85.0,
     bladeLength: 63.0,
     velocityExponent: 7.5,
     annualRainfall: 1200.0,
@@ -88,64 +81,320 @@ export const DEFAULT_PARAMETERS = {
     repairEnabled: false,
     repairInterval: 10,
     repairEffectiveness: 0.8,
-
-    // INTERNAL CONSTANT: Industry reference for calibration consistency
-    _referenceSpeed: 80.0           // Hidden from UI, used for physics consistency
+    _referenceSpeed: 80.0
 };
 
+// ========================================
+// CORE PHYSICS FUNCTIONS (LU-1, LU-2, LU-3)
+// ========================================
+
 /**
- * Get calibration details for display in UI
- * @param {Object} calibratedTypes - Result from calibrateLEPTypes
- * @returns {Array} Calibration details for each LEP type
+ * CORE PHYSICS: Generate LEP time series data for a single LEP type
+ * @param {Array} rainfallData - DataPointSchema array [{year, value}] for rainfall (mm/year)
+ * @param {Array} windData - DataPointSchema array [{year, value}] for wind speed (m/s)  
+ * @param {Object} bladeConfig - Complete project.equipment.blades configuration object (with lepType set)
+ * @returns {Array} DataPointSchema array [{year, value}] for AEP loss percentage
  */
-export function getCalibrationDetails(calibratedTypes) {
-    return Object.entries(calibratedTypes).map(([name, config]) => ({
-        name,
-        testConditions: config.calibration,
-        calibratedP: config.P,
-        scalingFactor: config.calibrationResults?.scalingFromBase || 1,
-        installationPenalty: config.installationPenalty,
-        source: config.calibration.source
-    }));
+export function generateLEPTimeSeries(rainfallData, windData, bladeConfig) {
+    if (!rainfallData?.length || !windData?.length || !bladeConfig) return [];
+
+    const { nominalTipSpeed: tipSpeed, bladeLength, velocityExponent = 8.0, lepType = 'No LEP' } = bladeConfig;
+    const lepSpec = LEP_SPECIFICATIONS[lepType];
+
+    if (!lepSpec) return [];
+
+    // Build LEP configuration from blade config
+    const lepConfig = {
+        lepLength: bladeConfig.lepLength || lepSpec.defaultConfig.lepLength,
+        repairEnabled: bladeConfig.lepRepairEnabled || false,
+        repairInterval: bladeConfig.lepRepairInterval || lepSpec.defaultConfig.repairInterval,
+        repairEffectiveness: (bladeConfig.lepRepairEffectiveness || lepSpec.defaultConfig.repairEffectiveness * 100) / 100
+    };
+
+    // Calibrate LEP type
+    const calibratedTypes = calibrateLEPTypes({
+        tipSpeed, bladeLength, velocityExponent,
+        _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed,
+        overrideInstallationPenalty: bladeConfig.lepInPowerCurve ? 0 : undefined
+    });
+
+    const config = calibratedTypes[lepType];
+    const baseP = calibratedTypes['No LEP'].P;
+
+    // Create year-aligned data arrays
+    const years = rainfallData.map(d => d.year).sort((a, b) => a - b);
+    const result = [];
+
+    let cumulativeRain = 0;
+
+    years.forEach(year => {
+        // Get rainfall and wind speed for this year
+        const rainfallPoint = rainfallData.find(d => d.year === year);
+        const windPoint = windData.find(d => d.year === year);
+
+        if (!rainfallPoint || !windPoint) return;
+
+        cumulativeRain += rainfallPoint.value;
+
+        // Apply repair adjustments if enabled
+        let effectiveCumRain = cumulativeRain;
+        if (lepConfig.repairEnabled && lepConfig.repairInterval > 0) {
+            const lastRepairYear = Math.floor((year - 1) / lepConfig.repairInterval) * lepConfig.repairInterval;
+            if (lastRepairYear > 0) {
+                const yearsSinceRepair = year - lastRepairYear;
+                const erosionReduced = cumulativeRain * lepConfig.repairEffectiveness;
+                effectiveCumRain = cumulativeRain - erosionReduced + (yearsSinceRepair * rainfallPoint.value);
+            }
+        }
+
+        // Calculate AEP loss for this year
+        const powerLoss = calculateBladeAveragedPowerLoss(
+            effectiveCumRain,
+            config.P,
+            lepConfig.lepLength,
+            baseP,
+            { tipSpeed, bladeLength, velocityExponent, _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed }
+        );
+        const aepLoss = powerToAEPLoss(powerLoss, windPoint.value);
+        const totalPenalty = (config.installationPenalty || 0) * lepConfig.lepLength;
+
+        result.push({
+            year,
+            value: aepLoss + totalPenalty
+        });
+    });
+
+    return result;
 }
 
 /**
- * Get rainfall and wind speed from simulation data
- * @param {Object} scenarioData - Scenario data from context
- * @param {number} percentile - Selected percentile (0-100)
- * @returns {Object} Rainfall and wind speed values
+ * CORE PHYSICS: Generate LEP spatial analysis data (for visualization only)
+ * @param {Array} rainfallData - DataPointSchema array for rainfall  
+ * @param {Array} windData - DataPointSchema array for wind speed
+ * @param {Object} bladeConfig - Complete project.equipment.blades configuration object
+ * @returns {Object} Spatial analysis data for end-of-life visualization
  */
-export function getSimulationInputs(scenarioData, percentile = 50) {
-    const rainfallSim = scenarioData?.simulation?.inputSim?.distributionAnalysis?.rainfallAmount;
-    const windSim = scenarioData?.simulation?.inputSim?.distributionAnalysis?.windVariability;
+export function generateLEPSpatialAnalysis(rainfallData, windData, bladeConfig) {
+    if (!rainfallData?.length || !windData?.length || !bladeConfig) return {};
 
-    let rainfall = DEFAULT_PARAMETERS.annualRainfall;
-    let windSpeed = DEFAULT_PARAMETERS.meanWindSpeed;
+    // Use end-of-life values (cumulative rainfall, average wind speed)
+    const totalRainfall = rainfallData.reduce((sum, d) => sum + d.value, 0);
+    const avgWindSpeed = windData.reduce((sum, d) => sum + d.value, 0) / windData.length;
 
-    if (rainfallSim?.results?.length > 0) {
-        // Find the closest percentile result
-        const rainfallResult = rainfallSim.results.find(r =>
-            Math.abs(r.percentile.value - percentile) < 0.1
-        ) || rainfallSim.results[0];
+    const { nominalTipSpeed: tipSpeed, bladeLength, velocityExponent = 8.0, lepType = 'No LEP' } = bladeConfig;
+    const lepSpec = LEP_SPECIFICATIONS[lepType];
 
-        if (rainfallResult?.data?.length > 0) {
-            // Use the first year value or average if multiple years
-            rainfall = rainfallResult.data[0]?.value || rainfall;
+    if (!lepSpec) return {};
+
+    // Build LEP configuration from blade config
+    const lepConfig = {
+        lepLength: bladeConfig.lepLength || lepSpec.defaultConfig.lepLength,
+        repairEnabled: bladeConfig.lepRepairEnabled || false,
+        repairInterval: bladeConfig.lepRepairInterval || lepSpec.defaultConfig.repairInterval,
+        repairEffectiveness: (bladeConfig.lepRepairEffectiveness || lepSpec.defaultConfig.repairEffectiveness * 100) / 100
+    };
+
+    // Calibrate LEP type using blade config parameters
+    const calibratedTypes = calibrateLEPTypes({
+        tipSpeed, bladeLength, velocityExponent,
+        _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed,
+        overrideInstallationPenalty: bladeConfig.lepInPowerCurve ? 0 : undefined
+    });
+
+    const config = calibratedTypes[lepType];
+    const baseP = calibratedTypes['No LEP'].P;
+    const penaltyPerM = config.installationPenalty || 0;
+
+    // Apply repair adjustments for end-of-life
+    let effectiveCumRain = totalRainfall;
+    if (lepConfig.repairEnabled && lepConfig.repairInterval > 0) {
+        const projectLife = rainfallData.length;
+        const numRepairs = Math.floor(projectLife / lepConfig.repairInterval);
+        if (numRepairs > 0) {
+            const erosionReduced = totalRainfall * lepConfig.repairEffectiveness * numRepairs * 0.5;
+            effectiveCumRain = Math.max(totalRainfall - erosionReduced, totalRainfall * 0.3);
         }
     }
 
-    if (windSim?.results?.length > 0) {
-        const windResult = windSim.results.find(r =>
-            Math.abs(r.percentile.value - percentile) < 0.1
-        ) || windSim.results[0];
+    const { positions, contributions } = calculateAEPLossPerMeter(
+        effectiveCumRain, config.P, lepConfig.lepLength, baseP, avgWindSpeed, penaltyPerM,
+        { tipSpeed, bladeLength, velocityExponent, _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed }
+    );
 
-        if (windResult?.data?.length > 0) {
-            windSpeed = windResult.data[0]?.value || windSpeed;
-        }
+    return {
+        positions,
+        contributions,
+        lepLength: lepConfig.lepLength,
+        maxContribution: Math.max(...contributions),
+        lepCoveragePercent: lepConfig.lepLength > 0 ? (lepConfig.lepLength / bladeLength * 100) : 0,
+        color: lepSpec.color
+    };
+}
+
+// ========================================
+// LEPSIM COMPATIBILITY LAYER (LS-1, LS-2, LS-3)
+// ========================================
+
+/**
+ * COMPATIBILITY: Extract simulation inputs from DataPointSchema arrays
+ * @param {Array} rainfallData - DataPointSchema array for rainfall
+ * @param {Array} windData - DataPointSchema array for wind speed
+ * @param {number} percentile - Selected percentile (for backward compatibility)
+ * @returns {Object} Rainfall and wind speed values
+ */
+export function getSimulationInputs(rainfallData, windData, percentile = 50) {
+    // For DataPointSchema arrays, we can use average values or specific year
+    let rainfall = DEFAULT_PARAMETERS.annualRainfall;
+    let windSpeed = DEFAULT_PARAMETERS.meanWindSpeed;
+
+    if (rainfallData?.length > 0) {
+        // Use average annual rainfall from the dataset
+        rainfall = rainfallData.reduce((sum, d) => sum + d.value, 0) / rainfallData.length;
+    }
+
+    if (windData?.length > 0) {
+        // Use average wind speed from the dataset
+        windSpeed = windData.reduce((sum, d) => sum + d.value, 0) / windData.length;
     }
 
     return { rainfall, windSpeed };
 }
+
+/**
+ * COMPATIBILITY: Generate time series data for ALL LEP types (for chart visualization)
+ * @param {Object} params - Input parameters
+ * @param {Object} calibratedTypes - Calibrated LEP types
+ * @param {Object} bladeConfig - Base blade configuration object
+ * @returns {Object} Chart data for AEP loss over time FOR ALL LEP TYPES
+ */
+export function generateAEPLossOverTime(params, calibratedTypes, bladeConfig) {
+    const { lifespan, annualRainfall, meanWindSpeed } = params;
+
+    // Create synthetic DataPointSchema arrays for compatibility
+    const rainfallData = [];
+    const windData = [];
+
+    for (let year = 1; year <= Math.floor(lifespan); year++) {
+        rainfallData.push({ year, value: annualRainfall });
+        windData.push({ year, value: meanWindSpeed });
+    }
+
+    const data = {};
+
+    // Generate data for ALL LEP types by creating modified blade configs
+    Object.entries(LEP_SPECIFICATIONS).forEach(([lepType, lepSpec]) => {
+        // Create blade config for this specific LEP type
+        const lepTypeBladeConfig = {
+            ...bladeConfig,
+            lepType: lepType,
+            // Use current settings if this is the selected type, otherwise use defaults
+            lepLength: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepLength || lepSpec.defaultConfig.lepLength) :
+                lepSpec.defaultConfig.lepLength,
+            lepRepairEnabled: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairEnabled || false) :
+                lepSpec.defaultConfig.repairEffectiveness > 0,
+            lepRepairInterval: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairInterval || lepSpec.defaultConfig.repairInterval) :
+                lepSpec.defaultConfig.repairInterval,
+            lepRepairEffectiveness: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairEffectiveness || lepSpec.defaultConfig.repairEffectiveness * 100) :
+                lepSpec.defaultConfig.repairEffectiveness * 100
+        };
+
+        // Use core physics function
+        const coreResult = generateLEPTimeSeries(rainfallData, windData, lepTypeBladeConfig);
+
+        // Extract years and values
+        const years = coreResult.map(d => d.year);
+        const aepLoss = coreResult.map(d => d.value);
+
+        // Create interpolated data for smooth charting (more points)
+        const interpolatedYears = [];
+        const interpolatedAepLoss = [];
+
+        if (years.length >= 2) {
+            const totalYears = Math.floor(lifespan);
+            for (let t = 1; t <= totalYears; t += 0.1) { // 0.1 year intervals for smooth curves
+                interpolatedYears.push(t);
+                interpolatedAepLoss.push(interpolateLinear(t, years, aepLoss));
+            }
+        } else {
+            interpolatedYears.push(...years);
+            interpolatedAepLoss.push(...aepLoss);
+        }
+
+        data[lepType] = {
+            years: interpolatedYears,
+            aepLoss: interpolatedAepLoss,
+            cumulativeAverage: _.mean(aepLoss),
+            lepLength: lepTypeBladeConfig.lepLength,
+            repairSchedule: {
+                enabled: lepTypeBladeConfig.lepRepairEnabled,
+                interval: lepTypeBladeConfig.lepRepairInterval,
+                effectiveness: lepTypeBladeConfig.lepRepairEffectiveness / 100
+            },
+            color: lepSpec.color
+        };
+    });
+
+    return data;
+}
+
+/**
+ * COMPATIBILITY: Generate chart data for AEP loss per meter at end of lifetime FOR ALL LEP TYPES
+ * @param {Object} params - Input parameters  
+ * @param {Object} calibratedTypes - Calibrated LEP types
+ * @param {Object} bladeConfig - Base blade configuration object
+ * @returns {Object} Chart data for AEP loss per meter FOR ALL LEP TYPES
+ */
+export function generateAEPLossPerMeterAtEndLife(params, calibratedTypes, bladeConfig) {
+    const { lifespan, annualRainfall, meanWindSpeed } = params;
+
+    // Create synthetic DataPointSchema arrays for end-of-life analysis
+    const rainfallData = [];
+    const windData = [];
+
+    for (let year = 1; year <= Math.floor(lifespan); year++) {
+        rainfallData.push({ year, value: annualRainfall });
+        windData.push({ year, value: meanWindSpeed });
+    }
+
+    const data = {};
+
+    // Generate data for ALL LEP types by creating modified blade configs
+    Object.entries(LEP_SPECIFICATIONS).forEach(([lepType, lepSpec]) => {
+        // Create blade config for this specific LEP type
+        const lepTypeBladeConfig = {
+            ...bladeConfig,
+            lepType: lepType,
+            // Use current settings if this is the selected type, otherwise use defaults
+            lepLength: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepLength || lepSpec.defaultConfig.lepLength) :
+                lepSpec.defaultConfig.lepLength,
+            lepRepairEnabled: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairEnabled || false) :
+                lepSpec.defaultConfig.repairEffectiveness > 0,
+            lepRepairInterval: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairInterval || lepSpec.defaultConfig.repairInterval) :
+                lepSpec.defaultConfig.repairInterval,
+            lepRepairEffectiveness: lepType === bladeConfig.lepType ?
+                (bladeConfig.lepRepairEffectiveness || lepSpec.defaultConfig.repairEffectiveness * 100) :
+                lepSpec.defaultConfig.repairEffectiveness * 100
+        };
+
+        // Use core spatial analysis function
+        const coreResult = generateLEPSpatialAnalysis(rainfallData, windData, lepTypeBladeConfig);
+
+        data[lepType] = coreResult;
+    });
+
+    return data;
+}
+
+// ========================================
+// PRESERVED EXISTING ALGORITHMS (LU-4)
+// ========================================
 
 /**
  * Calculate erosion state considering repair schedule
@@ -233,6 +482,7 @@ export function calibrateLEPTypes(currentParams) {
 
     return calibratedTypes;
 }
+
 /**
  * Map power loss percentage to AEP loss percentage using IEA table
  * @param {number} powerLoss - Power loss percentage
@@ -263,26 +513,24 @@ export function powerToAEPLoss(powerLoss, windSpeed) {
     const l3 = l3_lower + ratio * (l3_upper - l3_lower);
     const l4 = l4_lower + ratio * (l4_upper - l4_lower);
 
-    // Extend levels for interpolation
-    const l1 = (l2 / 1.5) * 0.5;
-    const l5 = (l4 / 3.5) * 5.0;
-    const l6 = l5 * 2;
-    const l7 = l6 * 2;
+    // Map power loss to AEP loss using interpolation
+    if (powerLoss <= 0) return 0;
+    if (powerLoss <= 2) return interpolateLinear(powerLoss, [0, 2], [0, l2]);
+    if (powerLoss <= 4) return interpolateLinear(powerLoss, [2, 4], [l2, l3]);
+    if (powerLoss <= 6) return interpolateLinear(powerLoss, [4, 6], [l3, l4]);
 
-    const powerPoints = [0.0, 0.5, 1.5, 2.5, 3.5, 5.0, 10.0, 20.0];
-    const aepPoints = [0.0, l1, l2, l3, l4, l5, l6, l7];
-
-    // Linear interpolation
-    return interpolateLinear(powerLoss, powerPoints, aepPoints);
+    // Beyond 6% power loss, extrapolate linearly
+    const slopeHigh = (l4 - l3) / 2;
+    return l4 + slopeHigh * (powerLoss - 6);
 }
 
 /**
- * Calculate blade-averaged power loss for given conditions
+ * Calculate blade-averaged power loss
  * @param {number} cumRain - Cumulative rainfall (mm)
  * @param {number} P - Protection factor
  * @param {number} lepLength - LEP length (m)
- * @param {number} baseP - Base protection factor for No LEP
- * @param {Object} params - Input parameters
+ * @param {number} baseP - Base protection factor
+ * @param {Object} params - Physics parameters
  * @returns {number} Blade-averaged power loss percentage
  */
 export function calculateBladeAveragedPowerLoss(cumRain, P, lepLength, baseP, params) {
@@ -342,7 +590,7 @@ export function calculateBladeAveragedPowerLoss(cumRain, P, lepLength, baseP, pa
  * @param {number} avgWindSpeed - Average wind speed
  * @param {number} penaltyPerM - Installation penalty per meter
  * @param {Object} params - Input parameters
- * @returns {Array} AEP loss contribution per meter
+ * @returns {Object} Positions and contributions arrays
  */
 export function calculateAEPLossPerMeter(cumRain, P, lepLength, baseP, avgWindSpeed, penaltyPerM, params) {
     const { bladeLength, tipSpeed, _referenceSpeed, velocityExponent } = params;
@@ -391,73 +639,10 @@ export function calculateAEPLossPerMeter(cumRain, P, lepLength, baseP, avgWindSp
 }
 
 /**
- * Generate time series data for AEP loss over years
- * @param {Object} params - Input parameters
- * @param {Object} calibratedTypes - Calibrated LEP types
- * @returns {Object} Chart data for AEP loss over time
- */
-// Updated generation function for per-type configurations
-export function generateAEPLossOverTime(params, calibratedTypes, lepConfigs) {
-    const { lifespan, annualRainfall, meanWindSpeed } = params;
-    const years = _.range(1, Math.floor(lifespan) + 1);
-
-    // Generate cumulative rainfall
-    const cumRainfall = [];
-    let cumulativeSum = 0;
-    for (let i = 0; i < Math.floor(lifespan); i++) {
-        cumulativeSum += annualRainfall;
-        cumRainfall.push(cumulativeSum);
-    }
-
-    const data = {};
-    const baseP = calibratedTypes['No LEP'].P;
-
-    Object.entries(calibratedTypes).forEach(([name, config]) => {
-        const lepConfig = lepConfigs[name];
-        const actualLepLength = lepConfig.lepLength;
-        const penaltyPerM = config.installationPenalty;
-
-        const repairConfig = {
-            enabled: lepConfig.repairEnabled,
-            interval: lepConfig.repairInterval,
-            effectiveness: lepConfig.repairEffectiveness
-        };
-
-        const aepLossOverTime = years.map((year, i) => {
-            const cumRain = cumRainfall[i];
-
-            // Apply repair adjustments if enabled
-            let effectiveCumRain = cumRain;
-            if (repairConfig.enabled && repairConfig.interval > 0) {
-                const lastRepairYear = Math.floor((year - 1) / repairConfig.interval) * repairConfig.interval;
-                if (lastRepairYear > 0) {
-                    const yearsSinceRepair = year - lastRepairYear;
-                    const erosionReduced = cumRain * repairConfig.effectiveness;
-                    effectiveCumRain = cumRain - erosionReduced + (yearsSinceRepair * annualRainfall);
-                }
-            }
-
-            const powerLoss = calculateBladeAveragedPowerLoss(effectiveCumRain, config.P, actualLepLength, baseP, params);
-            const aepLoss = powerToAEPLoss(powerLoss, meanWindSpeed);
-            const totalPenalty = penaltyPerM * actualLepLength;
-            return aepLoss + totalPenalty;
-        });
-
-        data[name] = {
-            years,
-            aepLoss: aepLossOverTime,
-            cumulativeAverage: _.mean(aepLossOverTime),
-            lepLength: actualLepLength,
-            repairSchedule: repairConfig,
-            color: LEP_SPECIFICATIONS[name].color
-        };
-    });
-
-    return data;
-}
-
-/**
- * Calculate time to reach IEA levels
+ * Calculate time to reach IEA levels (FIXED to return whole numbers)
+ * @param {Object} aepLossTimeData - Time series data from generateAEPLossOverTime
+ * @param {Array} ieaLevels - IEA reference levels
+ * @returns {Object} Time to reach each level per LEP type
  */
 export function calculateTimeToIEALevels(aepLossTimeData, ieaLevels) {
     const results = {};
@@ -471,7 +656,7 @@ export function calculateTimeToIEALevels(aepLossTimeData, ieaLevels) {
 
         for (let i = 0; i < data.aepLoss.length; i++) {
             const loss = data.aepLoss[i];
-            const year = data.years[i];
+            const year = Math.ceil(data.years[i]); // ROUND UP to whole numbers
 
             if (timeToL2 === null && loss >= l2Threshold) {
                 timeToL2 = year;
@@ -483,56 +668,12 @@ export function calculateTimeToIEALevels(aepLossTimeData, ieaLevels) {
         }
 
         results[name] = {
-            timeToL2: timeToL2 || '>25', // If never reached, show >25
+            timeToL2: timeToL2 || '>25',
             timeToL5: timeToL5 || '>25'
         };
     });
 
     return results;
-}
-
-/**
- * Generate chart data for AEP loss per meter at end of lifetime
- * @param {Object} params - Input parameters  
- * @param {Object} calibratedTypes - Calibrated LEP types
- * @returns {Object} Chart data for AEP loss per meter
- */
-export function generateAEPLossPerMeterAtEndLife(params, calibratedTypes, lepConfigs) {
-    const { lifespan, annualRainfall, meanWindSpeed } = params;
-    let cumRainEnd = annualRainfall * lifespan;
-    const baseP = calibratedTypes['No LEP'].P;
-
-    const data = {};
-
-    Object.entries(calibratedTypes).forEach(([name, config]) => {
-        const lepConfig = lepConfigs[name];
-        const actualLepLength = lepConfig.lepLength;
-        const penaltyPerM = config.installationPenalty || 0;
-
-        // Apply repair adjustments for end-of-life calculation
-        let effectiveCumRain = cumRainEnd;
-        if (lepConfig.repairEnabled && lepConfig.repairInterval > 0) {
-            const numRepairs = Math.floor(lifespan / lepConfig.repairInterval);
-            if (numRepairs > 0) {
-                const erosionReduced = cumRainEnd * lepConfig.repairEffectiveness * numRepairs * 0.5; // Conservative estimate
-                effectiveCumRain = Math.max(cumRainEnd - erosionReduced, cumRainEnd * 0.3); // Minimum 30% of original
-            }
-        }
-
-        const { positions, contributions } = calculateAEPLossPerMeter(
-            effectiveCumRain, config.P, actualLepLength, baseP, meanWindSpeed, penaltyPerM, params
-        );
-
-        data[name] = {
-            positions,
-            contributions,
-            lepLength: actualLepLength,
-            maxContribution: Math.max(...contributions),
-            lepCoveragePercent: actualLepLength > 0 ? (actualLepLength / params.bladeLength * 100) : 0
-        };
-    });
-
-    return data;
 }
 
 /**
@@ -558,6 +699,22 @@ export function getIEAReferenceLevels(meanWindSpeed) {
         { value: l4, color: 'gray', style: '--', label: 'L4' },
         { value: l5, color: 'red', style: '--', label: 'L5 (Structural)' }
     ];
+}
+
+/**
+ * Get calibration details for display in UI
+ * @param {Object} calibratedTypes - Result from calibrateLEPTypes
+ * @returns {Array} Calibration details for each LEP type
+ */
+export function getCalibrationDetails(calibratedTypes) {
+    return Object.entries(calibratedTypes).map(([name, config]) => ({
+        name,
+        testConditions: config.calibration,
+        calibratedP: config.P,
+        scalingFactor: config.calibrationResults?.scalingFromBase || 1,
+        installationPenalty: config.installationPenalty,
+        source: config.calibration.source
+    }));
 }
 
 /**

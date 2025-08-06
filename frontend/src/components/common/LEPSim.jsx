@@ -169,12 +169,14 @@ const LEPSim = () => {
     }, [effectiveParams, forceUpdate]);
 
     const aepLossTimeData = useMemo(() => {
-        return generateAEPLossOverTime(effectiveParams, calibratedTypes, lepConfigs);
-    }, [effectiveParams, calibratedTypes, lepConfigs, forceUpdate]);
+        const bladeConfig = getValueByPath(['settings', 'project', 'equipment', 'blades'], {});
+        return generateAEPLossOverTime(effectiveParams, calibratedTypes, bladeConfig);
+    }, [effectiveParams, calibratedTypes, getValueByPath]);
 
     const aepLossPerMeterData = useMemo(() => {
-        return generateAEPLossPerMeterAtEndLife(effectiveParams, calibratedTypes, lepConfigs);
-    }, [effectiveParams, calibratedTypes, lepConfigs, forceUpdate]);
+        const bladeConfig = getValueByPath(['settings', 'project', 'equipment', 'blades'], {});
+        return generateAEPLossPerMeterAtEndLife(effectiveParams, calibratedTypes, bladeConfig);
+    }, [effectiveParams, calibratedTypes, getValueByPath]);
 
     const ieaLevels = useMemo(() =>
         getIEAReferenceLevels(effectiveParams.meanWindSpeed),
@@ -193,7 +195,8 @@ const LEPSim = () => {
         }
 
         // When LEP is NOT in power curve, adjust IEA levels for installation impact
-        const selectedConfig = lepConfigs[selectedLEPType];
+        const bladeConfig = getValueByPath(['settings', 'project', 'equipment', 'blades'], {});
+        const selectedConfig = bladeConfig;
 
         if (!selectedConfig) return ieaLevels;
 
