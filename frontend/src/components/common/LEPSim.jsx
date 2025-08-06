@@ -1,6 +1,6 @@
 // frontend/src/components/common/LEPSim.jsx
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Card, Row, Col, Typography, Space, Switch, Select, Divider, Radio, Slider, InputNumber } from 'antd';
+import { Card, Row, Col, Typography, Space, Switch, Select, Divider, Radio, Slider, InputNumber, Checkbox, Alert } from 'antd';
 import { ExperimentOutlined, ToolOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Plot from 'react-plotly.js';
 import { useScenario } from '../../contexts/ScenarioContext';
@@ -17,7 +17,8 @@ import {
 import {
     FormSection,
     NumberField,
-    ResponsiveFieldRow
+    ResponsiveFieldRow,
+    SwitchField,
 } from '../contextFields';
 
 const { Text } = Typography;
@@ -40,6 +41,7 @@ const LEPSim = () => {
     const lepRepairInterval = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepRepairInterval'], 10);
     const lepRepairEffectiveness = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepRepairEffectiveness'], 90);
     const lepLength = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepLength'], 13);
+    const lepInPowerCurve = getValueByPath(['settings', 'project', 'equipment', 'blades', 'lepInPowerCurve'], false);
 
     // State for per-LEP-type configurations
     const [lepConfigs, setLepConfigs] = useState(() => {
@@ -133,8 +135,11 @@ const LEPSim = () => {
         lifespan: contextLifespan,
         annualRainfall: simulationInputs.rainfall,
         meanWindSpeed: simulationInputs.windSpeed,
-        _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed
-    }), [contextTipSpeed, contextBladeLength, contextVelocityExponent, simulationInputs, contextLifespan]);
+        _referenceSpeed: DEFAULT_PARAMETERS._referenceSpeed,
+        // Override installation penalty when LEP is in power curve
+        overrideInstallationPenalty: lepInPowerCurve ? 0 : undefined
+    }), [contextTipSpeed, contextBladeLength, contextVelocityExponent, simulationInputs, contextLifespan, lepInPowerCurve]);
+
 
     // Available percentiles
     const availablePercentiles = useMemo(() => {
@@ -176,46 +181,45 @@ const LEPSim = () => {
         [effectiveParams.meanWindSpeed]
     );
 
-    // Calculate LEP-adjusted IEA levels based on selected LEP type and length
+    // Calculate LEP-adjusted IEA levels based on selected LEP type, length, and power curve setting
     const adjustedIEALevels = useMemo(() => {
-        if (!calibratedTypes[selectedLEPType] || selectedLEPType === 'No LEP') {
-            return ieaLevels; // No adjustment for No LEP
+        if (lepInPowerCurve || selectedLEPType === 'No LEP') {
+            // When LEP is in power curve, use original levels (no installation adjustment)
+            return ieaLevels.map(level => ({
+                ...level,
+                originalValue: level.value,
+                lepAdjustment: 0
+            }));
         }
 
-        // Get the selected LEP configuration
+        // When LEP is NOT in power curve, adjust IEA levels for installation impact
         const selectedConfig = lepConfigs[selectedLEPType];
-        const selectedSpec = LEP_SPECIFICATIONS[selectedLEPType];
 
-        if (!selectedConfig || !selectedSpec) return ieaLevels;
+        if (!selectedConfig) return ieaLevels;
 
-        // Calculate LEP impact based on actual LEP length
-        const lepCoverage = selectedConfig.lepLength / effectiveParams.bladeLength; // Coverage ratio (0-1)
-
-        // Different LEP types have different impact rates per meter
         const impactPerMeter = {
             'No LEP': 0,
-            'LEP Tape': 0.01, // Lower impact per meter
-            'LEP Shell': 0.015, // Medium impact per meter  
-            'LEP Coating': 0.005, // Lowest impact per meter
-            'Full Blade Protection': 0.02 // Highest impact per meter
+            'LEP Tape': 0.01,
+            'LEP Shell': 0.015,
+            'LEP Coating': 0.005,
+            'Full Blade Protection': 0.02
         };
 
         const lepTypeImpact = impactPerMeter[selectedLEPType] || 0.01;
-        const totalLEPImpact = selectedConfig.lepLength * lepTypeImpact; // Cumulative impact
+        const totalLEPImpact = selectedConfig.lepLength * lepTypeImpact;
 
-        // Adjust IEA levels by adding the cumulative LEP impact
         return ieaLevels.map(level => ({
             ...level,
             value: level.value + totalLEPImpact,
-            originalValue: level.value, // Keep track of original for display
+            originalValue: level.value,
             lepAdjustment: totalLEPImpact
         }));
-    }, [ieaLevels, selectedLEPType, lepConfigs, effectiveParams.bladeLength, calibratedTypes]);
+    }, [ieaLevels, selectedLEPType, lepConfigs, effectiveParams.bladeLength, lepInPowerCurve]);
 
+    // Calculate time to IEA levels using adjusted thresholds
     const timeToIEALevels = useMemo(() => {
-        // Use the LEP-adjusted IEA levels instead of the raw ones
         return calculateTimeToIEALevels(aepLossTimeData, adjustedIEALevels);
-    }, [aepLossTimeData, adjustedIEALevels]); // Changed from ieaLevels to adjustedIEALevels
+    }, [aepLossTimeData, adjustedIEALevels]);
 
     // Chart data with LEP-adjusted IEA levels
     const timeChartData = useMemo(() => {
@@ -238,28 +242,32 @@ const LEPSim = () => {
 
         // Add LEP-adjusted IEA reference levels L2-L5
         const ieaLabels = ['L2', 'L3 (Repair)', 'L4', 'L5 (Critical)'];
-        const ieaColors = ['#d9d9d9', '#faad14', '#d9d9d9', '#fa8c16']; // Orange for L5
+        const ieaColors = ['#d9d9d9', '#faad14', '#d9d9d9', '#fa8c16'];
 
         [1, 2, 3, 4].forEach((levelIndex, i) => {
             const level = adjustedIEALevels[levelIndex];
+            const adjustmentText = lepInPowerCurve ? '' : ` (Adj: +${level.lepAdjustment.toFixed(3)}%)`;
+
             traces.push({
                 x: [1, effectiveParams.lifespan],
                 y: [level.value, level.value],
                 type: 'scatter',
                 mode: 'lines',
-                name: `${ieaLabels[i]} (Adj: +${(level.value - ieaLevels[levelIndex].value).toFixed(3)}%)`,
+                name: `${ieaLabels[i]}${adjustmentText}`,
                 line: {
                     dash: 'dash',
                     color: ieaColors[i],
                     width: 2
                 },
                 showlegend: false,
-                hovertemplate: `${ieaLabels[i]}: %{y:.3f}%<br>LEP Adjustment: +${(level.value - ieaLevels[levelIndex].value).toFixed(3)}%<extra></extra>`
+                hovertemplate: lepInPowerCurve ?
+                    `${ieaLabels[i]}: %{y:.3f}%<br>LEP Impact: Included in Power Curve<extra></extra>` :
+                    `${ieaLabels[i]}: %{y:.3f}%<br>LEP Adjustment: +${level.lepAdjustment.toFixed(3)}%<extra></extra>`
             });
         });
 
         return { traces, ieaLevels: adjustedIEALevels.slice(1, 5) };
-    }, [aepLossTimeData, adjustedIEALevels, ieaLevels, effectiveParams, selectedLEPType]);
+    }, [aepLossTimeData, adjustedIEALevels, ieaLevels, effectiveParams, selectedLEPType, lepInPowerCurve]);
 
     const perMeterChartData = useMemo(() => {
         return Object.entries(aepLossPerMeterData).map(([name, data]) => {
@@ -308,17 +316,22 @@ const LEPSim = () => {
                 size="small"
                 style={{ marginBottom: 16 }}
             >
-                <Space split={<Divider type="vertical" />}>
-                    <Text><strong>Project Life:</strong> {effectiveParams.lifespan} years</Text>
-                    <Text><strong>Rainfall:</strong> {effectiveParams.annualRainfall.toFixed(0)} mm/year</Text>
-                    <Text><strong>Wind Speed:</strong> {effectiveParams.meanWindSpeed.toFixed(1)} m/s</Text>
-                    <Text><strong>Selected LEP:</strong> {selectedLEPType}</Text>
-                </Space>
+                <Row gutter={16} align="middle">
+                    <Col>
+                        <Space split={<Divider type="vertical" />}>
+                            <Text><strong>Project Life:</strong> {effectiveParams.lifespan} years</Text>
+                            <Text><strong>Rainfall:</strong> {effectiveParams.annualRainfall.toFixed(0)} mm/year</Text>
+                            <Text><strong>Wind Speed:</strong> {effectiveParams.meanWindSpeed.toFixed(1)} m/s</Text>
+                            <Text><strong>Selected LEP:</strong> {selectedLEPType}</Text>
+                        </Space>
+                    </Col>
+
+                </Row>
             </Card>
 
             {/* Turbine Configuration using ContextFields */}
             <Card title={<><ExperimentOutlined /> Turbine Configuration</>} size="small" style={{ marginBottom: 16 }}>
-                <ResponsiveFieldRow layout="threeColumn">
+                <ResponsiveFieldRow layout="fourColumn">
                     <NumberField
                         path={['settings', 'project', 'equipment', 'blades', 'bladeLength']}
                         label="Blade Length (m)"
@@ -349,8 +362,24 @@ const LEPSim = () => {
                         precision={1}
                         required
                     />
+                    <SwitchField
+                        path={['settings', 'project', 'equipment', 'blades', 'lepInPowerCurve']}
+                        label="LEP Loss in Power Curve"
+                        tooltip="Check if LEP performance impact is already included in the turbine's power curve data"
+                        style={{ margin: 0, align: 'right' }}
+                    />
                 </ResponsiveFieldRow>
             </Card>
+            {/* Power Curve Notice */}
+            {lepInPowerCurve && (
+                <Alert
+                    message="LEP installation performance impact is considered already included in the power curve. Calculating erosion impact only."
+                    type="info"
+                    icon={<InfoCircleOutlined />}
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                />
+            )}
 
             {/* LEP Type Selection */}
             <Card title={<><ToolOutlined /> LEP Protection Selection</>} size="small" style={{ marginBottom: 16 }}>
@@ -429,7 +458,7 @@ const LEPSim = () => {
                                                     </div>
                                                 </Col>
                                                 {name !== 'No LEP' && (
-                                                    <Col flex="120px">
+                                                    <Col flex="180px">
                                                         <div style={{ fontSize: '11px', color: '#666', marginBottom: 4 }}>
                                                             LEP Length: {config.lepLength}m
                                                         </div>
@@ -474,8 +503,8 @@ const LEPSim = () => {
                                     <InputNumber
                                         value={lepRepairInterval}
                                         onChange={(value) => handleRepairSettingsUpdate({ repairInterval: value })}
-                                        min={5}
-                                        max={15}
+                                        min={1}
+                                        max={25}
                                         step={1}
                                         size="small"
                                         addonAfter="years"
@@ -489,8 +518,8 @@ const LEPSim = () => {
                                     <InputNumber
                                         value={lepRepairEffectiveness}
                                         onChange={(value) => handleRepairSettingsUpdate({ repairEffectiveness: value })}
-                                        min={0}
-                                        max={95}
+                                        min={20}
+                                        max={100}
                                         step={5}
                                         size="small"
                                         addonAfter="%"
@@ -510,13 +539,22 @@ const LEPSim = () => {
                         <Plot
                             data={timeChartData.traces}
                             layout={{
-                                title: 'AEP Loss Timeline with IEA Thresholds',
+                                title: {
+                                    text: 'AEP Loss Timeline with IEA Thresholds',
+                                    font: { size: 14 }
+                                },
                                 xaxis: {
-                                    title: 'Project Year',
+                                    title: {
+                                        text: 'Project Year',
+                                        font: { size: 12 }
+                                    },
                                     showgrid: true
                                 },
                                 yaxis: {
-                                    title: 'AEP Loss (%)',
+                                    title: {
+                                        text: 'AEP Loss (%)',
+                                        font: { size: 12 }
+                                    },
                                     showgrid: true
                                 },
                                 legend: {
@@ -525,19 +563,19 @@ const LEPSim = () => {
                                     x: 0
                                 },
                                 annotations: timeChartData.ieaLevels.map((level, i) => ({
-                                    x: effectiveParams.lifespan * 0.95, // Position on right side
+                                    x: effectiveParams.lifespan * 0.98,
                                     y: level.value,
                                     text: ['L2', 'L3', 'L4', 'L5'][i],
                                     showarrow: false,
-                                    xanchor: 'left',
+                                    xanchor: 'right',
                                     yanchor: 'middle',
-                                    font: { size: 10, color: '#666' },
-                                    bgcolor: 'rgba(255,255,255,0.8)',
+                                    font: { size: 12, color: '#666', family: 'Arial Black' },
+                                    bgcolor: 'rgba(255,255,255,0.9)',
                                     bordercolor: '#ddd',
                                     borderwidth: 1
                                 })),
                                 height: 350,
-                                margin: { l: 60, r: 40, t: 40, b: 100 }
+                                margin: { l: 60, r: 60, t: 60, b: 100 } // Increased top margin for title
                             }}
                             config={{ displayModeBar: false, responsive: true }}
                             style={{ width: '100%' }}
@@ -550,14 +588,23 @@ const LEPSim = () => {
                         <Plot
                             data={perMeterChartData}
                             layout={{
-                                title: 'Blade Position Impact Analysis',
+                                title: {
+                                    text: 'Blade Position Impact Analysis',
+                                    font: { size: 14 }
+                                },
                                 xaxis: {
-                                    title: 'Blade Position from Root (m)',
+                                    title: {
+                                        text: 'Blade Position from Root (m)',
+                                        font: { size: 12 }
+                                    },
                                     showgrid: true,
                                     range: [0, effectiveParams.bladeLength]
                                 },
                                 yaxis: {
-                                    title: 'AEP Loss Contribution (%/m)',
+                                    title: {
+                                        text: 'AEP Loss Contribution (%/m)',
+                                        font: { size: 12 }
+                                    },
                                     showgrid: true
                                 },
                                 legend: {
@@ -566,7 +613,7 @@ const LEPSim = () => {
                                     x: 0
                                 },
                                 height: 350,
-                                margin: { l: 60, r: 40, t: 40, b: 100 }
+                                margin: { l: 60, r: 60, t: 60, b: 100 } // Increased top margin for title
                             }}
                             config={{ displayModeBar: false, responsive: true }}
                             style={{ width: '100%' }}

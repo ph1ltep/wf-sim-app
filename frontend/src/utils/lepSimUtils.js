@@ -187,12 +187,17 @@ export function calculateRepairAdjustedErosion(year, cumulativeRain, repairConfi
  * @returns {Object} Calibrated LEP protection factors
  */
 export function calibrateLEPTypes(currentParams) {
-    const { _referenceSpeed, velocityExponent, bladeLength } = currentParams;
+    const { _referenceSpeed, velocityExponent, bladeLength, overrideInstallationPenalty } = currentParams;
 
     const calibratedTypes = {};
 
     Object.entries(LEP_SPECIFICATIONS).forEach(([name, spec]) => {
-        const { P_base, calibration, installationPenalty = 0 } = spec;
+        const { P_base, calibration } = spec;
+
+        // Use override if provided, otherwise use spec's installationPenalty
+        const installationPenalty = overrideInstallationPenalty !== undefined
+            ? overrideInstallationPenalty
+            : (spec.installationPenalty || 0);
 
         // Use the specific test conditions for this LEP type
         const testTipSpeed = calibration.tipSpeed;
@@ -217,7 +222,7 @@ export function calibrateLEPTypes(currentParams) {
         calibratedTypes[name] = {
             ...spec,
             P: calibratedP,
-            installationPenalty,
+            installationPenalty, // Use the (potentially overridden) installation penalty
             calibrationResults: {
                 calibratedProtectionFactor: calibratedP,
                 testConditions: calibration,
@@ -228,7 +233,6 @@ export function calibrateLEPTypes(currentParams) {
 
     return calibratedTypes;
 }
-
 /**
  * Map power loss percentage to AEP loss percentage using IEA table
  * @param {number} powerLoss - Power loss percentage

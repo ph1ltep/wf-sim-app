@@ -122,8 +122,10 @@ const SettingsSchema = Yup.object().shape({
                 lepRepairInterval: Yup.number().default(10),
                 lepRepairEffectiveness: Yup.number().default(90),
                 lepLength: Yup.number().default(13),
+                lepInPowerCurve: Yup.boolean().default(false),
                 nominalTipSpeed: Yup.number().default(88),
                 velocityExponent: Yup.number().default(8.0),
+
             }),
         }),
         windFarm: Yup.object().shape({
