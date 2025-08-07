@@ -20,7 +20,7 @@ import {
     equityCashflow,
     llcr,
     icr,
-    lepTimeSeriesTransformer,
+    lepAepImpactTransformer,
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -71,8 +71,67 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 formatter: (value) => `$${value.toFixed(0)}/MWh`
             }
         },
+        {
+            id: 'rainfall',
+            priority: 20,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount', 'results'],
+            hasPercentiles: true,
+            references: [],
+            transformer: null,
+            multipliers: [],
+            metadata: {
+                name: 'Annual Rainfall',
+                type: 'direct',
+                visualGroup: 'environmental',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Annual rainfall data used for LEP erosion analysis',
+                formatter: (value) => `${value.toFixed(0)} mm/yr`
+            }
+        },
+        {
+            id: 'windSpeed',
+            priority: 21,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability', 'results'],
+            hasPercentiles: true,
+            references: [],
+            transformer: null,
+            multipliers: [],
+            metadata: {
+                name: 'Wind Speed',
+                type: 'direct',
+                visualGroup: 'environmental',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Wind speed data used for LEP erosion analysis',
+                formatter: (value) => `${value.toFixed(1)} m/s`
+            }
+        },
 
         // COSTS - Indirect sources (type: 'indirect', priority: 99)
+        {
+            id: 'lepAepImpact',
+            priority: 90,
+            path: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount', 'results'],
+            hasPercentiles: true,
+            references: [
+                { id: 'bladeConfig', path: ['settings', 'project', 'equipment', 'blades'] }
+            ],
+            transformer: lepAepImpactTransformer,
+            multipliers: [],
+            metadata: {
+                name: 'LEP AEP Impact',
+                type: 'indirect',
+                visualGroup: 'equipment',
+                cashflowType: 'none',
+                accountingClass: 'equipment_performance',
+                projectPhase: 'operations',
+                description: 'Leading Edge Protection impact on Annual Energy Production over project lifetime',
+                formatter: (value) => `${value.toFixed(3)}%`
+            }
+        },
         {
             id: 'capexDrawdown',
             priority: 99,
@@ -184,6 +243,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             references: [],
             transformer: null,
             multipliers: [
+                { id: 'lepAepImpact', operation: 'reducePercent', baseYear: 1 },
                 { id: 'electricityPrice', operation: 'multiply', baseYear: 1 },
                 //{ id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 } 
             ],
@@ -501,8 +561,8 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             }
         },
         {
-            id: 'lepTimeSeries',
-            priority: 200,
+            id: 'lepAepImpact',
+            priority: 98,
             path: null, // Virtual source - no path
             hasPercentiles: true,
             references: [
@@ -510,7 +570,7 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 { id: 'rainfallData', path: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount', 'results'] },
                 { id: 'windData', path: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability', 'results'] }
             ],
-            transformer: lepTimeSeriesTransformer,
+            transformer: lepAepImpactTransformer,
             multipliers: [],
             metadata: {
                 name: 'LEP AEP Loss Time Series',

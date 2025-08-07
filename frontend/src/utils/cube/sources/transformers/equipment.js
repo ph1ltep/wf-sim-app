@@ -1,164 +1,113 @@
 // frontend/src/utils/cube/sources/transformers/equipment.js
-import { extractPercentileData, normalizeIntoSimResults } from './common.js';
+import { extractPercentileData, filterCubeSourceData } from './common.js';
 import { generateLEPTimeSeries } from '../../../lepSimUtils.js';
 
 /**
- * LEP Time Series Transformer - Generate Leading Edge Protection impact over project lifetime
- * Converts rainfall and wind data into AEP loss time series for the current LEP configuration
+ * LEP AEP Impact Transformer - Generate Leading Edge Protection impact over project lifetime
+ * Transforms rainfall distribution data using wind speed and blade config into AEP loss time series
  * 
- * @param {null} sourceData - Not used for virtual sources
+ * @param {Array} sourceData - SimResultsSchema array from rainfallAmount distribution
  * @param {Object} context - Transformer context
  * @returns {Array} Array of SimResultsSchema objects with AEP loss over time
  */
-export const lepTimeSeriesTransformer = (sourceData, context) => {
+export const lepAepImpactTransformer = (sourceData, context) => {
     const {
+        processedData,
         percentileInfo,
         customPercentile,
         addAuditEntry,
         allReferences
     } = context;
 
-    // Get blade configuration and simulation data from references
+    // Get blade configuration from references
     const bladeConfig = allReferences.bladeConfig;
-    const rainfallResults = allReferences.rainfallData;
-    const windResults = allReferences.windData;
-
     if (!bladeConfig || !bladeConfig.lepType) {
-        addAuditEntry(
-            'lep_config_missing',
-            'blade configuration or LEP type not found in references',
-            [],
-            null,
-            'error',
-            'validation'
-        );
+        console.warn('⚠️ lepAepImpactTransformer: No blade configuration or LEP type available in references');
         return [];
     }
 
-    if (!rainfallResults?.length || !windResults?.length) {
-        addAuditEntry(
-            'lep_data_missing',
-            'rainfall or wind simulation results not found in references',
-            [],
-            {
-                hasRainfall: !!rainfallResults?.length,
-                hasWind: !!windResults?.length
-            },
-            'error',
-            'validation'
-        );
+    // Validate rainfall source data
+    if (!sourceData || !Array.isArray(sourceData) || sourceData.length === 0) {
+        console.warn('⚠️ lepAepImpactTransformer: No rainfall source data provided');
         return [];
     }
 
-    addAuditEntry(
-        'lep_processing_start',
-        `processing LEP analysis for type: ${bladeConfig.lepType}`,
-        [],
-        { lepType: bladeConfig.lepType, lepLength: bladeConfig.lepLength },
-        'transform',
-        'lep_analysis'
-    );
+    // Get wind speed data from processed sources
+    const windSpeedSources = filterCubeSourceData(processedData, { sourceId: 'windSpeed' });
+
+    if (windSpeedSources.length === 0) {
+        console.warn('⚠️ lepAepImpactTransformer: No wind speed source found in processed data');
+        return [];
+    }
+
+    const windSpeedSource = windSpeedSources[0];
+
+    console.log(`🌬️ lepAepImpactTransformer: Processing LEP AEP impact for ${bladeConfig.lepType}`);
 
     const results = [];
+    let processedPercentiles = 0;
+    let totalDataPoints = 0;
 
     // Process each percentile separately
     percentileInfo.available.forEach(percentile => {
         try {
-            // Extract DataPointSchema arrays for this percentile from references
-            const rainfallData = extractPercentileData(rainfallResults, percentile);
-            const windData = extractPercentileData(windResults, percentile);
+            // Extract DataPointSchema arrays for this percentile
+            const rainfallData = extractPercentileData(sourceData, percentile);
+            const windSpeedData = extractPercentileData(windSpeedSource.percentileSource, percentile);
 
-            if (!rainfallData?.length || !windData?.length) {
-                addAuditEntry(
-                    'lep_percentile_skip',
-                    `skipping percentile ${percentile} - no data available`,
-                    [],
-                    { percentile, rainfallCount: rainfallData?.length, windCount: windData?.length },
-                    'warning',
-                    'data_validation'
-                );
-                return;
+            if (!rainfallData?.length || !windSpeedData?.length) {
+                return; // Skip percentile with insufficient data
             }
 
             // Call core LEP physics function
-            const lepResult = generateLEPTimeSeries(rainfallData, windData, bladeConfig);
+            const lepResult = generateLEPTimeSeries(rainfallData, windSpeedData, bladeConfig);
 
             if (!lepResult?.length) {
-                addAuditEntry(
-                    'lep_calculation_failed',
-                    `LEP calculation failed for percentile ${percentile}`,
-                    [],
-                    { percentile, lepType: bladeConfig.lepType },
-                    'error',
-                    'calculation'
-                );
-                return;
+                return; // Skip if calculation failed
             }
 
             // Add to results for this percentile
             results.push({
-                name: `LEP AEP Loss - ${bladeConfig.lepType}`,
+                name: 'lepAepImpact',
                 data: lepResult, // DataPointSchema array
                 percentile: { value: percentile },
                 metadata: {
                     lepType: bladeConfig.lepType,
                     lepLength: bladeConfig.lepLength,
                     repairEnabled: bladeConfig.lepRepairEnabled,
-                    customPercentile: customPercentile && customPercentile['lepTimeSeries'] ? {
-                        lepTimeSeries: customPercentile['lepTimeSeries']
+                    customPercentile: customPercentile && customPercentile['lepAepImpact'] ? {
+                        lepAepImpact: customPercentile['lepAepImpact']
                     } : null
                 }
             });
 
-            addAuditEntry(
-                'lep_percentile_complete',
-                `completed LEP analysis for percentile ${percentile}`,
-                [],
-                {
-                    percentile,
-                    dataPoints: lepResult.length,
-                    avgAepLoss: lepResult.reduce((sum, d) => sum + d.value, 0) / lepResult.length
-                },
-                'transform',
-                'lep_analysis'
-            );
+            processedPercentiles++;
+            totalDataPoints += lepResult.length;
 
         } catch (error) {
-            addAuditEntry(
-                'lep_percentile_error',
-                `error processing percentile ${percentile}: ${error.message}`,
-                [],
-                { percentile, error: error.message },
-                'error',
-                'calculation'
-            );
-            console.error(`❌ LEP transformer failed for percentile ${percentile}:`, error);
+            console.error(`❌ LEP AEP Impact transformer failed for percentile ${percentile}:`, error);
         }
     });
 
     if (results.length === 0) {
-        addAuditEntry(
-            'lep_no_results',
-            'no valid LEP results generated for any percentile',
-            [],
-            { bladeConfig },
-            'error',
-            'final_validation'
-        );
+        console.warn('⚠️ lepAepImpactTransformer: No valid LEP AEP impact results generated');
         return [];
     }
 
+    // Calculate summary statistics
+    const allLossValues = results.flatMap(r => r.data.map(d => d.value));
+    const avgLoss = allLossValues.reduce((sum, val) => sum + val, 0) / allLossValues.length;
+
+    console.log(`✅ lepAepImpactTransformer: ${results.length} percentiles, ${totalDataPoints} total data points, avg AEP loss: ${avgLoss.toFixed(4)}%`);
+
+    // Single audit entry following financing.js pattern
     addAuditEntry(
-        'lep_processing_complete',
-        `LEP analysis complete - generated ${results.length} percentile results`,
-        [],
-        {
-            resultCount: results.length,
-            lepType: bladeConfig.lepType,
-            percentiles: results.map(r => r.percentile.value)
-        },
+        'apply_lep_aep_impact_transformation',
+        `calculating LEP AEP impact analysis for ${bladeConfig.lepType}`,
+        ['windSpeed', 'bladeConfig'],
+        results,
         'transform',
-        'lep_analysis'
+        'complex'
     );
 
     return results;

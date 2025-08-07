@@ -399,6 +399,9 @@ const applyMultipliers = (transformedData, multipliers, percentileInfo, allRefer
                             case 'multiplyPercent':
                                 newValue = dataPoint.value * (1 + (multiplierValue / 100));
                                 break;
+                            case 'reducePercent':
+                                newValue = dataPoint.value * (1 - (multiplierValue / 100));
+                                break;
                             case 'compound':
                                 newValue = dataPoint.value * Math.pow(1 + multiplierValue, dataPoint.year - baseYear);
                                 break;

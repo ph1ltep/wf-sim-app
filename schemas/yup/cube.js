@@ -76,7 +76,7 @@ const CubeSourceRegistryItemSchema = Yup.object().shape({
     transformer: Yup.mixed().optional(), // function to transform data. Takes the path object, availablePerentiles, and references as input. Must output a SimResultsSchema array
     multipliers: Yup.array().of(Yup.object().shape({
         id: Yup.string().required('operation ID is required'),
-        operation: Yup.string().oneOf(['multiply', 'compound', 'simple', 'summation']).required('Operation is required'),
+        operation: Yup.string().oneOf(['multiply', 'compound', 'simple', 'summation', 'multiplyPercent', 'compoundPercent', 'reducePercent']).required('Operation is required'),
         baseYear: Yup.number().default(1),
         filter: Yup.mixed().optional(), //function to filter processedData and return results in same format ()
     })).default([]),
