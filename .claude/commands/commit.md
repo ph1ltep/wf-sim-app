@@ -1,16 +1,27 @@
+---
+title: 'Git Commit Task'
+read_only: true
+description: "Creates well-formatted commits with conventional commit messages and emoji"
+type: 'command'
+allowed-tools:
+  [
+    "Bash(git add:*)",
+    "Bash(git status:*)",
+    "Bash(git commit:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+  ]
+---
+
+
 # Claude Command: Commit
 
 This command helps you create well-formatted commits with conventional commit messages and emoji.
 
 ## Usage
 
-To create a commit, just type:
 ```
 /commit
-```
-
-Or with options:
-```
 /commit --no-verify
 ```
 
@@ -162,4 +173,4 @@ Example of splitting commits:
 - Before committing, the command will review the diff to identify if multiple commits would be more appropriate
 - If suggesting multiple commits, it will help you stage and commit the changes separately
 - Always reviews the commit diff to ensure the message matches the changes
-- DO NOT add Claude co-authorship footer to commits
+- **NEVER add Claude signature to commits**

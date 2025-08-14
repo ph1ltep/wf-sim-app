@@ -1,3 +1,4 @@
+
 // frontend/src/utils/financingMetrics.js - FIXED Equity IRR calculation and enhanced finance metrics
 
 import { get } from 'lodash';

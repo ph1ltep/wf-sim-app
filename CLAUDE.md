@@ -5,24 +5,42 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
 
 ## Task Delegation Strategy
 
-### Frontend Development
-Use **frontend-master-engineer** for:
-- React component implementation
-- Antd UI patterns
-- Performance optimization
-- ContextField/ScenarioContext integration
+### Parallel Sub-Agent Coordination
+**Multiple agents can work together simultaneously** for optimal results:
 
-Use **frontend-feature-architect** for:
-- Feature planning and breakdown
-- Component architecture design
-- State management planning
+**Feature Development Pipeline:**
+- **frontend-feature-architect** → **api-data-architect** → **frontend-master-engineer**
+- **wind-finance-risk-analyst** provides domain expertise throughout
+- **documentation-manager** updates docs after significant changes
 
-### Financial Analysis
-Use **wind-finance-risk-analyst** for:
-- Financial model review
-- Risk assessment
-- Market analysis
-- Investment scenarios
+### Agent Specializations
+
+**IMPORTANT** Dynamically call any sub-agent deemed necessary or significantly helpful for the task at hand. Call sub-agents in PARALLEL when possible.
+
+**frontend-master-engineer**: React implementation
+- Collaborate with **wind-finance-risk-analyst** for statistical algorithms
+- Coordinate with **api-data-architect** for optimal data structures
+- Partner with **documentation-manager** for component documentation
+
+**frontend-feature-architect**: Feature planning & architecture  
+- Work with **api-data-architect** to design data structures
+- Consult **wind-finance-risk-analyst** for critical data requirements
+- Plan feature breakdown and component hierarchies
+
+**api-data-architect**: Data structures & API design
+- Design Yup schemas and API endpoints
+- Collaborate with **wind-finance-risk-analyst** for financial data models
+- Support **frontend-master-engineer** with optimal data patterns
+
+**wind-finance-risk-analyst**: Domain expertise
+- Provide risk algorithms and statistical methods
+- Guide financial model requirements across all agents
+- Review data structures for industry compliance
+
+**documentation-manager**: Documentation maintenance
+- **Always called after significant feature changes**
+- Updates README, API docs, and component documentation
+- Maintains consistency across all documentation
 
 ## Core Architecture
 
