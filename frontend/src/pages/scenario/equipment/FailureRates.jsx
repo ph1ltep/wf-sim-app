@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Card, Typography, Space, Switch, Button, Tag, message, Form, Input } from 'antd';
+import { Card, Typography, Space, Switch, Button, Tag, message, Form, Input, Select } from 'antd';
 import { SettingOutlined, ThunderboltOutlined, ToolOutlined, ControlOutlined, 
          SyncOutlined, ReloadOutlined, DashboardOutlined, ApiOutlined } from '@ant-design/icons';
 
@@ -12,6 +12,7 @@ import { useScenario } from 'contexts/ScenarioContext';
 import EditableTable from 'components/tables/EditableTable';
 import { ContextField } from 'components/contextFields/ContextField';
 import DistributionFieldV3 from 'components/distributionFields/DistributionFieldV3';
+import { createActionsColumn, createTagColumn, createBooleanColumn } from 'components/tables/columns';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
 
@@ -29,6 +30,15 @@ const COMPONENT_ICONS = {
     api: <ApiOutlined />
 };
 
+// Component categories for organization
+const CATEGORY_OPTIONS = [
+    { value: 'drivetrain', label: 'Drivetrain' },
+    { value: 'electrical', label: 'Electrical' },
+    { value: 'rotor', label: 'Rotor' },
+    { value: 'mechanical', label: 'Mechanical' },
+    { value: 'control', label: 'Control' }
+];
+
 // Category color mapping for tags
 const CATEGORY_COLORS = {
     drivetrain: 'blue',
@@ -37,6 +47,114 @@ const CATEGORY_COLORS = {
     mechanical: 'purple',
     control: 'cyan'
 };
+
+// Default component configurations for initialization
+const DEFAULT_COMPONENTS = [
+    {
+        id: 'gearbox',
+        name: 'Gearbox',
+        category: 'drivetrain',
+        icon: 'setting',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.025, value: 0.025 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'generator',
+        name: 'Generator',
+        category: 'electrical',
+        icon: 'thunderbolt',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.020, value: 0.020 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'mainBearing',
+        name: 'Main Bearing',
+        category: 'drivetrain',
+        icon: 'tool',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.018, value: 0.018 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'powerElectronics',
+        name: 'Power Electronics',
+        category: 'electrical',
+        icon: 'control',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.022, value: 0.022 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'bladeBearings',
+        name: 'Blade Bearings',
+        category: 'rotor',
+        icon: 'sync',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.015, value: 0.015 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'yawSystem',
+        name: 'Yaw System',
+        category: 'mechanical',
+        icon: 'reload',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.012, value: 0.012 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'controlSystem',
+        name: 'Control System',
+        category: 'control',
+        icon: 'dashboard',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.008, value: 0.008 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    },
+    {
+        id: 'transformer',
+        name: 'Transformer',
+        category: 'electrical',
+        icon: 'api',
+        enabled: false,
+        failureRate: {
+            type: 'exponential',
+            parameters: { lambda: 0.010, value: 0.010 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        }
+    }
+];
 
 const FailureRates = () => {
     const { getValueByPath, updateByPath } = useScenario();
@@ -56,6 +174,21 @@ const FailureRates = () => {
     const handleDetailedConfig = (component) => {
         setSelectedComponent(component);
         setDetailModalVisible(true);
+    };
+
+    // Initialize defaults if no data exists
+    const handleInitializeDefaults = async () => {
+        try {
+            const currentComponents = getValueByPath('settings.project.equipment.failureRates.components', []);
+            if (currentComponents.length === 0) {
+                await updateByPath('settings.project.equipment.failureRates.components', DEFAULT_COMPONENTS);
+                message.success('Default components initialized successfully');
+            } else {
+                message.info('Components already exist. Clear existing data first to reinitialize.');
+            }
+        } catch (error) {
+            message.error(`Failed to initialize defaults: ${error.message}`);
+        }
     };
 
     // Handle modal close
@@ -86,7 +219,7 @@ const FailureRates = () => {
         return enabled ? <Tag color="green">Active</Tag> : <Tag color="default">Disabled</Tag>;
     };
 
-    // EditableTable columns configuration  
+    // EditableTable columns configuration using reusable column helpers
     const columns = [
         {
             title: 'Component',
@@ -95,23 +228,23 @@ const FailureRates = () => {
             width: '25%',
             render: (name, record) => (
                 <Space>
-                    {COMPONENT_ICONS[record.icon]}
+                    {COMPONENT_ICONS[record.icon] || <ToolOutlined />}
                     <div>
                         <div style={{ fontWeight: 500 }}>{name}</div>
                         <Tag color={CATEGORY_COLORS[record.category]} size="small">
-                            {record.category}
+                            {record.category?.charAt(0).toUpperCase() + record.category?.slice(1)}
                         </Tag>
                     </div>
                 </Space>
             )
         },
-        {
-            title: 'Status',
-            dataIndex: 'enabled',
-            key: 'enabled',
+        createBooleanColumn('enabled', 'Enabled', {
             width: '15%',
-            render: (enabled) => getStatusBadge(enabled)
-        },
+            trueText: 'Yes',
+            falseText: 'No',
+            trueColor: 'success',
+            falseColor: 'default'
+        }),
         {
             title: 'Failure Rate',
             dataIndex: 'failureRate',
@@ -123,20 +256,16 @@ const FailureRates = () => {
                 </Text>
             )
         },
-        {
-            title: 'Actions',
-            key: 'actions',
-            width: '15%',
-            render: (_, record) => (
-                <Button
-                    type="link"
-                    size="small"
-                    onClick={() => handleDetailedConfig(record)}
-                >
-                    Details
-                </Button>
-            )
-        }
+        createActionsColumn(
+            (record) => handleDetailedConfig(record),
+            null, // No delete action - handled by EditableTable
+            {
+                title: 'Details',
+                width: 100,
+                hideDelete: true,
+                needsConfirm: false
+            }
+        )
     ];
 
     // Form fields for EditableTable modal
@@ -150,13 +279,16 @@ const FailureRates = () => {
                 rules={[{ required: true, message: 'Component name is required' }]}
             />
             
-            <ContextField
-                path="category"
-                component={Input}
-                label="Category"
-                required
-                rules={[{ required: true, message: 'Category is required' }]}
-            />
+            <Form.Item 
+                name="category" 
+                label="Category" 
+                rules={[{ required: true, message: 'Please select a category' }]}
+            >
+                <Select 
+                    placeholder="Select component category"
+                    options={CATEGORY_OPTIONS}
+                />
+            </Form.Item>
             
             <ContextField
                 path="icon"
@@ -197,12 +329,23 @@ const FailureRates = () => {
                 title="Global Configuration" 
                 style={{ marginBottom: '24px' }}
                 extra={
-                    <Switch
-                        checked={failureRatesConfig.enabled || false}
-                        onChange={handleGlobalToggle}
-                        checkedChildren="Enabled"
-                        unCheckedChildren="Disabled"
-                    />
+                    <Space>
+                        {componentsArray.length === 0 && (
+                            <Button 
+                                type="dashed" 
+                                onClick={handleInitializeDefaults}
+                                size="small"
+                            >
+                                Initialize Defaults
+                            </Button>
+                        )}
+                        <Switch
+                            checked={failureRatesConfig.enabled || false}
+                            onChange={handleGlobalToggle}
+                            checkedChildren="Enabled"
+                            unCheckedChildren="Disabled"
+                        />
+                    </Space>
                 }
             >
                 <Space direction="vertical" size="small">
@@ -234,7 +377,7 @@ const FailureRates = () => {
                     addButtonText="Add Component"
                     keyField="id"
                     tableSize="small"
-                    autoActions={false}
+                    autoActions={true}
                     formLayout="vertical"
                     formCompact={false}
                 />
