@@ -23,8 +23,8 @@ Follow these steps:
 
 # TEST
 - Ask if we should run tests, and wait for a response. If No, skip TEST section here.
-- Use Playwright via MCP to test the changes if you have made changes to the UI
-- Write jest tests to describe the expected behaviour of your code
+- IMPORTANT: Use Playwright MCP to run UI tests, and validate the changes if you have made to the UI.
+- Write Playwright test-runner tests to describe the expected behaviour of your code
 - Run the full test suite to ensure you haven't broken anything.
 - If the tests are failing, fix them.
 - Ensure that all tests are passing before moving on to the next step.
