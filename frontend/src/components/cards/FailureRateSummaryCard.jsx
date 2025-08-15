@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const COMPONENT_NAMES = {
     gearbox: 'Gearbox',
