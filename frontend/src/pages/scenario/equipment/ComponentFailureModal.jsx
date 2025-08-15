@@ -13,16 +13,20 @@ const { TabPane } = Tabs;
 
 const ComponentFailureModal = ({ 
     visible, 
-    componentKey, 
-    componentName, 
+    component,
+    componentIndex,
     onClose 
 }) => {
     const { updateByPath } = useScenario();
     const [activeTab, setActiveTab] = useState('failureRate');
     const [loading, setLoading] = useState(false);
 
-    // Base path for component configuration
-    const basePath = `settings.project.equipment.failureRates.components.${componentKey}`;
+    // Component info
+    const componentName = component?.name || 'Component';
+    const componentId = component?.id || 'unknown';
+    
+    // Base path for component configuration (array format for DistributionFieldV3)
+    const basePath = ['settings', 'project', 'equipment', 'failureRates', 'components', componentIndex];
 
     // Handle modal close
     const handleClose = () => {
@@ -34,9 +38,10 @@ const ComponentFailureModal = ({
     const initializeComponent = async () => {
         try {
             setLoading(true);
+            const basePathStr = basePath.join('.');
             
             // Set default failure rate if not exists
-            await updateByPath(`${basePath}.failureRate`, {
+            await updateByPath(`${basePathStr}.failureRate`, {
                 type: 'exponential',
                 parameters: { lambda: 0.025, value: 0.025 },
                 timeSeriesMode: false,
@@ -45,37 +50,37 @@ const ComponentFailureModal = ({
             });
 
             // Set default costs if not exists
-            await updateByPath(`${basePath}.costs.componentReplacement`, {
+            await updateByPath(`${basePathStr}.costs.componentReplacement`, {
                 type: 'lognormal',
                 parameters: { mu: 13.1, sigma: 0.4, value: 500000 },
                 metadata: { percentileDirection: 'ascending' }
             });
 
-            await updateByPath(`${basePath}.costs.craneMobilization`, {
+            await updateByPath(`${basePathStr}.costs.craneMobilization`, {
                 type: 'triangular',
                 parameters: { min: 80000, mode: 120000, max: 200000, value: 120000 },
                 metadata: { percentileDirection: 'ascending' }
             });
 
-            await updateByPath(`${basePath}.costs.craneDailyRate`, {
+            await updateByPath(`${basePathStr}.costs.craneDailyRate`, {
                 type: 'normal',
                 parameters: { mean: 15000, stdDev: 3000, value: 15000 },
                 metadata: { percentileDirection: 'ascending' }
             });
 
-            await updateByPath(`${basePath}.costs.repairDurationDays`, {
+            await updateByPath(`${basePathStr}.costs.repairDurationDays`, {
                 type: 'gamma',
                 parameters: { shape: 3, scale: 2, value: 6 },
                 metadata: { percentileDirection: 'ascending' }
             });
 
-            await updateByPath(`${basePath}.costs.specialistLabor`, {
+            await updateByPath(`${basePathStr}.costs.specialistLabor`, {
                 type: 'normal',
                 parameters: { mean: 35000, stdDev: 10000, value: 35000 },
                 metadata: { percentileDirection: 'ascending' }
             });
 
-            await updateByPath(`${basePath}.costs.downtimeRevenuePerDay`, {
+            await updateByPath(`${basePathStr}.costs.downtimeRevenuePerDay`, {
                 type: 'normal',
                 parameters: { mean: 200, stdDev: 50, value: 200 },
                 metadata: { percentileDirection: 'descending' }
@@ -120,7 +125,7 @@ const ComponentFailureModal = ({
                         </div>
 
                         <DistributionFieldV3
-                            path={[basePath, 'failureRate']}
+                            path={[...basePath, 'failureRate']}
                             label="Annual Failure Rate"
                             tooltip="Annual probability of component failure (typically 0.5% - 5%)"
                             addonAfter="failures/year"
@@ -166,7 +171,7 @@ const ComponentFailureModal = ({
                         </div>
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'componentReplacement']}
+                            path={[...basePath, 'costs', 'componentReplacement']}
                             label="Component Replacement Cost"
                             tooltip="Cost of the replacement component including procurement and logistics"
                             addonAfter="USD"
@@ -175,7 +180,7 @@ const ComponentFailureModal = ({
                         />
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'craneMobilization']}
+                            path={[...basePath, 'costs', 'craneMobilization']}
                             label="Crane Mobilization Cost"
                             tooltip="One-time cost to mobilize heavy-lift crane to site"
                             addonAfter="USD"
@@ -184,7 +189,7 @@ const ComponentFailureModal = ({
                         />
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'craneDailyRate']}
+                            path={[...basePath, 'costs', 'craneDailyRate']}
                             label="Crane Daily Rate"
                             tooltip="Daily rental cost for heavy-lift crane during repair"
                             addonAfter="USD/day"
@@ -193,7 +198,7 @@ const ComponentFailureModal = ({
                         />
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'repairDurationDays']}
+                            path={[...basePath, 'costs', 'repairDurationDays']}
                             label="Repair Duration"
                             tooltip="Total duration for component replacement including weather delays"
                             addonAfter="days"
@@ -202,7 +207,7 @@ const ComponentFailureModal = ({
                         />
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'specialistLabor']}
+                            path={[...basePath, 'costs', 'specialistLabor']}
                             label="Specialist Labor Cost"
                             tooltip="Cost for specialist technicians and supervisors"
                             addonAfter="USD"
@@ -211,7 +216,7 @@ const ComponentFailureModal = ({
                         />
 
                         <DistributionFieldV3
-                            path={[basePath, 'costs', 'downtimeRevenuePerDay']}
+                            path={[...basePath, 'costs', 'downtimeRevenuePerDay']}
                             label="Downtime Revenue Loss"
                             tooltip="Daily revenue loss per MW during turbine downtime"
                             addonAfter="USD/MW/day"
@@ -239,8 +244,8 @@ const ComponentFailureModal = ({
                             <Title level={5}>Component Information</Title>
                             <Space direction="vertical" size="small">
                                 <Text><strong>Component:</strong> {componentName}</Text>
-                                <Text><strong>Key:</strong> {componentKey}</Text>
-                                <Text><strong>Schema Path:</strong> {basePath}</Text>
+                                <Text><strong>ID:</strong> {componentId}</Text>
+                                <Text><strong>Schema Path:</strong> {basePath.join('.')}</Text>
                             </Space>
                         </div>
 

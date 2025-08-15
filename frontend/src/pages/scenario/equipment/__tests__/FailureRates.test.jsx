@@ -23,10 +23,32 @@ jest.mock('contexts/ScenarioContext', () => ({
 
 // Mock EditableTable
 jest.mock('components/tables/EditableTable', () => {
-    return function MockEditableTable({ path, formFields }) {
+    return function MockEditableTable({ path, formFields, columns }) {
+        // Simulate table content with some mock data if columns exist
+        const mockData = [
+            { id: 'gearbox', name: 'Gearbox', enabled: true },
+            { id: 'generator', name: 'Generator', enabled: false }
+        ];
+        
         return (
             <div data-testid="editable-table" data-path={path}>
                 <div data-testid="form-fields-count">{formFields?.props?.children?.length || 0}</div>
+                {columns && mockData.map((item, index) => (
+                    <div key={item.id} data-testid={`table-row-${index}`}>
+                        <span>{item.name}</span>
+                        <button 
+                            onClick={() => {
+                                // Simulate clicking Configure button with the proper callback
+                                const detailsColumn = columns.find(col => col.key === 'details');
+                                if (detailsColumn && detailsColumn.render) {
+                                    detailsColumn.render(null, item, index);
+                                }
+                            }}
+                        >
+                            Configure
+                        </button>
+                    </div>
+                ))}
             </div>
         );
     };
@@ -42,25 +64,26 @@ jest.mock('antd', () => ({
 }));
 
 // Mock DistributionFieldV3 to avoid Plotly issues
-jest.mock('components/distributionFields/DistributionFieldV3', () => {
-    return function MockDistributionFieldV3({ path, label }) {
-        return <div data-testid="distribution-field-v3" data-path={path}>{label}</div>;
-    };
-});
+jest.mock('components/distributionFields', () => ({
+    DistributionFieldV3: function MockDistributionFieldV3({ path, label }) {
+        return <div data-testid="distribution-field-v3" data-path={JSON.stringify(path)}>{label}</div>;
+    }
+}));
 
 // Mock ContextField
-jest.mock('components/contextFields/ContextField', () => {
-    return function MockContextField({ path, label }) {
+jest.mock('components/contextFields/ContextField', () => ({
+    ContextField: function MockContextField({ path, label }) {
         return <div data-testid="context-field" data-path={path}>{label}</div>;
-    };
-});
+    }
+}));
 
 // Mock ComponentFailureModal
 jest.mock('../ComponentFailureModal', () => {
-    return function MockComponentFailureModal({ visible, componentName, onClose }) {
+    return function MockComponentFailureModal({ visible, component, componentIndex, onClose }) {
         return visible ? (
             <div data-testid="component-failure-modal">
-                Modal for {componentName}
+                Modal for {component?.name}
+                <div data-testid="component-index">{componentIndex}</div>
                 <button onClick={onClose}>Close</button>
             </div>
         ) : null;
@@ -205,5 +228,97 @@ describe('FailureRates Component', () => {
         render(<FailureRates />);
         
         expect(screen.getByText('2 of 3')).toBeInTheDocument();
+    });
+
+    test('shows Initialize Defaults button when no components exist', () => {
+        mockGetValueByPath.mockReturnValue({
+            enabled: false,
+            components: []
+        });
+
+        render(<FailureRates />);
+        
+        expect(screen.getByText('Initialize Defaults')).toBeInTheDocument();
+    });
+
+    test('hides Initialize Defaults button when components exist', () => {
+        mockGetValueByPath.mockReturnValue({
+            enabled: false,
+            components: [
+                { id: 'gearbox', name: 'Gearbox', enabled: false }
+            ]
+        });
+
+        render(<FailureRates />);
+        
+        expect(screen.queryByText('Initialize Defaults')).not.toBeInTheDocument();
+    });
+
+    test('handles Initialize Defaults button click', async () => {
+        // Set up the mock to return empty components first
+        mockGetValueByPath
+            .mockReturnValueOnce({ enabled: false, components: [] }) // Initial render
+            .mockReturnValue([]); // For the getValueByPath call inside handleInitializeDefaults
+
+        render(<FailureRates />);
+        
+        const initButton = screen.getByText('Initialize Defaults');
+        fireEvent.click(initButton);
+
+        await waitFor(() => {
+            expect(mockUpdateByPath).toHaveBeenCalledWith(
+                'settings.project.equipment.failureRates.components',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        id: 'gearbox',
+                        name: 'Gearbox',
+                        category: 'drivetrain'
+                    })
+                ])
+            );
+        });
+    });
+
+    test('opens ComponentFailureModal when Configure button clicked', async () => {
+        mockGetValueByPath.mockReturnValue({
+            enabled: true,
+            components: [
+                { id: 'gearbox', name: 'Gearbox', enabled: true, failureRate: { parameters: { lambda: 0.025 } } }
+            ]
+        });
+
+        render(<FailureRates />);
+        
+        const configureButtons = screen.getAllByText('Configure');
+        fireEvent.click(configureButtons[0]); // Click the first Configure button
+
+        await waitFor(() => {
+            expect(screen.getByTestId('component-failure-modal')).toBeInTheDocument();
+        });
+    });
+
+    test('passes correct props to ComponentFailureModal', async () => {
+        const testComponent = { 
+            id: 'gearbox', 
+            name: 'Gearbox', 
+            enabled: true, 
+            failureRate: { parameters: { lambda: 0.025 } } 
+        };
+
+        mockGetValueByPath.mockReturnValue({
+            enabled: true,
+            components: [testComponent]
+        });
+
+        render(<FailureRates />);
+        
+        const configureButtons = screen.getAllByText('Configure');
+        fireEvent.click(configureButtons[0]); // Click the first Configure button
+
+        await waitFor(() => {
+            const modal = screen.getByTestId('component-failure-modal');
+            expect(modal).toBeInTheDocument();
+            expect(screen.getByText('Modal for Gearbox')).toBeInTheDocument();
+        });
     });
 });

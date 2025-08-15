@@ -11,7 +11,7 @@ import { SettingOutlined, ThunderboltOutlined, ToolOutlined, ControlOutlined,
 import { useScenario } from 'contexts/ScenarioContext';
 import EditableTable from 'components/tables/EditableTable';
 import { ContextField } from 'components/contextFields/ContextField';
-import DistributionFieldV3 from 'components/distributionFields/DistributionFieldV3';
+import { DistributionFieldV3 } from 'components/distributionFields';
 import { createActionsColumn, createTagColumn, createBooleanColumn } from 'components/tables/columns';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
@@ -160,6 +160,7 @@ const FailureRates = () => {
     const { getValueByPath, updateByPath } = useScenario();
     const [detailModalVisible, setDetailModalVisible] = useState(false);
     const [selectedComponent, setSelectedComponent] = useState(null);
+    const [selectedComponentIndex, setSelectedComponentIndex] = useState(null);
     
     // Get failure rates configuration from scenario context
     const failureRatesConfig = getValueByPath('settings.project.equipment.failureRates', {
@@ -171,8 +172,9 @@ const FailureRates = () => {
     const componentsArray = failureRatesConfig.components || [];
 
     // Handle opening detailed configuration modal
-    const handleDetailedConfig = (component) => {
+    const handleDetailedConfig = (component, index) => {
         setSelectedComponent(component);
+        setSelectedComponentIndex(index);
         setDetailModalVisible(true);
     };
 
@@ -195,6 +197,7 @@ const FailureRates = () => {
     const handleDetailModalClose = () => {
         setDetailModalVisible(false);
         setSelectedComponent(null);
+        setSelectedComponentIndex(null);
     };
 
     // Handle global enable/disable
@@ -256,16 +259,21 @@ const FailureRates = () => {
                 </Text>
             )
         },
-        createActionsColumn(
-            (record) => handleDetailedConfig(record),
-            null, // No delete action - handled by EditableTable
-            {
-                title: 'Details',
-                width: 100,
-                hideDelete: true,
-                needsConfirm: false
-            }
-        )
+        {
+            title: 'Details',
+            key: 'details',
+            width: 100,
+            align: 'center',
+            render: (_, record, index) => (
+                <Button
+                    type="text"
+                    onClick={() => handleDetailedConfig(record, index)}
+                    size="small"
+                >
+                    Configure
+                </Button>
+            )
+        }
     ];
 
     // Form fields for EditableTable modal
@@ -302,13 +310,6 @@ const FailureRates = () => {
                 <Switch />
             </Form.Item>
             
-            <Form.Item label="Failure Rate Distribution">
-                <DistributionFieldV3
-                    path="failureRate"
-                    showAdvanced={true}
-                    compactMode={false}
-                />
-            </Form.Item>
         </>
     );
 
@@ -387,11 +388,11 @@ const FailureRates = () => {
             <FailureRateSummaryCard />
 
             {/* Detail Configuration Modal */}
-            {selectedComponent && (
+            {selectedComponent && selectedComponentIndex !== null && (
                 <ComponentFailureModal
                     visible={detailModalVisible}
-                    componentKey={selectedComponent.id}
-                    componentName={selectedComponent.name}
+                    component={selectedComponent}
+                    componentIndex={selectedComponentIndex}
                     onClose={handleDetailModalClose}
                 />
             )}
