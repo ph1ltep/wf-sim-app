@@ -7,8 +7,12 @@
 const Yup = require('yup');
 const { DistributionTypeSchema } = require('./distribution');
 
-// Individual component failure rate and cost configuration
+// Individual component failure rate and cost configuration (for dynamic arrays)
 const ComponentFailureRateSchema = Yup.object().shape({
+    id: Yup.string().required('Component ID is required'),
+    name: Yup.string().required('Component name is required'),
+    category: Yup.string().oneOf(['drivetrain', 'electrical', 'rotor', 'mechanical', 'control']).required(),
+    icon: Yup.string().default('tool'),
     enabled: Yup.boolean().default(false),
     
     // Failure rate using existing distribution system - supports all input modes
@@ -55,9 +59,13 @@ const ComponentFailureRateSchema = Yup.object().shape({
     }).default(() => ({}))
 }).default(() => ({}));
 
-// Default component configurations with industry-standard failure rates
-const DEFAULT_COMPONENTS = {
-    gearbox: {
+// Default component configurations as array for EditableTable
+const DEFAULT_COMPONENTS = [
+    {
+        id: 'gearbox',
+        name: 'Gearbox',
+        category: 'drivetrain',
+        icon: 'setting',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -66,7 +74,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    generator: {
+    {
+        id: 'generator',
+        name: 'Generator',
+        category: 'electrical',
+        icon: 'thunderbolt',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -75,7 +87,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    mainBearing: {
+    {
+        id: 'mainBearing',
+        name: 'Main Bearing',
+        category: 'drivetrain',
+        icon: 'tool',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -84,7 +100,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    powerElectronics: {
+    {
+        id: 'powerElectronics',
+        name: 'Power Electronics',
+        category: 'electrical',
+        icon: 'control',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -93,7 +113,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    bladeBearings: {
+    {
+        id: 'bladeBearings',
+        name: 'Blade Bearings',
+        category: 'rotor',
+        icon: 'sync',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -102,7 +126,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    yawSystem: {
+    {
+        id: 'yawSystem',
+        name: 'Yaw System',
+        category: 'mechanical',
+        icon: 'reload',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -111,7 +139,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    controlSystem: {
+    {
+        id: 'controlSystem',
+        name: 'Control System',
+        category: 'control',
+        icon: 'dashboard',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -120,7 +152,11 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     },
-    transformer: {
+    {
+        id: 'transformer',
+        name: 'Transformer',
+        category: 'electrical',
+        icon: 'api',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -129,23 +165,14 @@ const DEFAULT_COMPONENTS = {
             metadata: { percentileDirection: 'ascending' }
         }
     }
-};
+];
 
-// Portfolio-level component failure rate configuration
+// Portfolio-level component failure rate configuration (dynamic array structure)
 const ComponentFailureModelingSchema = Yup.object().shape({
     enabled: Yup.boolean().default(false),
     
-    // 8 standardized major components
-    components: Yup.object().shape({
-        gearbox: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.gearbox),
-        generator: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.generator),
-        mainBearing: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.mainBearing),
-        powerElectronics: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.powerElectronics),
-        bladeBearings: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.bladeBearings),
-        yawSystem: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.yawSystem),
-        controlSystem: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.controlSystem),
-        transformer: ComponentFailureRateSchema.default(() => DEFAULT_COMPONENTS.transformer)
-    }).default(() => DEFAULT_COMPONENTS)
+    // Dynamic array of components for EditableTable
+    components: Yup.array().of(ComponentFailureRateSchema).default(() => DEFAULT_COMPONENTS)
 }).default(() => ({ enabled: false, components: DEFAULT_COMPONENTS }));
 
 // Component display metadata

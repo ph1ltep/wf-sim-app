@@ -23,16 +23,35 @@ jest.mock('contexts/ScenarioContext', () => ({
 
 // Mock EditableTable
 jest.mock('components/tables/EditableTable', () => {
-    return function MockEditableTable({ columns, data }) {
+    return function MockEditableTable({ path, formFields }) {
         return (
-            <div data-testid="editable-table">
-                {data.map(item => (
-                    <div key={item.id} data-testid={`component-${item.component}`}>
-                        {item.name}
-                    </div>
-                ))}
+            <div data-testid="editable-table" data-path={path}>
+                <div data-testid="form-fields-count">{formFields?.props?.children?.length || 0}</div>
             </div>
         );
+    };
+});
+
+// Mock Antd components
+jest.mock('antd', () => ({
+    ...jest.requireActual('antd'),
+    message: {
+        success: jest.fn(),
+        error: jest.fn()
+    }
+}));
+
+// Mock DistributionFieldV3 to avoid Plotly issues
+jest.mock('components/distributionFields/DistributionFieldV3', () => {
+    return function MockDistributionFieldV3({ path, label }) {
+        return <div data-testid="distribution-field-v3" data-path={path}>{label}</div>;
+    };
+});
+
+// Mock ContextField
+jest.mock('components/contextFields/ContextField', () => {
+    return function MockContextField({ path, label }) {
+        return <div data-testid="context-field" data-path={path}>{label}</div>;
     };
 });
 
@@ -55,44 +74,33 @@ jest.mock('components/cards/FailureRateSummaryCard', () => {
     };
 });
 
-// Mock antd message
-jest.mock('antd', () => ({
-    ...jest.requireActual('antd'),
-    message: {
-        success: jest.fn(),
-        error: jest.fn()
-    }
-}));
 
 describe('FailureRates Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         
-        // Default mock return values
+        // Default mock return values - array structure
         mockGetValueByPath.mockReturnValue({
             enabled: false,
-            components: {
-                gearbox: { enabled: false, failureRate: { parameters: { lambda: 0.025 } } },
-                generator: { enabled: false, failureRate: { parameters: { lambda: 0.02 } } }
-            }
+            components: [
+                { id: 'gearbox', name: 'Gearbox', enabled: false, failureRate: { parameters: { lambda: 0.025 } } },
+                { id: 'generator', name: 'Generator', enabled: false, failureRate: { parameters: { lambda: 0.02 } } }
+            ]
         });
         
         mockUpdateByPath.mockResolvedValue(true);
     });
 
-    test('renders failure rates page with all components', () => {
+    test('renders failure rates page with EditableTable', () => {
         render(<FailureRates />);
         
         expect(screen.getByText('Component Failure Rates')).toBeInTheDocument();
         expect(screen.getByText('Configure failure rates and cost modeling for major wind turbine components')).toBeInTheDocument();
         
-        // Check that all 8 components are rendered
-        const expectedComponents = ['gearbox', 'generator', 'mainBearing', 'powerElectronics', 
-                                   'bladeBearings', 'yawSystem', 'controlSystem', 'transformer'];
-        
-        expectedComponents.forEach(component => {
-            expect(screen.getByTestId(`component-${component}`)).toBeInTheDocument();
-        });
+        // Check that EditableTable is rendered with correct path
+        const editableTable = screen.getByTestId('editable-table');
+        expect(editableTable).toBeInTheDocument();
+        expect(editableTable).toHaveAttribute('data-path', 'settings.project.equipment.failureRates.components');
     });
 
     test('displays global configuration card', () => {
@@ -107,15 +115,15 @@ describe('FailureRates Component', () => {
     test('shows enabled state when global toggle is on', () => {
         mockGetValueByPath.mockReturnValue({
             enabled: true,
-            components: {
-                gearbox: { enabled: true, failureRate: { parameters: { lambda: 0.025 } } }
-            }
+            components: [
+                { id: 'gearbox', name: 'Gearbox', enabled: true, failureRate: { parameters: { lambda: 0.025 } } }
+            ]
         });
 
         render(<FailureRates />);
         
         expect(screen.getAllByText('Enabled')[0]).toBeInTheDocument(); // Use getAllByText for multiple matches
-        expect(screen.getByText('1 of 8')).toBeInTheDocument();
+        expect(screen.getByText('1 of 1')).toBeInTheDocument();
     });
 
     test('handles global toggle change', async () => {
@@ -134,28 +142,15 @@ describe('FailureRates Component', () => {
         expect(message.success).toHaveBeenCalledWith('Component failure modeling enabled');
     });
 
-    test('handles component toggle change', async () => {
+    test('renders EditableTable with proper configuration', () => {
         render(<FailureRates />);
         
-        // Find component toggles (there should be multiple switches)
-        const switches = screen.getAllByRole('switch');
+        // Verify EditableTable is present
+        const editableTable = screen.getByTestId('editable-table');
+        expect(editableTable).toBeInTheDocument();
         
-        // Skip if we don't have enough switches
-        if (switches.length > 1) {
-            const componentSwitch = switches[1]; // First switch is global, others are components
-            
-            fireEvent.click(componentSwitch);
-
-            await waitFor(() => {
-                expect(mockUpdateByPath).toHaveBeenCalledWith(
-                    expect.stringMatching(/settings\.project\.equipment\.failureRates\.components\.\w+\.enabled/),
-                    true
-                );
-            });
-        } else {
-            // If mocked table doesn't render switches, just verify the table exists
-            expect(screen.getByTestId('editable-table')).toBeInTheDocument();
-        }
+        // Verify it points to the correct path
+        expect(editableTable).toHaveAttribute('data-path', 'settings.project.equipment.failureRates.components');
     });
 
     test('displays editable table and summary card', () => {
@@ -165,21 +160,22 @@ describe('FailureRates Component', () => {
         expect(screen.getByTestId('failure-rate-summary-card')).toBeInTheDocument();
     });
 
-    test('formats failure rates correctly', () => {
+    test('renders with array data structure', () => {
         mockGetValueByPath.mockReturnValue({
             enabled: false,
-            components: {
-                gearbox: { 
+            components: [
+                { 
+                    id: 'gearbox',
+                    name: 'Gearbox',
                     enabled: true, 
                     failureRate: { parameters: { lambda: 0.025 } } 
                 }
-            }
+            ]
         });
 
         render(<FailureRates />);
         
-        // The formatting should show "2.50% annual" for 0.025 lambda
-        // This would be tested in the actual component rendering
+        // Verify EditableTable is present with array data
         expect(screen.getByTestId('editable-table')).toBeInTheDocument();
     });
 
@@ -199,15 +195,15 @@ describe('FailureRates Component', () => {
     test('displays correct component counts', () => {
         mockGetValueByPath.mockReturnValue({
             enabled: true,
-            components: {
-                gearbox: { enabled: true, failureRate: { parameters: { lambda: 0.025 } } },
-                generator: { enabled: true, failureRate: { parameters: { lambda: 0.02 } } },
-                mainBearing: { enabled: false, failureRate: { parameters: { lambda: 0.018 } } }
-            }
+            components: [
+                { id: 'gearbox', name: 'Gearbox', enabled: true, failureRate: { parameters: { lambda: 0.025 } } },
+                { id: 'generator', name: 'Generator', enabled: true, failureRate: { parameters: { lambda: 0.02 } } },
+                { id: 'mainBearing', name: 'Main Bearing', enabled: false, failureRate: { parameters: { lambda: 0.018 } } }
+            ]
         });
 
         render(<FailureRates />);
         
-        expect(screen.getByText('2 of 8')).toBeInTheDocument();
+        expect(screen.getByText('2 of 3')).toBeInTheDocument();
     });
 });

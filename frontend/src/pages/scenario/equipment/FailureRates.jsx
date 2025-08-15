@@ -1,107 +1,66 @@
 /**
  * Component Failure Rates Configuration Page
- * MVP implementation using proven EditableTable + Modal pattern
+ * Refactored to use EditableTable with dynamic array structure
  */
 
 import React, { useState, useMemo } from 'react';
-import { Card, Typography, Space, Switch, Button, Tag, message } from 'antd';
+import { Card, Typography, Space, Switch, Button, Tag, message, Form, Input } from 'antd';
 import { SettingOutlined, ThunderboltOutlined, ToolOutlined, ControlOutlined, 
          SyncOutlined, ReloadOutlined, DashboardOutlined, ApiOutlined } from '@ant-design/icons';
 
 import { useScenario } from 'contexts/ScenarioContext';
 import EditableTable from 'components/tables/EditableTable';
+import { ContextField } from 'components/contextFields/ContextField';
+import DistributionFieldV3 from 'components/distributionFields/DistributionFieldV3';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
 
 const { Title, Text } = Typography;
 
-// Component icons mapping
+// Component icons mapping for display
 const COMPONENT_ICONS = {
-    gearbox: <SettingOutlined />,
-    generator: <ThunderboltOutlined />,
-    mainBearing: <ToolOutlined />,
-    powerElectronics: <ControlOutlined />,
-    bladeBearings: <SyncOutlined />,
-    yawSystem: <ReloadOutlined />,
-    controlSystem: <DashboardOutlined />,
-    transformer: <ApiOutlined />
+    setting: <SettingOutlined />,
+    thunderbolt: <ThunderboltOutlined />,
+    tool: <ToolOutlined />,
+    control: <ControlOutlined />,
+    sync: <SyncOutlined />,
+    reload: <ReloadOutlined />,
+    dashboard: <DashboardOutlined />,
+    api: <ApiOutlined />
 };
 
-// Component display names
-const COMPONENT_NAMES = {
-    gearbox: 'Gearbox',
-    generator: 'Generator', 
-    mainBearing: 'Main Bearing',
-    powerElectronics: 'Power Electronics',
-    bladeBearings: 'Blade Bearings',
-    yawSystem: 'Yaw System',
-    controlSystem: 'Control System',
-    transformer: 'Transformer'
-};
-
-// Component categories for organization
-const COMPONENT_CATEGORIES = {
-    gearbox: 'Drivetrain',
-    generator: 'Electrical',
-    mainBearing: 'Drivetrain', 
-    powerElectronics: 'Electrical',
-    bladeBearings: 'Rotor',
-    yawSystem: 'Mechanical',
-    controlSystem: 'Control',
-    transformer: 'Electrical'
+// Category color mapping for tags
+const CATEGORY_COLORS = {
+    drivetrain: 'blue',
+    electrical: 'orange',
+    rotor: 'green',
+    mechanical: 'purple',
+    control: 'cyan'
 };
 
 const FailureRates = () => {
     const { getValueByPath, updateByPath } = useScenario();
-    const [modalVisible, setModalVisible] = useState(false);
+    const [detailModalVisible, setDetailModalVisible] = useState(false);
     const [selectedComponent, setSelectedComponent] = useState(null);
     
     // Get failure rates configuration from scenario context
     const failureRatesConfig = getValueByPath('settings.project.equipment.failureRates', {
         enabled: false,
-        components: {}
+        components: []
     });
 
-    // Component list for table display
-    const componentsList = useMemo(() => {
-        const components = Object.keys(COMPONENT_NAMES).map(componentKey => {
-            const componentConfig = failureRatesConfig.components?.[componentKey] || { enabled: false };
-            const failureRate = componentConfig.failureRate?.parameters?.value || 
-                              componentConfig.failureRate?.parameters?.lambda || 0;
-            
-            return {
-                id: componentKey,
-                key: componentKey,
-                component: componentKey,
-                name: COMPONENT_NAMES[componentKey],
-                category: COMPONENT_CATEGORIES[componentKey],
-                enabled: componentConfig.enabled || false,
-                failureRate: failureRate,
-                status: componentConfig.enabled ? 'configured' : 'disabled'
-            };
-        });
-        return components;
-    }, [failureRatesConfig]);
+    // Get components array from the dynamic structure
+    const componentsArray = failureRatesConfig.components || [];
 
-    // Handle component enable/disable toggle
-    const handleToggleComponent = async (componentKey, enabled) => {
-        try {
-            await updateByPath(`settings.project.equipment.failureRates.components.${componentKey}.enabled`, enabled);
-            message.success(`${COMPONENT_NAMES[componentKey]} ${enabled ? 'enabled' : 'disabled'}`);
-        } catch (error) {
-            message.error(`Failed to update ${COMPONENT_NAMES[componentKey]}: ${error.message}`);
-        }
-    };
-
-    // Handle opening modal for detailed configuration
-    const handleEditComponent = (componentKey) => {
-        setSelectedComponent(componentKey);
-        setModalVisible(true);
+    // Handle opening detailed configuration modal
+    const handleDetailedConfig = (component) => {
+        setSelectedComponent(component);
+        setDetailModalVisible(true);
     };
 
     // Handle modal close
-    const handleModalClose = () => {
-        setModalVisible(false);
+    const handleDetailModalClose = () => {
+        setDetailModalVisible(false);
         setSelectedComponent(null);
     };
 
@@ -116,84 +75,112 @@ const FailureRates = () => {
     };
 
     // Format failure rate for display
-    const formatFailureRate = (rate) => {
-        if (!rate || rate === 0) return 'Not configured';
+    const formatFailureRate = (failureRate) => {
+        if (!failureRate || !failureRate.parameters) return 'Not configured';
+        const rate = failureRate.parameters.lambda || failureRate.parameters.value || 0;
         return `${(rate * 100).toFixed(2)}% annual`;
     };
 
     // Get status badge
-    const getStatusBadge = (status, enabled) => {
-        if (!enabled) return <Tag color="default">Disabled</Tag>;
-        return <Tag color="green">Active</Tag>;
+    const getStatusBadge = (enabled) => {
+        return enabled ? <Tag color="green">Active</Tag> : <Tag color="default">Disabled</Tag>;
     };
 
-    // Table columns configuration
+    // EditableTable columns configuration  
     const columns = [
         {
             title: 'Component',
-            dataIndex: 'component',
-            key: 'component',
+            dataIndex: 'name',
+            key: 'name',
             width: '25%',
-            render: (componentKey, record) => (
+            render: (name, record) => (
                 <Space>
-                    {COMPONENT_ICONS[componentKey]}
+                    {COMPONENT_ICONS[record.icon]}
                     <div>
-                        <div style={{ fontWeight: 500 }}>{record.name}</div>
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                        <div style={{ fontWeight: 500 }}>{name}</div>
+                        <Tag color={CATEGORY_COLORS[record.category]} size="small">
                             {record.category}
-                        </Text>
+                        </Tag>
                     </div>
                 </Space>
             )
         },
         {
-            title: 'Enabled',
+            title: 'Status',
             dataIndex: 'enabled',
             key: 'enabled',
             width: '15%',
-            render: (enabled, record) => (
-                <Switch
-                    checked={enabled}
-                    onChange={(checked) => handleToggleComponent(record.component, checked)}
-                    size="small"
-                />
-            )
+            render: (enabled) => getStatusBadge(enabled)
         },
         {
             title: 'Failure Rate',
             dataIndex: 'failureRate',
             key: 'failureRate',
             width: '25%',
-            render: (rate) => (
+            render: (failureRate) => (
                 <Text style={{ fontFamily: 'monospace' }}>
-                    {formatFailureRate(rate)}
+                    {formatFailureRate(failureRate)}
                 </Text>
             )
         },
         {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            width: '15%',
-            render: (status, record) => getStatusBadge(status, record.enabled)
-        },
-        {
             title: 'Actions',
             key: 'actions',
-            width: '20%',
+            width: '15%',
             render: (_, record) => (
                 <Button
                     type="link"
                     size="small"
-                    onClick={() => handleEditComponent(record.component)}
+                    onClick={() => handleDetailedConfig(record)}
                 >
-                    Configure
+                    Details
                 </Button>
             )
         }
     ];
 
-    const enabledCount = componentsList.filter(c => c.enabled).length;
+    // Form fields for EditableTable modal
+    const formFields = (
+        <>
+            <ContextField
+                path="name"
+                component={Input}
+                label="Component Name"
+                required
+                rules={[{ required: true, message: 'Component name is required' }]}
+            />
+            
+            <ContextField
+                path="category"
+                component={Input}
+                label="Category"
+                required
+                rules={[{ required: true, message: 'Category is required' }]}
+            />
+            
+            <ContextField
+                path="icon"
+                component={Input}
+                label="Icon"
+                required
+                rules={[{ required: true, message: 'Icon is required' }]}
+            />
+            
+            <Form.Item label="Enabled" name="enabled" valuePropName="checked">
+                <Switch />
+            </Form.Item>
+            
+            <Form.Item label="Failure Rate Distribution">
+                <DistributionFieldV3
+                    path="failureRate"
+                    showAdvanced={true}
+                    compactMode={false}
+                />
+            </Form.Item>
+        </>
+    );
+
+    const enabledCount = componentsArray.filter(c => c.enabled).length;
 
     return (
         <div style={{ padding: '24px' }}>
@@ -227,7 +214,7 @@ const FailureRates = () => {
                     </div>
                     <div>
                         <Text>Active components: </Text>
-                        <Text strong>{enabledCount} of {componentsList.length}</Text>
+                        <Text strong>{enabledCount} of {componentsArray.length}</Text>
                     </div>
                     {failureRatesConfig.enabled && (
                         <Text type="secondary" style={{ fontSize: '12px' }}>
@@ -237,15 +224,19 @@ const FailureRates = () => {
                 </Space>
             </Card>
 
-            {/* Components Table */}
+            {/* Components EditableTable */}
             <Card title="Component Configuration" style={{ marginBottom: '24px' }}>
                 <EditableTable
+                    path="settings.project.equipment.failureRates.components"
                     columns={columns}
-                    data={componentsList}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    scroll={{ x: 'max-content' }}
+                    formFields={formFields}
+                    itemName="Component"
+                    addButtonText="Add Component"
+                    keyField="id"
+                    tableSize="small"
+                    autoActions={false}
+                    formLayout="vertical"
+                    formCompact={false}
                 />
             </Card>
 
@@ -255,10 +246,10 @@ const FailureRates = () => {
             {/* Detail Configuration Modal */}
             {selectedComponent && (
                 <ComponentFailureModal
-                    visible={modalVisible}
-                    componentKey={selectedComponent}
-                    componentName={COMPONENT_NAMES[selectedComponent]}
-                    onClose={handleModalClose}
+                    visible={detailModalVisible}
+                    componentKey={selectedComponent.id}
+                    componentName={selectedComponent.name}
+                    onClose={handleDetailModalClose}
                 />
             )}
         </div>
