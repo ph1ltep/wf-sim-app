@@ -10,6 +10,8 @@ const {
     SimulationInfoSchema,
 } = require('./distribution');
 
+const { ComponentFailureModelingSchema } = require('./componentFailureRates');
+
 // Component Allocation Schema
 const ComponentAllocationSchema = Yup.object().shape({
     oem: Yup.number().default(0.0),
@@ -125,8 +127,8 @@ const SettingsSchema = Yup.object().shape({
                 lepInPowerCurve: Yup.boolean().default(false),
                 nominalTipSpeed: Yup.number().default(88),
                 velocityExponent: Yup.number().default(8.0),
-
             }),
+            failureRates: ComponentFailureModelingSchema
         }),
         windFarm: Yup.object().shape({
             numWTGs: Yup.number().default(20),
