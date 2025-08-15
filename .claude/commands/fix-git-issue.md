@@ -2,6 +2,8 @@ Please analyze and fix the GitHub issue: $ARGUMENTS.
 
 Follow these steps:
 
+**IMPORTANT**: Use sub-agents in parallel and/or sequential thinking as much as needed.
+
 # PLAN 
 1. Use `gh issue view` to get the issue details
 2. Understand the problem described in the issue
@@ -19,6 +21,7 @@ Follow these steps:
 - Commit your changes after each step.
 
 # TEST
+- Ask if we should run tests, and wait for a response. If No, skip TEST section here.
 - Use Playwright via MCP to test the changes if you have made changes to the UI
 - Write jest tests to describe the expected behaviour of your code
 - Run the full test suite to ensure you haven't broken anything.
@@ -28,6 +31,6 @@ Follow these steps:
 # DEPLOY
 - Push, create a PR, and request a review.
 
-**CRITICAL**
+**CRITICAL INSTRUCTIONS**
 - Commits MUST follow instructions @.claude/references/git-conventional-commits.md
 - Remember to use the GitHub CLI (`gh`) for all GitHub-related tasks.

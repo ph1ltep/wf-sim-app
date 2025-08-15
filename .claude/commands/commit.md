@@ -22,12 +22,12 @@ This command helps you create well-formatted commits with conventional commit me
 
 ```
 /commit
-/commit --no-verify
+/commit --verify
 ```
 
 ## What This Command Does
 
-1. Unless specified with `--no-verify`, automatically runs pre-commit checks:
+1. When specified with `--verify`, automatically runs pre-commit checks:
    - `pnpm lint` to ensure code quality
    - `pnpm build` to verify the build succeeds
    - `pnpm generate:docs` to update documentation
@@ -43,11 +43,11 @@ This command helps you create well-formatted commits with conventional commit me
 
 ## Command Options
 
-- `--no-verify`: Skip running the pre-commit checks (lint, build, generate:docs)
+- `--verify`: Run the pre-commit checks (lint, build, generate:docs)
 
 ## Important Notes
 
-- By default, pre-commit checks (`pnpm lint`, `pnpm build`, `pnpm generate:docs`) will run to ensure code quality
+- By default no pre-commit checks. When --verify is used, pre-commit checks (`pnpm lint`, `pnpm build`, `pnpm generate:docs`) will run to ensure code quality
 - If these checks fail, you'll be asked if you want to proceed with the commit anyway or fix the issues first
 - If specific files are already staged, the command will only commit those files
 - If no files are staged, it will automatically stage all modified and new files
