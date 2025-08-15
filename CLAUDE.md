@@ -114,3 +114,4 @@ cd frontend && npm run build    # Production build
 4. **Fail fast validation** - explicit error boundaries
 5. **Antd design system** - consistent UI patterns
 6. **Distribution-aware inputs** - support uncertainty modeling
+7. **Git commits** - MUST follow rules at @.claude/references/git-conventional-commits.md
