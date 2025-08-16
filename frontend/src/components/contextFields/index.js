@@ -372,6 +372,9 @@ export const createTimeSeriesDataPoint = (year, value) => ({
 
 // Export all field components and layout components
 export {
+  // Core components
+  ContextField,
+
   // Layout components
   FormSection,
   FormRow,

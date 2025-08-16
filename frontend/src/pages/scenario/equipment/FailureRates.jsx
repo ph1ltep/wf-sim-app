@@ -3,31 +3,35 @@
  * Refactored to use EditableTable with dynamic array structure
  */
 
-import React, { useState, useMemo } from 'react';
-import { Card, Typography, Space, Switch, Button, Tag, message, Form, Input, Select } from 'antd';
-import { SettingOutlined, ThunderboltOutlined, ToolOutlined, ControlOutlined, 
-         SyncOutlined, ReloadOutlined, DashboardOutlined, ApiOutlined } from '@ant-design/icons';
+import React, { useState } from 'react';
+import { Card, Typography, Space, Switch, Button, Tag, message, Form, Input, Select, Tooltip } from 'antd';
+import { 
+    CheckOutlined, 
+    CloseOutlined,
+    DollarOutlined,
+    BankOutlined,
+    ToolOutlined,
+    ClockCircleOutlined,
+    UserOutlined,
+    ExclamationCircleOutlined
+} from '@ant-design/icons';
 
 import { useScenario } from 'contexts/ScenarioContext';
 import EditableTable from 'components/tables/EditableTable';
-import { ContextField } from 'components/contextFields/ContextField';
-import { DistributionFieldV3 } from 'components/distributionFields';
-import { createActionsColumn, createTagColumn, createBooleanColumn } from 'components/tables/columns';
+import { ContextField, SwitchField } from 'components/contextFields';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
 
 const { Title, Text } = Typography;
 
-// Component icons mapping for display
-const COMPONENT_ICONS = {
-    setting: <SettingOutlined />,
-    thunderbolt: <ThunderboltOutlined />,
-    tool: <ToolOutlined />,
-    control: <ControlOutlined />,
-    sync: <SyncOutlined />,
-    reload: <ReloadOutlined />,
-    dashboard: <DashboardOutlined />,
-    api: <ApiOutlined />
+// Cost component icons mapping
+const COST_ICONS = {
+    componentReplacement: <DollarOutlined style={{ color: '#1890ff' }} />,
+    craneMobilization: <ToolOutlined style={{ color: '#52c41a' }} />,
+    craneDailyRate: <BankOutlined style={{ color: '#fa8c16' }} />,
+    repairDurationDays: <ClockCircleOutlined style={{ color: '#722ed1' }} />,
+    specialistLabor: <UserOutlined style={{ color: '#eb2f96' }} />,
+    downtimeRevenuePerDay: <ExclamationCircleOutlined style={{ color: '#f5222d' }} />
 };
 
 // Component categories for organization
@@ -54,7 +58,6 @@ const DEFAULT_COMPONENTS = [
         id: 'gearbox',
         name: 'Gearbox',
         category: 'drivetrain',
-        icon: 'setting',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -67,7 +70,6 @@ const DEFAULT_COMPONENTS = [
         id: 'generator',
         name: 'Generator',
         category: 'electrical',
-        icon: 'thunderbolt',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -80,7 +82,6 @@ const DEFAULT_COMPONENTS = [
         id: 'mainBearing',
         name: 'Main Bearing',
         category: 'drivetrain',
-        icon: 'tool',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -93,7 +94,6 @@ const DEFAULT_COMPONENTS = [
         id: 'powerElectronics',
         name: 'Power Electronics',
         category: 'electrical',
-        icon: 'control',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -106,7 +106,6 @@ const DEFAULT_COMPONENTS = [
         id: 'bladeBearings',
         name: 'Blade Bearings',
         category: 'rotor',
-        icon: 'sync',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -119,7 +118,6 @@ const DEFAULT_COMPONENTS = [
         id: 'yawSystem',
         name: 'Yaw System',
         category: 'mechanical',
-        icon: 'reload',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -132,7 +130,6 @@ const DEFAULT_COMPONENTS = [
         id: 'controlSystem',
         name: 'Control System',
         category: 'control',
-        icon: 'dashboard',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -145,7 +142,6 @@ const DEFAULT_COMPONENTS = [
         id: 'transformer',
         name: 'Transformer',
         category: 'electrical',
-        icon: 'api',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -217,42 +213,123 @@ const FailureRates = () => {
         return `${(rate * 100).toFixed(2)}% annual`;
     };
 
-    // Get status badge
-    const getStatusBadge = (enabled) => {
-        return enabled ? <Tag color="green">Active</Tag> : <Tag color="default">Disabled</Tag>;
+    // Get cost summary icons with tooltips
+    const getCostSummary = (component) => {
+        if (!component?.costs) return null;
+        
+        const costComponents = [
+            { 
+                key: 'componentReplacement', 
+                icon: COST_ICONS.componentReplacement,
+                label: 'Component Cost',
+                getValue: (costs) => costs.componentReplacement?.parameters?.value || 0
+            },
+            { 
+                key: 'craneMobilization', 
+                icon: COST_ICONS.craneMobilization,
+                label: 'Crane Mobilization',
+                getValue: (costs) => costs.craneMobilization?.parameters?.value || 0
+            },
+            { 
+                key: 'craneDailyRate', 
+                icon: COST_ICONS.craneDailyRate,
+                label: 'Crane Daily Rate',
+                getValue: (costs) => costs.craneDailyRate?.parameters?.value || 0
+            },
+            { 
+                key: 'repairDurationDays', 
+                icon: COST_ICONS.repairDurationDays,
+                label: 'Repair Duration',
+                getValue: (costs) => costs.repairDurationDays?.parameters?.value || 0
+            },
+            { 
+                key: 'specialistLabor', 
+                icon: COST_ICONS.specialistLabor,
+                label: 'Specialist Labor',
+                getValue: (costs) => costs.specialistLabor?.parameters?.value || 0
+            },
+            { 
+                key: 'downtimeRevenuePerDay', 
+                icon: COST_ICONS.downtimeRevenuePerDay,
+                label: 'Downtime Revenue Loss',
+                getValue: (costs) => costs.downtimeRevenuePerDay?.parameters?.value || 0
+            }
+        ];
+        
+        const configuredComponents = costComponents.filter(comp => {
+            const value = comp.getValue(component.costs);
+            return value > 0;
+        });
+        
+        if (configuredComponents.length === 0) {
+            return <Tag color="default">Not configured</Tag>;
+        }
+        
+        return (
+            <Space size={4} wrap>
+                {configuredComponents.map(comp => {
+                    const value = comp.getValue(component.costs);
+                    const formattedValue = comp.key === 'repairDurationDays' 
+                        ? `${value} days`
+                        : `$${value.toLocaleString()}`;
+                    
+                    return (
+                        <Tooltip 
+                            key={comp.key}
+                            title={`${comp.label}: ${formattedValue}`}
+                            placement="top"
+                        >
+                            <span style={{ cursor: 'help' }}>
+                                {comp.icon}
+                            </span>
+                        </Tooltip>
+                    );
+                })}
+            </Space>
+        );
     };
 
-    // EditableTable columns configuration using reusable column helpers
+    // EditableTable columns configuration
     const columns = [
         {
-            title: 'Component',
+            title: 'Component Name',
             dataIndex: 'name',
             key: 'name',
-            width: '25%',
-            render: (name, record) => (
-                <Space>
-                    {COMPONENT_ICONS[record.icon] || <ToolOutlined />}
-                    <div>
-                        <div style={{ fontWeight: 500 }}>{name}</div>
-                        <Tag color={CATEGORY_COLORS[record.category]} size="small">
-                            {record.category?.charAt(0).toUpperCase() + record.category?.slice(1)}
-                        </Tag>
-                    </div>
-                </Space>
+            width: '18%',
+            render: (name) => (
+                <div style={{ fontWeight: 500 }}>{name}</div>
             )
         },
-        createBooleanColumn('enabled', 'Enabled', {
-            width: '15%',
-            trueText: 'Yes',
-            falseText: 'No',
-            trueColor: 'success',
-            falseColor: 'default'
-        }),
+        {
+            title: 'Category',
+            dataIndex: 'category',
+            key: 'category',
+            width: '12%',
+            render: (category) => (
+                <Tag color={CATEGORY_COLORS[category]}>
+                    {category?.charAt(0).toUpperCase() + category?.slice(1)}
+                </Tag>
+            )
+        },
+        {
+            title: 'Enabled',
+            key: 'enabled',
+            width: '10%',
+            align: 'center',
+            render: (_, record, index) => (
+                <SwitchField
+                    path={`settings.project.equipment.failureRates.components.${index}.enabled`}
+                    size="small"
+                    checkedChildren={<CheckOutlined />}
+                    unCheckedChildren={<CloseOutlined />}
+                />
+            )
+        },
         {
             title: 'Failure Rate',
             dataIndex: 'failureRate',
             key: 'failureRate',
-            width: '25%',
+            width: '15%',
             render: (failureRate) => (
                 <Text style={{ fontFamily: 'monospace' }}>
                     {formatFailureRate(failureRate)}
@@ -260,18 +337,27 @@ const FailureRates = () => {
             )
         },
         {
-            title: 'Details',
-            key: 'details',
-            width: 100,
+            title: 'Cost Summary',
+            key: 'costSummary',
+            width: '25%',
+            render: (_, record) => getCostSummary(record)
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            width: '20%',
             align: 'center',
             render: (_, record, index) => (
-                <Button
-                    type="text"
-                    onClick={() => handleDetailedConfig(record, index)}
-                    size="small"
-                >
-                    Configure
-                </Button>
+                <Space size="small">
+                    <Button
+                        type="text"
+                        onClick={() => handleDetailedConfig(record, index)}
+                        size="small"
+                        title="Configure detailed failure rate and cost parameters"
+                    >
+                        Configure
+                    </Button>
+                </Space>
             )
         }
     ];
@@ -299,16 +385,12 @@ const FailureRates = () => {
             </Form.Item>
             
             <ContextField
-                path="icon"
-                component={Input}
-                label="Icon"
-                required
-                rules={[{ required: true, message: 'Icon is required' }]}
+                path="enabled"
+                component={Switch}
+                label="Enabled"
+                transform={(checked) => checked}
+                valuePropName="checked"
             />
-            
-            <Form.Item label="Enabled" name="enabled" valuePropName="checked">
-                <Switch />
-            </Form.Item>
             
         </>
     );

@@ -138,5 +138,41 @@ Mongoose schemas in `/mongoose` are auto-generated from Yup schemas using `yupTo
 - **Extensions**: Add custom Yup validations (e.g., regex) if needed, but mirror them in Mongoose where possible.
 - **Errors**: Both frontend and backend return detailed error arrays for user-friendly feedback.
 
-This setup ensures consistent validation across your stack while leveraging Yup’s power and Mongoose’s DB enforcement.
+This setup ensures consistent validation across your stack while leveraging Yup's power and Mongoose's DB enforcement.
+
+## Component Failure Rates Schema Updates
+
+### Recent Changes (2025-08-16)
+The `componentFailureRates.js` schema has been updated with the following changes:
+
+#### Removed Fields:
+- **icon field**: Component icons removed from schema for cleaner UI design
+
+#### Enhanced Fields:
+- **category**: Required field with 5 categories (drivetrain, electrical, rotor, mechanical, control)
+- **costs.repairDurationDays**: New cost component for repair time modeling
+- **costs.downtimeRevenuePerDay**: Enhanced revenue loss modeling
+
+#### Schema Structure:
+```javascript
+const ComponentFailureRateSchema = Yup.object().shape({
+  id: Yup.string().required(),
+  name: Yup.string().required(),
+  category: Yup.string().oneOf(['drivetrain', 'electrical', 'rotor', 'mechanical', 'control']).required(),
+  enabled: Yup.boolean().default(false),
+  failureRate: DistributionTypeSchema.default(() => ({ /* ... */ })),
+  costs: Yup.object().shape({
+    componentReplacement: DistributionTypeSchema,
+    craneMobilization: DistributionTypeSchema,
+    craneDailyRate: DistributionTypeSchema,
+    repairDurationDays: DistributionTypeSchema, // NEW
+    specialistLabor: DistributionTypeSchema,
+    downtimeRevenuePerDay: DistributionTypeSchema // UPDATED name
+  })
+});
 ```
+
+#### UI Integration:
+- Components now use EditableTable pattern with dynamic arrays
+- Cost visualization through 6 icon types with tooltips
+- Category-based color coding for organization

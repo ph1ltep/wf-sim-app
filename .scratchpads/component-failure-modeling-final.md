@@ -37,9 +37,12 @@ Component failure rate modeling MVP leveraging existing distribution system. No 
 
 ## Optimized Data Structure (Leveraging Existing System)
 
-### Component Failure Schema - Clean & Simple
+### Component Failure Schema - Clean & Simple (UPDATED)
 ```javascript
-const ComponentFailureSchema = Yup.object().shape({
+const ComponentFailureRateSchema = Yup.object().shape({
+  id: Yup.string().required('Component ID is required'),
+  name: Yup.string().required('Component name is required'),
+  category: Yup.string().oneOf(['drivetrain', 'electrical', 'rotor', 'mechanical', 'control']).required(),
   enabled: Yup.boolean().default(false),
   
   // Single failure rate field - leverages full DistributionFieldV3 capabilities
@@ -47,54 +50,71 @@ const ComponentFailureSchema = Yup.object().shape({
     type: 'exponential', // or 'weibull', 'fixed', 'lognormal'
     parameters: { lambda: 0.025, value: 0.025 },
     timeSeriesMode: false, // Enable for aging effects
-    timeSeriesParameters: { value: [] } // DataPointSchema arrays for time-varying
+    timeSeriesParameters: { value: [] }, // DataPointSchema arrays for time-varying
+    metadata: { percentileDirection: 'ascending' }
   })),
   
-  // Cost components using existing distribution system
+  // Enhanced cost components - 6 cost types for comprehensive modeling
   costs: Yup.object().shape({
     componentReplacement: DistributionTypeSchema.default(() => ({
       type: 'lognormal',
-      parameters: { mu: 13.1, sigma: 0.4, value: 500000 }
+      parameters: { mu: 13.1, sigma: 0.4, value: 500000 },
+      metadata: { percentileDirection: 'ascending' }
     })),
     craneMobilization: DistributionTypeSchema.default(() => ({
       type: 'triangular',
-      parameters: { min: 80000, mode: 120000, max: 200000, value: 120000 }
+      parameters: { min: 80000, mode: 120000, max: 200000, value: 120000 },
+      metadata: { percentileDirection: 'ascending' }
     })),
     craneDailyRate: DistributionTypeSchema.default(() => ({
       type: 'normal',
-      parameters: { mean: 15000, stdDev: 3000, value: 15000 }
+      parameters: { mean: 15000, stdDev: 3000, value: 15000 },
+      metadata: { percentileDirection: 'ascending' }
     })),
     repairDurationDays: DistributionTypeSchema.default(() => ({
       type: 'gamma',
-      parameters: { shape: 3, scale: 2, value: 6 }
+      parameters: { shape: 3, scale: 2, value: 6 }, // 6 days average
+      metadata: { percentileDirection: 'ascending' }
     })),
     specialistLabor: DistributionTypeSchema.default(() => ({
       type: 'normal',
-      parameters: { mean: 35000, stdDev: 10000, value: 35000 }
+      parameters: { mean: 35000, stdDev: 10000, value: 35000 },
+      metadata: { percentileDirection: 'ascending' }
     })),
     downtimeRevenuePerDay: DistributionTypeSchema.default(() => ({
       type: 'normal',
-      parameters: { mean: 200, stdDev: 50, value: 200 }
+      parameters: { mean: 200, stdDev: 50, value: 200 }, // $/MWh/day
+      metadata: { percentileDirection: 'descending' } // Revenue loss
     }))
-  })
-});
+  }).default(() => ({}))
+}).default(() => ({}));
 
-// Portfolio-level configuration  
+// Portfolio-level configuration (UPDATED - Dynamic Array Structure)
 const ComponentFailureModelingSchema = Yup.object().shape({
   enabled: Yup.boolean().default(false),
   
-  // 8 standardized components
-  components: Yup.object().shape({
-    gearbox: ComponentFailureSchema.default(() => ({})),
-    generator: ComponentFailureSchema.default(() => ({})),
-    mainBearing: ComponentFailureSchema.default(() => ({})),
-    powerElectronics: ComponentFailureSchema.default(() => ({})),
-    bladeBearings: ComponentFailureSchema.default(() => ({})),
-    yawSystem: ComponentFailureSchema.default(() => ({})),
-    controlSystem: ComponentFailureSchema.default(() => ({})),
-    transformer: ComponentFailureSchema.default(() => ({}))
-  })
-});
+  // Dynamic array of components for EditableTable pattern
+  components: Yup.array().of(ComponentFailureRateSchema).default(() => DEFAULT_COMPONENTS)
+}).default(() => ({ enabled: false, components: DEFAULT_COMPONENTS }));
+
+// DEFAULT_COMPONENTS array with 8 standardized components including categories
+const DEFAULT_COMPONENTS = [
+  {
+    id: 'gearbox',
+    name: 'Gearbox',
+    category: 'drivetrain',
+    enabled: false,
+    failureRate: { type: 'exponential', parameters: { lambda: 0.025, value: 0.025 } }
+  },
+  {
+    id: 'generator', 
+    name: 'Generator',
+    category: 'electrical',
+    enabled: false,
+    failureRate: { type: 'exponential', parameters: { lambda: 0.020, value: 0.020 } }
+  }
+  // ... (additional 6 components)
+];
 ```
 
 ## Warranty Modeling (Future - Out of MVP Scope)
@@ -107,61 +127,63 @@ Schema designed to support warranty integration via matrix approach:
 
 ## UI Implementation (Leveraging Existing Components)
 
-### FailureRates.jsx Page Structure
+### FailureRates.jsx Page Structure (UPDATED - EditableTable Pattern)
 ```javascript
 const FailureRates = () => (
   <div>
-    <ComponentFailureGlobalCard />
-    <ComponentFailureList>
-      {COMPONENT_TYPES.map(component => (
-        <ComponentFailureCard key={component} componentType={component} />
-      ))}
-    </ComponentFailureList>
-    <FailureCostSummaryCard /> {/* Simple visualization */}
+    <GlobalConfigurationCard /> {/* Enable/disable failure modeling */}
+    <EditableTableCard>
+      <EditableTable
+        path="settings.project.equipment.failureRates.components"
+        columns={[componentName, category, enabled, failureRate, costSummary, actions]}
+        formFields={componentFormFields}
+        itemName="Component"
+        keyField="id"
+      />
+    </EditableTableCard>
+    <FailureRateSummaryCard /> {/* Simple visualization */}
+    <ComponentFailureModal /> {/* Detailed configuration modal */}
   </div>
 );
 
-// Clean component using existing DistributionFieldV3
-const ComponentFailureCard = ({ componentType }) => {
-  const basePath = `settings.componentFailure.components.${componentType}`;
-  
-  return (
-    <Card title={COMPONENT_NAMES[componentType]}>
-      <ContextField path={`${basePath}.enabled`} fieldType="boolean" />
-      
-      {/* Single failure rate field - all input modes supported */}
-      <DistributionFieldV3
-        path={[basePath, 'failureRate']}
-        label="Annual Failure Rate"
-        addonAfter="failures/year"
-        distributionOptions={[
-          { value: 'fixed', label: 'Fixed Rate' },
-          { value: 'exponential', label: 'Constant Rate' },
-          { value: 'weibull', label: 'Aging Effects' },
-          { value: 'lognormal', label: 'General Uncertainty' }
-        ]}
-        showTimeSeriesToggle={true}
-        allowCurveToggle={true}
-        showVisualization={true}
-      />
-      
-      <Collapse ghost>
-        <Panel key="costs" header="Cost Components">
-          <DistributionFieldV3
-            path={[basePath, 'costs', 'componentReplacement']}
-            label="Component Replacement Cost"
-            addonAfter="USD"
-          />
-          <DistributionFieldV3
-            path={[basePath, 'costs', 'craneMobilization']} 
-            label="Crane Mobilization Cost"
-            addonAfter="USD"
-          />
-          {/* Additional cost fields */}
-        </Panel>
-      </Collapse>
-    </Card>
-  );
+// Table columns with enhanced design (NO ICONS for components)
+const columns = [
+  {
+    title: 'Component Name',
+    dataIndex: 'name',
+    render: (name) => <div style={{ fontWeight: 500 }}>{name}</div>
+  },
+  createTagColumn('category', 'Category', {
+    colorMap: CATEGORY_COLORS,
+    render: (category) => (
+      <Tag color={CATEGORY_COLORS[category]}>
+        {category?.charAt(0).toUpperCase() + category?.slice(1)}
+      </Tag>
+    )
+  }),
+  createIconColumn('Enabled', [{
+    key: 'enabled',
+    icon: <CheckOutlined />,
+    tooltip: 'Component is enabled for failure modeling',
+    color: '#52c41a'
+  }]),
+  {
+    title: 'Cost Summary',
+    render: (_, record) => getCostSummary(record) // 6 cost icons with tooltips
+  }
+];
+
+// Cost summary with 6 cost component icons
+const getCostSummary = (component) => {
+  const COST_ICONS = {
+    componentReplacement: <DollarOutlined style={{ color: '#1890ff' }} />,
+    craneMobilization: <ToolOutlined style={{ color: '#52c41a' }} />,
+    craneDailyRate: <BankOutlined style={{ color: '#fa8c16' }} />,
+    repairDurationDays: <ClockCircleOutlined style={{ color: '#722ed1' }} />,
+    specialistLabor: <UserOutlined style={{ color: '#eb2f96' }} />,
+    downtimeRevenuePerDay: <ExclamationCircleOutlined style={{ color: '#f5222d' }} />
+  };
+  // Return configured cost icons with tooltips
 };
 ```
 
@@ -244,8 +266,10 @@ await updateByPath(`${basePath}.components.gearbox.failureRate`, {
 - **Backend**: Existing Monte Carlo engine processes everything automatically
 - **Performance**: Optimal - no new infrastructure overhead
 
-## File Structure - Simplified
-- Schema: `/schemas/yup/componentFailure.js` (minimal - leverages existing)
-- UI Page: `/frontend/src/pages/scenario/equipment/FailureRates.jsx`
+## File Structure - Updated
+- Schema: `/schemas/yup/componentFailureRates.js` (UPDATED - removed icon field, enhanced cost structure)
+- UI Page: `/frontend/src/pages/scenario/equipment/FailureRates.jsx` (UPDATED - EditableTable pattern)
+- Modal: `/frontend/src/pages/scenario/equipment/ComponentFailureModal.jsx` (detailed configuration)
+- Summary Card: `/frontend/src/components/cards/FailureRateSummaryCard.jsx`
 - Cube Sources: Enhanced `/frontend/src/utils/cube/sources/registry.js`
 - Transformers: `/frontend/src/utils/cube/sources/transformers/componentFailure.js`

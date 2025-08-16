@@ -12,7 +12,6 @@ const ComponentFailureRateSchema = Yup.object().shape({
     id: Yup.string().required('Component ID is required'),
     name: Yup.string().required('Component name is required'),
     category: Yup.string().oneOf(['drivetrain', 'electrical', 'rotor', 'mechanical', 'control']).required(),
-    icon: Yup.string().default('tool'),
     enabled: Yup.boolean().default(false),
     
     // Failure rate using existing distribution system - supports all input modes
@@ -65,7 +64,6 @@ const DEFAULT_COMPONENTS = [
         id: 'gearbox',
         name: 'Gearbox',
         category: 'drivetrain',
-        icon: 'setting',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -78,7 +76,6 @@ const DEFAULT_COMPONENTS = [
         id: 'generator',
         name: 'Generator',
         category: 'electrical',
-        icon: 'thunderbolt',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -91,7 +88,6 @@ const DEFAULT_COMPONENTS = [
         id: 'mainBearing',
         name: 'Main Bearing',
         category: 'drivetrain',
-        icon: 'tool',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -104,7 +100,6 @@ const DEFAULT_COMPONENTS = [
         id: 'powerElectronics',
         name: 'Power Electronics',
         category: 'electrical',
-        icon: 'control',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -117,7 +112,6 @@ const DEFAULT_COMPONENTS = [
         id: 'bladeBearings',
         name: 'Blade Bearings',
         category: 'rotor',
-        icon: 'sync',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -130,7 +124,6 @@ const DEFAULT_COMPONENTS = [
         id: 'yawSystem',
         name: 'Yaw System',
         category: 'mechanical',
-        icon: 'reload',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -143,7 +136,6 @@ const DEFAULT_COMPONENTS = [
         id: 'controlSystem',
         name: 'Control System',
         category: 'control',
-        icon: 'dashboard',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -156,7 +148,6 @@ const DEFAULT_COMPONENTS = [
         id: 'transformer',
         name: 'Transformer',
         category: 'electrical',
-        icon: 'api',
         enabled: false,
         failureRate: {
             type: 'exponential',
@@ -180,49 +171,41 @@ const COMPONENT_METADATA = {
     gearbox: {
         name: 'Gearbox',
         description: 'Main gearbox assembly (geared platforms only)',
-        icon: 'setting',
         category: 'drivetrain'
     },
     generator: {
         name: 'Generator',
         description: 'Electrical generator assembly',
-        icon: 'thunderbolt',
         category: 'electrical'
     },
     mainBearing: {
         name: 'Main Bearing',
         description: 'Main shaft bearing assembly',
-        icon: 'tool',
         category: 'drivetrain'
     },
     powerElectronics: {
         name: 'Power Electronics',
         description: 'Power conversion and control systems',
-        icon: 'control',
         category: 'electrical'
     },
     bladeBearings: {
         name: 'Blade Bearings',
         description: 'Blade pitch bearing assemblies',
-        icon: 'sync',
         category: 'rotor'
     },
     yawSystem: {
         name: 'Yaw System',
         description: 'Nacelle yaw drives and bearings',
-        icon: 'reload',
         category: 'mechanical'
     },
     controlSystem: {
         name: 'Control System',
         description: 'Turbine control and SCADA systems',
-        icon: 'dashboard',
         category: 'control'
     },
     transformer: {
         name: 'Transformer',
         description: 'Step-up transformer assembly',
-        icon: 'api',
         category: 'electrical'
     }
 };
