@@ -18,6 +18,7 @@
   "homepage": "https://github.com/ph1ltep/wf-sim-app#readme",
   "description": "",
   "dependencies": {
+    "@playwright/test": "^1.54.2",
     "mongoose": "^8.13.2",
     "yup": "^1.6.1"
   }

@@ -12,11 +12,12 @@ Space-efficient UI for configuring 8 major wind turbine component failure rates 
 - **Space efficient**: All components visible at-a-glance with quick enable/disable
 
 ### Table Columns Design
-1. **Component** (25%): Name + icon (gearbox, generator, etc.)
-2. **Enabled** (15%): Toggle switch for quick enable/disable
-3. **Failure Rate** (25%): Summary display (e.g., "Weibull (μ=2.5%)" or "Fixed: 2.5%")
-4. **Cost Impact** (20%): Annual expected cost summary
-5. **Status** (15%): Configuration status icon (configured/default/error)
+1. **Component Name** (20%): Clean text-only display (icons removed for cleaner design)
+2. **Category** (15%): Separate column with color-coded tags (drivetrain, electrical, rotor, mechanical, control)
+3. **Enabled** (10%): Icon column with check/close indicators for quick status identification
+4. **Failure Rate** (18%): Summary display (e.g., "2.50% annual" or "Not configured")
+5. **Cost Summary** (20%): New icon-based display showing configured cost components with tooltips
+6. **Actions** (17%): Configure, Edit, Delete buttons for component management
 
 ### Modal Edit Form (Tabbed Interface)
 **Tab 1: Failure Rate Configuration**
@@ -35,7 +36,7 @@ Space-efficient UI for configuring 8 major wind turbine component failure rates 
 - Design life assumptions
 - Historical calibration data
 
-## Data Structure (Simplified)
+## Data Structure (Updated)
 
 ### Schema Location
 `settings.project.equipment.failureRates`
@@ -43,6 +44,9 @@ Space-efficient UI for configuring 8 major wind turbine component failure rates 
 ### Component Structure
 ```javascript
 const ComponentFailureRateSchema = Yup.object().shape({
+  id: Yup.string().required('Component ID is required'),
+  name: Yup.string().required('Component name is required'),
+  category: Yup.string().oneOf(['drivetrain', 'electrical', 'rotor', 'mechanical', 'control']).required(),
   enabled: Yup.boolean().default(false),
   
   // Single failure rate field - all input modes via DistributionFieldV3
@@ -51,41 +55,55 @@ const ComponentFailureRateSchema = Yup.object().shape({
     parameters: { lambda: 0.025, value: 0.025 }
   })),
   
-  // Cost components
+  // Enhanced cost components with 6 cost types
   costs: Yup.object().shape({
     componentReplacement: DistributionTypeSchema,
     craneMobilization: DistributionTypeSchema,
     craneDailyRate: DistributionTypeSchema,
+    repairDurationDays: DistributionTypeSchema,
     specialistLabor: DistributionTypeSchema,
-    downtimeRevenue: DistributionTypeSchema
+    downtimeRevenuePerDay: DistributionTypeSchema
   })
 });
 ```
 
 ### Default Components (Extensible)
 **8 Default Major Components:**
-1. **gearbox**: Default 2.5% annual rate (geared platforms only)
-2. **generator**: Default 2.0% annual rate
-3. **mainBearing**: Default 1.8% annual rate  
-4. **powerElectronics**: Default 2.2% annual rate
-5. **bladeBearings**: Default 1.5% annual rate (3 per turbine)
-6. **yawSystem**: Default 1.2% annual rate
-7. **controlSystem**: Default 0.8% annual rate
-8. **transformer**: Default 1.0% annual rate
+1. **gearbox**: Default 2.5% annual rate (drivetrain category)
+2. **generator**: Default 2.0% annual rate (electrical category)
+3. **mainBearing**: Default 1.8% annual rate (drivetrain category)
+4. **powerElectronics**: Default 2.2% annual rate (electrical category)
+5. **bladeBearings**: Default 1.5% annual rate (rotor category)
+6. **yawSystem**: Default 1.2% annual rate (mechanical category)
+7. **controlSystem**: Default 0.8% annual rate (control category)
+8. **transformer**: Default 1.0% annual rate (electrical category)
 
-**Extensible Design:** Architecture supports adding custom components (tower, cables, sensors, etc.)
+**Category Color Coding:**
+- Drivetrain: Blue
+- Electrical: Orange
+- Rotor: Green
+- Mechanical: Purple
+- Control: Cyan
+
+**Extensible Design:** Architecture supports adding custom components through EditableTable interface
 
 ## UI Components Required
 
 ### Primary Components
-1. **ComponentFailureRatesTable** - Main table using EditableTable pattern
-2. **ComponentFailureModal** - Modal form with tabbed interface
+1. **EditableTable** - Main table using proven EditableTable pattern (no custom table needed)
+2. **ComponentFailureModal** - Modal form with tabbed interface for detailed configuration
 3. **FailureRateSummaryCard** - Overview metrics card
 
-### Utility Components  
-4. **ComponentFailureRow** - Table row component with summary display
-5. **FailureRateDisplay** - Smart display for different distribution types
-6. **ComponentToggle** - Enable/disable toggle with visual feedback
+### Enhanced Table Features
+4. **Category Tags** - Color-coded category display using Antd Tag component
+5. **Enabled Status Icons** - CheckOutlined/CloseOutlined icon display
+6. **Cost Summary Icons** - Six cost component icons with detailed tooltips:
+   - Component Replacement (DollarOutlined)
+   - Crane Mobilization (ToolOutlined)
+   - Crane Daily Rate (BankOutlined)
+   - Repair Duration (ClockCircleOutlined)
+   - Specialist Labor (UserOutlined)
+   - Downtime Revenue (ExclamationCircleOutlined)
 
 ## Implementation Benefits
 

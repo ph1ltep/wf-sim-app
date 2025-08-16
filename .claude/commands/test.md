@@ -5,6 +5,7 @@
 - Target component/feature: $ARGUMENTS
 - Existing test files and frameworks will be referenced using @ file syntax.
 - Current test coverage and gaps will be assessed.
+- Use jest and Playwright for testing.
 
 ## Your Role
 You are the Test Strategy Coordinator managing four testing specialists:

@@ -2,25 +2,51 @@
 
 This file contains project-specific instructions that Claude should read at the start of each conversation and maintain in memory throughout the entire interaction. **IMPORTANT:** Once this file has been read or updated, it MUST be loaded at the beginning of any new conversation to ensure awareness of communication requirements, custom tasks, etc.
 
-## CRITICAL & IMPORTANT Rules to ALWAYS FOLLOW
-- ALL instructions within this document MUST BE FOLLOWED, these are not optional unless explicitly stated.
-- ASK FOR CLARIFICATION If you are uncertain of any of thing within the document.
-- DO NOT edit more code than you have to.
-- DO NOT WASTE TOKENS, be succinct and concise.
+## 🚨 QUICK DECISION MATRIX - USE THIS FIRST
+| Task Type | Primary Agent | Support Agents | Execution |
+|-----------|--------------|----------------|-----------|
+| Frontend Feature | frontend-feature-architect | api-data-architect, wind-finance-risk-analyst | Sequential |
+| React Implementation | frontend-master-engineer | wind-finance-risk-analyst, documentation-manager | Parallel |
+| Data Schema Design | api-data-architect | documentation-manager, wind-finance-risk-analyst | Parallel |
+| Financial Modeling | wind-finance-risk-analyst | api-data-architect, documentation-manager | Sequential |
+| Code Review/Validation | ALL agents | - | Parallel |
+| Documentation | documentation-manager | api-data-architect (for schemas) | After changes |
 
-1. **Edit existing files first** - avoid new file creation
-2. **Yup schemas drive everything** - validation + Mongoose generation
+## 🚨 CRITICAL RULES - MANDATORY COMPLIANCE
+- **ALL** instructions within this document **MUST BE FOLLOWED** - these are not optional
+- **ASK FOR CLARIFICATION** if uncertain about any instruction
+- **MINIMIZE** code edits - only change what's necessary
+- **CONSERVE TOKENS** - be succinct and precise
+
+### Core Principles (ALWAYS ENFORCE):
+1. **Edit existing files FIRST** - avoid new file creation
+2. **Yup schemas drive EVERYTHING** - validation + Mongoose generation
 3. **Context-first state management** - minimize local state
 4. **Fail fast validation** - explicit error boundaries
 5. **Antd design system** - consistent UI patterns
 6. **Distribution-aware inputs** - support uncertainty modeling
-7. **Git commits** - MUST follow rules at @.claude/references/git-conventional-commits.md
-8. **USE sub-agents in parallel and sequential thinking** when useful or necessary.
+7. **Git commits** - MUST follow @.claude/references/git-conventional-commits.md
+8. **MANDATORY: USE SUB-AGENTS** - leverage specialized agents for ALL tasks
+
+## 🎯 IMMEDIATE ACTION PROTOCOL
+
+### ⚡ FIRST STEP: AGENT DELEGATION DECISION
+**Before ANY coding task, IMMEDIATELY assess:**
+1. **Is this a frontend task?** → Use **frontend-master-engineer** (MANDATORY)
+2. **Need feature planning?** → Start with **frontend-feature-architect**
+3. **Data/schema changes?** → Include **api-data-architect** + **documentation-manager**
+4. **Financial/risk modeling?** → Involve **wind-finance-risk-analyst**
+5. **ANY code changes?** → **ALWAYS** call **documentation-manager** to sync feature docs
+6. **Feature folder exists?** → **documentation-manager** MUST update .md files in that folder
+
+**Use PARALLEL execution whenever possible for maximum efficiency.**
 
 ## Default Mode
 
+- **Sub-agent orchestration mode** is PRIMARY approach
 - Architect mode should be enabled by default
-- Focus on providing detailed analysis, patterns, trade-offs, and architectural guidance
+- Focus on leveraging specialized agents for optimal results
+- Provide detailed analysis, patterns, trade-offs, and architectural guidance
 
 ## Permissions
 
@@ -73,30 +99,33 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
   1. Run task:commit (need to manually stage files first)
   2. Neither (stop here)
 
-## Coding Standards & AI Instructions
+## 💻 CODING STANDARDS & AI ORCHESTRATION
 
-### Key requirements
-- ALWAYS respect how things are written in the existing project
-- ALWAYS add JSDoc to exported functions.
-- DO NOT invent your own approaches or innovations
-- STRICTLY follow the existing style of tests, resolvers, functions, and arguments
-- Before creating a new file, ALWAYS examine a similar file and follow its style exactly
-- If code doesn't include comments, DO NOT add comments
-- Use seeded data in tests instead of creating new objects when seeded data exists
-- Follow the exact format of error handling, variable naming, and code organization used in similar files
-- Never deviate from the established patterns in the codebase
+### 🚨 CRITICAL REQUIREMENTS (NEVER VIOLATE):
+- **AGENT-FIRST APPROACH**: ALL coding tasks MUST use specialized agents
+- **RESPECT EXISTING CODE**: Follow project patterns religiously
+- **NO INNOVATION**: Use established patterns, don't invent new approaches
+- **JSDoc MANDATORY**: Add to ALL exported functions
+- **STYLE CONSISTENCY**: Examine similar files, follow exactly
+- **MINIMAL COMMENTS**: Only add if code clarity insufficient
+- **SEEDED DATA**: Use existing test data, don't create new objects
+- **PATTERN ADHERENCE**: Never deviate from established codebase patterns
+
+### 🎯 AI ORCHESTRATION PROTOCOL:
+1. **READ CONTEXT FIRST**: Always examine relevant files before planning
+2. **DELEGATE TO AGENTS**: Use specialized agents for their expertise areas
+3. **PARALLEL EXECUTION**: Run multiple agents simultaneously when possible
+4. **CROSS-VALIDATION**: Have agents review each other's outputs
+5. **DOCUMENTATION SYNC**: Always update docs after code changes
 
 ### General Instructions
-- Your most important job is to manage your own context. Always read any relevant files BEFORE planning changes.
-- When updating documentation, keep updates concise and on point to prevent bloat.
-- Write code following KISS, YAGNI, and DRY principles.
-- When in doubt follow proven best practices for implementation.
-- Do not commit to git without user approval.
-- Do not run any servers, rather tell the user to run servers for testing.
-- Always consider industry standard libraries/frameworks first over custom implementations.
-- Never mock anything. Never use placeholders. Never omit code.
-- Apply SOLID principles where relevant. Use modern framework features rather than reinventing solutions.
-- Be brutally honest about whether an idea is good or bad.
+- **PRIMARY JOB**: Orchestrate specialized agents effectively
+- **CONTEXT MANAGEMENT**: Read relevant files BEFORE planning changes
+- **CONCISE UPDATES**: Keep documentation updates focused
+- **PROVEN PRINCIPLES**: Follow KISS, YAGNI, DRY, and SOLID
+- **INDUSTRY STANDARDS**: Use established libraries over custom solutions
+- **NO MOCKING/PLACEHOLDERS**: Always implement complete solutions
+- **BRUTAL HONESTY**: Give direct feedback on ideas and implementations
 
 ## Knowledge Sharing and Persistence
 
@@ -118,44 +147,66 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
 
 - When a path starts with `./` in any file containing instructions for Claude, it means the path is relative to that file's location. Always interpret relative paths in the context of the file they appear in, not the current working directory.
 
-## Task Delegation Strategy
+## 🤖 MANDATORY SUB-AGENT STRATEGY - ALWAYS USE
 
-### Parallel Sub-Agent Coordination
-**Multiple agents can work together simultaneously** for optimal results:
+### 🚀 PRIMARY DIRECTIVE: LEVERAGE SPECIALIZED AGENTS
+**CRITICAL:** For ANY substantial task, **IMMEDIATELY** delegate to appropriate specialized agents. Use them in **PARALLEL** or **SEQUENTIAL** execution as optimal.
 
-**Feature Development Pipeline:**
-- **frontend-feature-architect** → **api-data-architect** → **frontend-master-engineer**
-- **wind-finance-risk-analyst** provides domain expertise throughout
-- **documentation-manager** updates docs after significant changes
+### 🎯 FRONTEND CODING WORKFLOW (MANDATORY):
+**ALL frontend coding tasks MUST go through:**
+1. **frontend-feature-architect** → Plan & architect the feature
+2. **api-data-architect** → Design data structures & schemas (if needed)
+3. **frontend-master-engineer** → Implement the code
+4. **documentation-manager** → Update docs after changes
 
-### Agent Specializations
+### ⚡ AGENT SPECIALIZATIONS - USE PROACTIVELY
 
-**IMPORTANT** Dynamically call any sub-agent deemed necessary or significantly helpful for the task at hand. Call sub-agents in PARALLEL or Squential Thinking when necessary. 
-
-**frontend-master-engineer**: React implementation
+**🎨 frontend-master-engineer** (PRIMARY for React code):
+- **MANDATORY** for ALL React/frontend implementation
 - Collaborate with **wind-finance-risk-analyst** for statistical algorithms
-- Coordinate with **api-data-architect** for optimal data structures
-- Partner with **documentation-manager** for component documentation
+- Coordinate with **api-data-architect** for data structures
+- Partner with **documentation-manager** for documentation
 
-**frontend-feature-architect**: Feature planning & architecture  
-- Work with **api-data-architect** to design data structures
-- Consult **wind-finance-risk-analyst** for critical data requirements
-- Plan feature breakdown and component hierarchies
+**🏗️ frontend-feature-architect** (Feature planning):
+- **REQUIRED** before any new feature development
+- Design component hierarchies and feature breakdown
+- Work with **api-data-architect** for data structure design
+- Consult **wind-finance-risk-analyst** for domain requirements
 
-**api-data-architect**: Data structures & API design
-- Design Yup schemas and API endpoints
-- Collaborate with **wind-finance-risk-analyst** for financial data models
-- Support **frontend-master-engineer** with optimal data patterns
+**📊 api-data-architect** (Data & API design):
+- **ESSENTIAL** for Yup schemas and API endpoints
+- **MANDATORY COORDINATION** with **documentation-manager** for schema documentation
+- Collaborate with **wind-finance-risk-analyst** for financial models
+- Support **frontend-master-engineer** with optimal patterns
+- **UPDATE FEATURE DOCS**: Ensure .md files in feature folders reflect schema changes
 
-**wind-finance-risk-analyst**: Domain expertise
-- Provide risk algorithms and statistical methods
-- Guide financial model requirements across all agents
+**💰 wind-finance-risk-analyst** (Domain expertise):
+- **CRITICAL** for financial modeling and risk algorithms
+- Guide requirements across ALL other agents
 - Review data structures for industry compliance
+- Provide statistical methods and validation
 
-**documentation-manager**: Documentation maintenance
-- **Always called after significant feature changes**
-- Updates README, API docs, and component documentation
-- Maintains consistency across all documentation
+**📚 documentation-manager** (Always call after changes):
+- **MANDATORY** after significant feature implementations
+- **FEATURE DOCUMENTATION SYNC**: Update .md files in feature subfolders when code changes
+- **SCHEMA COORDINATION**: Work with **api-data-architect** to document schema changes
+- Update README, API docs, and component documentation
+- **SEARCH FOR FEATURE DOCS**: Automatically identify and update relevant .md files in feature directories
+- Maintain consistency across all project documentation
+
+### 🔄 EXECUTION PATTERNS:
+- **PARALLEL**: Multiple agents working simultaneously on different aspects
+- **SEQUENTIAL**: Pipeline approach with handoffs between agents
+- **COLLABORATIVE**: Agents consulting each other during execution
+- **VALIDATION**: Cross-agent review and validation of outputs
+
+### 📋 FEATURE DOCUMENTATION PROTOCOL:
+**CRITICAL:** When making ANY code changes, agents MUST:
+1. **api-data-architect** + **documentation-manager**: Update schema documentation immediately
+2. **documentation-manager**: Search for and update relevant .md files in feature subfolders
+3. **PATTERN**: Look for `/[feature-name]/README.md` or `/[feature-name]/docs/*.md` files
+4. **SYNCHRONIZATION**: Ensure feature docs reflect current implementation state
+5. **CROSS-REFERENCE**: Update inter-feature documentation links when schemas change
 
 ## Core Architecture
 

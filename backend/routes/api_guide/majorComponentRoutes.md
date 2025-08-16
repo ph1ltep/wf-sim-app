@@ -102,7 +102,7 @@ This document, `majorComponentRoutes.md`, outlines the API routes defined in `ma
   - `geared`: Boolean (optional, default `true`).
   - `directDrive`: Boolean (optional, default `true`).
 - `quantityPerWTG`: Number (required, default 1).
-- `defaultFailureRate`: Number (optional, default 0.01).
+- `defaultFailureRate`: Number (optional, default 0.01). **Note**: Component failure rates are now primarily configured through the Component Failure Rates feature with DistributionTypeSchema support.
 - `createdAt`: Date (optional, defaults to current date).
 - `updatedAt`: Date (optional, defaults to current date).
 
@@ -159,7 +159,7 @@ This document, `majorComponentRoutes.md`, outlines the API routes defined in `ma
   - `geared`: Boolean (optional, default `true`).
   - `directDrive`: Boolean (optional, default `true`).
 - `quantityPerWTG`: Number (required, default 1).
-- `defaultFailureRate`: Number (optional, default 0.01).
+- `defaultFailureRate`: Number (optional, default 0.01). **Note**: Component failure rates are now primarily configured through the Component Failure Rates feature with DistributionTypeSchema support.
 - `createdAt`: Date (optional, defaults to current date).
 - `updatedAt`: Date (optional, defaults to current date).
 - `id`: String (required, MongoDB ObjectID, via URL parameter).
@@ -243,6 +243,33 @@ This document, `majorComponentRoutes.md`, outlines the API routes defined in `ma
   "errors": []
 }
 ```
+
+## Component Failure Rates Integration
+
+### Recent Updates (2025-08-16)
+The major component system now integrates with the enhanced Component Failure Rates feature:
+
+#### Schema Changes:
+- **Removed**: Component icon fields from failure rate configurations
+- **Added**: Category-based organization (drivetrain, electrical, rotor, mechanical, control)
+- **Enhanced**: Cost modeling with 6 cost components:
+  - Component Replacement Cost
+  - Crane Mobilization Cost  
+  - Crane Daily Rate
+  - Repair Duration (days)
+  - Specialist Labor Cost
+  - Downtime Revenue Loss
+
+#### UI Integration:
+- Components display in EditableTable with category tags
+- Cost visualization through icon-based summary with tooltips
+- No component icons in table for cleaner design
+- Enhanced enable/disable status indicators
+
+#### API Compatibility:
+- Existing `defaultFailureRate` field maintained for backward compatibility
+- New failure rate configurations use DistributionTypeSchema through Component Failure Rates feature
+- Platform type filtering (`geared`, `direct-drive`) continues to work as documented
 
 ## Future Updates Prompt
 
