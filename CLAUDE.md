@@ -3,14 +3,16 @@
 This file contains project-specific instructions that Claude should read at the start of each conversation and maintain in memory throughout the entire interaction. **IMPORTANT:** Once this file has been read or updated, it MUST be loaded at the beginning of any new conversation to ensure awareness of communication requirements, custom tasks, etc.
 
 ## 🚨 QUICK DECISION MATRIX - USE THIS FIRST
-| Task Type | Primary Agent | Support Agents | Execution |
-|-----------|--------------|----------------|-----------|
-| Frontend Feature | frontend-feature-architect | api-data-architect, wind-finance-risk-analyst | Sequential |
-| React Implementation | frontend-master-engineer | wind-finance-risk-analyst, documentation-manager | Parallel |
-| Data Schema Design | api-data-architect | documentation-manager, wind-finance-risk-analyst | Parallel |
-| Financial Modeling | wind-finance-risk-analyst | api-data-architect, documentation-manager | Sequential |
-| Code Review/Validation | ALL agents | - | Parallel |
-| Documentation | documentation-manager | api-data-architect (for schemas) | After changes |
+| Task Type | Primary Agent | Support Agents | Execution | Model |
+|-----------|--------------|----------------|-----------|-------|
+| Frontend Feature | planner + schemas | finance | **PARALLEL** | Opus |
+| React Implementation | builder | docs | Sequential | Sonnet |
+| Data Schema Design | schemas | finance | **PARALLEL** | Opus |
+| Financial Modeling | finance | schemas | **PARALLEL** | Opus |
+| Code Analysis/Flow | analyzer (3x parallel) | ALL agents as needed | **PARALLEL** (up to 3) | Sonnet |
+| Validation (END ONLY) | validator | NONE | **END ONLY** | Sonnet |
+| Bug Fixes/Issues | analyzer (3x) | relevant domain agents | **PARALLEL** | Sonnet |
+| Documentation | docs | NONE | After significant changes | Sonnet |
 
 ## 🚨 CRITICAL RULES - MANDATORY COMPLIANCE
 - **ALL** instructions within this document **MUST BE FOLLOWED** - these are not optional
@@ -30,16 +32,28 @@ This file contains project-specific instructions that Claude should read at the 
 
 ## 🎯 IMMEDIATE ACTION PROTOCOL
 
-### ⚡ FIRST STEP: AGENT DELEGATION DECISION
-**Before ANY coding task, IMMEDIATELY assess:**
-1. **Is this a frontend task?** → Use **frontend-master-engineer** (MANDATORY)
-2. **Need feature planning?** → Start with **frontend-feature-architect**
-3. **Data/schema changes?** → Include **api-data-architect** + **documentation-manager**
-4. **Financial/risk modeling?** → Involve **wind-finance-risk-analyst**
-5. **ANY code changes?** → **ALWAYS** call **documentation-manager** to sync feature docs
-6. **Feature folder exists?** → **documentation-manager** MUST update .md files in that folder
+### ⚡ AGENT DELEGATION PROTOCOL - OPTIMIZED FOR SPEED
 
-**Use PARALLEL execution whenever possible for maximum efficiency.**
+**PARALLEL-FIRST EXECUTION:**
+1. **Analysis Phase** → Run 3x **analyzer** instances in PARALLEL
+2. **Planning Phase** → Run **planner** + **schemas** + **finance** in PARALLEL
+3. **Implementation** → **builder** OR **schemas** (sequential)
+4. **Validation** → **ONLY at natural checkpoints or when explicitly requested**
+5. **Documentation** → **ONLY after significant changes, not every edit**
+
+**VALIDATION MODES:**
+- **Quick** (30s): `npm run lint` only
+- **Standard** (2m): `npm run lint && npm run build`
+- **Full** (5m+): Complete test suite with **validator**
+- **Default**: SKIP unless issues detected or user requests
+
+**⚡ PERFORMANCE OPTIMIZATION SUMMARY:**
+With these optimizations:
+- **50-70% faster execution** through parallel agents
+- **60% fewer tokens** by eliminating redundant testing  
+- **3x parallel analysis** capability (analyzer)
+- **Clearer agent outputs** with strict boundaries
+- **Smart validation** only when needed
 
 ## Default Mode
 
@@ -95,9 +109,24 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
   - Include within the diff a bulleted list explaining what was changed and why
   - Explicitly note when a solution is opinionated and explain the reasoning
 
-- When completing a task, ask if I want to:
-  1. Run task:commit (need to manually stage files first)
-  2. Neither (stop here)
+- When completing a task:
+  1. Comment progress summary on GitHub issue/PR
+  2. Ask: "1. Continue with additional work, 2. Run validation, 3. Complete (ready for review)"
+
+## 🔄 WORKFLOW INTEGRATION
+
+### **Primary Workflow: GitHub Issue/PR Driven**
+1. **Start**: `/fix-git-issue {issue-number}` or direct issue/PR reference
+2. **Analysis**: Use **analyzer** agents in parallel for codebase understanding
+3. **Planning**: Use **planner** + **schemas** + **finance** for feature design
+4. **Implementation**: Use **builder** + **schemas** for code changes
+5. **Progress**: Comment updates on GitHub issue/PR throughout process
+6. **Completion**: Mark issue resolved when user approves and merges PR
+
+### **Continuation Workflow: User Comments**
+- **When**: User comments on PR/issue with additional requirements or feedback
+- **Process**: Read comments → analyze requirements → continue implementation → update progress
+- **Goal**: Iterative improvement until user satisfaction and PR merge
 
 ## 💻 CODING STANDARDS & AI ORCHESTRATION
 
@@ -152,58 +181,96 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
 ### 🚀 PRIMARY DIRECTIVE: LEVERAGE SPECIALIZED AGENTS
 **CRITICAL:** For ANY substantial task, **IMMEDIATELY** delegate to appropriate specialized agents. Use them in **PARALLEL** or **SEQUENTIAL** execution as optimal.
 
-### 🎯 FRONTEND CODING WORKFLOW (MANDATORY):
-**ALL frontend coding tasks MUST go through:**
-1. **frontend-feature-architect** → Plan & architect the feature
-2. **api-data-architect** → Design data structures & schemas (if needed)
-3. **frontend-master-engineer** → Implement the code
-4. **documentation-manager** → Update docs after changes
+### 🎯 OPTIMIZED FRONTEND WORKFLOW:
+
+**PHASE 1: PARALLEL ANALYSIS (All at once)**
+- **analyzer[1]** → Analyze UI components
+- **analyzer[2]** → Analyze state management
+- **analyzer[3]** → Analyze data flow
+
+**PHASE 2: PARALLEL PLANNING (If new feature)**
+- **planner** → Design UI architecture
+- **schemas** → Design data schemas
+- **finance** → Validate requirements
+
+**PHASE 3: IMPLEMENTATION**
+- **builder** → Implement based on plans
+
+**PHASE 4: COMPLETION (Optional)**
+- **validator** → Only if requested
+- **docs** → Only for significant changes
 
 ### ⚡ AGENT SPECIALIZATIONS - USE PROACTIVELY
 
-**🎨 frontend-master-engineer** (PRIMARY for React code):
+**🎨 builder** (PRIMARY for React code):
 - **MANDATORY** for ALL React/frontend implementation
-- Collaborate with **wind-finance-risk-analyst** for statistical algorithms
-- Coordinate with **api-data-architect** for data structures
-- Partner with **documentation-manager** for documentation
+- Collaborate with **finance** for statistical algorithms
+- Coordinate with **schemas** for data structures
+- Partner with **docs** for documentation
 
 **🏗️ frontend-feature-architect** (Feature planning):
 - **REQUIRED** before any new feature development
 - Design component hierarchies and feature breakdown
-- Work with **api-data-architect** for data structure design
-- Consult **wind-finance-risk-analyst** for domain requirements
+- Work with **schemas** for data structure design
+- Consult **finance** for domain requirements
 
-**📊 api-data-architect** (Data & API design):
+**📊 schemas** (Data & API design):
 - **ESSENTIAL** for Yup schemas and API endpoints
-- **MANDATORY COORDINATION** with **documentation-manager** for schema documentation
-- Collaborate with **wind-finance-risk-analyst** for financial models
-- Support **frontend-master-engineer** with optimal patterns
+- **MANDATORY COORDINATION** with **docs** for schema documentation
+- Collaborate with **finance** for financial models
+- Support **builder** with optimal patterns
 - **UPDATE FEATURE DOCS**: Ensure .md files in feature folders reflect schema changes
 
-**💰 wind-finance-risk-analyst** (Domain expertise):
+**💰 finance** (Domain expertise):
 - **CRITICAL** for financial modeling and risk algorithms
 - Guide requirements across ALL other agents
 - Review data structures for industry compliance
 - Provide statistical methods and validation
 
-**📚 documentation-manager** (Always call after changes):
+**🔍 analyzer** (Code analysis - READ-ONLY):
+- **ESSENTIAL** for understanding React components, Yup schemas, or data structures
+- **PARALLEL EXECUTION**: Support up to **3 instances simultaneously**
+- **Instance 1**: Component structure and UI flow analysis
+- **Instance 2**: Data flow and state management analysis
+- **Instance 3**: Dependencies and integration analysis
+- **STRICT RULE**: READ-ONLY agent, NEVER modifies code
+- **Model**: Sonnet (fast pattern matching)
+
+**✅ validator** (Validation - END ONLY):
+- **USE ONLY**: At task completion OR when explicitly requested
+- **VALIDATION MODES**:
+  - **Quick**: `npm run lint` only (30 seconds)
+  - **Standard**: `npm run lint && npm run build` (2 minutes)
+  - **Full**: Complete test suite including typecheck, test, build (5+ minutes)
+- **DEFAULT BEHAVIOR**: Skip validation unless issues detected
+- **Model**: Sonnet (rule-based checking)
+
+**📚 docs** (Always call after changes):
 - **MANDATORY** after significant feature implementations
 - **FEATURE DOCUMENTATION SYNC**: Update .md files in feature subfolders when code changes
-- **SCHEMA COORDINATION**: Work with **api-data-architect** to document schema changes
+- **SCHEMA COORDINATION**: Work with **schemas** to document schema changes
 - Update README, API docs, and component documentation
 - **SEARCH FOR FEATURE DOCS**: Automatically identify and update relevant .md files in feature directories
 - Maintain consistency across all project documentation
 
-### 🔄 EXECUTION PATTERNS:
-- **PARALLEL**: Multiple agents working simultaneously on different aspects
-- **SEQUENTIAL**: Pipeline approach with handoffs between agents
-- **COLLABORATIVE**: Agents consulting each other during execution
-- **VALIDATION**: Cross-agent review and validation of outputs
+### 🔄 EXECUTION PATTERNS - SPEED OPTIMIZED:
+
+**PRIMARY PATTERNS:**
+1. **PARALLEL-FIRST**: Default for all analysis and planning tasks
+2. **BATCH OPERATIONS**: Group related changes, avoid micro-commits
+3. **LAZY VALIDATION**: Only validate at natural checkpoints
+4. **SMART DOCUMENTATION**: Update docs only for significant changes
+
+**AGENT PARALLELISM LIMITS:**
+- **analyzer**: Up to 3 parallel instances
+- **Planning agents**: All can run simultaneously
+- **Implementation agents**: Sequential only (avoid conflicts)
+- **docs**: Can run parallel with any agent
 
 ### 📋 FEATURE DOCUMENTATION PROTOCOL:
 **CRITICAL:** When making ANY code changes, agents MUST:
-1. **api-data-architect** + **documentation-manager**: Update schema documentation immediately
-2. **documentation-manager**: Search for and update relevant .md files in feature subfolders
+1. **schemas** + **docs**: Update schema documentation immediately
+2. **docs**: Search for and update relevant .md files in feature subfolders
 3. **PATTERN**: Look for `/[feature-name]/README.md` or `/[feature-name]/docs/*.md` files
 4. **SYNCHRONIZATION**: Ensure feature docs reflect current implementation state
 5. **CROSS-REFERENCE**: Update inter-feature documentation links when schemas change
@@ -272,3 +339,5 @@ cd frontend && npm test         # React testing
 cd frontend && npm run build    # Production build
 ```
 
+
+- REMEMBER: NEVER ADD Claude co-authored message to ANY commit!

@@ -228,6 +228,7 @@ export const SwitchField = ({
     tooltip={tooltip}
     component={Switch}
     transform={(checked) => checked}
+    valuePropName="checked"
     {...rest}
   />
 );

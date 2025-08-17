@@ -13,12 +13,15 @@ import {
     ToolOutlined,
     ClockCircleOutlined,
     UserOutlined,
-    ExclamationCircleOutlined
+    ExclamationCircleOutlined,
+    EditOutlined,
+    DeleteOutlined
 } from '@ant-design/icons';
 
 import { useScenario } from 'contexts/ScenarioContext';
 import EditableTable from 'components/tables/EditableTable';
 import { ContextField, SwitchField } from 'components/contextFields';
+import { createActionsColumn } from 'components/tables/columns';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
 
@@ -196,6 +199,99 @@ const FailureRates = () => {
         setSelectedComponentIndex(null);
     };
 
+    // Generate default cost structure
+    const generateDefaultCosts = () => ({
+        componentReplacement: {
+            type: 'lognormal',
+            parameters: { mu: 13.1, sigma: 0.4, value: 500000 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        },
+        craneMobilization: {
+            type: 'triangular',
+            parameters: { min: 80000, mode: 120000, max: 200000, value: 120000 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        },
+        craneDailyRate: {
+            type: 'normal',
+            parameters: { mean: 15000, stdDev: 3000, value: 15000 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        },
+        repairDurationDays: {
+            type: 'gamma',
+            parameters: { shape: 3, scale: 2, value: 6 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        },
+        specialistLabor: {
+            type: 'normal',
+            parameters: { mean: 35000, stdDev: 10000, value: 35000 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'ascending' }
+        },
+        downtimeRevenuePerDay: {
+            type: 'normal',
+            parameters: { mean: 200, stdDev: 50, value: 200 },
+            timeSeriesMode: false,
+            metadata: { percentileDirection: 'descending' }
+        }
+    });
+
+    // Generate default failure rate structure
+    const generateDefaultFailureRate = () => ({
+        type: 'exponential',
+        parameters: { lambda: 0.025, value: 0.025 },
+        timeSeriesMode: false,
+        timeSeriesParameters: { value: [] },
+        metadata: { percentileDirection: 'ascending' }
+    });
+
+    // Handle before save to ensure proper structure
+    const handleBeforeSave = async (itemToSave, context) => {
+        try {
+            // Ensure failureRate exists with proper structure
+            if (!itemToSave.failureRate) {
+                itemToSave.failureRate = generateDefaultFailureRate();
+            }
+            
+            // Ensure costs exists with proper structure
+            if (!itemToSave.costs) {
+                itemToSave.costs = generateDefaultCosts();
+            }
+            
+            // Ensure enabled is boolean
+            if (typeof itemToSave.enabled !== 'boolean') {
+                itemToSave.enabled = false;
+            }
+            
+            return itemToSave;
+        } catch (error) {
+            console.error('Error in handleBeforeSave:', error);
+            throw error;
+        }
+    };
+
+    // Handle component deletion
+    const handleDelete = async (componentId) => {
+        try {
+            const currentComponents = getValueByPath('settings.project.equipment.failureRates.components', []);
+            const filteredComponents = currentComponents.filter(c => c.id !== componentId);
+            await updateByPath('settings.project.equipment.failureRates.components', filteredComponents);
+            message.success('Component removed successfully');
+        } catch (error) {
+            message.error(`Failed to remove component: ${error.message}`);
+        }
+    };
+
+    // Handle component editing
+    const handleEdit = (record, index) => {
+        setSelectedComponent(record);
+        setSelectedComponentIndex(index);
+        setDetailModalVisible(true);
+    };
+
     // Handle global enable/disable
     const handleGlobalToggle = async (enabled) => {
         try {
@@ -317,12 +413,15 @@ const FailureRates = () => {
             width: '10%',
             align: 'center',
             render: (_, record, index) => (
-                <SwitchField
-                    path={`settings.project.equipment.failureRates.components.${index}.enabled`}
-                    size="small"
-                    checkedChildren={<CheckOutlined />}
-                    unCheckedChildren={<CloseOutlined />}
-                />
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <SwitchField
+                        path={`settings.project.equipment.failureRates.components.${index}.enabled`}
+                        size="small"
+                        checkedChildren={<CheckOutlined />}
+                        unCheckedChildren={<CloseOutlined />}
+                        valuePropName="checked"
+                    />
+                </div>
             )
         },
         {
@@ -357,6 +456,21 @@ const FailureRates = () => {
                     >
                         Configure
                     </Button>
+                    <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={() => handleEdit(record, index)}
+                        size="small"
+                        title="Edit component"
+                    />
+                    <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDelete(record.id)}
+                        size="small"
+                        title="Remove component"
+                    />
                 </Space>
             )
         }
@@ -460,9 +574,10 @@ const FailureRates = () => {
                     addButtonText="Add Component"
                     keyField="id"
                     tableSize="small"
-                    autoActions={true}
+                    autoActions={false}
                     formLayout="vertical"
                     formCompact={false}
+                    onBeforeSave={handleBeforeSave}
                 />
             </Card>
 

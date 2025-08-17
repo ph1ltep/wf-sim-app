@@ -32,30 +32,26 @@ const FailureRateSummaryCard = ({ title = "Failure Rate Summary" }) => {
     // Get failure rates configuration
     const failureRatesConfig = getValueByPath('settings.project.equipment.failureRates', {
         enabled: false,
-        components: {}
+        components: []
     });
 
     // Calculate summary statistics
-    const componentKeys = Object.keys(COMPONENT_NAMES);
-    const enabledComponents = componentKeys.filter(key => 
-        failureRatesConfig.components?.[key]?.enabled
-    );
+    const componentsArray = failureRatesConfig.components || [];
+    const enabledComponents = componentsArray.filter(component => component.enabled);
     
     const enabledCount = enabledComponents.length;
-    const totalCount = componentKeys.length;
+    const totalCount = Object.keys(COMPONENT_NAMES).length;
     const enabledPercentage = totalCount > 0 ? (enabledCount / totalCount) * 100 : 0;
 
     // Calculate estimated annual failure probability
-    const annualFailureProbability = enabledComponents.reduce((sum, key) => {
-        const component = failureRatesConfig.components[key];
+    const annualFailureProbability = enabledComponents.reduce((sum, component) => {
         const failureRate = component?.failureRate?.parameters?.value || 
                           component?.failureRate?.parameters?.lambda || 0;
         return sum + failureRate;
     }, 0);
 
     // Calculate estimated annual cost (simplified)
-    const estimatedAnnualCost = enabledComponents.reduce((sum, key) => {
-        const component = failureRatesConfig.components[key];
+    const estimatedAnnualCost = enabledComponents.reduce((sum, component) => {
         const failureRate = component?.failureRate?.parameters?.value || 
                           component?.failureRate?.parameters?.lambda || 0;
         const replacementCost = component?.costs?.componentReplacement?.parameters?.value || 500000;
@@ -163,13 +159,13 @@ const FailureRateSummaryCard = ({ title = "Failure Rate Summary" }) => {
                         <Text type="secondary">Active Components:</Text>
                         <br />
                         <Space wrap style={{ marginTop: '8px' }}>
-                            {enabledComponents.map(key => (
+                            {enabledComponents.map(component => (
                                 <Tag 
-                                    key={key} 
+                                    key={component.id} 
                                     color="green" 
                                     style={{ margin: '2px' }}
                                 >
-                                    {COMPONENT_NAMES[key]}
+                                    {component.name}
                                 </Tag>
                             ))}
                         </Space>

@@ -4,6 +4,7 @@ import {
     totalDebt,
     totalCapex,
     totalRevenue,
+    totalComponentFailureCosts,
     netCashflow,
     capexDrawdown,
     debtDrawdown,
@@ -21,6 +22,8 @@ import {
     llcr,
     icr,
     lepAepImpactTransformer,
+    componentFailureRatesTransformer,
+    componentReplacementCostsTransformer,
 } from './transformers';
 
 export const CASHFLOW_SOURCE_REGISTRY = {
@@ -581,6 +584,70 @@ export const CASHFLOW_SOURCE_REGISTRY = {
                 projectPhase: 'operations',
                 description: 'Leading Edge Protection impact on Annual Energy Production over project lifetime',
                 formatter: (value) => `${value.toFixed(3)}%`
+            }
+        },
+
+        // COMPONENT FAILURE SOURCES
+        {
+            id: 'componentFailureRates',
+            priority: 200,
+            path: ['settings', 'project', 'equipment', 'failureRates', 'components'],
+            hasPercentiles: false,
+            references: [],
+            transformer: componentFailureRatesTransformer,
+            multipliers: [
+                { id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 }
+            ],
+            metadata: {
+                name: 'Component Failure Rates',
+                type: 'indirect',
+                visualGroup: 'component_failures',
+                cashflowType: 'outflow',
+                accountingClass: 'opex',
+                projectPhase: 'operations',
+                description: 'Annual costs from component failures based on failure rates and replacement costs',
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'componentReplacementCosts',
+            priority: 201,
+            path: ['settings', 'project', 'equipment', 'failureRates', 'components'],
+            hasPercentiles: false,
+            references: [],
+            transformer: componentReplacementCostsTransformer,
+            multipliers: [
+                { id: 'escalationRate', operation: 'compoundPercent', baseYear: 1 }
+            ],
+            metadata: {
+                name: 'Component Replacement Costs',
+                type: 'indirect',
+                visualGroup: 'component_failures',
+                cashflowType: 'outflow',
+                accountingClass: 'opex',
+                projectPhase: 'operations',
+                description: 'Annual replacement costs for major wind turbine components',
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
+            }
+        },
+        {
+            id: 'totalComponentFailureCosts',
+            priority: 820,
+            path: null,
+            hasPercentiles: false,
+            references: [],
+            transformer: totalComponentFailureCosts,
+            multipliers: [],
+            metadata: {
+                name: 'Total Component Failure Costs',
+                type: 'virtual',
+                visualGroup: 'aggregation',
+                cashflowType: 'outflow',
+                accountingClass: 'opex',
+                projectPhase: 'operations',
+                description: 'Total annual costs from all component failure events',
+                customPercentile: 50,
+                formatter: (value) => `$${(value / 1000000).toFixed(1)}M`
             }
         },
     ]
