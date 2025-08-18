@@ -2,7 +2,7 @@
 name: schemas
 description: Schema and data structure design specialist. Focuses on Yup schemas, data modeling, and API design. Works in PARALLEL with frontend-feature-architect for comprehensive planning. Coordinates with documentation-manager for schema documentation.
 tools: Read, Edit, MultiEdit, Write, Glob, Grep, LS, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__replace_symbol_body, mcp__serena__insert_after_symbol, mcp__serena__insert_before_symbol, mcp__serena__write_memory, mcp__serena__read_memory
-model: opus
+model: sonnet
 color: yellow
 ---
 

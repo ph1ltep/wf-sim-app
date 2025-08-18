@@ -5,19 +5,22 @@ Follow these steps:
 **RECOMMENDED AGENT WORKFLOW**: Follow CLAUDE.md agent orchestration strategy.
 **OPEN PR HANDLING**: if the git issue has an open PR, fully understand the progress that has been made and continue working through it. The issue stays open until the PR is closed. Ensure to maintain issue checklist updated.
 
-# PLAN (PARALLEL EXECUTION)
+# PLAN (ADAPTIVE EXECUTION)
 1. Use `gh issue view` to get the issue details
-2. **PARALLEL AGENT ANALYSIS** (run simultaneously):
-   - **analyzer[1]**: Analyze component structure and UI flow
-   - **analyzer[2]**: Analyze data flow and state management
-   - **analyzer[3]**: Search for related files and dependencies
-   - **finance**: Analyze financial/business logic (if applicable)
-3. Search scratchpads and PRs for context
-4. **PARALLEL AGENT PLANNING** (if new feature):
-   - **planner**: Design UI architecture
-   - **schemas**: Design data schemas
-   - **finance**: Validate business requirements
-5. Document your plan in a scratchpad. Follow @.claude/references/scratchpads.md
+2. **ASSESS COMPLEXITY** (determine task scope):
+   - Simple bug fix? → 1 analyzer instance
+   - Feature addition? → 1-2 analyzer instances
+   - Architecture change? → 2-3 analyzer instances
+3. **ANALYSIS PHASE** (scale based on complexity):
+   - Simple: **analyzer** → focused analysis
+   - Medium: **analyzer(2x)** → broader coverage
+   - Complex: **analyzer(3x)** → comprehensive analysis
+4. Search scratchpads and PRs for context
+5. **PLANNING PHASE** (only if needed):
+   - Simple: Skip planning, go to implementation
+   - Medium: **planner** OR **schemas** (choose one)
+   - Complex: **planner** + **schemas** + **finance** (parallel)
+6. Document your plan in a scratchpad if medium/complex. Follow @.claude/references/scratchpads.md
 
 # CREATE
 - Create/checkout appropriate branch
@@ -29,11 +32,15 @@ Follow these steps:
 - Push to server periodically
 
 # VALIDATE (OPTIONAL)
-- Ask user: "Run validation? 1. Quick (lint only), 2. Standard (lint+build), 3. Full (all tests), 4. Skip"
+- Ask user: "Select testing approach:
+  1. **Run comprehensive tests** - Full test suite (npm test, npm run build, e2e tests)
+  2. **Focused test** - Test only the specific feature/bug being addressed
+  3. **Custom test** - Specify exactly which tests to run
+  4. **Skip tests** - Continue without testing (useful when more fixes are needed)"
 - Based on response:
-  - **Quick**: `npm run lint` only (30 seconds)
-  - **Standard**: `npm run lint && npm run build` (2 minutes)
-  - **Full**: Use **validator** for complete validation
+  - **Comprehensive**: Full test suite with **validator** agent
+  - **Focused**: Run tests specific to the changed feature/bug
+  - **Custom**: Run exactly what user specifies
   - **Skip**: Continue without validation
 - **docs**: Update docs ONLY after significant changes
 - **CRITICAL**: When making schema changes in @schemas/yup, restart frontend for changes to take effect
@@ -55,10 +62,15 @@ Follow these steps:
 - When working on existing PR, CONTINUE ON THE EXISTING BRANCH
 
 **⚡ OPTIMIZATION RULES:**
-- **PARALLEL EXECUTION**: Run 3x analyzer + planning agents simultaneously
-- **VALIDATION MODES**: Quick (lint), Standard (lint+build), Full (all tests), Skip (default)
+- **ADAPTIVE SCALING**: 1 analyzer for simple, 2 for medium, 3 for complex tasks
+- **SMART PLANNING**: Skip planning for simple fixes, use single planner for medium tasks
+- **TEST SELECTION**: Always ask user to choose: Comprehensive, Focused, Custom, or Skip
 - **BATCH OPERATIONS**: Group related changes, avoid micro-commits
-- **SMART DOCUMENTATION**: Only update docs after significant changes
-- **DEFAULT BEHAVIOR**: Skip validation unless explicitly requested or issues detected
+- **DOCUMENTATION**: Only for significant changes, not every edit
+- **DEFAULT BEHAVIOR**: Scale agents based on complexity, never over-provision
 
-**PERFORMANCE GAINS**: 50-70% faster execution with these optimizations
+**PERFORMANCE GAINS**: 
+- Simple tasks: 60% faster (1 vs 3 analyzers)
+- Medium tasks: 40% faster (sequential vs full parallel)
+- Complex tasks: Full power when needed
+- Overall: 40-60% token savings on average

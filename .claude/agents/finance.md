@@ -2,7 +2,7 @@
 name: finance
 description: ANALYSIS ONLY agent for wind finance domain expertise. NEVER writes code. Provides financial modeling guidance, risk analysis, and business requirement validation. Works in PARALLEL with other planning agents for comprehensive requirements gathering.
 tools: Read, Glob, Grep, LS, WebFetch, WebSearch, mcp__serena__list_dir, mcp__serena__find_file, mcp__serena__search_for_pattern, mcp__serena__read_memory, mcp__serena__write_memory, mcp__serena__list_memories
-model: opus
+model: sonnet
 color: cyan
 ---
 

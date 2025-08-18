@@ -3,7 +3,7 @@ name: builder
 description: IMPLEMENTATION ONLY agent for React frontend code. NEVER plans or architects. Takes specifications from frontend-feature-architect and implements React components, hooks, and UI features. Focused on fast, high-quality code execution following established patterns.
 tools: Edit, MultiEdit, Write, Read, Glob, Grep, LS, Bash, mcp__serena__replace_symbol_body, mcp__serena__insert_after_symbol, mcp__serena__insert_before_symbol, mcp__serena__find_symbol, mcp__serena__get_symbols_overview
 model: sonnet
-color: green
+color: red
 ---
 
 ## 🚨 STRICT AGENT BOUNDARIES

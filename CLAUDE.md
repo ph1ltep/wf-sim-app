@@ -2,17 +2,35 @@
 
 This file contains project-specific instructions that Claude should read at the start of each conversation and maintain in memory throughout the entire interaction. **IMPORTANT:** Once this file has been read or updated, it MUST be loaded at the beginning of any new conversation to ensure awareness of communication requirements, custom tasks, etc.
 
-## 🚨 QUICK DECISION MATRIX - USE THIS FIRST
-| Task Type | Primary Agent | Support Agents | Execution | Model |
-|-----------|--------------|----------------|-----------|-------|
-| Frontend Feature | planner + schemas | finance | **PARALLEL** | Opus |
-| React Implementation | builder | docs | Sequential | Sonnet |
-| Data Schema Design | schemas | finance | **PARALLEL** | Opus |
-| Financial Modeling | finance | schemas | **PARALLEL** | Opus |
-| Code Analysis/Flow | analyzer (3x parallel) | ALL agents as needed | **PARALLEL** (up to 3) | Sonnet |
-| Validation (END ONLY) | validator | NONE | **END ONLY** | Sonnet |
-| Bug Fixes/Issues | analyzer (3x) | relevant domain agents | **PARALLEL** | Sonnet |
-| Documentation | docs | NONE | After significant changes | Sonnet |
+## 🚨 ADAPTIVE EXECUTION STRATEGY - ASSESS COMPLEXITY FIRST
+
+### Task Complexity Assessment
+**Simple** (< 50 lines, single file, clear fix):
+- 1 analyzer instance
+- Sequential execution
+- Skip validation unless requested
+
+**Medium** (multiple files, < 200 lines, standard feature):
+- 1-2 analyzer instances
+- Mixed parallel/sequential
+- Focused validation
+
+**Complex** (new feature, architecture changes, > 200 lines):
+- 2-3 analyzer instances
+- Full parallel execution
+- Comprehensive validation
+
+### Optimized Decision Matrix
+| Task Type | Complexity | Primary Agents | Execution Pattern |
+|-----------|------------|----------------|-------------------|
+| Bug Fix | Simple | analyzer → builder | Sequential |
+| Bug Fix | Complex | analyzer(2x) → builder | Parallel analysis |
+| Small Feature | Medium | analyzer → planner → builder | Sequential |
+| Large Feature | Complex | analyzer(3x) + planner + schemas | Full parallel |
+| Schema Change | Medium | schemas → builder | Sequential |
+| Financial Logic | Any | finance + relevant agent | Parallel |
+| Documentation | Post-task | docs | Only if significant |
+| Validation | End only | validator | User choice |
 
 ## 🚨 CRITICAL RULES - MANDATORY COMPLIANCE
 - **ALL** instructions within this document **MUST BE FOLLOWED** - these are not optional
@@ -32,28 +50,50 @@ This file contains project-specific instructions that Claude should read at the 
 
 ## 🎯 IMMEDIATE ACTION PROTOCOL
 
-### ⚡ AGENT DELEGATION PROTOCOL - OPTIMIZED FOR SPEED
+### ⚡ ADAPTIVE AGENT PROTOCOL - COMPLEXITY-BASED
 
-**PARALLEL-FIRST EXECUTION:**
-1. **Analysis Phase** → Run 3x **analyzer** instances in PARALLEL
-2. **Planning Phase** → Run **planner** + **schemas** + **finance** in PARALLEL
-3. **Implementation** → **builder** OR **schemas** (sequential)
-4. **Validation** → **ONLY at natural checkpoints or when explicitly requested**
-5. **Documentation** → **ONLY after significant changes, not every edit**
+**STEP 1: ASSESS COMPLEXITY**
+- Simple task? → Minimal agents, sequential
+- Medium task? → Balanced approach
+- Complex task? → Full parallel execution
 
-**VALIDATION MODES:**
-- **Quick** (30s): `npm run lint` only
-- **Standard** (2m): `npm run lint && npm run build`
-- **Full** (5m+): Complete test suite with **validator**
-- **Default**: SKIP unless issues detected or user requests
+**EXECUTION PATTERNS BY COMPLEXITY:**
+
+**Simple Tasks (Bug fixes, minor changes):**
+1. **analyzer** (1 instance) → Understand the issue
+2. **builder** → Fix it
+3. **validator** → Only if requested
+
+**Medium Tasks (Small features, multi-file changes):**
+1. **analyzer** (1-2 instances) → Analyze codebase
+2. **planner** OR **schemas** → Design approach (not both)
+3. **builder** → Implement
+4. **validator** → Focused testing if requested
+
+**Complex Tasks (New features, architecture):**
+1. **analyzer** (2-3 instances parallel) → Deep analysis
+2. **planner** + **schemas** + **finance** → Full parallel planning
+3. **builder** → Implement with guidance
+4. **validator** → Comprehensive testing
+5. **docs** → Update documentation
+
+**TEST SELECTION PROTOCOL:**
+ALWAYS ask user to choose testing approach before running ANY tests:
+1. **Run comprehensive tests** - Full test suite (npm test, npm run build, e2e tests)
+2. **Focused test** - Test only the specific feature/bug being addressed
+3. **Custom test** - User specifies exactly which tests to run
+4. **Skip tests** - Continue without testing (useful when more fixes are needed)
+
+**Default**: Present options and wait for user selection - NEVER auto-run tests
 
 **⚡ PERFORMANCE OPTIMIZATION SUMMARY:**
-With these optimizations:
-- **50-70% faster execution** through parallel agents
-- **60% fewer tokens** by eliminating redundant testing  
-- **3x parallel analysis** capability (analyzer)
-- **Clearer agent outputs** with strict boundaries
-- **Smart validation** only when needed
+Adaptive strategy delivers:
+- **Simple tasks**: 60% faster with single analyzer vs 3
+- **Medium tasks**: 40% faster with sequential vs full parallel
+- **Complex tasks**: Full parallel power when actually needed
+- **Token savings**: 40-60% average reduction
+- **Smart testing**: User-controlled test execution
+- **Focused agents**: No overlapping analysis work
 
 ## Default Mode
 
@@ -181,24 +221,31 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
 ### 🚀 PRIMARY DIRECTIVE: LEVERAGE SPECIALIZED AGENTS
 **CRITICAL:** For ANY substantial task, **IMMEDIATELY** delegate to appropriate specialized agents. Use them in **PARALLEL** or **SEQUENTIAL** execution as optimal.
 
-### 🎯 OPTIMIZED FRONTEND WORKFLOW:
+### 🎯 ADAPTIVE WORKFLOW - SCALE TO TASK
 
-**PHASE 1: PARALLEL ANALYSIS (All at once)**
-- **analyzer[1]** → Analyze UI components
-- **analyzer[2]** → Analyze state management
-- **analyzer[3]** → Analyze data flow
+**FIRST: ASSESS TASK COMPLEXITY**
+- Count files affected
+- Estimate lines of change
+- Determine if architecture changes needed
 
-**PHASE 2: PARALLEL PLANNING (If new feature)**
-- **planner** → Design UI architecture
-- **schemas** → Design data schemas
-- **finance** → Validate requirements
+**THEN EXECUTE APPROPRIATELY:**
 
-**PHASE 3: IMPLEMENTATION**
-- **builder** → Implement based on plans
+**Simple Task Workflow** (bug fix, minor change):
+1. **analyzer** → Single instance analysis
+2. **builder** → Direct implementation
+3. **validator** → Only if user requests
 
-**PHASE 4: COMPLETION (Optional)**
-- **validator** → Only if requested
-- **docs** → Only for significant changes
+**Medium Task Workflow** (small feature, multi-file):
+1. **analyzer(1-2)** → Focused analysis
+2. **planner** OR **schemas** → Single planning agent
+3. **builder** → Guided implementation
+4. **validator** → User choice
+
+**Complex Task Workflow** (new feature, architecture):
+1. **analyzer(2-3)** → Full parallel analysis
+2. **planner** + **schemas** + **finance** → Parallel planning
+3. **builder** → Comprehensive implementation
+4. **validator** + **docs** → Full validation and documentation
 
 ### ⚡ AGENT SPECIALIZATIONS - USE PROACTIVELY
 
