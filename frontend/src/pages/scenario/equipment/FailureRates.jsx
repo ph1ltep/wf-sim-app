@@ -24,6 +24,7 @@ import { ContextField, SwitchField } from 'components/contextFields';
 import { createActionsColumn } from 'components/tables/columns';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
+import { DEFAULT_COMPONENTS } from 'schemas/yup/componentFailureRates';
 
 const { Title, Text } = Typography;
 
@@ -55,105 +56,6 @@ const CATEGORY_COLORS = {
     control: 'cyan'
 };
 
-// Default component configurations for initialization
-const DEFAULT_COMPONENTS = [
-    {
-        id: 'gearbox',
-        name: 'Gearbox',
-        category: 'drivetrain',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.025, value: 0.025 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'generator',
-        name: 'Generator',
-        category: 'electrical',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.020, value: 0.020 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'mainBearing',
-        name: 'Main Bearing',
-        category: 'drivetrain',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.018, value: 0.018 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'powerElectronics',
-        name: 'Power Electronics',
-        category: 'electrical',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.022, value: 0.022 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'bladeBearings',
-        name: 'Blade Bearings',
-        category: 'rotor',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.015, value: 0.015 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'yawSystem',
-        name: 'Yaw System',
-        category: 'mechanical',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.012, value: 0.012 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'controlSystem',
-        name: 'Control System',
-        category: 'control',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.008, value: 0.008 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    },
-    {
-        id: 'transformer',
-        name: 'Transformer',
-        category: 'electrical',
-        enabled: false,
-        failureRate: {
-            type: 'exponential',
-            parameters: { lambda: 0.010, value: 0.010 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        }
-    }
-];
 
 const FailureRates = () => {
     const { getValueByPath, updateByPath } = useScenario();
@@ -199,69 +101,13 @@ const FailureRates = () => {
         setSelectedComponentIndex(null);
     };
 
-    // Generate default cost structure
-    const generateDefaultCosts = () => ({
-        componentReplacement: {
-            type: 'lognormal',
-            parameters: { mu: 13.1, sigma: 0.4, value: 500000 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        },
-        craneMobilization: {
-            type: 'triangular',
-            parameters: { min: 80000, mode: 120000, max: 200000, value: 120000 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        },
-        craneDailyRate: {
-            type: 'normal',
-            parameters: { mean: 15000, stdDev: 3000, value: 15000 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        },
-        repairDurationDays: {
-            type: 'gamma',
-            parameters: { shape: 3, scale: 2, value: 6 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        },
-        specialistLabor: {
-            type: 'normal',
-            parameters: { mean: 35000, stdDev: 10000, value: 35000 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'ascending' }
-        },
-        downtimeRevenuePerDay: {
-            type: 'normal',
-            parameters: { mean: 200, stdDev: 50, value: 200 },
-            timeSeriesMode: false,
-            metadata: { percentileDirection: 'descending' }
-        }
-    });
 
-    // Generate default failure rate structure
-    const generateDefaultFailureRate = () => ({
-        type: 'exponential',
-        parameters: { lambda: 0.025, value: 0.025 },
-        timeSeriesMode: false,
-        timeSeriesParameters: { value: [] },
-        metadata: { percentileDirection: 'ascending' }
-    });
-
-    // Handle before save to ensure proper structure
+    // Handle before save to ensure proper structure using schema defaults
     const handleBeforeSave = async (itemToSave, context) => {
         try {
-            // Ensure failureRate exists with proper structure
-            if (!itemToSave.failureRate) {
-                itemToSave.failureRate = generateDefaultFailureRate();
-            }
-            
-            // Ensure costs exists with proper structure
-            if (!itemToSave.costs) {
-                itemToSave.costs = generateDefaultCosts();
-            }
-            
-            // Ensure enabled is boolean
+            // Use schema defaults to ensure proper structure
+            // Schema provides complete defaults for failureRate and costs
+            // Just ensure enabled is boolean
             if (typeof itemToSave.enabled !== 'boolean') {
                 itemToSave.enabled = false;
             }
