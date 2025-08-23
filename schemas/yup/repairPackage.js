@@ -1,6 +1,5 @@
 // schemas/yup/repairPackage.js
 const Yup = require('yup');
-const { DistributionTypeSchema } = require('./distribution');
 
 // Predefined repair package categories
 const REPAIR_PACKAGE_CATEGORIES = [
@@ -50,8 +49,20 @@ const RepairPackageSchema = Yup.object().shape({
             .min(0, 'Crane daily rate must be at least 0')
             .default(0),
         
-        specialistLaborEUR: Yup.number()
-            .min(0, 'Specialist labor cost must be at least 0')
+        specialistLaborDailyEUR: Yup.number()
+            .min(0, 'Specialist labor daily rate must be at least 0')
+            .default(0),
+        
+        specialtyToolingDailyEUR: Yup.number()
+            .min(0, 'Specialty tooling daily rate must be at least 0')
+            .default(0),
+        
+        additionalDailyCostEUR: Yup.number()
+            .min(0, 'Additional daily cost must be at least 0')
+            .default(0),
+        
+        additionalPerEventCostEUR: Yup.number()
+            .min(0, 'Additional per-event cost must be at least 0')
             .default(0)
     }).required('Costs are required').default(() => ({})),
     
@@ -75,49 +86,11 @@ const RepairPackageSchema = Yup.object().shape({
             .default(1)
     }).required('Crane configuration is required').default(() => ({})),
     
-    // Component-specific complexity distributions
-    complexity: Yup.object().shape({
-        component: DistributionTypeSchema
-            .required('Component complexity distribution is required'),
-        
-        repair: DistributionTypeSchema
-            .required('Repair complexity distribution is required')
-    }).required('Complexity distributions are required'),
-    
-    // Single escalation rate (can be modified by global escalation distribution)
-    baseEscalationRate: Yup.number()
-        .min(-0.1, 'Base escalation rate must be at least -10%')
-        .max(0.2, 'Base escalation rate must not exceed 20%')
-        .default(0.03), // 3% annual
-    
-    // Optional: Override global distributions only when needed
-    distributionOverrides: Yup.object()
-        .default(() => ({})),
-    
     // Component applicability (which components can use this package)
     appliesTo: Yup.object().shape({
         componentCategories: Yup.array()
             .of(Yup.string())
-            .default(() => []),
-        
-        turbineTypes: Yup.array()
-            .of(Yup.string())
-            .default(() => []),
-        
-        powerRangeKW: Yup.object().shape({
-            min: Yup.number().min(0).default(0),
-            max: Yup.number().min(0).default(999999)
-        }).default(() => ({ min: 0, max: 999999 }))
-    }).default(() => ({})),
-    
-    // Metadata
-    metadata: Yup.object().shape({
-        dataSource: Yup.string().trim().default(''),
-        confidenceLevel: Yup.string()
-            .oneOf(['high', 'medium', 'low'], 'Invalid confidence level')
-            .default('medium'),
-        lastReviewed: Yup.date().default(() => new Date()),
-        reviewedBy: Yup.string().trim().default('')
+            .default(() => [])
     }).default(() => ({})),
     
     // Standard timestamps

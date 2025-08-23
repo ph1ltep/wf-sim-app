@@ -181,6 +181,45 @@ const SettingsSchema = Yup.object().shape({
                 percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
             }
         })),
+        craneMarketFactor: DistributionTypeSchema.default(() => ({
+            key: 'craneMarketFactor',
+            type: 'normal',
+            timeSeriesMode: false,
+            parameters: {
+                value: 1.0,
+                mean: 1.0,
+                stdDev: 0.15
+            },
+            metadata: {
+                percentileDirection: 'ascending' // Higher percentiles = higher costs = more conservative
+            }
+        })),
+        laborMarketFactor: DistributionTypeSchema.default(() => ({
+            key: 'laborMarketFactor',
+            type: 'lognormal',
+            timeSeriesMode: false,
+            parameters: {
+                value: 1.0,
+                mu: 0,
+                sigma: 0.2
+            },
+            metadata: {
+                percentileDirection: 'ascending' // Higher percentiles = higher costs = more conservative
+            }
+        })),
+        escalationVariability: DistributionTypeSchema.default(() => ({
+            key: 'escalationVariability',
+            type: 'normal',
+            timeSeriesMode: false,
+            parameters: {
+                value: 0.0,
+                mean: 0.0,
+                stdDev: 0.005
+            },
+            metadata: {
+                percentileDirection: 'ascending' // Higher percentiles = higher escalation = more conservative
+            }
+        })),
     }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
@@ -366,7 +405,10 @@ const InputSimSchema = Yup.object().shape({
         windVariability: SimulationInfoSchema.nullable().default(null),
         downtimePerEvent: SimulationInfoSchema.nullable().default(null),
         escalationRate: SimulationInfoSchema.nullable().default(null),
-        rainfallAmount: SimulationInfoSchema.nullable().default(null)
+        rainfallAmount: SimulationInfoSchema.nullable().default(null),
+        craneMarketFactor: SimulationInfoSchema.nullable().default(null),
+        laborMarketFactor: SimulationInfoSchema.nullable().default(null),
+        escalationVariability: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
         percentileData: PercentileDataSchema.nullable().default(null),

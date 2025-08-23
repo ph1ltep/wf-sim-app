@@ -136,6 +136,11 @@ const Sider = ({ collapsed }) => {
               key: '/config/defaults/omscopes',
               icon: <ToolOutlined />,
               label: 'O&M Scopes'
+            },
+            {
+              key: '/config/defaults/repair-packages',
+              icon: <BuildOutlined />,
+              label: 'Repair Packages'
             }
           ]
         },

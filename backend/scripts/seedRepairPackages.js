@@ -13,10 +13,13 @@ const repairPackageData = [
     description: "Gearbox, generator, main bearing replacements requiring heavy crane operations",
     category: "major",
     costs: {
-      componentCostEUR: 400000,      // High-value major components
-      craneMobilizationEUR: 120000,  // Crawler crane mobilization
-      craneDailyRateEUR: 15000,      // Daily crawler crane rate
-      specialistLaborEUR: 35000      // Specialized technicians
+      componentCostEUR: 400000,           // High-value major components
+      craneMobilizationEUR: 120000,       // Crawler crane mobilization
+      craneDailyRateEUR: 15000,          // Daily crawler crane rate
+      specialistLaborDailyEUR: 2500,     // Specialized technicians daily rate
+      specialtyToolingDailyEUR: 1500,    // Special tools daily rate
+      additionalDailyCostEUR: 800,       // Other daily costs
+      additionalPerEventCostEUR: 5000    // One-time event costs
     },
     crane: {
       required: true,
@@ -24,21 +27,8 @@ const repairPackageData = [
       minimumDays: 3,
       baseDurationDays: 6
     },
-    complexity: {
-      component: {
-        type: 'lognormal',
-        parameters: { mu: 0, sigma: 0.3 }  // High technical risk variation
-      },
-      repair: {
-        type: 'gamma',
-        parameters: { shape: 3, scale: 0.3 }  // Moderate duration uncertainty
-      }
-    },
-    baseEscalationRate: 0.03,
     appliesTo: {
-      componentCategories: ['gearbox', 'generator', 'main_bearing'],
-      turbineTypes: [],
-      powerRangeKW: { min: 1500, max: 999999 }
+      componentCategories: ['gearbox', 'generator', 'main_bearing']
     },
     isDefault: true,
     isActive: true
@@ -48,10 +38,13 @@ const repairPackageData = [
     description: "Power electronics and transformer replacements with mobile crane support",
     category: "medium", 
     costs: {
-      componentCostEUR: 85000,       // Medium-value electrical components
-      craneMobilizationEUR: 60000,   // Mobile crane mobilization
-      craneDailyRateEUR: 8000,       // Daily mobile crane rate
-      specialistLaborEUR: 20000      // Electrical specialists
+      componentCostEUR: 85000,             // Medium-value electrical components
+      craneMobilizationEUR: 60000,         // Mobile crane mobilization
+      craneDailyRateEUR: 8000,            // Daily mobile crane rate
+      specialistLaborDailyEUR: 1800,      // Electrical specialists daily rate
+      specialtyToolingDailyEUR: 900,      // Testing equipment daily rate
+      additionalDailyCostEUR: 500,        // Other daily costs
+      additionalPerEventCostEUR: 2500     // One-time event costs
     },
     crane: {
       required: true,
@@ -59,21 +52,8 @@ const repairPackageData = [
       minimumDays: 2,
       baseDurationDays: 3
     },
-    complexity: {
-      component: {
-        type: 'lognormal',
-        parameters: { mu: 0, sigma: 0.2 }  // Medium technical risk
-      },
-      repair: {
-        type: 'gamma',
-        parameters: { shape: 2.5, scale: 0.25 }  // Lower duration uncertainty
-      }
-    },
-    baseEscalationRate: 0.025,
     appliesTo: {
-      componentCategories: ['power_electronics', 'transformer'],
-      turbineTypes: [],
-      powerRangeKW: { min: 850, max: 999999 }
+      componentCategories: ['power_electronics', 'transformer']
     },
     isDefault: true,
     isActive: true
@@ -83,10 +63,13 @@ const repairPackageData = [
     description: "Yaw and pitch system repairs with light crane requirements",
     category: "minor",
     costs: {
-      componentCostEUR: 35000,       // Lower-value mechanical components
-      craneMobilizationEUR: 40000,   // Light mobile crane
-      craneDailyRateEUR: 5000,       // Daily light crane rate
-      specialistLaborEUR: 15000      // Mechanical specialists
+      componentCostEUR: 35000,             // Lower-value mechanical components
+      craneMobilizationEUR: 40000,         // Light mobile crane
+      craneDailyRateEUR: 5000,            // Daily light crane rate
+      specialistLaborDailyEUR: 1200,      // Mechanical specialists daily rate
+      specialtyToolingDailyEUR: 600,      // Hydraulic tools daily rate
+      additionalDailyCostEUR: 300,        // Other daily costs
+      additionalPerEventCostEUR: 1500     // One-time event costs
     },
     crane: {
       required: true,
@@ -94,21 +77,8 @@ const repairPackageData = [
       minimumDays: 1,
       baseDurationDays: 2
     },
-    complexity: {
-      component: {
-        type: 'lognormal', 
-        parameters: { mu: 0, sigma: 0.15 }  // Low technical risk
-      },
-      repair: {
-        type: 'gamma',
-        parameters: { shape: 4, scale: 0.2 }  // Very low duration uncertainty
-      }
-    },
-    baseEscalationRate: 0.02,
     appliesTo: {
-      componentCategories: ['yaw_system', 'pitch_system'],
-      turbineTypes: [],
-      powerRangeKW: { min: 600, max: 999999 }
+      componentCategories: ['yaw_system', 'pitch_system']
     },
     isDefault: true,
     isActive: true
@@ -118,10 +88,13 @@ const repairPackageData = [
     description: "Control systems and sensor replacements requiring no crane operations",
     category: "electronic",
     costs: {
-      componentCostEUR: 18000,       // Low-value electronic components
-      craneMobilizationEUR: 0,       // No crane required
-      craneDailyRateEUR: 0,          // No crane costs
-      specialistLaborEUR: 8000       // Electronics specialists
+      componentCostEUR: 18000,             // Low-value electronic components
+      craneMobilizationEUR: 0,             // No crane required
+      craneDailyRateEUR: 0,               // No crane costs
+      specialistLaborDailyEUR: 900,       // Electronics specialists daily rate
+      specialtyToolingDailyEUR: 400,      // Testing equipment daily rate
+      additionalDailyCostEUR: 200,        // Other daily costs
+      additionalPerEventCostEUR: 800      // One-time event costs
     },
     crane: {
       required: false,
@@ -129,21 +102,8 @@ const repairPackageData = [
       minimumDays: 0,
       baseDurationDays: 1
     },
-    complexity: {
-      component: {
-        type: 'lognormal',
-        parameters: { mu: 0, sigma: 0.1 }  // Minimal technical risk
-      },
-      repair: {
-        type: 'uniform',
-        parameters: { min: 0.8, max: 1.2 }  // Predictable duration
-      }
-    },
-    baseEscalationRate: 0.015,
     appliesTo: {
-      componentCategories: ['control_system', 'sensors', 'scada'],
-      turbineTypes: [],
-      powerRangeKW: { min: 0, max: 999999 }
+      componentCategories: ['control_system', 'sensors', 'scada']
     },
     isDefault: true,
     isActive: true
@@ -153,10 +113,13 @@ const repairPackageData = [
     description: "Blade bearing and blade repair operations with specialized tower crane",
     category: "blade",
     costs: {
-      componentCostEUR: 45000,       // Blade-specific components
-      craneMobilizationEUR: 150000,  // Specialized tower crane
-      craneDailyRateEUR: 20000,      // High tower crane daily rate
-      specialistLaborEUR: 25000      // Blade repair specialists
+      componentCostEUR: 45000,             // Blade-specific components
+      craneMobilizationEUR: 150000,        // Specialized tower crane
+      craneDailyRateEUR: 20000,           // High tower crane daily rate
+      specialistLaborDailyEUR: 2200,      // Blade repair specialists daily rate
+      specialtyToolingDailyEUR: 1200,     // Blade tools daily rate
+      additionalDailyCostEUR: 600,        // Other daily costs
+      additionalPerEventCostEUR: 3500     // One-time event costs
     },
     crane: {
       required: true,
@@ -164,21 +127,8 @@ const repairPackageData = [
       minimumDays: 4,
       baseDurationDays: 7
     },
-    complexity: {
-      component: {
-        type: 'lognormal',
-        parameters: { mu: 0, sigma: 0.25 }  // Weather-dependent complexity
-      },
-      repair: {
-        type: 'gamma',
-        parameters: { shape: 2, scale: 0.4 }  // High weather uncertainty
-      }
-    },
-    baseEscalationRate: 0.035,
     appliesTo: {
-      componentCategories: ['blade_bearings', 'blades', 'hub'],
-      turbineTypes: [],
-      powerRangeKW: { min: 1000, max: 999999 }
+      componentCategories: ['blade_bearings', 'blades', 'hub']
     },
     isDefault: true,
     isActive: true

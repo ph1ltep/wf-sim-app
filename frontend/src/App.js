@@ -10,6 +10,7 @@ import MainLayout from './layouts/MainLayout';
 import AppSettings from './pages/config/app/AppSettings';
 import Locations from './pages/config/defaults/Locations';
 import OMScopes from './pages/config/defaults/OMScopes';
+import RepairPackages from './pages/config/defaults/RepairPackages';
 import ProjectSettings from './pages/config/project/ProjectSettings';
 import ScenarioSettings from './pages/config/scenario/ScenarioSettings';
 
@@ -62,6 +63,7 @@ function App() {
                   <Route path="defaults">
                     <Route path="locations" element={<Locations />} />
                     <Route path="omscopes" element={<OMScopes />} />
+                    <Route path="repair-packages" element={<RepairPackages />} />
                     <Route index element={<Navigate to="/config/defaults/locations" replace />} />
                   </Route>
                   <Route path="project-settings" element={<ProjectSettings />} />
