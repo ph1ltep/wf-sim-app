@@ -9,7 +9,8 @@ const oemScopeRoutes = require('./oemScopeRoutes');
 const majorComponentRoutes = require('./majorComponentRoutes');
 const failureModelRoutes = require('./failureModelRoutes');
 const defaultsRoutes = require('./defaultsRoutes');
-const simulationRoutes = require('./simulationRoutes'); // Add this line
+const simulationRoutes = require('./simulationRoutes');
+const repairPackageRoutes = require('./repairPackageRoutes');
 
 // Mount routes
 router.use('/scenarios', scenarioRoutes);
@@ -19,5 +20,6 @@ router.use('/oemscopes', oemScopeRoutes);
 router.use('/components', majorComponentRoutes);
 router.use('/defaults', defaultsRoutes);
 router.use('/simulation', simulationRoutes);
+router.use('/repair-packages', repairPackageRoutes);
 
 module.exports = router;

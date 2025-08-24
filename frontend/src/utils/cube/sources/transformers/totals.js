@@ -123,3 +123,31 @@ export const totalRevenue = (sourceData, context) => {
     }, addAuditEntry);
 };
 
+/**
+ * Calculate total component failure costs by aggregating component failure sources
+ * @param {null} sourceData - Not used for virtual sources
+ * @param {Object} context - Transformer context with addAuditEntry
+ * @returns {Array} Array of SimResultsSchema objects
+ */
+export const totalComponentFailureCosts = (sourceData, context) => {
+    const { processedData, percentileInfo, customPercentile, addAuditEntry } = context;
+
+    // Filter to component failure sources only
+    const componentFailureSources = filterCubeSourceData(processedData, {
+        visualGroup: 'component_failures'
+    });
+
+    if (componentFailureSources.length === 0) {
+        console.warn('⚠️ No component failure sources found for totalComponentFailureCosts calculation');
+        return [];
+    }
+
+    console.log(`🔧 Aggregating ${componentFailureSources.length} component failure sources for totalComponentFailureCosts`);
+
+    // Aggregate all component failure sources with audit trail
+    return aggregateCubeSourceData(componentFailureSources, percentileInfo.available, {
+        operation: 'sum',
+        customPercentile
+    }, addAuditEntry);
+};
+

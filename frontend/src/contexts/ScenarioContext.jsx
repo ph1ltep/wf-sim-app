@@ -15,7 +15,7 @@ import {
 } from '../api/scenarios';
 
 import { ScenarioSchema } from 'schemas/yup/scenario';
-import { validatePath } from '../utils/validate';
+const { validatePath } = require('../utils/validate');
 
 const ScenarioContext = createContext();
 

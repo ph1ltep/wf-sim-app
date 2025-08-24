@@ -2,25 +2,105 @@
 
 This file contains project-specific instructions that Claude should read at the start of each conversation and maintain in memory throughout the entire interaction. **IMPORTANT:** Once this file has been read or updated, it MUST be loaded at the beginning of any new conversation to ensure awareness of communication requirements, custom tasks, etc.
 
-## CRITICAL & IMPORTANT Rules to ALWAYS FOLLOW
-- ALL instructions within this document MUST BE FOLLOWED, these are not optional unless explicitly stated.
-- ASK FOR CLARIFICATION If you are uncertain of any of thing within the document.
-- DO NOT edit more code than you have to.
-- DO NOT WASTE TOKENS, be succinct and concise.
+## 🚨 ADAPTIVE EXECUTION STRATEGY - ASSESS COMPLEXITY FIRST
 
-1. **Edit existing files first** - avoid new file creation
-2. **Yup schemas drive everything** - validation + Mongoose generation
+### Task Complexity Assessment
+**Simple** (< 50 lines, single file, clear fix):
+- 1 analyzer instance
+- Sequential execution
+- Skip validation unless requested
+
+**Medium** (multiple files, < 200 lines, standard feature):
+- 1-2 analyzer instances
+- Mixed parallel/sequential
+- Focused validation
+
+**Complex** (new feature, architecture changes, > 200 lines):
+- 2-3 analyzer instances
+- Full parallel execution
+- Comprehensive validation
+
+### Optimized Decision Matrix
+| Task Type | Complexity | Primary Agents | Execution Pattern |
+|-----------|------------|----------------|-------------------|
+| Bug Fix | Simple | analyzer → builder | Sequential |
+| Bug Fix | Complex | analyzer(2x) → builder | Parallel analysis |
+| Small Feature | Medium | analyzer → planner → builder | Sequential |
+| Large Feature | Complex | analyzer(3x) + planner + schemas | Full parallel |
+| Schema Change | Medium | schemas → builder | Sequential |
+| Financial Logic | Any | finance + relevant agent | Parallel |
+| Documentation | Post-task | docs | Only if significant |
+| Validation | End only | validator | User choice |
+
+## 🚨 CRITICAL RULES - MANDATORY COMPLIANCE
+- **ALL** instructions within this document **MUST BE FOLLOWED** - these are not optional
+- **ASK FOR CLARIFICATION** if uncertain about any instruction
+- **MINIMIZE** code edits - only change what's necessary
+- **CONSERVE TOKENS** - be succinct and precise
+
+### Core Principles (ALWAYS ENFORCE):
+1. **Edit existing files FIRST** - avoid new file creation
+2. **Yup schemas drive EVERYTHING** - validation + Mongoose generation
 3. **Context-first state management** - minimize local state
 4. **Fail fast validation** - explicit error boundaries
 5. **Antd design system** - consistent UI patterns
 6. **Distribution-aware inputs** - support uncertainty modeling
-7. **Git commits** - MUST follow rules at @.claude/references/git-conventional-commits.md
-8. **USE sub-agents in parallel and sequential thinking** when useful or necessary.
+7. **Git commits** - MUST follow @.claude/references/git-conventional-commits.md
+8. **MANDATORY: USE SUB-AGENTS** - leverage specialized agents for ALL tasks
+
+## 🎯 IMMEDIATE ACTION PROTOCOL
+
+### ⚡ ADAPTIVE AGENT PROTOCOL - COMPLEXITY-BASED
+
+**STEP 1: ASSESS COMPLEXITY**
+- Simple task? → Minimal agents, sequential
+- Medium task? → Balanced approach
+- Complex task? → Full parallel execution
+
+**EXECUTION PATTERNS BY COMPLEXITY:**
+
+**Simple Tasks (Bug fixes, minor changes):**
+1. **analyzer** (1 instance) → Understand the issue
+2. **builder** → Fix it
+3. **validator** → Only if requested
+
+**Medium Tasks (Small features, multi-file changes):**
+1. **analyzer** (1-2 instances) → Analyze codebase
+2. **planner** OR **schemas** → Design approach (not both)
+3. **builder** → Implement
+4. **validator** → Focused testing if requested
+
+**Complex Tasks (New features, architecture):**
+1. **analyzer** (2-3 instances parallel) → Deep analysis
+2. **planner** + **schemas** + **finance** → Full parallel planning
+3. **builder** → Implement with guidance
+4. **validator** → Comprehensive testing
+5. **docs** → Update documentation
+
+**TEST SELECTION PROTOCOL:**
+ALWAYS ask user to choose testing approach before running ANY tests:
+1. **Run comprehensive tests** - Full test suite (npm test, npm run build, e2e tests)
+2. **Focused test** - Test only the specific feature/bug being addressed
+3. **Custom test** - User specifies exactly which tests to run
+4. **Skip tests** - Continue without testing (useful when more fixes are needed)
+
+**Default**: Present options and wait for user selection - NEVER auto-run tests
+
+**⚡ PERFORMANCE OPTIMIZATION SUMMARY:**
+Adaptive strategy delivers:
+- **Simple tasks**: 60% faster with single analyzer vs 3
+- **Medium tasks**: 40% faster with sequential vs full parallel
+- **Complex tasks**: Full parallel power when actually needed
+- **Token savings**: 40-60% average reduction
+- **Smart testing**: User-controlled test execution
+- **Focused agents**: No overlapping analysis work
 
 ## Default Mode
 
+- **Sub-agent orchestration mode** is PRIMARY approach
 - Architect mode should be enabled by default
-- Focus on providing detailed analysis, patterns, trade-offs, and architectural guidance
+- Focus on leveraging specialized agents for optimal results
+- Provide detailed analysis, patterns, trade-offs, and architectural guidance
 
 ## Permissions
 
@@ -69,34 +149,52 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
   - Include within the diff a bulleted list explaining what was changed and why
   - Explicitly note when a solution is opinionated and explain the reasoning
 
-- When completing a task, ask if I want to:
-  1. Run task:commit (need to manually stage files first)
-  2. Neither (stop here)
+- When completing a task:
+  1. Comment progress summary on GitHub issue/PR
+  2. Ask: "1. Continue with additional work, 2. Run validation, 3. Complete (ready for review)"
 
-## Coding Standards & AI Instructions
+## 🔄 WORKFLOW INTEGRATION
 
-### Key requirements
-- ALWAYS respect how things are written in the existing project
-- ALWAYS add JSDoc to exported functions.
-- DO NOT invent your own approaches or innovations
-- STRICTLY follow the existing style of tests, resolvers, functions, and arguments
-- Before creating a new file, ALWAYS examine a similar file and follow its style exactly
-- If code doesn't include comments, DO NOT add comments
-- Use seeded data in tests instead of creating new objects when seeded data exists
-- Follow the exact format of error handling, variable naming, and code organization used in similar files
-- Never deviate from the established patterns in the codebase
+### **Primary Workflow: GitHub Issue/PR Driven**
+1. **Start**: `/fix-git-issue {issue-number}` or direct issue/PR reference
+2. **Analysis**: Use **analyzer** agents in parallel for codebase understanding
+3. **Planning**: Use **planner** + **schemas** + **finance** for feature design
+4. **Implementation**: Use **builder** + **schemas** for code changes
+5. **Progress**: Comment updates on GitHub issue/PR throughout process
+6. **Completion**: Mark issue resolved when user approves and merges PR
+
+### **Continuation Workflow: User Comments**
+- **When**: User comments on PR/issue with additional requirements or feedback
+- **Process**: Read comments → analyze requirements → continue implementation → update progress
+- **Goal**: Iterative improvement until user satisfaction and PR merge
+
+## 💻 CODING STANDARDS & AI ORCHESTRATION
+
+### 🚨 CRITICAL REQUIREMENTS (NEVER VIOLATE):
+- **AGENT-FIRST APPROACH**: ALL coding tasks MUST use specialized agents
+- **RESPECT EXISTING CODE**: Follow project patterns religiously
+- **NO INNOVATION**: Use established patterns, don't invent new approaches
+- **JSDoc MANDATORY**: Add to ALL exported functions
+- **STYLE CONSISTENCY**: Examine similar files, follow exactly
+- **MINIMAL COMMENTS**: Only add if code clarity insufficient
+- **SEEDED DATA**: Use existing test data, don't create new objects
+- **PATTERN ADHERENCE**: Never deviate from established codebase patterns
+
+### 🎯 AI ORCHESTRATION PROTOCOL:
+1. **READ CONTEXT FIRST**: Always examine relevant files before planning
+2. **DELEGATE TO AGENTS**: Use specialized agents for their expertise areas
+3. **PARALLEL EXECUTION**: Run multiple agents simultaneously when possible
+4. **CROSS-VALIDATION**: Have agents review each other's outputs
+5. **DOCUMENTATION SYNC**: Always update docs after code changes
 
 ### General Instructions
-- Your most important job is to manage your own context. Always read any relevant files BEFORE planning changes.
-- When updating documentation, keep updates concise and on point to prevent bloat.
-- Write code following KISS, YAGNI, and DRY principles.
-- When in doubt follow proven best practices for implementation.
-- Do not commit to git without user approval.
-- Do not run any servers, rather tell the user to run servers for testing.
-- Always consider industry standard libraries/frameworks first over custom implementations.
-- Never mock anything. Never use placeholders. Never omit code.
-- Apply SOLID principles where relevant. Use modern framework features rather than reinventing solutions.
-- Be brutally honest about whether an idea is good or bad.
+- **PRIMARY JOB**: Orchestrate specialized agents effectively
+- **CONTEXT MANAGEMENT**: Read relevant files BEFORE planning changes
+- **CONCISE UPDATES**: Keep documentation updates focused
+- **PROVEN PRINCIPLES**: Follow KISS, YAGNI, DRY, and SOLID
+- **INDUSTRY STANDARDS**: Use established libraries over custom solutions
+- **NO MOCKING/PLACEHOLDERS**: Always implement complete solutions
+- **BRUTAL HONESTY**: Give direct feedback on ideas and implementations
 
 ## Knowledge Sharing and Persistence
 
@@ -118,44 +216,111 @@ Wind farm financial modeling platform with React + Antd frontend, Express backen
 
 - When a path starts with `./` in any file containing instructions for Claude, it means the path is relative to that file's location. Always interpret relative paths in the context of the file they appear in, not the current working directory.
 
-## Task Delegation Strategy
+## 🤖 MANDATORY SUB-AGENT STRATEGY - ALWAYS USE
 
-### Parallel Sub-Agent Coordination
-**Multiple agents can work together simultaneously** for optimal results:
+### 🚀 PRIMARY DIRECTIVE: LEVERAGE SPECIALIZED AGENTS
+**CRITICAL:** For ANY substantial task, **IMMEDIATELY** delegate to appropriate specialized agents. Use them in **PARALLEL** or **SEQUENTIAL** execution as optimal.
 
-**Feature Development Pipeline:**
-- **frontend-feature-architect** → **api-data-architect** → **frontend-master-engineer**
-- **wind-finance-risk-analyst** provides domain expertise throughout
-- **documentation-manager** updates docs after significant changes
+### 🎯 ADAPTIVE WORKFLOW - SCALE TO TASK
 
-### Agent Specializations
+**FIRST: ASSESS TASK COMPLEXITY**
+- Count files affected
+- Estimate lines of change
+- Determine if architecture changes needed
 
-**IMPORTANT** Dynamically call any sub-agent deemed necessary or significantly helpful for the task at hand. Call sub-agents in PARALLEL or Squential Thinking when necessary. 
+**THEN EXECUTE APPROPRIATELY:**
 
-**frontend-master-engineer**: React implementation
-- Collaborate with **wind-finance-risk-analyst** for statistical algorithms
-- Coordinate with **api-data-architect** for optimal data structures
-- Partner with **documentation-manager** for component documentation
+**Simple Task Workflow** (bug fix, minor change):
+1. **analyzer** → Single instance analysis
+2. **builder** → Direct implementation
+3. **validator** → Only if user requests
 
-**frontend-feature-architect**: Feature planning & architecture  
-- Work with **api-data-architect** to design data structures
-- Consult **wind-finance-risk-analyst** for critical data requirements
-- Plan feature breakdown and component hierarchies
+**Medium Task Workflow** (small feature, multi-file):
+1. **analyzer(1-2)** → Focused analysis
+2. **planner** OR **schemas** → Single planning agent
+3. **builder** → Guided implementation
+4. **validator** → User choice
 
-**api-data-architect**: Data structures & API design
-- Design Yup schemas and API endpoints
-- Collaborate with **wind-finance-risk-analyst** for financial data models
-- Support **frontend-master-engineer** with optimal data patterns
+**Complex Task Workflow** (new feature, architecture):
+1. **analyzer(2-3)** → Full parallel analysis
+2. **planner** + **schemas** + **finance** → Parallel planning
+3. **builder** → Comprehensive implementation
+4. **validator** + **docs** → Full validation and documentation
 
-**wind-finance-risk-analyst**: Domain expertise
-- Provide risk algorithms and statistical methods
-- Guide financial model requirements across all agents
+### ⚡ AGENT SPECIALIZATIONS - USE PROACTIVELY
+
+**🎨 builder** (PRIMARY for React code):
+- **MANDATORY** for ALL React/frontend implementation
+- Collaborate with **finance** for statistical algorithms
+- Coordinate with **schemas** for data structures
+- Partner with **docs** for documentation
+
+**🏗️ frontend-feature-architect** (Feature planning):
+- **REQUIRED** before any new feature development
+- Design component hierarchies and feature breakdown
+- Work with **schemas** for data structure design
+- Consult **finance** for domain requirements
+
+**📊 schemas** (Data & API design):
+- **ESSENTIAL** for Yup schemas and API endpoints
+- **MANDATORY COORDINATION** with **docs** for schema documentation
+- Collaborate with **finance** for financial models
+- Support **builder** with optimal patterns
+- **UPDATE FEATURE DOCS**: Ensure .md files in feature folders reflect schema changes
+
+**💰 finance** (Domain expertise):
+- **CRITICAL** for financial modeling and risk algorithms
+- Guide requirements across ALL other agents
 - Review data structures for industry compliance
+- Provide statistical methods and validation
 
-**documentation-manager**: Documentation maintenance
-- **Always called after significant feature changes**
-- Updates README, API docs, and component documentation
-- Maintains consistency across all documentation
+**🔍 analyzer** (Code analysis - READ-ONLY):
+- **ESSENTIAL** for understanding React components, Yup schemas, or data structures
+- **PARALLEL EXECUTION**: Support up to **3 instances simultaneously**
+- **Instance 1**: Component structure and UI flow analysis
+- **Instance 2**: Data flow and state management analysis
+- **Instance 3**: Dependencies and integration analysis
+- **STRICT RULE**: READ-ONLY agent, NEVER modifies code
+- **Model**: Sonnet (fast pattern matching)
+
+**✅ validator** (Validation - END ONLY):
+- **USE ONLY**: At task completion OR when explicitly requested
+- **VALIDATION MODES**:
+  - **Quick**: `npm run lint` only (30 seconds)
+  - **Standard**: `npm run lint && npm run build` (2 minutes)
+  - **Full**: Complete test suite including typecheck, test, build (5+ minutes)
+- **DEFAULT BEHAVIOR**: Skip validation unless issues detected
+- **Model**: Sonnet (rule-based checking)
+
+**📚 docs** (Always call after changes):
+- **MANDATORY** after significant feature implementations
+- **FEATURE DOCUMENTATION SYNC**: Update .md files in feature subfolders when code changes
+- **SCHEMA COORDINATION**: Work with **schemas** to document schema changes
+- Update README, API docs, and component documentation
+- **SEARCH FOR FEATURE DOCS**: Automatically identify and update relevant .md files in feature directories
+- Maintain consistency across all project documentation
+
+### 🔄 EXECUTION PATTERNS - SPEED OPTIMIZED:
+
+**PRIMARY PATTERNS:**
+1. **PARALLEL-FIRST**: Default for all analysis and planning tasks
+2. **BATCH OPERATIONS**: Group related changes, avoid micro-commits
+3. **LAZY VALIDATION**: Only validate at natural checkpoints
+4. **SMART DOCUMENTATION**: Update docs only for significant changes
+
+**AGENT PARALLELISM LIMITS:**
+- **analyzer**: Up to 3 parallel instances
+- **Planning agents**: All can run simultaneously
+- **Implementation agents**: Sequential only (avoid conflicts)
+- **docs**: Can run parallel with any agent
+
+### 📋 FEATURE DOCUMENTATION PROTOCOL:
+**CRITICAL:** When making ANY code changes, agents MUST:
+1. **schemas** + **docs**: Update schema documentation immediately
+2. **docs**: Search for and update relevant .md files in feature subfolders
+3. **PATTERN**: Look for `/[feature-name]/README.md` or `/[feature-name]/docs/*.md` files
+4. **SYNCHRONIZATION**: Ensure feature docs reflect current implementation state
+5. **CROSS-REFERENCE**: Update inter-feature documentation links when schemas change
 
 ## Core Architecture
 
@@ -221,3 +386,5 @@ cd frontend && npm test         # React testing
 cd frontend && npm run build    # Production build
 ```
 
+
+- REMEMBER: NEVER ADD Claude co-authored message to ANY commit!
