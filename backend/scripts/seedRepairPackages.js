@@ -12,20 +12,17 @@ const repairPackageData = [
     name: "Heavy Lift Major",
     description: "Gearbox, generator, main bearing replacements requiring heavy crane operations",
     category: "major",
+    baseDurationDays: 6,
     costs: {
-      componentCostEUR: 400000,           // High-value major components
-      craneMobilizationEUR: 120000,       // Crawler crane mobilization
-      craneDailyRateEUR: 15000,          // Daily crawler crane rate
-      specialistLaborDailyEUR: 2500,     // Specialized technicians daily rate
-      specialtyToolingDailyEUR: 1500,    // Special tools daily rate
-      additionalDailyCostEUR: 800,       // Other daily costs
-      additionalPerEventCostEUR: 5000    // One-time event costs
+      material: { perEventEUR: 400000, perDayEUR: 0 },
+      labor: { perEventEUR: 0, perDayEUR: 2500 },
+      tooling: { perEventEUR: 0, perDayEUR: 1500 },
+      crane: { perEventEUR: 120000, perDayEUR: 15000 },
+      other: { perEventEUR: 5000, perDayEUR: 800 }
     },
     crane: {
-      required: true,
       type: "crawler",
-      minimumDays: 3,
-      baseDurationDays: 6
+      minimumDays: 3
     },
     appliesTo: {
       componentCategories: ['gearbox', 'generator', 'main_bearing']
@@ -36,21 +33,18 @@ const repairPackageData = [
   {
     name: "Medium Lift Electrical",
     description: "Power electronics and transformer replacements with mobile crane support",
-    category: "medium", 
+    category: "medium",
+    baseDurationDays: 3,
     costs: {
-      componentCostEUR: 85000,             // Medium-value electrical components
-      craneMobilizationEUR: 60000,         // Mobile crane mobilization
-      craneDailyRateEUR: 8000,            // Daily mobile crane rate
-      specialistLaborDailyEUR: 1800,      // Electrical specialists daily rate
-      specialtyToolingDailyEUR: 900,      // Testing equipment daily rate
-      additionalDailyCostEUR: 500,        // Other daily costs
-      additionalPerEventCostEUR: 2500     // One-time event costs
+      material: { perEventEUR: 85000, perDayEUR: 0 },
+      labor: { perEventEUR: 0, perDayEUR: 1800 },
+      tooling: { perEventEUR: 0, perDayEUR: 900 },
+      crane: { perEventEUR: 60000, perDayEUR: 8000 },
+      other: { perEventEUR: 2500, perDayEUR: 500 }
     },
     crane: {
-      required: true,
       type: "mobile",
-      minimumDays: 2,
-      baseDurationDays: 3
+      minimumDays: 2
     },
     appliesTo: {
       componentCategories: ['power_electronics', 'transformer']
@@ -59,23 +53,20 @@ const repairPackageData = [
     isActive: true
   },
   {
-    name: "Light Mechanical", 
+    name: "Light Mechanical",
     description: "Yaw and pitch system repairs with light crane requirements",
     category: "minor",
+    baseDurationDays: 2,
     costs: {
-      componentCostEUR: 35000,             // Lower-value mechanical components
-      craneMobilizationEUR: 40000,         // Light mobile crane
-      craneDailyRateEUR: 5000,            // Daily light crane rate
-      specialistLaborDailyEUR: 1200,      // Mechanical specialists daily rate
-      specialtyToolingDailyEUR: 600,      // Hydraulic tools daily rate
-      additionalDailyCostEUR: 300,        // Other daily costs
-      additionalPerEventCostEUR: 1500     // One-time event costs
+      material: { perEventEUR: 35000, perDayEUR: 0 },
+      labor: { perEventEUR: 0, perDayEUR: 1200 },
+      tooling: { perEventEUR: 0, perDayEUR: 600 },
+      crane: { perEventEUR: 40000, perDayEUR: 5000 },
+      other: { perEventEUR: 1500, perDayEUR: 300 }
     },
     crane: {
-      required: true,
       type: "mobile",
-      minimumDays: 1,
-      baseDurationDays: 2
+      minimumDays: 1
     },
     appliesTo: {
       componentCategories: ['yaw_system', 'pitch_system']
@@ -87,20 +78,17 @@ const repairPackageData = [
     name: "No Crane Electronic",
     description: "Control systems and sensor replacements requiring no crane operations",
     category: "electronic",
+    baseDurationDays: 1,
     costs: {
-      componentCostEUR: 18000,             // Low-value electronic components
-      craneMobilizationEUR: 0,             // No crane required
-      craneDailyRateEUR: 0,               // No crane costs
-      specialistLaborDailyEUR: 900,       // Electronics specialists daily rate
-      specialtyToolingDailyEUR: 400,      // Testing equipment daily rate
-      additionalDailyCostEUR: 200,        // Other daily costs
-      additionalPerEventCostEUR: 800      // One-time event costs
+      material: { perEventEUR: 18000, perDayEUR: 0 },
+      labor: { perEventEUR: 0, perDayEUR: 900 },
+      tooling: { perEventEUR: 0, perDayEUR: 400 },
+      crane: { perEventEUR: 0, perDayEUR: 0 },
+      other: { perEventEUR: 800, perDayEUR: 200 }
     },
     crane: {
-      required: false,
       type: "none",
-      minimumDays: 0,
-      baseDurationDays: 1
+      minimumDays: 0
     },
     appliesTo: {
       componentCategories: ['control_system', 'sensors', 'scada']
@@ -112,20 +100,17 @@ const repairPackageData = [
     name: "Blade Work Package",
     description: "Blade bearing and blade repair operations with specialized tower crane",
     category: "blade",
+    baseDurationDays: 7,
     costs: {
-      componentCostEUR: 45000,             // Blade-specific components
-      craneMobilizationEUR: 150000,        // Specialized tower crane
-      craneDailyRateEUR: 20000,           // High tower crane daily rate
-      specialistLaborDailyEUR: 2200,      // Blade repair specialists daily rate
-      specialtyToolingDailyEUR: 1200,     // Blade tools daily rate
-      additionalDailyCostEUR: 600,        // Other daily costs
-      additionalPerEventCostEUR: 3500     // One-time event costs
+      material: { perEventEUR: 45000, perDayEUR: 0 },
+      labor: { perEventEUR: 0, perDayEUR: 2200 },
+      tooling: { perEventEUR: 0, perDayEUR: 1200 },
+      crane: { perEventEUR: 150000, perDayEUR: 20000 },
+      other: { perEventEUR: 3500, perDayEUR: 600 }
     },
     crane: {
-      required: true,
       type: "tower",
-      minimumDays: 4,
-      baseDurationDays: 7
+      minimumDays: 4
     },
     appliesTo: {
       componentCategories: ['blade_bearings', 'blades', 'hub']
@@ -142,13 +127,9 @@ const seedDatabase = async () => {
     await connectDB();
     console.log('Connected to MongoDB successfully');
 
-    // Check for existing data
-    const existingCount = await RepairPackage.countDocuments({});
-    if (existingCount > 0) {
-      console.log(`Found ${existingCount} existing repair packages. Skipping seed to avoid duplicates.`);
-      await mongoose.disconnect();
-      process.exit(0);
-    }
+    await RepairPackage.deleteMany({});
+    console.log('Deleted existing location data');
+
 
     // Insert new data
     const result = await RepairPackage.insertMany(repairPackageData);
@@ -157,7 +138,9 @@ const seedDatabase = async () => {
     // Display summary of seeded data
     console.log('\nSeeded repair packages:');
     result.forEach(package => {
-      console.log(`- ${package.name} (${package.category}): €${package.costs.componentCostEUR.toLocaleString()} component cost, ${package.crane.required ? package.crane.type : 'no'} crane`);
+      const materialCost = package.costs?.material?.perEventEUR || 0;
+      const hasCrane = (package.costs?.crane?.perEventEUR > 0) || (package.costs?.crane?.perDayEUR > 0);
+      console.log(`- ${package.name} (${package.category}): €${materialCost.toLocaleString()} material cost, ${hasCrane ? package.crane.type : 'no'} crane, ${package.baseDurationDays} day${package.baseDurationDays !== 1 ? 's' : ''}`);
     });
 
     // Display category summary
@@ -165,7 +148,7 @@ const seedDatabase = async () => {
     result.forEach(package => {
       categorySummary[package.category] = (categorySummary[package.category] || 0) + 1;
     });
-    
+
     console.log('\nPackages by category:');
     Object.entries(categorySummary).forEach(([category, count]) => {
       console.log(`- ${category}: ${count} package${count > 1 ? 's' : ''}`);

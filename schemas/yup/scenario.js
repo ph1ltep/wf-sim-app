@@ -12,6 +12,40 @@ const {
 
 const { ComponentFailureModelingSchema } = require('./componentFailureRates');
 
+// Market Factor Schema
+const MarketFactorSchema = Yup.object().shape({
+    id: Yup.string().required('Market factor ID is required'),
+    name: Yup.string().required('Market factor name is required'),
+    description: Yup.string().default(''),
+    distribution: DistributionTypeSchema.required('Distribution is required'),
+    isDefault: Yup.boolean().default(false)
+});
+
+// Default market factors array
+const DEFAULT_MARKET_FACTORS = [
+    {
+        id: 'escalationRate',
+        name: 'Base Escalation Rate',
+        description: 'Default cost escalation for all operations',
+        distribution: {
+            key: 'escalationRate',
+            type: 'fixed',
+            timeSeriesMode: false,
+            parameters: {
+                value: 1.0,
+                drift: 2.5
+            },
+            timeSeriesParameters: {
+                value: []
+            },
+            metadata: {
+                percentileDirection: 'ascending'
+            }
+        },
+        isDefault: true
+    }
+];
+
 // Component Allocation Schema
 const ComponentAllocationSchema = Yup.object().shape({
     oem: Yup.number().default(0.0),
@@ -165,62 +199,41 @@ const SettingsSchema = Yup.object().shape({
             exchangeRate: Yup.number().default(1.0),
         }),
         location: Yup.string(),
+        environment: Yup.object().shape({
+            rainfallAmount: DistributionTypeSchema.default(() => ({
+                key: 'rainfallAmount',
+                type: 'gamma',
+                timeSeriesMode: false,
+                parameters: {
+                    value: 1200,
+                    scale: 12,
+                    shape: 100,
+                    stdDev: 10
+                },
+                metadata: {
+                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
+                }
+            })),
+            windVariability: DistributionTypeSchema.default(() => ({
+                key: 'windVariability',
+                type: 'weibull', 
+                timeSeriesMode: false,
+                parameters: {
+                    value: 7.5,
+                    scale: 7.9,
+                    shape: 1.8
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
+                }
+            })),
+        }),
     }),
     marketFactors: Yup.object().shape({
-        rainfallAmount: DistributionTypeSchema.default(() => ({
-            key: 'rainfallAmount',
-            type: 'gamma',
-            timeSeriesMode: false,
-            parameters: {
-                value: 1200,
-                scale: 12,
-                shape: 100,
-                stdDev: 10
-            },
-            metadata: {
-                percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
-            }
-        })),
-        craneMarketFactor: DistributionTypeSchema.default(() => ({
-            key: 'craneMarketFactor',
-            type: 'normal',
-            timeSeriesMode: false,
-            parameters: {
-                value: 1.0,
-                mean: 1.0,
-                stdDev: 0.15
-            },
-            metadata: {
-                percentileDirection: 'ascending' // Higher percentiles = higher costs = more conservative
-            }
-        })),
-        laborMarketFactor: DistributionTypeSchema.default(() => ({
-            key: 'laborMarketFactor',
-            type: 'lognormal',
-            timeSeriesMode: false,
-            parameters: {
-                value: 1.0,
-                mu: 0,
-                sigma: 0.2
-            },
-            metadata: {
-                percentileDirection: 'ascending' // Higher percentiles = higher costs = more conservative
-            }
-        })),
-        escalationVariability: DistributionTypeSchema.default(() => ({
-            key: 'escalationVariability',
-            type: 'normal',
-            timeSeriesMode: false,
-            parameters: {
-                value: 0.0,
-                mean: 0.0,
-                stdDev: 0.005
-            },
-            metadata: {
-                percentileDirection: 'ascending' // Higher percentiles = higher escalation = more conservative
-            }
-        })),
-    }),
+        factors: Yup.array().of(MarketFactorSchema).default(() => DEFAULT_MARKET_FACTORS)
+    }).default(() => ({
+        factors: DEFAULT_MARKET_FACTORS
+    })),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
@@ -243,19 +256,6 @@ const SettingsSchema = Yup.object().shape({
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),
-            // Updated to be a DistributionTypeSchema of Fixed type (to match getDefaultSettings)
-            escalationRate: DistributionTypeSchema.default(() => ({
-                key: 'escalationRate',
-                type: 'fixed',
-                timeSeriesMode: false,
-                parameters: {
-                    value: 1,
-                    drift: 2.5
-                },
-                metadata: {
-                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
-                }
-            })),
             failureEventProbability: Yup.number().default(5),
             failureEventCost: Yup.number().default(200000),
             majorRepairEvents: Yup.array().of(Yup.object().shape({
@@ -309,20 +309,6 @@ const SettingsSchema = Yup.object().shape({
                 },
                 metadata: {
                     percentileDirection: 'ascending' // Higher percentiles = more downtime = more conservative (cost-like)
-                }
-            })),
-            // Updated to use GBM type
-            windVariability: DistributionTypeSchema.default(() => ({
-                key: 'windVariability',
-                type: 'weibull', // Changed to weibull type
-                timeSeriesMode: false,
-                parameters: {
-                    value: 7.5,
-                    scale: 7.9,
-                    shape: 1.8
-                },
-                metadata: {
-                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
                 }
             })),
             turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings

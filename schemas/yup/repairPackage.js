@@ -34,43 +34,42 @@ const RepairPackageSchema = Yup.object().shape({
         .oneOf(REPAIR_PACKAGE_CATEGORIES, 'Invalid repair package category')
         .required('Category is required'),
     
-    // Base costs in EUR (the "1.0" values before uncertainty)
+    // Repair costs organized by category (material, labor, tooling, crane, other)
     costs: Yup.object().shape({
-        componentCostEUR: Yup.number()
-            .min(0, 'Component cost must be at least 0')
-            .required('Component cost is required')
-            .default(0),
+        material: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
         
-        craneMobilizationEUR: Yup.number()
-            .min(0, 'Crane mobilization cost must be at least 0')
-            .default(0),
+        labor: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
         
-        craneDailyRateEUR: Yup.number()
-            .min(0, 'Crane daily rate must be at least 0')
-            .default(0),
+        tooling: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
         
-        specialistLaborDailyEUR: Yup.number()
-            .min(0, 'Specialist labor daily rate must be at least 0')
-            .default(0),
+        crane: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
         
-        specialtyToolingDailyEUR: Yup.number()
-            .min(0, 'Specialty tooling daily rate must be at least 0')
-            .default(0),
-        
-        additionalDailyCostEUR: Yup.number()
-            .min(0, 'Additional daily cost must be at least 0')
-            .default(0),
-        
-        additionalPerEventCostEUR: Yup.number()
-            .min(0, 'Additional per-event cost must be at least 0')
-            .default(0)
+        other: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 }))
     }).required('Costs are required').default(() => ({})),
+    
+    // General repair duration (applies to all repairs of this type)
+    baseDurationDays: Yup.number()
+        .min(0, 'Base duration must be at least 0')
+        .max(365, 'Base duration must not exceed 365')
+        .default(1),
     
     // Crane configuration
     crane: Yup.object().shape({
-        required: Yup.boolean()
-            .default(false),
-        
         type: Yup.string()
             .oneOf(CRANE_TYPES, 'Invalid crane type')
             .default('none'),
@@ -78,12 +77,7 @@ const RepairPackageSchema = Yup.object().shape({
         minimumDays: Yup.number()
             .min(0, 'Minimum crane days must be at least 0')
             .max(365, 'Minimum crane days must not exceed 365')
-            .default(0),
-        
-        baseDurationDays: Yup.number()
-            .min(0, 'Base duration must be at least 0')
-            .max(365, 'Base duration must not exceed 365')
-            .default(1)
+            .default(0)
     }).required('Crane configuration is required').default(() => ({})),
     
     // Component applicability (which components can use this package)
