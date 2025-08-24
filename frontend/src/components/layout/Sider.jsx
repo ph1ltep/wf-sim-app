@@ -17,6 +17,7 @@ import {
   FundProjectionScreenOutlined,
   FundOutlined, // Added this import
   DotChartOutlined,
+  CloudOutlined,
   AppstoreOutlined,
   DatabaseOutlined,
   ProjectOutlined,
@@ -202,6 +203,11 @@ const Sider = ({ collapsed }) => {
               key: '/scenario/economics/market-factors',
               icon: <AreaChartOutlined />,
               label: 'Market Factors'
+            },
+            {
+              key: '/scenario/economics/environment',
+              icon: <CloudOutlined />,
+              label: 'Environment'
             }
           ]
         },

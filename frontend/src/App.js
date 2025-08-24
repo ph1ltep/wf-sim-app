@@ -21,6 +21,7 @@ import EquipmentFailureRates from './pages/scenario/equipment/FailureRates';
 import Investment from './pages/scenario/economics/Investment';
 import EconomicsRevenue from './pages/scenario/economics/Revenue';
 import MarketFactors from './pages/scenario/economics/MarketFactors';
+import Environment from './pages/scenario/economics/Environment';
 import ServiceContracts from './pages/scenario/operations/ServiceContracts';
 import OperatingCosts from './pages/scenario/operations/OperatingCosts';
 import Performance from './pages/scenario/operations/Performance';
@@ -84,6 +85,7 @@ function App() {
                     <Route path="investment" element={<Investment />} />
                     <Route path="revenue" element={<EconomicsRevenue />} />
                     <Route path="market-factors" element={<MarketFactors />} />
+                    <Route path="environment" element={<Environment />} />
                   </Route>
                   <Route path="operations">
                     <Route index element={<Navigate to="/scenario/operations/service-contracts" replace />} />
