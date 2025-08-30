@@ -229,7 +229,7 @@ const DistributionFieldV3 = ({
     return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
   }, [timeSeriesMode, hasFittedParams]);
 
-  const colSpan = compact ? 200 : 150;
+  const colSpan = compact ? { xs: 24, sm: 8 } : { xs: 24, sm: 12 };
 
   // Initialize parameters and time series as needed
   useEffect(() => {
@@ -363,7 +363,7 @@ const DistributionFieldV3 = ({
               </div>
 
               {/* Compact Separator */}
-              <Divider style={{ margin: '0px', marginBottom: '14px' }} />
+              <Divider style={{ margin: '0px', marginBottom: '6px' }} />
 
               {/* Dynamic Content Area */}
               <div>
@@ -373,7 +373,7 @@ const DistributionFieldV3 = ({
                   ) : (
                     <>
                       <FormRow>
-                        <FormCol span={colSpan}>
+                        <FormCol {...(typeof colSpan === 'object' ? colSpan : { span: colSpan })}>
                           {valueType === 'percentage' ? (
                             <PercentageField
                               path={[...parametersPath, 'value']}
@@ -404,17 +404,34 @@ const DistributionFieldV3 = ({
                         </FormCol>
                       </FormRow>
                       <FormRow>
-                        {renderParameterFields(currentType, parametersPath, {
-                          addonAfter,
-                          step,
-                          colSpan,
-                          renderValueSeparately: true,
-                          currentParameters: { value: parameters.value }
-                        }).map((field, index) => (
-                          <FormCol span={colSpan} key={index}>
-                            {field}
-                          </FormCol>
-                        ))}
+                        {(() => {
+                          // Get metadata to extract span information
+                          const fieldMetadata = DistributionUtils.getMetadata(currentType, parameters);
+                          const parametersToRender = fieldMetadata?.parameters?.filter(param => param.name !== 'value') || [];
+
+                          return renderParameterFields(currentType, parametersPath, {
+                            addonAfter,
+                            step,
+                            colSpan,
+                            renderValueSeparately: true,
+                            currentParameters: { value: parameters.value }
+                          }).map((field, index) => {
+                            // Get the corresponding parameter metadata for this field
+                            const paramMetadata = parametersToRender[index];
+                            const fieldSpan = paramMetadata?.fieldProps?.span || colSpan;
+
+                            // Handle both object spans and number spans
+                            const spanProps = typeof fieldSpan === 'object'
+                              ? fieldSpan  // { xs: 24, sm: 8 }
+                              : { span: fieldSpan }; // 24
+
+                            return (
+                              <FormCol {...spanProps} key={index}>
+                                {field}
+                              </FormCol>
+                            );
+                          });
+                        })()}
                       </FormRow>
                     </>
                   )}

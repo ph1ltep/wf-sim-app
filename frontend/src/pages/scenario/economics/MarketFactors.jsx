@@ -1,6 +1,6 @@
 // frontend/src/pages/scenario/economics/MarketFactors.jsx
 import React, { useState, useMemo } from 'react';
-import { Typography, Alert, Table, Button, Modal, Input, Space, Popconfirm, message, Card, Divider, Form, Select, List, Tag } from 'antd';
+import { Typography, Alert, Table, Button, Modal, Input, Space, Popconfirm, message, Card, Divider, Form, Select } from 'antd';
 import { 
     PlusOutlined, 
     EditOutlined, 
@@ -10,7 +10,9 @@ import {
     UserOutlined,
     ToolOutlined,
     BuildOutlined,
-    AppstoreOutlined
+    AppstoreOutlined,
+    FileTextOutlined,
+    GlobalOutlined
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
@@ -69,6 +71,20 @@ const COST_CATEGORIES = [
         icon: <BuildOutlined />, 
         color: '#722ed1',
         description: 'Crane mobilization and operation'
+    },
+    { 
+        key: 'contractsLocal', 
+        label: 'Contracts (Local)', 
+        icon: <FileTextOutlined />, 
+        color: '#13c2c2',
+        description: 'Local contracting and service costs'
+    },
+    { 
+        key: 'contractsForeign', 
+        label: 'Contracts (Foreign)', 
+        icon: <GlobalOutlined />, 
+        color: '#2f54eb',
+        description: 'International contracting and logistics'
     },
     { 
         key: 'other', 
@@ -241,6 +257,8 @@ const MarketFactors = () => {
         labor: 'escalationRate',
         tooling: 'escalationRate',
         crane: 'escalationRate',
+        contractsLocal: 'escalationRate',
+        contractsForeign: 'escalationRate',
         other: 'escalationRate'
     });
     
@@ -373,72 +391,62 @@ const MarketFactors = () => {
             </Card>
 
             <Card 
-                title={
-                    <Space>
-                        <Text strong>Cost Category Factor Assignment</Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                            Assign market factors to each repair cost category
-                        </Text>
-                    </Space>
-                }
-                size="small"
+                title="Cost Category Factor Assignment"
                 style={{ marginBottom: 24 }}
             >
-                <List
-                    dataSource={COST_CATEGORIES}
-                    renderItem={(category) => {
-                        const currentFactor = marketFactorsArray.find(f => f.id === costCategoryFactors[category.key]);
-                        
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                    Market factors are multipliers applied to base costs during Monte Carlo simulations. 
+                    Each cost category can have its own market factor to model different escalation patterns.
+                </Text>
+                
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                    gap: '16px'
+                }}>
+                    {COST_CATEGORIES.map((category) => {
                         return (
-                            <List.Item
-                                actions={[
+                            <Card
+                                key={category.key}
+                                size="small"
+                                style={{
+                                    borderLeft: `4px solid ${category.color}`,
+                                    borderRadius: '6px',
+                                    backgroundColor: '#fafafa'
+                                }}
+                                bodyStyle={{ padding: '12px' }}
+                            >
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ color: category.color, fontSize: 16 }}>
+                                            {category.icon}
+                                        </span>
+                                        <div style={{ flex: 1 }}>
+                                            <Text strong>{category.label}</Text>
+                                            <div style={{ fontSize: 11, color: '#666', lineHeight: '14px' }}>
+                                                {category.description}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <Select
-                                        key="select"
                                         value={costCategoryFactors[category.key]}
                                         onChange={(value) => handleCategoryFactorChange(category.key, value)}
-                                        style={{ width: 200 }}
+                                        style={{ width: '100%' }}
                                         size="small"
-                                        placeholder="Select factor"
+                                        placeholder="Select market factor"
+                                        dropdownMatchSelectWidth={true}
                                     >
                                         {marketFactorsArray.map(factor => (
                                             <Option key={factor.id} value={factor.id}>
-                                                <Space>
-                                                    {factor.isDefault && <Tag color="blue" style={{ margin: 0 }}>Default</Tag>}
-                                                    <Text>{factor.name}</Text>
-                                                </Space>
+                                                {factor.name}
                                             </Option>
                                         ))}
                                     </Select>
-                                ]}
-                            >
-                                <List.Item.Meta
-                                    avatar={
-                                        <span style={{ color: category.color, fontSize: 18 }}>
-                                            {category.icon}
-                                        </span>
-                                    }
-                                    title={
-                                        <Space>
-                                            <Text strong>{category.label}</Text>
-                                            {currentFactor && (
-                                                <Text style={{ fontSize: 12, color: category.color }}>
-                                                    → {currentFactor.name}
-                                                </Text>
-                                            )}
-                                        </Space>
-                                    }
-                                    description={category.description}
-                                />
-                            </List.Item>
+                                </div>
+                            </Card>
                         );
-                    }}
-                />
-                
-                <div style={{ marginTop: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                        <strong>Note:</strong> Market factors are multipliers applied to base costs during Monte Carlo simulations. 
-                        Each cost category can have its own market factor to model different escalation patterns.
-                    </Text>
+                    })}
                 </div>
             </Card>
 

@@ -393,7 +393,8 @@ export const Gamma = {
                         tooltip: "Shape parameter of the Gamma distribution",
                         min: 0.001,
                         step: 0.1,
-                        defaultValue: defaultShape
+                        defaultValue: defaultShape,
+                        span: { xs: 24, sm: 8 }
                     }
                 }
             ]

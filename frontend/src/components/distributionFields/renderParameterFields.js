@@ -75,6 +75,8 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
             fieldProps.style = style;
         }
 
+        // Note: span is handled at the FormCol level in DistributionFieldV3
+
         // For parameter fields, use addonAfter from metadata if provided
         if (param.fieldProps.addonAfter) {
             fieldProps.addonAfter = param.fieldProps.addonAfter;
