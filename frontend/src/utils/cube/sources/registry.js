@@ -37,6 +37,25 @@ export const CASHFLOW_SOURCE_REGISTRY = {
     sources: [
         // MULTIPLIERS - Direct sources (type: 'direct', priority: 9)
         {
+            id: 'baseEscalationRate',
+            priority: 9,
+            path: ['simulation', 'inputSim', 'marketFactors', 'baseEscalationRate', 'results'],
+            hasPercentiles: true,
+            references: [],
+            transformer: null,
+            multipliers: [],
+            metadata: {
+                name: 'Base Escalation Rate',
+                type: 'direct',
+                visualGroup: 'economic_factors',
+                cashflowType: 'none',
+                accountingClass: 'none',
+                projectPhase: 'operations',
+                description: 'Annual cost escalation rate applied to all cost items',
+                formatter: (value) => `${(value * 100).toFixed(1)}%`
+            }
+        },
+        {
             id: 'escalationRate',
             priority: 9,
             path: ['simulation', 'inputSim', 'distributionAnalysis', 'escalationRate', 'results'],
@@ -45,13 +64,13 @@ export const CASHFLOW_SOURCE_REGISTRY = {
             transformer: null,
             multipliers: [],
             metadata: {
-                name: 'Escalation Rate',
+                name: 'Escalation Rate (Legacy)',
                 type: 'direct',
                 visualGroup: 'economic_factors',
                 cashflowType: 'none',
                 accountingClass: 'none',
                 projectPhase: 'operations',
-                description: 'Annual cost escalation rate applied to all cost items',
+                description: 'Legacy escalation rate for backwards compatibility',
                 formatter: (value) => `${(value * 100).toFixed(1)}%`
             }
         },

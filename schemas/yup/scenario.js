@@ -24,11 +24,11 @@ const MarketFactorSchema = Yup.object().shape({
 // Default market factors array
 const DEFAULT_MARKET_FACTORS = [
     {
-        id: 'escalationRate',
+        id: 'baseEscalationRate',
         name: 'Base Escalation Rate',
         description: 'Default cost escalation for all operations',
         distribution: {
-            key: 'escalationRate',
+            key: 'baseEscalationRate',
             type: 'fixed',
             timeSeriesMode: false,
             parameters: {
@@ -426,6 +426,19 @@ const InputSimSchema = Yup.object().shape({
     scope: Yup.object().shape({
         responsibilityMatrix: Yup.array().of(YearlyResponsibilitySchema).nullable().default(null),
     }),
+    marketFactors: Yup.lazy((obj) => {
+        if (!obj || typeof obj !== 'object') {
+            return Yup.object().default({});
+        }
+        
+        // Build shape for each market factor key dynamically
+        const shape = {};
+        Object.keys(obj).forEach(key => {
+            shape[key] = SimulationInfoSchema.nullable().default(null);
+        });
+        
+        return Yup.object().shape(shape);
+    }), // Dynamic keys for market factor IDs
 });
 
 // OutputSim Schema

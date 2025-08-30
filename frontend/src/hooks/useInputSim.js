@@ -15,6 +15,43 @@ const useInputSim = () => {
     const [fittingDistribution, setFittingDistribution] = useState(false);
 
     /**
+     * Collect all distributions from hardcoded sources and market factors
+     * @returns {Array} Array of all distributions
+     */
+    const collectAllDistributions = useCallback(() => {
+        if (!scenarioData) return [];
+
+        const distributions = [];
+
+        // Hardcoded existing distributions
+        const hardcodedDistributions = {
+            energyProduction: scenarioData.settings.modules.revenue.energyProduction,
+            electricityPrice: scenarioData.settings.modules.revenue.electricityPrice,
+            escalationRate: scenarioData.settings.modules.cost.escalationRate,
+            downtimePerEvent: scenarioData.settings.modules.revenue.downtimePerEvent,
+            windVariability: scenarioData.settings.modules.revenue.windVariability,
+            rainfallAmount: scenarioData.settings.marketFactors.rainfallAmount
+        };
+
+        // Add hardcoded distributions
+        Object.entries(hardcodedDistributions).forEach(([key, dist]) => {
+            if (dist) {
+                distributions.push(dist);
+            }
+        });
+
+        // Add market factor distributions (keys are now guaranteed unique by backend)
+        const marketFactors = scenarioData.settings.marketFactors.factors || [];
+        marketFactors.forEach(factor => {
+            if (factor && factor.distribution) {
+                distributions.push(factor.distribution);
+            }
+        });
+
+        return distributions;
+    }, [scenarioData]);
+
+    /**
      * Update distributions in the input simulation
      * @returns {Promise<boolean>} Success status
      */
@@ -24,13 +61,8 @@ const useInputSim = () => {
         try {
             setLoading(true);
 
-            // Extract required distribution objects from scenario data
-            const energyProduction = scenarioData.settings.modules.revenue.energyProduction;
-            const electricityPrice = scenarioData.settings.modules.revenue.electricityPrice;
-            const escalationRate = scenarioData.settings.modules.cost.escalationRate;
-            const downtimePerEvent = scenarioData.settings.modules.revenue.downtimePerEvent;
-            const windVariability = scenarioData.settings.modules.revenue.windVariability;
-            const rainfallAmount = scenarioData.settings.marketFactors.rainfallAmount;
+            // Collect all distributions (existing + market factors)
+            const allDistributions = collectAllDistributions();
 
             // Ensure proper structure for each distribution
             const normalizeDistribution = (dist) => {
@@ -39,14 +71,7 @@ const useInputSim = () => {
 
             // Create parameters for API request
             const params = {
-                distributions: [
-                    normalizeDistribution(energyProduction),
-                    normalizeDistribution(electricityPrice),
-                    normalizeDistribution(escalationRate),
-                    normalizeDistribution(downtimePerEvent),
-                    normalizeDistribution(windVariability),
-                    normalizeDistribution(rainfallAmount)
-                ],
+                distributions: allDistributions.map(normalizeDistribution),
                 simulationSettings: {
                     iterations: scenarioData.settings.simulation.iterations || 10000,
                     seed: scenarioData.settings.simulation.seed || 42,
@@ -62,12 +87,26 @@ const useInputSim = () => {
                 // Get all simulation results
                 const results = response.data.simulationInfo;
 
+                // Get market factor IDs for determining storage location
+                const marketFactors = scenarioData.settings.marketFactors.factors || [];
+                const marketFactorIds = marketFactors.map(f => f.id);
+
                 // Create batch updates object using the keys from the distribution objects
                 const updates = {};
                 for (const result of results) {
                     if (result.distribution && result.distribution.key) {
                         const key = result.distribution.key;
-                        const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
+                        
+                        // Determine storage location based on whether key matches a market factor ID
+                        let path;
+                        if (marketFactorIds.includes(key)) {
+                            // Store market factor results in marketFactors object
+                            path = ['simulation', 'inputSim', 'marketFactors', key];
+                        } else {
+                            // Store existing distributions in distributionAnalysis (unchanged behavior)
+                            path = ['simulation', 'inputSim', 'distributionAnalysis', key];
+                        }
+                        
                         updates[path.join('.')] = result;
                     }
                 }
@@ -93,7 +132,7 @@ const useInputSim = () => {
         } finally {
             setLoading(false);
         }
-    }, [scenarioData, updateByPath]);
+    }, [scenarioData, updateByPath, collectAllDistributions]);
 
     /**
      * Fit distribution to time series data
