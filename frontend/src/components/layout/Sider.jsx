@@ -263,9 +263,14 @@ const Sider = ({ collapsed }) => {
       label: 'Simulations',
       children: [
         {
-          key: '/simulations/external-factors',
-          icon: <AreaChartOutlined />,
-          label: 'External Factors'
+          key: '/simulations/market-factors',
+          icon: <RiseOutlined />,
+          label: 'Market Factors'
+        },
+        {
+          key: '/simulations/environmental-factors',
+          icon: <CloudOutlined />,
+          label: 'Environmental'
         },
         {
           key: '/simulations/operational-risks',
