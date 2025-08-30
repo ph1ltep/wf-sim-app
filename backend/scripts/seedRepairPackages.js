@@ -18,6 +18,8 @@ const repairPackageData = [
       labor: { perEventEUR: 0, perDayEUR: 2500 },
       tooling: { perEventEUR: 0, perDayEUR: 1500 },
       crane: { perEventEUR: 120000, perDayEUR: 15000 },
+      contractsLocal: { perEventEUR: 25000, perDayEUR: 1200 },
+      contractsForeign: { perEventEUR: 35000, perDayEUR: 1800 },
       other: { perEventEUR: 5000, perDayEUR: 800 }
     },
     crane: {
@@ -40,6 +42,8 @@ const repairPackageData = [
       labor: { perEventEUR: 0, perDayEUR: 1800 },
       tooling: { perEventEUR: 0, perDayEUR: 900 },
       crane: { perEventEUR: 60000, perDayEUR: 8000 },
+      contractsLocal: { perEventEUR: 15000, perDayEUR: 800 },
+      contractsForeign: { perEventEUR: 22000, perDayEUR: 1200 },
       other: { perEventEUR: 2500, perDayEUR: 500 }
     },
     crane: {
@@ -62,6 +66,8 @@ const repairPackageData = [
       labor: { perEventEUR: 0, perDayEUR: 1200 },
       tooling: { perEventEUR: 0, perDayEUR: 600 },
       crane: { perEventEUR: 40000, perDayEUR: 5000 },
+      contractsLocal: { perEventEUR: 8000, perDayEUR: 500 },
+      contractsForeign: { perEventEUR: 12000, perDayEUR: 750 },
       other: { perEventEUR: 1500, perDayEUR: 300 }
     },
     crane: {
@@ -84,6 +90,8 @@ const repairPackageData = [
       labor: { perEventEUR: 0, perDayEUR: 900 },
       tooling: { perEventEUR: 0, perDayEUR: 400 },
       crane: { perEventEUR: 0, perDayEUR: 0 },
+      contractsLocal: { perEventEUR: 3000, perDayEUR: 300 },
+      contractsForeign: { perEventEUR: 5000, perDayEUR: 450 },
       other: { perEventEUR: 800, perDayEUR: 200 }
     },
     crane: {
@@ -106,6 +114,8 @@ const repairPackageData = [
       labor: { perEventEUR: 0, perDayEUR: 2200 },
       tooling: { perEventEUR: 0, perDayEUR: 1200 },
       crane: { perEventEUR: 150000, perDayEUR: 20000 },
+      contractsLocal: { perEventEUR: 18000, perDayEUR: 1000 },
+      contractsForeign: { perEventEUR: 28000, perDayEUR: 1500 },
       other: { perEventEUR: 3500, perDayEUR: 600 }
     },
     crane: {
