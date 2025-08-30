@@ -16,15 +16,17 @@ import {
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
+import { getMarketFactorColorScheme } from 'utils/charts/colors';
+import { distributionTypes } from '../../../utils/distributions';
 
 // Default market factors
 const DEFAULT_MARKET_FACTORS = [
     {
-        id: 'escalationRate',
+        id: 'baseEscalationRate',
         name: 'Base Escalation Rate',
         description: 'Default cost escalation for all operations',
         distribution: {
-            key: 'escalationRate',
+            key: 'baseEscalationRate',
             type: 'fixed',
             timeSeriesMode: false,
             parameters: {
@@ -48,49 +50,42 @@ const COST_CATEGORIES = [
         key: 'material', 
         label: 'Material', 
         icon: <DollarOutlined />, 
-        color: '#1890ff',
         description: 'Component and spare parts costs'
     },
     { 
         key: 'labor', 
         label: 'Labor', 
         icon: <UserOutlined />, 
-        color: '#52c41a',
         description: 'Technician and specialist costs'
     },
     { 
         key: 'tooling', 
         label: 'Tooling', 
         icon: <ToolOutlined />, 
-        color: '#fa8c16',
         description: 'Equipment and tool rental'
     },
     { 
         key: 'crane', 
         label: 'Crane', 
         icon: <BuildOutlined />, 
-        color: '#722ed1',
         description: 'Crane mobilization and operation'
     },
     { 
         key: 'contractsLocal', 
         label: 'Contracts (Local)', 
         icon: <FileTextOutlined />, 
-        color: '#13c2c2',
         description: 'Local contracting and service costs'
     },
     { 
         key: 'contractsForeign', 
         label: 'Contracts (Foreign)', 
         icon: <GlobalOutlined />, 
-        color: '#2f54eb',
         description: 'International contracting and logistics'
     },
     { 
         key: 'other', 
         label: 'Other', 
         icon: <AppstoreOutlined />, 
-        color: '#eb2f96',
         description: 'Additional and contingency costs'
     }
 ];
@@ -124,9 +119,9 @@ const MarketFactors = () => {
                 needsCleanup = true;
             }
 
-            // Ensure escalationRate exists
-            const hasEscalationRate = validFactors.some(f => f.id === 'escalationRate');
-            if (!hasEscalationRate) {
+            // Ensure baseEscalationRate exists
+            const hasBaseEscalationRate = validFactors.some(f => f.id === 'baseEscalationRate');
+            if (!hasBaseEscalationRate) {
                 validFactors.unshift(DEFAULT_MARKET_FACTORS[0]);
                 needsCleanup = true;
             }
@@ -237,7 +232,7 @@ const MarketFactors = () => {
                 const updatedMappings = { ...failureRates.costCategoryFactors };
                 Object.keys(updatedMappings).forEach(category => {
                     if (updatedMappings[category] === factorToDelete.id) {
-                        updatedMappings[category] = 'escalationRate'; // Reset to default
+                        updatedMappings[category] = 'baseEscalationRate'; // Reset to default
                     }
                 });
                 await updateByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], updatedMappings);
@@ -253,13 +248,13 @@ const MarketFactors = () => {
 
     // Get current cost category factors
     const costCategoryFactors = getValueByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], {
-        material: 'escalationRate',
-        labor: 'escalationRate',
-        tooling: 'escalationRate',
-        crane: 'escalationRate',
-        contractsLocal: 'escalationRate',
-        contractsForeign: 'escalationRate',
-        other: 'escalationRate'
+        material: 'baseEscalationRate',
+        labor: 'baseEscalationRate',
+        tooling: 'baseEscalationRate',
+        crane: 'baseEscalationRate',
+        contractsLocal: 'baseEscalationRate',
+        contractsForeign: 'baseEscalationRate',
+        other: 'baseEscalationRate'
     });
     
     // Handle factor change for a category
@@ -405,12 +400,13 @@ const MarketFactors = () => {
                     gap: '16px'
                 }}>
                     {COST_CATEGORIES.map((category) => {
+                        const categoryColor = getMarketFactorColorScheme(category.key);
                         return (
                             <Card
                                 key={category.key}
                                 size="small"
                                 style={{
-                                    borderLeft: `4px solid ${category.color}`,
+                                    borderLeft: `4px solid ${categoryColor}`,
                                     borderRadius: '6px',
                                     backgroundColor: '#fafafa'
                                 }}
@@ -418,7 +414,7 @@ const MarketFactors = () => {
                             >
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ color: category.color, fontSize: 16 }}>
+                                        <span style={{ color: categoryColor, fontSize: 16 }}>
                                             {category.icon}
                                         </span>
                                         <div style={{ flex: 1 }}>
@@ -451,7 +447,7 @@ const MarketFactors = () => {
             </Card>
 
             <Modal
-                title={`${editingIndex !== null && marketFactorsArray[editingIndex]?.id === 'escalationRate' ? 'Edit' : editingIndex !== null ? 'Edit' : 'Create'} Market Factor`}
+                title={`${editingIndex !== null && marketFactorsArray[editingIndex]?.id === 'baseEscalationRate' ? 'Edit' : editingIndex !== null ? 'Edit' : 'Create'} Market Factor`}
                 open={isModalOpen}
                 onCancel={handleCloseModal}
                 width={900}
@@ -469,7 +465,7 @@ const MarketFactors = () => {
                                     value={marketFactorsArray[editingIndex]?.name || ''}
                                     onChange={(e) => updateByPath(['settings', 'marketFactors', 'factors', editingIndex, 'name'], e.target.value)}
                                     placeholder="e.g., Crane Cost Factor, Local Labor Rates"
-                                    disabled={marketFactorsArray[editingIndex]?.id === 'escalationRate'}
+                                    disabled={marketFactorsArray[editingIndex]?.id === 'baseEscalationRate'}
                                 />
                             </Form.Item>
 
@@ -478,7 +474,7 @@ const MarketFactors = () => {
                                     value={marketFactorsArray[editingIndex]?.description || ''}
                                     onChange={(e) => updateByPath(['settings', 'marketFactors', 'factors', editingIndex, 'description'], e.target.value)}
                                     placeholder="Describe what this market factor represents"
-                                    disabled={marketFactorsArray[editingIndex]?.id === 'escalationRate'}
+                                    disabled={marketFactorsArray[editingIndex]?.id === 'baseEscalationRate'}
                                     rows={2}
                                 />
                             </Form.Item>
@@ -500,16 +496,7 @@ const MarketFactors = () => {
                                 valueName="Base Multiplier"
                                 step={0.01}
                                 showTitle={false}
-                                options={[
-                                    { value: 'fixed', label: 'Fixed Value with Drift' },
-                                    { value: 'normal', label: 'Normal Distribution' },
-                                    { value: 'lognormal', label: 'Lognormal Distribution' },
-                                    { value: 'triangular', label: 'Triangular Distribution' },
-                                    { value: 'uniform', label: 'Uniform Distribution' },
-                                    { value: 'beta', label: 'Beta Distribution' },
-                                    { value: 'gamma', label: 'Gamma Distribution' },
-                                    { value: 'weibull', label: 'Weibull Distribution' }
-                                ]}
+                                options={distributionTypes}
                             />
                         </div>
                     </Space>
