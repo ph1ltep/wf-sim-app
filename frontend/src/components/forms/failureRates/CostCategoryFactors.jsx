@@ -9,6 +9,7 @@ import {
     AppstoreOutlined
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
+import { getMarketFactorColorScheme } from 'utils/charts/colors';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -19,35 +20,30 @@ const COST_CATEGORIES = [
         key: 'material', 
         label: 'Material', 
         icon: <DollarOutlined />, 
-        color: '#1890ff',
         description: 'Component and spare parts costs'
     },
     { 
         key: 'labor', 
         label: 'Labor', 
         icon: <UserOutlined />, 
-        color: '#52c41a',
         description: 'Technician and specialist costs'
     },
     { 
         key: 'tooling', 
         label: 'Tooling', 
         icon: <ToolOutlined />, 
-        color: '#fa8c16',
         description: 'Equipment and tool rental'
     },
     { 
         key: 'crane', 
         label: 'Crane', 
         icon: <BuildOutlined />, 
-        color: '#722ed1',
         description: 'Crane mobilization and operation'
     },
     { 
         key: 'other', 
         label: 'Other', 
         icon: <AppstoreOutlined />, 
-        color: '#eb2f96',
         description: 'Additional and contingency costs'
     }
 ];
@@ -57,11 +53,11 @@ const CostCategoryFactors = () => {
     
     // Get current cost category factors
     const costCategoryFactors = getValueByPath('settings.project.equipment.failureRates.costCategoryFactors', {
-        material: 'escalationRate',
-        labor: 'escalationRate',
-        tooling: 'escalationRate',
-        crane: 'escalationRate',
-        other: 'escalationRate'
+        material: 'baseEscalationRate',
+        labor: 'baseEscalationRate',
+        tooling: 'baseEscalationRate',
+        crane: 'baseEscalationRate',
+        other: 'baseEscalationRate'
     });
     
     // Get available market factors
@@ -108,7 +104,7 @@ const CostCategoryFactors = () => {
                         <Col key={category.key} xs={24} sm={12} md={8} lg={8} xl={8}>
                             <Space direction="vertical" style={{ width: '100%' }}>
                                 <Space>
-                                    <span style={{ color: category.color, fontSize: 18 }}>
+                                    <span style={{ color: getMarketFactorColorScheme(category.key), fontSize: 18 }}>
                                         {category.icon}
                                     </span>
                                     <Text strong>{category.label}</Text>
@@ -136,7 +132,7 @@ const CostCategoryFactors = () => {
                                 </Text>
                                 
                                 {currentFactor && (
-                                    <Text style={{ fontSize: 11, color: category.color }}>
+                                    <Text style={{ fontSize: 11, color: getMarketFactorColorScheme(category.key) }}>
                                         Using: {currentFactor.name}
                                     </Text>
                                 )}

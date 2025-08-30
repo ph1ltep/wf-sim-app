@@ -266,6 +266,67 @@ export const getFinancialColorScheme = (metricType) => {
 };
 
 /**
+ * Get market factor color scheme using Ant Design palette
+ * @param {string} costCategory - Type of market factor cost category
+ * @returns {string} Hex color code
+ */
+export const getMarketFactorColorScheme = (costCategory) => {
+    const marketFactorMap = {
+        // Cost categories (distinct color families for market factor analysis)
+        material: blue[5],           // #1890ff - primary blue (material costs)
+        labor: green[5],             // #52c41a - standard green (labor costs)
+        tooling: orange[5],          // #fa8c16 - vibrant orange (tooling/equipment)
+        crane: purple[5],            // #722ed1 - royal purple (crane operations)
+        contractsLocal: cyan[5],     // #13c2c2 - cyan (local contractor costs)
+        contractsForeign: geekblue[5], // #2f54eb - geek blue (foreign contractor costs)
+        other: magenta[5],           // #eb2f96 - magenta (miscellaneous costs)
+        
+        // Default market factors
+        escalationRate: volcano[5],         // #fa541c - warm red-orange (legacy escalation rate)
+        baseEscalationRate: volcano[5]      // #fa541c - warm red-orange (base escalation rate)
+    };
+
+    // For dynamic factor IDs (factor_timestamp_random), generate a color based on the ID
+    if (!marketFactorMap[costCategory] && costCategory?.startsWith?.('factor_')) {
+        // Use a simple hash to generate consistent colors for dynamic factors
+        const hash = costCategory.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const colorOptions = [blue[6], green[6], purple[6], cyan[6], orange[6], magenta[6], geekblue[6]];
+        return colorOptions[hash % colorOptions.length];
+    }
+
+    return marketFactorMap[costCategory] || grey[6]; // Default fallback
+};
+
+/**
+ * Get distribution field color scheme using Ant Design palette
+ * @param {string} fieldKey - Distribution field key
+ * @returns {string} Hex color code
+ */
+export const getDistributionColorScheme = (fieldKey) => {
+    const distributionMap = {
+        // Revenue and pricing (green - positive financial impact)
+        electricityPrice: green[5],      // #52c41a - standard green for electricity price/revenue
+        
+        // Cost escalation (red - negative financial impact)
+        escalationRate: red[5],          // #f5222d - standard red for rising costs
+        
+        // Environmental variability (magenta - natural variance)
+        windVariability: magenta[5],     // #eb2f96 - magenta for wind patterns
+        
+        // Water/weather related (blue - natural elements)
+        rainfallAmount: blue[5],         // #1890ff - primary blue for water/rainfall
+        
+        // Energy production (cyan - energy generation)
+        energyProduction: cyan[5],       // #13c2c2 - cyan for energy output (distinct from rainfall)
+        
+        // Operational issues (orange - warnings/disruptions)
+        downtimePerEvent: orange[5]      // #fa8c16 - warning orange for operational downtime
+    };
+
+    return distributionMap[fieldKey] || grey[6]; // Default fallback
+};
+
+/**
  * Get standardized category color scheme for sensitivity variables
  * @param {string} category - Variable category
  * @returns {string} Hex color code

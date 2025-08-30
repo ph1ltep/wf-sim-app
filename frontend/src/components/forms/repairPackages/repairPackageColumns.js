@@ -14,6 +14,7 @@ import {
   CarOutlined,
   MoreOutlined
 } from '@ant-design/icons';
+import { getMarketFactorColorScheme } from '../../../utils/charts/colors';
 
 /**
  * Format currency with EUR symbol and commas
@@ -81,11 +82,11 @@ const getCostCategoryIcons = (costs) => {
   if (!costs) return null;
 
   const categoryConfig = {
-    material: { icon: <GoldOutlined />, color: '#faad14', label: 'Material' },
-    labor: { icon: <TeamOutlined />, color: '#52c41a', label: 'Labor' },
-    tooling: { icon: <ToolOutlined />, color: '#1890ff', label: 'Tooling' },
-    crane: { icon: <CarOutlined />, color: '#722ed1', label: 'Crane' },
-    other: { icon: <MoreOutlined />, color: '#f50', label: 'Other' }
+    material: { icon: <GoldOutlined />, color: getMarketFactorColorScheme('material'), label: 'Material' },
+    labor: { icon: <TeamOutlined />, color: getMarketFactorColorScheme('labor'), label: 'Labor' },
+    tooling: { icon: <ToolOutlined />, color: getMarketFactorColorScheme('tooling'), label: 'Tooling' },
+    crane: { icon: <CarOutlined />, color: getMarketFactorColorScheme('crane'), label: 'Crane' },
+    other: { icon: <MoreOutlined />, color: getMarketFactorColorScheme('other'), label: 'Other' }
   };
 
   return (

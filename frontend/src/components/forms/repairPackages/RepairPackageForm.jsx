@@ -1,6 +1,13 @@
 // frontend/src/components/forms/repairPackages/RepairPackageForm.jsx
 import React, { useEffect } from 'react';
 import { Form, Input, InputNumber, Select, Switch, Collapse } from 'antd';
+import { 
+  DollarOutlined, 
+  UserOutlined, 
+  ToolOutlined, 
+  BuildOutlined, 
+  AppstoreOutlined 
+} from '@ant-design/icons';
 // TODO: Replace TextArea with proper distribution field component when available
 
 // Import Context Field Layout components for visual consistency
@@ -8,6 +15,9 @@ import {
   FormSection,
   ResponsiveFieldRow
 } from 'components/contextFields';
+
+// Import color scheme helper for consistent styling
+import { getMarketFactorColorScheme } from 'utils/charts/colors';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -189,7 +199,12 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
           items={[
             {
               key: 'material',
-              label: 'Material Costs',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <DollarOutlined style={{ color: getMarketFactorColorScheme('material') }} />
+                  <span>Material Costs</span>
+                </div>
+              ),
               children: (
                 <ResponsiveFieldRow layout="twoColumn">
                   <Form.Item
@@ -220,11 +235,17 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
                     />
                   </Form.Item>
                 </ResponsiveFieldRow>
-              )
+              ),
+              style: { borderLeft: `4px solid ${getMarketFactorColorScheme('material')}` }
             },
             {
               key: 'labor',
-              label: 'Labor Costs',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserOutlined style={{ color: getMarketFactorColorScheme('labor') }} />
+                  <span>Labor Costs</span>
+                </div>
+              ),
               children: (
                 <ResponsiveFieldRow layout="twoColumn">
                   <Form.Item
@@ -255,11 +276,17 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
                     />
                   </Form.Item>
                 </ResponsiveFieldRow>
-              )
+              ),
+              style: { borderLeft: `4px solid ${getMarketFactorColorScheme('labor')}` }
             },
             {
               key: 'tooling',
-              label: 'Tooling Costs',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ToolOutlined style={{ color: getMarketFactorColorScheme('tooling') }} />
+                  <span>Tooling Costs</span>
+                </div>
+              ),
               children: (
                 <ResponsiveFieldRow layout="twoColumn">
                   <Form.Item
@@ -290,11 +317,17 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
                     />
                   </Form.Item>
                 </ResponsiveFieldRow>
-              )
+              ),
+              style: { borderLeft: `4px solid ${getMarketFactorColorScheme('tooling')}` }
             },
             {
               key: 'crane',
-              label: 'Crane Costs & Configuration',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BuildOutlined style={{ color: getMarketFactorColorScheme('crane') }} />
+                  <span>Crane Costs & Configuration</span>
+                </div>
+              ),
               children: (
                 <div>
                   <ResponsiveFieldRow layout="twoColumn">
@@ -358,11 +391,17 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
                     </Form.Item>
                   </ResponsiveFieldRow>
                 </div>
-              )
+              ),
+              style: { borderLeft: `4px solid ${getMarketFactorColorScheme('crane')}` }
             },
             {
               key: 'other',
-              label: 'Other Costs',
+              label: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AppstoreOutlined style={{ color: getMarketFactorColorScheme('other') }} />
+                  <span>Other Costs</span>
+                </div>
+              ),
               children: (
                 <ResponsiveFieldRow layout="twoColumn">
                   <Form.Item
@@ -393,14 +432,14 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
                     />
                   </Form.Item>
                 </ResponsiveFieldRow>
-              )
+              ),
+              style: { borderLeft: `4px solid ${getMarketFactorColorScheme('other')}` }
             }
           ]}
         />
       </FormSection>
 
-
-      <FormSection title="Applicability" level={5}>
+      <FormSection title="Applicability" level={5} style={{ marginTop: '24px' }}>
         <ResponsiveFieldRow layout="oneColumn">
           <Form.Item
             name={['appliesTo', 'componentCategories']}
@@ -416,7 +455,7 @@ const RepairPackageForm = ({ form, initialValues = {} }) => {
         </ResponsiveFieldRow>
       </FormSection>
 
-      <FormSection title="Status" level={5}>
+      <FormSection title="Status" level={5} style={{ marginTop: '24px' }}>
         <ResponsiveFieldRow layout="twoColumn">
           <Form.Item
             name="isDefault"

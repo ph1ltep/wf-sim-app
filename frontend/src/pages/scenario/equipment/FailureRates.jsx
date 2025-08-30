@@ -25,17 +25,18 @@ import { createActionsColumn } from 'components/tables/columns';
 import ComponentFailureModal from './ComponentFailureModal';
 import FailureRateSummaryCard from 'components/cards/FailureRateSummaryCard';
 import { DEFAULT_COMPONENTS } from 'schemas/yup/componentFailureRates';
+import { getMarketFactorColorScheme } from 'utils/charts/colors';
 
 const { Title, Text } = Typography;
 
-// Cost component icons mapping
+// Cost component icons mapping with centralized color scheme
 const COST_ICONS = {
-    componentReplacement: <DollarOutlined style={{ color: '#1890ff' }} />,
-    craneMobilization: <ToolOutlined style={{ color: '#52c41a' }} />,
-    craneDailyRate: <BankOutlined style={{ color: '#fa8c16' }} />,
-    repairDurationDays: <ClockCircleOutlined style={{ color: '#722ed1' }} />,
-    specialistLabor: <UserOutlined style={{ color: '#eb2f96' }} />,
-    downtimeRevenuePerDay: <ExclamationCircleOutlined style={{ color: '#f5222d' }} />
+    componentReplacement: <DollarOutlined style={{ color: getMarketFactorColorScheme('material') }} />,
+    craneMobilization: <ToolOutlined style={{ color: getMarketFactorColorScheme('crane') }} />,
+    craneDailyRate: <BankOutlined style={{ color: getMarketFactorColorScheme('crane') }} />,
+    repairDurationDays: <ClockCircleOutlined style={{ color: getMarketFactorColorScheme('other') }} />,
+    specialistLabor: <UserOutlined style={{ color: getMarketFactorColorScheme('labor') }} />,
+    downtimeRevenuePerDay: <ExclamationCircleOutlined style={{ color: getMarketFactorColorScheme('contractsLocal') }} />
 };
 
 // Component categories for organization
