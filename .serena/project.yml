@@ -66,3 +66,7 @@ excluded_tools: []
 initial_prompt: ""
 
 project_name: "wf-sim-app"
+
+# Web dashboard configuration (project-specific)
+web_dashboard_open_on_launch: false
+# Prevent browser from automatically opening when Serena starts for this project
