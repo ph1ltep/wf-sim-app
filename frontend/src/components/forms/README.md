@@ -1,327 +1,202 @@
-# Context Forms Guide
+# ContextForm Documentation
 
-## Overview
+## Quick Start
 
-The ContextForm component integrates Ant Design's Form with the application's context state, providing a seamless way to edit context data with form isolation, validation, user-friendly interactions, and automatic metric calculations.
+ContextForm integrates Ant Design forms with application context state, providing form isolation, batch updates, and automatic metric calculations.
+
+```jsx
+<ContextForm path={['settings', 'project']} affectedMetrics={['totalMW']}>
+  <TextField path="name" label="Project Name" required />
+  <NumberField path="capacity" label="Capacity (MW)" />
+</ContextForm>
+```
 
 ## Core Features
 
-- Form Isolation: Changes are kept in form state until submission - no context pollution during editing
-- Path-based Integration: Automatically maps form fields to context paths
-- Batch Updates: Single context update on form submission for optimal performance
-- Automatic Metrics: Calculate and update metrics using all form field values on submission
-- Validation Integration: Uses existing updateByPath validation with simple error display
-- Unsaved Changes Detection: Tracks and warns about unsaved changes
-- Ant Design Integration: Full compatibility with Ant Design Form features
+- **Form Isolation** - Changes stay in form state until submission
+- **Path-based Integration** - Automatic mapping to context paths
+- **Batch Updates** - Single context update on submission
+- **Automatic Metrics** - Calculate metrics using all form values
+- **Validation Integration** - Built-in error handling and display
+- **Unsaved Changes Detection** - Warns before losing changes
 
-## Basic Usage
+## API Reference
 
-```jsx
-<ContextForm
-  path={['settings', 'project']}
-  onSubmit={(values) => console.log('Saved:', values)}
-  onCancel={() => console.log('Cancelled')}
->
-  <TextField path="name" label="Project Name" required />
-  <NumberField path="capacity" label="Capacity (MW)" />
-  <SelectField 
-    path="status" 
-    label="Status" 
-    options={[
-      { value: 'active', label: 'Active' },
-      { value: 'inactive', label: 'Inactive' }
-    ]} 
-  />
-</ContextForm>
-```
-
-## Props
+### Props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| path | string[] or string | Required | Base path in the context for this form |
-| onSubmit | Function | - | Callback when form is submitted successfully |
-| onCancel | Function | - | Callback when form is cancelled |
-| children | React.ReactNode | - | Form field components |
-| affectedMetrics | string[] | null | Array of metric names to calculate on form submission |
-| submitText | string | "Save" | Text for submit button |
-| cancelText | string | "Cancel" | Text for cancel button |
-| showActions | boolean | true | Whether to show action buttons |
-| confirmOnCancel | boolean | true | Whether to show confirmation when cancelling with unsaved changes |
-| ...formProps | Object | - | All other props are passed to Ant Design Form |
+| `path` | `string[]` \| `string` | **Required** | Base context path for the form |
+| `onSubmit` | `(values) => void` | - | Success callback with form values |
+| `onCancel` | `() => void` | - | Cancel callback |
+| `affectedMetrics` | `string[]` | `null` | Metrics to calculate on submit |
+| `submitText` | `string` | `"Save"` | Submit button text |
+| `cancelText` | `string` | `"Cancel"` | Cancel button text |
+| `showActions` | `boolean` | `true` | Show action buttons |
+| `confirmOnCancel` | `boolean` | `true` | Confirm when cancelling unsaved changes |
 
-## Automatic Metrics Integration
+All other props are passed to Ant Design's Form component.
 
-### Form-Level Metrics
-ContextForm can automatically calculate metrics using all form field values when the form is submitted:
+### Ref Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `validateContextFields()` | `Promise<boolean>` | Validates all form fields |
+| `resetToInitial()` | `void` | Resets to original context values |
+| `hasUnsavedChanges()` | `boolean` | Checks for unsaved changes |
+
+## Path Handling
+
+Form fields use paths relative to the form's base path:
 
 ```jsx
-<ContextForm 
-  path={['settings', 'modules', 'financing']}
-  affectedMetrics={['wacc', 'debtToEquityRatio']} // Calculated on submit
->
-  <NumberField path="debtRatio" label="Debt Ratio" />
-  <NumberField path="costOfEquity" label="Cost of Equity" />
-  <NumberField path="costOfOperationalDebt" label="Cost of Debt" />
-  <NumberField path="effectiveTaxRate" label="Tax Rate" />
+<ContextForm path={['settings', 'project']}>
+  <TextField path="name" />           {/* → ['settings', 'project', 'name'] */}
+  <TextField path="contact.email" />  {/* → ['settings', 'project', 'contact', 'email'] */}
 </ContextForm>
 ```
 
-How it works:
-1. User edits form fields (metrics NOT calculated during editing)
-2. User clicks Save button
-3. Form validation runs first
-4. If valid, metrics are calculated using ALL form field values
-5. Single batch update: form data + calculated metrics
-6. Context is updated atomically with consistent state
+## Metrics Integration
 
-### Benefits of Form-Level Metrics
-- Accurate calculations: Uses complete form state, not individual field changes
-- Performance: Single calculation on submit, not on every field change
-- Consistency: All related fields considered together
-- User experience: No distracting recalculations during editing
+### Form-Level Metrics (Recommended)
+Calculate metrics using all form values on submission:
 
-### Combining with Field-Level Metrics
 ```jsx
-// ❌ Don't mix - can cause inconsistent behavior
+<ContextForm 
+  path={['settings', 'financing']}
+  affectedMetrics={['wacc', 'debtToEquityRatio']}
+>
+  <NumberField path="debtRatio" label="Debt Ratio" />
+  <NumberField path="costOfEquity" label="Cost of Equity" />
+  <NumberField path="costOfDebt" label="Cost of Debt" />
+</ContextForm>
+```
+
+**Benefits:**
+- Accurate calculations with complete form state
+- Better performance (single calculation)
+- Consistent user experience
+
+### Field-Level vs Form-Level
+```jsx
+// ❌ Don't mix - causes conflicts
 <ContextForm affectedMetrics={['wacc']}>
-  <NumberField path="debtRatio" affectedMetrics={['wacc']} /> {/* Conflict! */}
+  <NumberField path="debtRatio" affectedMetrics={['wacc']} />
 </ContextForm>
 
-// ✅ Choose one approach per form
-<ContextForm affectedMetrics={['wacc']}> {/* Form-level */}
+// ✅ Choose one approach
+<ContextForm affectedMetrics={['wacc']}>  {/* Form-level */}
   <NumberField path="debtRatio" />
-  <NumberField path="costOfEquity" />
 </ContextForm>
 
 // ✅ Or field-level for immediate feedback
 <ContextForm>
   <NumberField path="debtRatio" affectedMetrics={['wacc']} />
-  <NumberField path="costOfEquity" affectedMetrics={['wacc']} />
 </ContextForm>
 ```
 
 ## Form Lifecycle
 
-1. Initialization: Form loads initial values from context path
-2. Editing: All changes stay in form state (context unchanged, metrics not calculated)
-3. Submission: Form validates and batch-updates context via updateByPath
-4. Metric Calculation: If affectedMetrics declared, calculated using all form values
-5. Success: Context updated with form data + metrics, form state resets, success message shown
-6. Validation Errors: Errors from updateByPath are displayed in Alert component
-7. Cancel: Form resets to original context values (with confirmation if unsaved changes)
+1. **Initialization** - Load values from context path
+2. **Editing** - Changes isolated in form state
+3. **Submission** - Validate and batch-update context
+4. **Metrics** - Calculate if `affectedMetrics` specified
+5. **Success** - Update context, reset form, show success message
+6. **Errors** - Display validation errors in Alert component
 
-## Path Handling
+## Common Patterns
 
-ContextForm automatically handles path mapping:
-
+### Modal Form
 ```jsx
-// Form base path
-<ContextForm path={['settings', 'project']}>
-  {/* Field path is relative to form base path */}
-  <TextField path="name" />         {/* Actual path: ['settings', 'project', 'name'] */}
-  <TextField path="description" />  {/* Actual path: ['settings', 'project', 'description'] */}
-  
-  {/* Nested paths work too */}
-  <TextField path="contact.email" /> {/* Actual path: ['settings', 'project', 'contact', 'email'] */}
-</ContextForm>
+<Modal title="Edit Settings" open={visible} footer={null}>
+  <ContextForm
+    path={['settings', 'project']}
+    onSubmit={() => setVisible(false)}
+    onCancel={() => setVisible(false)}
+  >
+    <TextField path="name" label="Name" required />
+  </ContextForm>
+</Modal>
 ```
 
-## Validation
-
-- Form Validation: Uses Ant Design's built-in field validation (required, rules, etc.)
-- Context Validation: Performed on submission via updateByPath using existing Yup schemas
-- Error Display: Validation errors shown in dismissible Alert component above form
-- Error Clearing: Errors automatically clear when user starts editing
-
-## Layout Integration
-
-ContextForm works seamlessly with all Ant Design Form layout features:
-
+### Custom Actions
 ```jsx
-<ContextForm 
-  path={['settings', 'project']}
-  layout="horizontal"
-  labelCol={{ span: 6 }}
-  wrapperCol={{ span: 18 }}
->
-  <TextField path="name" label="Project Name" />
-  <NumberField path="capacity" label="Capacity" />
-</ContextForm>
-```
-
-## Advanced Examples
-
-### Complex Form with Metrics
-```jsx
-<ContextForm 
-  path={['settings', 'modules', 'financing']}
-  affectedMetrics={['wacc', 'debtToEquityRatio']}
->
-  <FormSection title="Debt Structure">
-    <ResponsiveFieldRow layout="twoColumn">
-      <NumberField path="debtRatio" label="Debt Ratio" required />
-      <NumberField path="costOfOperationalDebt" label="Cost of Debt" />
-    </ResponsiveFieldRow>
-  </FormSection>
+<ContextForm path={['settings', 'project']} showActions={false}>
+  <TextField path="name" label="Name" />
   
-  <FormDivider />
-  
-  <FormSection title="Equity & Tax">
-    <ResponsiveFieldRow layout="twoColumn">
-      <NumberField path="costOfEquity" label="Cost of Equity" />
-      <NumberField path="effectiveTaxRate" label="Tax Rate" />
-    </ResponsiveFieldRow>
-  </FormSection>
-</ContextForm>
-```
-
-### Form with Custom Actions
-```jsx
-<ContextForm 
-  path={['settings', 'project']}
-  showActions={false}
-  affectedMetrics={['totalMW', 'netAEP']}
-  onSubmit={(values) => {
-    console.log('Project saved:', values);
-    // Custom success handling
-  }}
->
-  <TextField path="name" label="Project Name" required />
-  <NumberField path="numWTGs" label="Number of WTGs" />
-  
-  {/* Custom action buttons */}
-  <Form.Item style={{ marginTop: 24 }}>
+  <Form.Item>
     <Space>
-      <Button onClick={() => window.history.back()}>
-        Back
-      </Button>
-      <Button type="primary" htmlType="submit">
-        Save Project
-      </Button>
-      <Button type="primary" htmlType="submit">
-        Save & Continue
-      </Button>
+      <Button onClick={onBack}>Back</Button>
+      <Button type="primary" htmlType="submit">Save & Continue</Button>
     </Space>
   </Form.Item>
 </ContextForm>
 ```
 
-### Modal Form with Metrics
-```jsx
-const [modalVisible, setModalVisible] = useState(false);
-
-<Modal
-  title="Edit Financing Parameters"
-  open={modalVisible}
-  footer={null}
-  onCancel={() => setModalVisible(false)}
->
-  <ContextForm
-    path={['settings', 'modules', 'financing']}
-    affectedMetrics={['wacc']}
-    onSubmit={() => setModalVisible(false)}
-    onCancel={() => setModalVisible(false)}
-  >
-    <NumberField path="debtRatio" label="Debt Ratio" required />
-    <NumberField path="costOfEquity" label="Cost of Equity" required />
-  </ContextForm>
-</Modal>
-```
-
-### Wizard Step Form
-```jsx
-const WizardStep = ({ currentStep, onNext, onBack }) => (
-  <ContextForm
-    path={['wizard', `step${currentStep}`]}
-    submitText="Next"
-    cancelText="Back"
-    affectedMetrics={currentStep === 2 ? ['totalMW', 'netAEP'] : null}
-    onSubmit={onNext}
-    onCancel={onBack}
-  >
-    {currentStep === 1 && (
-      <>
-        <TextField path="name" label="Project Name" required />
-        <TextField path="location" label="Location" required />
-      </>
-    )}
-    {currentStep === 2 && (
-      <>
-        <NumberField path="numWTGs" label="Number of WTGs" required />
-        <NumberField path="mwPerWTG" label="MW per WTG" required />
-      </>
-    )}
-  </ContextForm>
-);
-```
-
-## Form Methods
-
-When using a ref, ContextForm exposes additional methods:
-
-| Method | Description |
-|--------|-------------|
-| validateContextFields() | Validates all form fields |
-| resetToInitial() | Resets form to initial context values |
-| getInitialValues() | Returns the original context values |
-| hasUnsavedChanges() | Returns true if form has unsaved changes |
-
-## Error Handling
-
-ContextForm handles errors gracefully:
-
-- Validation Errors: Shown in Alert component with list of specific errors
-- Network Errors: Handled with generic error message
-- Context Errors: Errors from updateByPath are displayed to user
-- Form Errors: Ant Design validation errors shown on individual fields
-- Metric Errors: Metric calculation errors logged but don't break form submission
-
-## Performance Considerations
-
-- Form Isolation: No context updates during editing = no unnecessary re-renders
-- Batch Updates: Single updateByPath call on submission (form data + metrics)
-- Efficient Comparison: Simple JSON stringify for change detection
-- Minimal State: Only tracks essential form state (loading, errors, changes)
-- Smart Re-initialization: Only reinitializes when path changes
-- Metric Efficiency: Calculations only on form submission, not during editing
-
-## Migration from Direct Context Fields
-
-If you have existing direct context field usage and want to add form capabilities:
-
-### Before (Direct Context)
-```jsx
-<FormSection title="Project Settings">
-  <TextField path={['settings', 'project', 'name']} label="Name" />
-  <NumberField 
-    path={['settings', 'project', 'capacity']} 
-    label="Capacity"
-    affectedMetrics={['totalMW']}
-  />
-</FormSection>
-```
-
-### After (With ContextForm)
+### Complex Layout
 ```jsx
 <ContextForm 
-  path={['settings', 'project']}
-  affectedMetrics={['totalMW']}
+  path={['settings', 'financing']}
+  layout="horizontal"
+  labelCol={{ span: 6 }}
+  affectedMetrics={['wacc']}
 >
-  <FormSection title="Project Settings">
-    <TextField path="name" label="Name" />
-    <NumberField path="capacity" label="Capacity" />
+  <FormSection title="Debt Structure">
+    <ResponsiveFieldRow layout="twoColumn">
+      <NumberField path="debtRatio" label="Debt Ratio" required />
+      <NumberField path="costOfDebt" label="Cost of Debt" />
+    </ResponsiveFieldRow>
   </FormSection>
+</ContextForm>
+```
+
+## Validation & Error Handling
+
+- **Form Validation** - Ant Design field rules and required props
+- **Context Validation** - Yup schemas via `updateByPath`
+- **Error Display** - Alert component with dismissible error list
+- **Auto-clearing** - Errors clear when user starts editing
+
+## Performance Features
+
+- **Form Isolation** - No context updates during editing
+- **Batch Updates** - Single `updateByPath` call on submit
+- **Smart Re-initialization** - Only when path changes
+- **Efficient Change Detection** - Simple JSON comparison
+
+## Migration Guide
+
+### From Direct Context Fields
+
+**Before:**
+```jsx
+<TextField path={['settings', 'project', 'name']} label="Name" />
+<NumberField 
+  path={['settings', 'project', 'capacity']} 
+  affectedMetrics={['totalMW']}
+/>
+```
+
+**After:**
+```jsx
+<ContextForm path={['settings', 'project']} affectedMetrics={['totalMW']}>
+  <TextField path="name" label="Name" />
+  <NumberField path="capacity" />
 </ContextForm>
 ```
 
 ## Best Practices
 
-1. Use meaningful base paths - Choose paths that represent logical data groupings
-2. Keep forms focused - One ContextForm per logical data entity
-3. Declare metrics at form level - For complex interdependent calculations
-4. Handle callbacks appropriately - Use onSubmit for navigation, onCancel for cleanup
-5. Provide user feedback - Success messages are shown automatically
-6. Use confirmation dialogs - Leave confirmOnCancel enabled for better UX
-7. Test with debug borders - Use REACT_APP_DEBUG_FORM_BORDERS=true during development
-8. Choose metric strategy - Form-level for batch calculations, field-level for immediate feedback
+1. **Logical Grouping** - Use meaningful base paths for related data
+2. **Form-Level Metrics** - Prefer form-level over field-level for complex calculations  
+3. **Focused Forms** - One ContextForm per logical entity
+4. **User Feedback** - Keep `confirmOnCancel` enabled for better UX
+5. **Error Handling** - Let ContextForm handle validation display
+6. **Performance** - Leverage form isolation for smooth editing experience
+
+## Development Tools
+
+Enable debug borders during development:
+```bash
+REACT_APP_DEBUG_FORM_BORDERS=true npm start
+```
