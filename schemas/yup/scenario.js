@@ -10,6 +10,42 @@ const {
     SimulationInfoSchema,
 } = require('./distribution');
 
+const { ComponentFailureModelingSchema } = require('./componentFailureRates');
+
+// Market Factor Schema
+const MarketFactorSchema = Yup.object().shape({
+    id: Yup.string().required('Market factor ID is required'),
+    name: Yup.string().required('Market factor name is required'),
+    description: Yup.string().default(''),
+    distribution: DistributionTypeSchema.required('Distribution is required'),
+    isDefault: Yup.boolean().default(false)
+});
+
+// Default market factors array
+const DEFAULT_MARKET_FACTORS = [
+    {
+        id: 'baseEscalationRate',
+        name: 'Base Escalation Rate',
+        description: 'Default cost escalation for all operations',
+        distribution: {
+            key: 'baseEscalationRate',
+            type: 'fixed',
+            timeSeriesMode: false,
+            parameters: {
+                value: 1.0,
+                drift: 2.5
+            },
+            timeSeriesParameters: {
+                value: []
+            },
+            metadata: {
+                percentileDirection: 'ascending'
+            }
+        },
+        isDefault: true
+    }
+];
+
 // Component Allocation Schema
 const ComponentAllocationSchema = Yup.object().shape({
     oem: Yup.number().default(0.0),
@@ -125,8 +161,8 @@ const SettingsSchema = Yup.object().shape({
                 lepInPowerCurve: Yup.boolean().default(false),
                 nominalTipSpeed: Yup.number().default(88),
                 velocityExponent: Yup.number().default(8.0),
-
             }),
+            failureRates: ComponentFailureModelingSchema
         }),
         windFarm: Yup.object().shape({
             numWTGs: Yup.number().default(20),
@@ -163,23 +199,41 @@ const SettingsSchema = Yup.object().shape({
             exchangeRate: Yup.number().default(1.0),
         }),
         location: Yup.string(),
+        environment: Yup.object().shape({
+            rainfallAmount: DistributionTypeSchema.default(() => ({
+                key: 'rainfallAmount',
+                type: 'gamma',
+                timeSeriesMode: false,
+                parameters: {
+                    value: 1200,
+                    scale: 12,
+                    shape: 100,
+                    stdDev: 10
+                },
+                metadata: {
+                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
+                }
+            })),
+            windVariability: DistributionTypeSchema.default(() => ({
+                key: 'windVariability',
+                type: 'weibull', 
+                timeSeriesMode: false,
+                parameters: {
+                    value: 7.5,
+                    scale: 7.9,
+                    shape: 1.8
+                },
+                metadata: {
+                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
+                }
+            })),
+        }),
     }),
     marketFactors: Yup.object().shape({
-        rainfallAmount: DistributionTypeSchema.default(() => ({
-            key: 'rainfallAmount',
-            type: 'gamma',
-            timeSeriesMode: false,
-            parameters: {
-                value: 1200,
-                scale: 12,
-                shape: 100,
-                stdDev: 10
-            },
-            metadata: {
-                percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
-            }
-        })),
-    }),
+        factors: Yup.array().of(MarketFactorSchema).default(() => DEFAULT_MARKET_FACTORS)
+    }).default(() => ({
+        factors: DEFAULT_MARKET_FACTORS
+    })),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
@@ -202,19 +256,6 @@ const SettingsSchema = Yup.object().shape({
         }),
         cost: Yup.object().shape({
             //annualBaseOM: Yup.number().default(5000000),
-            // Updated to be a DistributionTypeSchema of Fixed type (to match getDefaultSettings)
-            escalationRate: DistributionTypeSchema.default(() => ({
-                key: 'escalationRate',
-                type: 'fixed',
-                timeSeriesMode: false,
-                parameters: {
-                    value: 1,
-                    drift: 2.5
-                },
-                metadata: {
-                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
-                }
-            })),
             failureEventProbability: Yup.number().default(5),
             failureEventCost: Yup.number().default(200000),
             majorRepairEvents: Yup.array().of(Yup.object().shape({
@@ -268,20 +309,6 @@ const SettingsSchema = Yup.object().shape({
                 },
                 metadata: {
                     percentileDirection: 'ascending' // Higher percentiles = more downtime = more conservative (cost-like)
-                }
-            })),
-            // Updated to use GBM type
-            windVariability: DistributionTypeSchema.default(() => ({
-                key: 'windVariability',
-                type: 'weibull', // Changed to weibull type
-                timeSeriesMode: false,
-                parameters: {
-                    value: 7.5,
-                    scale: 7.9,
-                    shape: 1.8
-                },
-                metadata: {
-                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
                 }
             })),
             turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
@@ -364,7 +391,10 @@ const InputSimSchema = Yup.object().shape({
         windVariability: SimulationInfoSchema.nullable().default(null),
         downtimePerEvent: SimulationInfoSchema.nullable().default(null),
         escalationRate: SimulationInfoSchema.nullable().default(null),
-        rainfallAmount: SimulationInfoSchema.nullable().default(null)
+        rainfallAmount: SimulationInfoSchema.nullable().default(null),
+        craneMarketFactor: SimulationInfoSchema.nullable().default(null),
+        laborMarketFactor: SimulationInfoSchema.nullable().default(null),
+        escalationVariability: SimulationInfoSchema.nullable().default(null)
     }),
     cashflow: Yup.object().shape({
         percentileData: PercentileDataSchema.nullable().default(null),
@@ -396,6 +426,9 @@ const InputSimSchema = Yup.object().shape({
     scope: Yup.object().shape({
         responsibilityMatrix: Yup.array().of(YearlyResponsibilitySchema).nullable().default(null),
     }),
+    // Dynamic keys for market factor IDs - using mixed() instead of lazy() for Mongoose compatibility
+    marketFactors: Yup.mixed()
+        .default({}),
 });
 
 // OutputSim Schema

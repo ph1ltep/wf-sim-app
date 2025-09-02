@@ -201,13 +201,25 @@ export const ContextField = ({
     ...formItemProps
   };
 
+  // Determine if this is a Switch component and use proper props
+  const isSwitch = Component && (Component.displayName === 'Switch' || Component.name === 'Switch' || 
+                                 componentProps.type === 'switch' || formItemProps.valuePropName === 'checked');
+  
+  const componentPropsWithValue = isSwitch ? {
+    ...componentProps,
+    checked: currentValue,
+    onChange: handleChange
+  } : {
+    ...componentProps,
+    value: currentValue,
+    onChange: handleChange
+  };
+
   return (
     <Form.Item {...finalFormItemProps}>
       <Component
-        {...componentProps}
+        {...componentPropsWithValue}
         disabled={disabled}
-        value={currentValue}
-        onChange={handleChange}
       >
         {children}
       </Component>

@@ -17,6 +17,7 @@ import {
   FundProjectionScreenOutlined,
   FundOutlined, // Added this import
   DotChartOutlined,
+  CloudOutlined,
   AppstoreOutlined,
   DatabaseOutlined,
   ProjectOutlined,
@@ -136,6 +137,11 @@ const Sider = ({ collapsed }) => {
               key: '/config/defaults/omscopes',
               icon: <ToolOutlined />,
               label: 'O&M Scopes'
+            },
+            {
+              key: '/config/defaults/repair-packages',
+              icon: <BuildOutlined />,
+              label: 'Repair Packages'
             }
           ]
         },
@@ -197,6 +203,11 @@ const Sider = ({ collapsed }) => {
               key: '/scenario/economics/market-factors',
               icon: <AreaChartOutlined />,
               label: 'Market Factors'
+            },
+            {
+              key: '/scenario/economics/environment',
+              icon: <CloudOutlined />,
+              label: 'Environment'
             }
           ]
         },
@@ -252,9 +263,14 @@ const Sider = ({ collapsed }) => {
       label: 'Simulations',
       children: [
         {
-          key: '/simulations/external-factors',
-          icon: <AreaChartOutlined />,
-          label: 'External Factors'
+          key: '/simulations/market-factors',
+          icon: <RiseOutlined />,
+          label: 'Market Factors'
+        },
+        {
+          key: '/simulations/environmental-factors',
+          icon: <CloudOutlined />,
+          label: 'Environmental'
         },
         {
           key: '/simulations/operational-risks',

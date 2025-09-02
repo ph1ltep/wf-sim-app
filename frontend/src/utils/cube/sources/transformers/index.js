@@ -17,7 +17,10 @@ export const TRANSFORMER_REGISTRY = {
     ...common,
     ...financing,
     ...totals,
-    ...cashflow
+    ...cashflow,
+    ...cost,
+    ...drawdown,
+    ...equipment
 };
 
 /**

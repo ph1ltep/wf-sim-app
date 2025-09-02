@@ -12,6 +12,7 @@ import {
 import { useScenario } from '../../contexts/ScenarioContext';
 import useInputSim from '../../hooks/useInputSim';
 import { DistributionCard } from '../../components/cards';
+import { getDistributionColorScheme } from '../../utils/charts/colors';
 
 const { Title, Paragraph } = Typography;
 
@@ -22,18 +23,16 @@ const operationalRisksFields = [
         path: ['settings', 'modules', 'revenue', 'energyProduction'],
         contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'energyProduction'],
         key: 'energyProduction',
-        icon: <ThunderboltOutlined style={{ color: '#1890ff' }} />,
-        units: 'MWh',
-        color: '#1890ff'
+        icon: <ThunderboltOutlined />,
+        units: 'MWh'
     },
     {
         name: 'Downtime Per Event',
         path: ['settings', 'modules', 'revenue', 'downtimePerEvent'],
         contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'downtimePerEvent'],
         key: 'downtimePerEvent',
-        icon: <FieldTimeOutlined style={{ color: '#faad14' }} />,
+        icon: <FieldTimeOutlined />,
         units: 'hours',
-        color: '#faad14',
         precision: 0
     }
 ];
@@ -140,15 +139,19 @@ const OperationalRisks = () => {
                     {hasResults ? (
                         operationalRisksFields.map((field, index) => {
                             const simulationInfo = distributionAnalysis[field.key] || {};
+                            const fieldColor = getDistributionColorScheme(field.key);
+                            const iconWithColor = React.cloneElement(field.icon, {
+                                style: { color: fieldColor }
+                            });
                             return (
                                 <Col span={24} key={index}>
                                     <DistributionCard
                                         simulationInfo={simulationInfo}
                                         primaryPercentile={primaryPercentile}
                                         title={field.name}
-                                        icon={field.icon}
+                                        icon={iconWithColor}
                                         units={field.units}
-                                        color={field.color}
+                                        color={fieldColor}
                                         precision={field.precision}
                                         cardProps={{ style: { marginBottom: '16px' } }}
                                     />

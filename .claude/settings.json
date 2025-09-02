@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "post-pr-merge": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "find .claude/scratchpads -name '*pr-{pr_number}*' -delete"
+          }
+        ]
+      }
+    ],
+    "post-issue-close": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "find .claude/scratchpads -name '*issue-{issue_number}*' -delete"
+          }
+        ]
+      }
+    ]
+  }
+}

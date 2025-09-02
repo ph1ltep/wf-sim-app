@@ -88,6 +88,7 @@ When analyzing the diff, consider splitting commits based on these criteria:
 3. **File patterns**: Changes to different types of files (e.g., source code vs documentation)
 4. **Logical grouping**: Changes that would be easier to understand or review separately
 5. **Size**: Very large changes that would be clearer if broken down
+6. **Documentation**: generally can be submitted together with other documents. 
 
 ## Examples
 

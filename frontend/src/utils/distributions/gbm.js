@@ -445,7 +445,8 @@ export const GBM = {
                         label: "Drift (%)",
                         tooltip: "Annual growth rate (as percentage)",
                         step: 0.1,
-                        defaultValue: 5 // Changed from 0.05 to 5 (now as percentage)
+                        defaultValue: 5, // Changed from 0.05 to 5 (now as percentage)
+                        span: { xs: 24, sm: 8 }
                     }
                 },
                 {
@@ -458,7 +459,8 @@ export const GBM = {
                         tooltip: "Annual volatility (as percentage)",
                         min: 0,
                         step: 0.1,
-                        defaultValue: 20 // Changed from 0.2 to 20 (now as percentage)
+                        defaultValue: 20, // Changed from 0.2 to 20 (now as percentage)
+                        span: { xs: 24, sm: 8 }
                     }
                 },
                 {
@@ -471,7 +473,8 @@ export const GBM = {
                         tooltip: "Number of time units to project forward",
                         min: 0.001,
                         step: 0.1,
-                        defaultValue: 1
+                        defaultValue: 1,
+                        span: { xs: 24, sm: 8 }
                     }
                 }
             ]

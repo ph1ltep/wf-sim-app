@@ -377,7 +377,8 @@ export const Kaimal = {
                         min: 0,
                         max: 30,
                         step: 0.1,
-                        defaultValue: 10
+                        defaultValue: 10,
+                        span: { xs: 24, sm: 8 }
                     }
                 },
                 {

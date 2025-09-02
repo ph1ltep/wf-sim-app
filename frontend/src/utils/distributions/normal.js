@@ -258,7 +258,8 @@ export const Normal = {
                         tooltip: "Standard deviation as percentage of the mean value",
                         min: 0.001,
                         step: 0.1,
-                        defaultValue: value !== null ? Math.max(1, Math.abs(value) * 0.1) : 10
+                        defaultValue: value !== null ? Math.max(1, Math.abs(value) * 0.1) : 10,
+                        span: { xs: 12, sm: 12 }
                     }
                 }
             ]

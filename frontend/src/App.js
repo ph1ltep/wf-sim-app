@@ -10,6 +10,7 @@ import MainLayout from './layouts/MainLayout';
 import AppSettings from './pages/config/app/AppSettings';
 import Locations from './pages/config/defaults/Locations';
 import OMScopes from './pages/config/defaults/OMScopes';
+import RepairPackages from './pages/config/defaults/RepairPackages';
 import ProjectSettings from './pages/config/project/ProjectSettings';
 import ScenarioSettings from './pages/config/scenario/ScenarioSettings';
 
@@ -20,6 +21,7 @@ import EquipmentFailureRates from './pages/scenario/equipment/FailureRates';
 import Investment from './pages/scenario/economics/Investment';
 import EconomicsRevenue from './pages/scenario/economics/Revenue';
 import MarketFactors from './pages/scenario/economics/MarketFactors';
+import Environment from './pages/scenario/economics/Environment';
 import ServiceContracts from './pages/scenario/operations/ServiceContracts';
 import OperatingCosts from './pages/scenario/operations/OperatingCosts';
 import Performance from './pages/scenario/operations/Performance';
@@ -28,7 +30,8 @@ import RiskMitigations from './pages/scenario/risk/Mitigations';
 import RiskWarranties from './pages/scenario/risk/Warranties';
 
 // Simulations pages
-import ExternalFactors from './pages/simulations/ExternalFactors';
+import MarketFactorsSimulation from './pages/simulations/MarketFactorsSimulation';
+import Environmental from './pages/simulations/Environmental';
 import OperationalRisks from './pages/simulations/OperationalRisks';
 
 // Analyses pages  
@@ -62,6 +65,7 @@ function App() {
                   <Route path="defaults">
                     <Route path="locations" element={<Locations />} />
                     <Route path="omscopes" element={<OMScopes />} />
+                    <Route path="repair-packages" element={<RepairPackages />} />
                     <Route index element={<Navigate to="/config/defaults/locations" replace />} />
                   </Route>
                   <Route path="project-settings" element={<ProjectSettings />} />
@@ -82,6 +86,7 @@ function App() {
                     <Route path="investment" element={<Investment />} />
                     <Route path="revenue" element={<EconomicsRevenue />} />
                     <Route path="market-factors" element={<MarketFactors />} />
+                    <Route path="environment" element={<Environment />} />
                   </Route>
                   <Route path="operations">
                     <Route index element={<Navigate to="/scenario/operations/service-contracts" replace />} />
@@ -100,9 +105,10 @@ function App() {
 
                 {/* Simulations routes */}
                 <Route path="simulations">
-                  <Route path="external-factors" element={<ExternalFactors />} />
+                  <Route path="market-factors" element={<MarketFactorsSimulation />} />
+                  <Route path="environmental-factors" element={<Environmental />} />
                   <Route path="operational-risks" element={<OperationalRisks />} />
-                  <Route index element={<Navigate to="/simulations/external-factors" replace />} />
+                  <Route index element={<Navigate to="/simulations/market-factors" replace />} />
                 </Route>
 
                 {/* Analyses routes */}
