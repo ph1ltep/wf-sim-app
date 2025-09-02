@@ -16,6 +16,7 @@ import {
 
 import { ScenarioSchema } from 'schemas/yup/scenario';
 const { validatePath } = require('../utils/validate');
+const Yup = require('yup');
 
 const ScenarioContext = createContext();
 
@@ -327,12 +328,50 @@ export const ScenarioProvider = ({ children }) => {
   }, [scenarioData]);
 
   /**
+     * Helper function to set values using dynamic key safe assignment
+     * @param {Object} draft - Immer draft object
+     * @param {Array} pathArray - Path as array
+     * @param {any} value - Value to set
+     */
+  const setWithDynamicKeys = (draft, pathArray, value) => {
+    let current = draft;
+    
+    // Navigate to the parent object, creating objects as needed
+    for (let i = 0; i < pathArray.length - 1; i++) {
+      const key = pathArray[i];
+      if (!(key in current) || current[key] === null || current[key] === undefined) {
+        current[key] = {};
+      }
+      current = current[key];
+    }
+    
+    // Handle legacy data: if parent is an array but we need to set string keys, convert to object
+    if (Array.isArray(current)) {
+      console.warn(`[ScenarioContext] Converting array to object for dynamic keys at path: ${pathArray.slice(0, -1).join('.')}`);
+      // Find the parent's parent and replace the array with an empty object
+      let parentParent = draft;
+      const pathToParent = pathArray.slice(0, -2);
+      const parentKey = pathArray[pathArray.length - 2];
+      
+      for (const k of pathToParent) {
+        parentParent = parentParent[k];
+      }
+      parentParent[parentKey] = {};
+      current = parentParent[parentKey];
+    }
+    
+    // Set the final value using direct assignment (Immer-compatible)
+    current[pathArray[pathArray.length - 1]] = value;
+  };
+
+  /**
      * Updates values at specific paths in the scenario data with validation
      * @param {string[]|string|Object} pathOrUpdates - Path to update or object of path-value pairs
      * @param {any} value - New value (ignored if pathOrUpdates is an object)
+     * @param {Object} options - Optional settings: { dynamicKeys: boolean }
      * @returns {Object} FieldValidationResponseSchema
      */
-  const updateByPath = useCallback(async (pathOrUpdates, value) => {
+  const updateByPath = useCallback(async (pathOrUpdates, value, options = {}) => {
     if (!hasValidScenario(false)) {
       return {
         isValid: false,
@@ -377,7 +416,12 @@ export const ScenarioProvider = ({ children }) => {
               errors.push(`Validation cast value to null for path ${pathArray.join('.')}`);
               continue;
             }
-            set(draft, pathArray, finalValue);
+            // Use dynamic key safe assignment if requested, otherwise use lodash set
+            if (options.dynamicKeys) {
+              setWithDynamicKeys(draft, pathArray, finalValue);
+            } else {
+              set(draft, pathArray, finalValue);
+            }
             appliedCount++;
           } else {
             errors.push(validationResult.error || 'Validation failed');
@@ -414,7 +458,12 @@ export const ScenarioProvider = ({ children }) => {
       }
 
       setScenarioData(produce(scenarioData, draft => {
-        set(draft, pathArray, finalValue);
+        // Use dynamic key safe assignment if requested, otherwise use lodash set
+        if (options.dynamicKeys) {
+          setWithDynamicKeys(draft, pathArray, finalValue);
+        } else {
+          set(draft, pathArray, finalValue);
+        }
       }));
 
       setIsModified(true);

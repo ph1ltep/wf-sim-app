@@ -34,10 +34,50 @@ const validate = async (schema, object) => {
 };
 
 /**
+ * Check if a path goes through a mixed field
+ * @param {Object} schema - Yup schema
+ * @param {Array} pathArray - Path as array
+ * @returns {boolean} True if path contains a mixed field
+ */
+const pathContainsMixedField = (schema, pathArray) => {
+    let currentSchema = schema;
+    
+    for (let i = 0; i < pathArray.length; i++) {
+        try {
+            const partialPath = pathArray.slice(0, i + 1).join('.');
+            const fieldSchema = Yup.reach(currentSchema, partialPath);
+            
+            // If this field is mixed type, the path goes through a mixed field
+            if (fieldSchema.type === 'mixed') {
+                return true;
+            }
+            
+        } catch (error) {
+            // If we can't reach this far, it might be because we hit a mixed field
+            // Try to check if the parent field exists and is mixed
+            if (i > 0) {
+                try {
+                    const parentPath = pathArray.slice(0, i).join('.');
+                    const parentSchema = Yup.reach(currentSchema, parentPath);
+                    if (parentSchema.type === 'mixed') {
+                        return true;
+                    }
+                } catch (parentError) {
+                    // Continue checking
+                }
+            }
+        }
+    }
+    
+    return false;
+};
+
+/**
  * Validate a specific path within a schema
- * Uses a two-tier approach:
- * 1. First tries direct field validation using Yup.reach
- * 2. Falls back to full object validation if needed
+ * Uses a three-tier approach:
+ * 1. First checks if path goes through a mixed field (bypass validation)
+ * 2. Then tries direct field validation using Yup.reach
+ * 3. Falls back to full object validation if needed
  * 
  * @param {Object} schema - Yup schema
  * @param {Array|string} path - Path as array or dot notation string
@@ -49,6 +89,17 @@ const validatePath = async (schema, path, value, context = {}) => {
     // Convert path to array if it's a string
     const pathArray = Array.isArray(path) ? path : path.split('.');
     const pathString = pathArray.join('.');
+
+    // Check if path goes through a mixed field - if so, consider it valid
+    if (pathContainsMixedField(schema, pathArray)) {
+        return formatValidation(true, [], {
+            path: pathString,
+            value,
+            defaultValue: undefined,
+            applied: true,
+            method: 'mixed-bypass'
+        });
+    }
 
     try {
         // First try to reach the field schema directly

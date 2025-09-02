@@ -91,28 +91,43 @@ const useInputSim = () => {
                 const marketFactors = scenarioData.settings.marketFactors.factors || [];
                 const marketFactorIds = marketFactors.map(f => f.id);
 
-                // Create batch updates object using the keys from the distribution objects
-                const updates = {};
+                // Separate regular updates from marketFactors updates
+                const regularUpdates = {};
+                const marketFactorsUpdates = [];
+                
                 for (const result of results) {
                     if (result.distribution && result.distribution.key) {
                         const key = result.distribution.key;
                         
-                        // Determine storage location based on whether key matches a market factor ID
-                        let path;
                         if (marketFactorIds.includes(key)) {
-                            // Store market factor results in marketFactors object
-                            path = ['simulation', 'inputSim', 'marketFactors', key];
+                            // Store market factor results with dynamicKeys option
+                            const path = ['simulation', 'inputSim', 'marketFactors', key];
+                            marketFactorsUpdates.push({ path, value: result });
                         } else {
                             // Store existing distributions in distributionAnalysis (unchanged behavior)
-                            path = ['simulation', 'inputSim', 'distributionAnalysis', key];
+                            const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
+                            regularUpdates[path.join('.')] = result;
                         }
-                        
-                        updates[path.join('.')] = result;
                     }
                 }
 
-                // Perform a single batch update
-                const result = await updateByPath(updates);
+                // Perform regular batch update first
+                let result = { isValid: true, applied: 0, errors: [] };
+                if (Object.keys(regularUpdates).length > 0) {
+                    result = await updateByPath(regularUpdates);
+                }
+
+                // Perform marketFactors updates with dynamicKeys flag
+                for (const { path, value } of marketFactorsUpdates) {
+                    const marketResult = await updateByPath(path, value, { dynamicKeys: true });
+                    if (!marketResult.isValid) {
+                        result.isValid = false;
+                        result.errors = [...(result.errors || []), ...(marketResult.errors || [])];
+                        result.error = marketResult.error || result.error;
+                    } else {
+                        result.applied += marketResult.applied;
+                    }
+                }
 
                 if (result.isValid) {
                     message.success('Distributions updated successfully');

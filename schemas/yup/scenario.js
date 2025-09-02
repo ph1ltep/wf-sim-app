@@ -426,19 +426,9 @@ const InputSimSchema = Yup.object().shape({
     scope: Yup.object().shape({
         responsibilityMatrix: Yup.array().of(YearlyResponsibilitySchema).nullable().default(null),
     }),
-    marketFactors: Yup.lazy((obj) => {
-        if (!obj || typeof obj !== 'object') {
-            return Yup.object().default({});
-        }
-        
-        // Build shape for each market factor key dynamically
-        const shape = {};
-        Object.keys(obj).forEach(key => {
-            shape[key] = SimulationInfoSchema.nullable().default(null);
-        });
-        
-        return Yup.object().shape(shape);
-    }), // Dynamic keys for market factor IDs
+    // Dynamic keys for market factor IDs - using mixed() instead of lazy() for Mongoose compatibility
+    marketFactors: Yup.mixed()
+        .default({}),
 });
 
 // OutputSim Schema
