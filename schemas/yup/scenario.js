@@ -216,7 +216,7 @@ const SettingsSchema = Yup.object().shape({
             })),
             windVariability: DistributionTypeSchema.default(() => ({
                 key: 'windVariability',
-                type: 'weibull', 
+                type: 'weibull',
                 timeSeriesMode: false,
                 parameters: {
                     value: 7.5,
@@ -229,11 +229,14 @@ const SettingsSchema = Yup.object().shape({
             })),
         }),
     }),
-    marketFactors: Yup.object().shape({
-        factors: Yup.array().of(MarketFactorSchema).default(() => DEFAULT_MARKET_FACTORS)
-    }).default(() => ({
-        factors: DEFAULT_MARKET_FACTORS
-    })),
+    // Dynamic keys for market factor IDs - using mixed() for dynamic key support
+    marketFactors: Yup.mixed().default(() => {
+        // Convert default array to object with dynamic keys
+        return DEFAULT_MARKET_FACTORS.reduce((acc, factor) => {
+            acc[factor.id] = factor;
+            return acc;
+        }, {});
+    }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({
             model: Yup.string().oneOf(['Balance-Sheet', 'Project-Finance']).default('Project-Finance'),
@@ -427,8 +430,7 @@ const InputSimSchema = Yup.object().shape({
         responsibilityMatrix: Yup.array().of(YearlyResponsibilitySchema).nullable().default(null),
     }),
     // Dynamic keys for market factor IDs - using mixed() instead of lazy() for Mongoose compatibility
-    marketFactors: Yup.mixed()
-        .default({}),
+    marketFactors: Yup.mixed().default({}),
 });
 
 // OutputSim Schema
