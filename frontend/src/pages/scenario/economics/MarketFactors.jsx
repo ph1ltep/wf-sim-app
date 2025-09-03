@@ -1,6 +1,6 @@
 // frontend/src/pages/scenario/economics/MarketFactors.jsx
 import React, { useState, useMemo } from 'react';
-import { Typography, Alert, Table, Button, Modal, Space, Popconfirm, message, Card, Select, Input, Divider, Form } from 'antd';
+import { Typography, Alert, Table, Button, Modal, Space, Popconfirm, message, Card, Select, Input, Divider, Row, Col, Form } from 'antd';
 import {
     PlusOutlined,
     EditOutlined,
@@ -12,12 +12,11 @@ import {
     BuildOutlined,
     AppstoreOutlined,
     FileTextOutlined,
-    GlobalOutlined
+    GlobalOutlined,
+    SettingOutlined
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
-import ContextForm from 'components/forms/ContextForm';
-import { ContextField } from 'components/contextFields';
 import { getMarketFactorColorScheme } from 'utils/charts/colors';
 import { distributionTypes } from '../../../utils/distributions';
 
@@ -95,11 +94,48 @@ const COST_CATEGORIES = [
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// Market Factor Detail Component for expandable rows
+const MarketFactorDetail = ({ record }) => {
+    return (
+        <div style={{ padding: '16px 0', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+            <Row gutter={24}>
+                <Col span={24}>
+                    <div style={{ marginBottom: 12 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                            Configure the statistical distribution for this market factor. 
+                            The base value is fixed at 1.0 since this is a multiplier. Changes are applied immediately.
+                        </Text>
+                    </div>
+                    
+                    {/* DistributionFieldV3 - Direct context integration, no form wrapper needed */}
+                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                        <DistributionFieldV3
+                            path={['settings', 'marketFactors', record.id, 'distribution']}
+                            showVisualization={true}
+                            showInfoBox={true}
+                            valueType="number"
+                            valueName="Multiplier"
+                            step={0.01}
+                            showTitle={false}
+                            options={distributionTypes}
+                            addonAfter="×"
+                            valueReadOnly={true}
+                            defaultValue={1.0}
+                            enforceValue={1.0}
+                        />
+                    </div>
+                </Col>
+            </Row>
+        </div>
+    );
+};
+
 const MarketFactors = () => {
     const { scenarioData, updateByPath, getValueByPath } = useScenario();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingKey, setEditingKey] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [form] = Form.useForm();
 
     // Get market factors object and convert to array for table display
     const marketFactorsObject = useMemo(() => {
@@ -111,6 +147,26 @@ const MarketFactors = () => {
     const marketFactorsArray = useMemo(() => {
         return Object.values(marketFactorsObject);
     }, [marketFactorsObject]);
+
+    // Get current cost category factors
+    const costCategoryFactors = getValueByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], {
+        material: 'baseEscalationRate',
+        labor: 'baseEscalationRate',
+        tooling: 'baseEscalationRate',
+        crane: 'baseEscalationRate',
+        contractsLocal: 'baseEscalationRate',
+        contractsForeign: 'baseEscalationRate',
+        other: 'baseEscalationRate'
+    });
+
+    // Determine which factors are assigned to cost categories (and thus locked from deletion)
+    const assignedFactors = useMemo(() => {
+        const assigned = new Set();
+        Object.values(costCategoryFactors).forEach(factorId => {
+            assigned.add(factorId);
+        });
+        return assigned;
+    }, [costCategoryFactors]);
 
     // Clean up invalid market factors on component mount
     React.useEffect(() => {
@@ -170,9 +226,9 @@ const MarketFactors = () => {
     };
 
     // Handle opening modal for edit/create
-    const handleOpenModal = async (factorKey = null) => {
+    const handleOpenModal = (factorKey = null) => {
         if (factorKey !== null) {
-            // Edit existing factor - log the data being edited
+            // Edit existing factor
             const marketFactorData = getValueByPath(['settings', 'marketFactors', factorKey]);
             console.log('🚀 Opening modal for editing:', { 
                 factorKey, 
@@ -181,55 +237,84 @@ const MarketFactors = () => {
             });
             
             setEditingKey(factorKey);
-            setIsModalOpen(true);
+            form.setFieldsValue({
+                name: marketFactorData?.name || '',
+                description: marketFactorData?.description || ''
+            });
         } else {
             // Create new factor
-            const newFactorId = generateFactorId();
-            const currentFactors = getValueByPath(['settings', 'marketFactors'], {});
-
-            const newFactor = {
-                id: newFactorId,
-                name: 'New Market Factor',
-                description: '',
-                distribution: {
-                    key: newFactorId,
-                    type: 'fixed',
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 1.0,
-                        drift: 0
-                    },
-                    timeSeriesParameters: {
-                        value: []
-                    },
-                    metadata: {
-                        percentileDirection: 'ascending'
-                    }
-                },
-                isDefault: false
-            };
-
-            const updatedFactors = { ...currentFactors, [newFactorId]: newFactor };
-
-            try {
-                setLoading(true);
-                await updateByPath(['settings', 'marketFactors'], updatedFactors);
-                setEditingKey(newFactorId);
-                setIsModalOpen(true);
-                message.success('New market factor created');
-            } catch (error) {
-                console.error('Error creating market factor:', error);
-                message.error('Failed to create market factor');
-            } finally {
-                setLoading(false);
-            }
+            setEditingKey(null);
+            form.resetFields();
+            form.setFieldsValue({
+                name: '',
+                description: ''
+            });
         }
+        setIsModalOpen(true);
     };
 
     // Handle modal close
     const handleCloseModal = () => {
         setIsModalOpen(false);
         setEditingKey(null);
+        form.resetFields();
+    };
+
+    // Handle form submission
+    const handleFormSubmit = async (values) => {
+        try {
+            setLoading(true);
+            const currentFactors = getValueByPath(['settings', 'marketFactors'], {});
+
+            if (editingKey) {
+                // Update existing factor
+                const existingFactor = currentFactors[editingKey];
+                const updatedFactor = {
+                    ...existingFactor,
+                    name: values.name,
+                    description: values.description
+                };
+
+                const updatedFactors = { ...currentFactors, [editingKey]: updatedFactor };
+                await updateByPath(['settings', 'marketFactors'], updatedFactors);
+                message.success('Market factor updated successfully');
+            } else {
+                // Create new factor
+                const newFactorId = generateFactorId();
+                const newFactor = {
+                    id: newFactorId,
+                    name: values.name,
+                    description: values.description,
+                    distribution: {
+                        key: newFactorId,
+                        type: 'fixed',
+                        timeSeriesMode: false,
+                        parameters: {
+                            value: 1.0, // Always 1.0 for multipliers
+                            drift: 0
+                        },
+                        timeSeriesParameters: {
+                            value: []
+                        },
+                        metadata: {
+                            percentileDirection: 'ascending'
+                        }
+                    },
+                    isDefault: false
+                };
+
+                const updatedFactors = { ...currentFactors, [newFactorId]: newFactor };
+                await updateByPath(['settings', 'marketFactors'], updatedFactors);
+                message.success('New market factor created successfully');
+            }
+
+            handleCloseModal();
+        } catch (error) {
+            console.error('Error saving market factor:', error);
+            message.error('Failed to save market factor');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Handle delete
@@ -262,17 +347,6 @@ const MarketFactors = () => {
         }
     };
 
-    // Get current cost category factors
-    const costCategoryFactors = getValueByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], {
-        material: 'baseEscalationRate',
-        labor: 'baseEscalationRate',
-        tooling: 'baseEscalationRate',
-        crane: 'baseEscalationRate',
-        contractsLocal: 'baseEscalationRate',
-        contractsForeign: 'baseEscalationRate',
-        other: 'baseEscalationRate'
-    });
-
     // Handle factor change for a category
     const handleCategoryFactorChange = async (category, factorId) => {
         try {
@@ -292,12 +366,24 @@ const MarketFactors = () => {
             title: 'Name',
             dataIndex: 'name',
             key: 'name',
-            render: (text, record, index) => (
-                <Space>
-                    {record.isDefault && <LockOutlined style={{ color: '#1890ff' }} />}
-                    <Text strong={record.isDefault}>{text}</Text>
-                </Space>
-            )
+            render: (text, record, index) => {
+                const isAssigned = assignedFactors.has(record.id);
+                const isLocked = record.isDefault || isAssigned;
+                return (
+                    <Space>
+                        {isLocked && (
+                            <LockOutlined 
+                                style={{ 
+                                    color: record.isDefault ? '#1890ff' : '#52c41a',
+                                    fontSize: record.isDefault ? 14 : 12
+                                }} 
+                                title={record.isDefault ? 'Default factor (cannot be deleted)' : 'Assigned to cost categories (cannot be deleted)'}
+                            />
+                        )}
+                        <Text strong={record.isDefault}>{text}</Text>
+                    </Space>
+                );
+            }
         },
         {
             title: 'Description',
@@ -309,20 +395,31 @@ const MarketFactors = () => {
             title: 'Distribution Type',
             dataIndex: 'distribution',
             key: 'distributionType',
-            render: (distribution) => distribution?.type || 'Fixed',
+            render: (distribution) => {
+                const type = distribution?.type || 'fixed';
+                const typeLabel = distributionTypes.find(dt => dt.value === type)?.label || 'Fixed';
+                return (
+                    <Space>
+                        <Text>{typeLabel}</Text>
+                        {distribution?.timeSeriesMode && (
+                            <Text type="secondary" style={{ fontSize: 11 }}>(Time Series)</Text>
+                        )}
+                    </Space>
+                );
+            },
             width: 150
         },
         {
             title: 'Base Value',
             dataIndex: 'distribution',
             key: 'baseValue',
-            render: (distribution) => {
-                const value = distribution?.parameters?.value || 1.0;
+            render: (distribution, record) => {
+                // Always show 1.0 as the base value since this is a multiplier
                 const drift = distribution?.parameters?.drift || 0;
                 if (drift !== 0) {
-                    return `${value.toFixed(2)} (${drift > 0 ? '+' : ''}${drift}% p.a.)`;
+                    return `1.00× (${drift > 0 ? '+' : ''}${drift}% p.a.)`;
                 }
-                return value.toFixed(2);
+                return '1.00×';
             },
             width: 150
         },
@@ -330,32 +427,47 @@ const MarketFactors = () => {
             title: 'Actions',
             key: 'actions',
             width: 120,
-            render: (_, record) => (
-                <Space>
-                    <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={() => handleOpenModal(record.id)}
-                        size="small"
-                    />
-                    {!record.isDefault && (
-                        <Popconfirm
-                            title="Delete Market Factor"
-                            description="Are you sure you want to delete this market factor?"
-                            onConfirm={() => handleDelete(record.id)}
-                            okText="Yes"
-                            cancelText="No"
-                        >
+            render: (_, record) => {
+                const isAssigned = assignedFactors.has(record.id);
+                const canDelete = !record.isDefault && !isAssigned;
+                
+                return (
+                    <Space>
+                        <Button
+                            type="text"
+                            icon={<EditOutlined />}
+                            onClick={() => handleOpenModal(record.id)}
+                            size="small"
+                            title="Edit basic properties"
+                        />
+                        {canDelete ? (
+                            <Popconfirm
+                                title="Delete Market Factor"
+                                description="Are you sure you want to delete this market factor?"
+                                onConfirm={() => handleDelete(record.id)}
+                                okText="Yes"
+                                cancelText="No"
+                            >
+                                <Button
+                                    type="text"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    size="small"
+                                />
+                            </Popconfirm>
+                        ) : (
                             <Button
                                 type="text"
-                                danger
                                 icon={<DeleteOutlined />}
                                 size="small"
+                                disabled
+                                title={record.isDefault ? 'Cannot delete default factor' : 'Cannot delete factor assigned to cost categories'}
+                                style={{ color: '#ccc' }}
                             />
-                        </Popconfirm>
-                    )}
-                </Space>
-            )
+                        )}
+                    </Space>
+                );
+            }
         }
     ];
 
@@ -369,31 +481,14 @@ const MarketFactors = () => {
                     <Text>
                         Market factors are multipliers applied to different cost categories. The base escalation rate is always available and cannot be removed.
                     </Text>
-                    <Space>
-                        <Button
-                            type="dashed"
-                            size="small"
-                            onClick={async () => {
-                                const defaultFactorsObject = DEFAULT_MARKET_FACTORS.reduce((acc, factor) => {
-                                    acc[factor.id] = factor;
-                                    return acc;
-                                }, {});
-                                await updateByPath(['settings', 'marketFactors'], defaultFactorsObject);
-                                message.success('Market factors reset to defaults');
-                            }}
-                            title="Reset to only the default escalation rate"
-                        >
-                            Reset to Defaults
-                        </Button>
-                        <Button
-                            type="primary"
-                            icon={<PlusOutlined />}
-                            onClick={() => handleOpenModal()}
-                            loading={loading}
-                        >
-                            Add Market Factor
-                        </Button>
-                    </Space>
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => handleOpenModal()}
+                        loading={loading}
+                    >
+                        Add Market Factor
+                    </Button>
                 </div>
 
                 <Table
@@ -402,6 +497,25 @@ const MarketFactors = () => {
                     pagination={false}
                     size="small"
                     rowKey="id"
+                    expandable={{
+                        expandedRowRender: (record) => <MarketFactorDetail record={record} />,
+                        rowExpandable: (record) => !!record?.distribution,
+                        expandRowByClick: false,
+                        expandIcon: ({ expanded, onExpand, record }) => (
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<SettingOutlined />}
+                                onClick={(e) => onExpand(record, e)}
+                                title={expanded ? "Hide distribution settings" : "Configure distribution"}
+                                style={{ 
+                                    color: expanded ? '#1890ff' : '#666',
+                                    transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'all 0.2s'
+                                }}
+                            />
+                        )
+                    }}
                 />
             </Card>
 
@@ -467,92 +581,80 @@ const MarketFactors = () => {
             </Card>
 
             <Modal
-                title={`${editingKey !== null && marketFactorsObject[editingKey]?.id === 'baseEscalationRate' ? 'Edit' : editingKey !== null ? 'Edit' : 'Create'} Market Factor`}
+                title={`${editingKey !== null ? 'Edit' : 'Create'} Market Factor`}
                 open={isModalOpen}
                 onCancel={handleCloseModal}
-                width={900}
-                footer={null} // Let ContextForm handle the footer
-            >
-                {editingKey !== null && marketFactorsObject[editingKey] && (
-                    <ContextForm
-                        path={['settings', 'marketFactors', editingKey]}
-                        onSubmit={(values) => {
-                            message.success('Market factor updated successfully');
-                            handleCloseModal();
-                        }}
-                        onCancel={handleCloseModal}
-                        submitText="Save Changes"
-                        cancelText="Cancel"
+                width={500}
+                footer={[
+                    <Button key="cancel" onClick={handleCloseModal}>
+                        Cancel
+                    </Button>,
+                    <Button 
+                        key="submit" 
+                        type="primary" 
+                        loading={loading}
+                        onClick={() => form.submit()}
                     >
-                        {/* Hidden ID Field - required for market factor */}
-                        <ContextField
-                            path="id"
-                            component={Input}
-                            style={{ display: 'none' }}
-                            defaultValue={marketFactorsObject[editingKey]?.id}
-                        />
-
-                        {/* Hidden isDefault Field - preserve lock status */}
-                        <ContextField
-                            path="isDefault"
-                            component={Input}
-                            style={{ display: 'none' }}
-                            defaultValue={marketFactorsObject[editingKey]?.isDefault}
-                        />
-
-                        {/* Factor Name Field */}
-                        <ContextField
-                            path="name"
-                            component={Input}
-                            label="Factor Name"
+                        {editingKey ? 'Save Changes' : 'Create Factor'}
+                    </Button>
+                ]}
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={handleFormSubmit}
+                    requiredMark={false}
+                >
+                    <Form.Item
+                        name="name"
+                        label="Factor Name"
+                        rules={[
+                            { required: true, message: 'Factor name is required' },
+                            { min: 3, message: 'Name must be at least 3 characters' },
+                            { max: 50, message: 'Name must be less than 50 characters' }
+                        ]}
+                    >
+                        <Input
                             placeholder="e.g., Crane Cost Factor, Local Labor Rates"
-                            disabled={marketFactorsObject[editingKey]?.id === 'baseEscalationRate'}
-                            required={true}
-                            rules={[
-                                { required: true, message: 'Factor name is required' },
-                                { min: 3, message: 'Name must be at least 3 characters' },
-                                { max: 50, message: 'Name must be less than 50 characters' }
-                            ]}
-                            style={{ marginBottom: 16 }}
+                            disabled={editingKey && marketFactorsObject[editingKey]?.id === 'baseEscalationRate'}
                         />
+                    </Form.Item>
 
-                        {/* Description Field */}
-                        <ContextField
-                            path="description"
-                            component={Input.TextArea}
-                            label="Description"
+                    <Form.Item
+                        name="description"
+                        label="Description"
+                        rules={[
+                            { max: 200, message: 'Description must be less than 200 characters' }
+                        ]}
+                    >
+                        <Input.TextArea
                             placeholder="Describe what this market factor represents"
-                            disabled={marketFactorsObject[editingKey]?.id === 'baseEscalationRate'}
-                            rows={2}
-                            rules={[
-                                { max: 200, message: 'Description must be less than 200 characters' }
-                            ]}
-                            style={{ marginBottom: 16 }}
+                            disabled={editingKey && marketFactorsObject[editingKey]?.id === 'baseEscalationRate'}
+                            rows={3}
                         />
+                    </Form.Item>
 
-                        <Divider style={{ margin: '12px 0' }} />
+                    <Divider orientation="left" style={{ margin: '16px 0' }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                            Distribution Settings
+                        </Text>
+                    </Divider>
 
-                        {/* Distribution Configuration Section */}
-                        <div style={{ marginTop: 16 }}>
-                            <Text strong style={{ display: 'block', marginBottom: 12 }}>Factor Distribution</Text>
-                            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-                                Configure the distribution for this market factor (base value should be 1.0 for multipliers)
-                            </Text>
-
-                            {/* DistributionFieldV3 with form mode - will automatically receive form props */}
-                            <DistributionFieldV3
-                                path="distribution"
-                                showVisualization={true}
-                                showInfoBox={true}
-                                valueType="number"
-                                valueName="Base Multiplier"
-                                step={0.01}
-                                showTitle={false}
-                                options={distributionTypes}
-                            />
-                        </div>
-                    </ContextForm>
-                )}
+                    <Alert
+                        message="Configure Distribution in Table"
+                        description={
+                            <div>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                    Use the <SettingOutlined /> button in the table to configure the statistical distribution 
+                                    for this market factor. Distribution settings are applied immediately to your scenario.
+                                </Text>
+                            </div>
+                        }
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: 0 }}
+                    />
+                </Form>
             </Modal>
         </div>
     );
