@@ -19,6 +19,10 @@ import { DistributionUtils } from '../../utils/distributions';
  * @param {boolean} options.renderValueSeparately - Whether value field is rendered separately
  * @param {string} options.label - Override for the field label
  * @param {Object} options.currentParameters - Current parameter values to inform defaults
+ * @param {boolean} options.formMode - Whether to render in form mode
+ * @param {string} options.baseName - Base name for form field names when in form mode
+ * @param {Function} options.getValueOverride - Value getter override for form mode
+ * @param {Function} options.updateValueOverride - Value updater override for form mode
  * @returns {Array} Array of parameter field components
  */
 const renderParameterFields = (distributionType, parametersPath, options = {}) => {
@@ -30,7 +34,11 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
         renderValueSeparately = true,
         defaultValue,
         label,
-        currentParameters = {}
+        currentParameters = {},
+        formMode = false,
+        baseName = null,
+        getValueOverride = null,
+        updateValueOverride = null
     } = options;
 
     // Get current value to pass to getMetadata
@@ -53,6 +61,12 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
         return [];
     }
 
+    // Generate field name for form mode
+    const generateFieldName = (paramName) => {
+        if (!formMode || !baseName) return undefined;
+        return `${baseName}.parameters.${paramName}`;
+    };
+
     // Render appropriate field based on field type
     const renderField = (param, path) => {
         // Only apply style if width is explicitly provided
@@ -67,7 +81,12 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
             step: param.fieldProps.step || step,
             precision: param.fieldProps.precision,
             defaultValue: param.fieldProps.defaultValue,
-            required: param.required
+            required: param.required,
+            // Form mode specific props
+            formMode,
+            name: generateFieldName(param.name),
+            getValueOverride,
+            updateValueOverride
         };
 
         // Only add style if it's defined

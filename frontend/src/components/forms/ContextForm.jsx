@@ -8,6 +8,44 @@ import { get } from 'lodash';
 
 const { confirm } = Modal;
 
+// Helper function to flatten nested objects for form field names
+const flattenObject = (obj, prefix = '') => {
+    const flattened = {};
+    Object.keys(obj || {}).forEach(key => {
+        const value = obj[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            Object.assign(flattened, flattenObject(value, newKey));
+        } else {
+            flattened[newKey] = value;
+        }
+    });
+    return flattened;
+};
+
+// Helper function to unflatten form data back to nested structure
+const unflattenObject = (flatObj) => {
+    const result = {};
+    
+    for (const key in flatObj) {
+        const keys = key.split('.');
+        let current = result;
+        
+        for (let i = 0; i < keys.length - 1; i++) {
+            const k = keys[i];
+            if (!current[k] || typeof current[k] !== 'object') {
+                current[k] = {};
+            }
+            current = current[k];
+        }
+        
+        current[keys[keys.length - 1]] = flatObj[key];
+    }
+    
+    return result;
+};
+
 const ContextForm = ({
     path,
     onSubmit,
@@ -74,14 +112,31 @@ const ContextForm = ({
         }
 
         // Make a deep copy to avoid reference issues
-        const initialValues = JSON.parse(JSON.stringify(initialValue));
-
-        // Store initial values for comparison
+        let initialValues = JSON.parse(JSON.stringify(initialValue));
+        
+        // Flatten nested objects for form field names (e.g., distribution.type)
+        const flatInitialValues = flattenObject(initialValues);
+        
+        // Store original values for comparison, but use flattened for form
         initialValuesRef.current = initialValues;
+        initialValues = flatInitialValues;
+
+        console.log('ContextForm initializing with data:', {
+            basePath,
+            originalValue: initialValue,
+            flattenedValues: initialValues,
+            hasDistribution: !!initialValue.distribution
+        });
 
         // ALWAYS reset form fields - this ensures clean state on reopen
         form.resetFields();
         form.setFieldsValue(initialValues);
+        
+        // Debug: Check what the form actually contains after setting values
+        setTimeout(() => {
+            const formValues = form.getFieldsValue();
+            console.log('📋 Form populated with:', formValues);
+        }, 100);
 
         // Reset all states to clean slate
         setHasUnsavedChanges(false);
@@ -92,13 +147,28 @@ const ContextForm = ({
 
     // Reset form to initial state
     const resetForm = useCallback(() => {
+        console.log('🔄 ContextForm resetForm called:', {
+            hasInitialValues: !!initialValuesRef.current,
+            initialValues: initialValuesRef.current
+        });
+        
         if (initialValuesRef.current) {
             form.resetFields();
-            form.setFieldsValue(initialValuesRef.current);
+            
+            // Use the same flattening logic as initialization
+            const flattenedInitialValues = flattenObject(initialValuesRef.current);
+            console.log('🔄 ContextForm resetting with flattened values:', { 
+                original: initialValuesRef.current,
+                flattened: flattenedInitialValues 
+            });
+            
+            form.setFieldsValue(flattenedInitialValues);
             setHasUnsavedChanges(false);
             setValidationErrors([]);
             setLoading(false); // Reset loading state
+            console.log('🔄 ContextForm reset completed');
         } else {
+            console.log('🔄 ContextForm no initial values, calling initializeForm');
             initializeForm();
         }
     }, [form, initializeForm]);
@@ -144,6 +214,13 @@ const ContextForm = ({
 
     // Handle form submission with proper Ant Design validation FIRST
     const handleFinish = async (values) => {
+        console.log('💾 ContextForm Save Operation Started:', {
+            path: basePath,
+            formValues: values,
+            initialValues: initialValuesRef.current,
+            hasChanges: hasUnsavedChanges
+        });
+        
         try {
             setLoading(true);
             setValidationErrors([]);
@@ -163,8 +240,15 @@ const ContextForm = ({
                 return;
             }
 
-            // Prepare updates - form values + affected metrics
-            let updates = { [basePath.join('.')]: values };
+            // Convert flattened form values back to nested structure for saving
+            const nestedValues = unflattenObject(values);
+            console.log('💾 ContextForm converting form data:', { 
+                flatValues: values,
+                nestedValues: nestedValues 
+            });
+            
+            // Prepare updates - nested form values + affected metrics
+            let updates = { [basePath.join('.')]: nestedValues };
 
             // Calculate affected metrics if declared (form mode)
             if (affectedMetrics && affectedMetrics.length > 0) {
@@ -180,11 +264,13 @@ const ContextForm = ({
             }
 
             // Single batch updateByPath call with form + metrics
+            console.log('💾 ContextForm calling updateByPath:', { updates });
             const result = await updateByPath(updates);
+            console.log('💾 ContextForm updateByPath result:', result);
 
             if (result.isValid) {
-                // Success path
-                initialValuesRef.current = JSON.parse(JSON.stringify(values));
+                // Success path - update initial values with nested structure for future comparisons
+                initialValuesRef.current = JSON.parse(JSON.stringify(nestedValues));
                 setHasUnsavedChanges(false);
                 message.success('Changes saved successfully');
 
@@ -221,7 +307,15 @@ const ContextForm = ({
 
     // Handle form cancellation with confirmation
     const handleCancel = useCallback(() => {
+        console.log('❌ ContextForm Cancel clicked:', { 
+            hasUnsavedChanges, 
+            confirmOnCancel,
+            initialValues: initialValuesRef.current,
+            currentValues: form.getFieldsValue()
+        });
+        
         const performCancel = () => {
+            console.log('❌ ContextForm performing cancel...');
             resetForm();
             if (onCancel) {
                 onCancel();
@@ -229,6 +323,7 @@ const ContextForm = ({
         };
 
         if (hasUnsavedChanges && confirmOnCancel) {
+            console.log('❌ ContextForm showing cancel confirmation dialog...');
             confirm({
                 title: 'Unsaved Changes',
                 icon: <ExclamationCircleOutlined />,
@@ -236,7 +331,13 @@ const ContextForm = ({
                 okText: 'Yes, Cancel',
                 okType: 'danger',
                 cancelText: 'Keep Editing',
-                onOk: performCancel
+                onOk: () => {
+                    console.log('❌ ContextForm user confirmed cancel');
+                    performCancel();
+                },
+                onCancel: () => {
+                    console.log('❌ ContextForm user chose to keep editing');
+                }
             });
         } else {
             performCancel();
@@ -245,7 +346,14 @@ const ContextForm = ({
 
     // Handle reset with confirmation
     const handleReset = useCallback(() => {
+        console.log('🔄 ContextForm Reset clicked:', { 
+            hasUnsavedChanges,
+            initialValues: initialValuesRef.current,
+            currentValues: form.getFieldsValue()
+        });
+        
         if (hasUnsavedChanges) {
+            console.log('🔄 ContextForm showing reset confirmation dialog...');
             confirm({
                 title: 'Reset Form',
                 icon: <ExclamationCircleOutlined />,
@@ -254,7 +362,11 @@ const ContextForm = ({
                 okType: 'danger',
                 cancelText: 'Cancel',
                 onOk: () => {
+                    console.log('🔄 ContextForm user confirmed reset');
                     resetForm();
+                },
+                onCancel: () => {
+                    console.log('🔄 ContextForm user cancelled reset');
                 }
             });
         } else {
@@ -268,8 +380,21 @@ const ContextForm = ({
             return;
         }
 
-        // Simple comparison to detect changes
-        const hasChanges = JSON.stringify(allValues) !== JSON.stringify(initialValuesRef.current);
+        // Flatten initial values for proper comparison with current form values
+        const flattenedInitialValues = flattenObject(initialValuesRef.current);
+        const hasChanges = JSON.stringify(allValues) !== JSON.stringify(flattenedInitialValues);
+        
+        // Debug unsaved changes detection
+        if (hasChanges !== hasUnsavedChanges) {
+            console.log('📝 ContextForm unsaved changes state changed:', {
+                previousHasChanges: hasUnsavedChanges,
+                newHasChanges: hasChanges,
+                changedValues,
+                allValues,
+                initialValues: initialValuesRef.current
+            });
+        }
+        
         setHasUnsavedChanges(hasChanges);
 
         // Clear validation errors when user starts editing
@@ -295,7 +420,14 @@ const ContextForm = ({
 
         if (relativePath.length > 1) {
             const allValues = form.getFieldsValue();
-            return get(allValues, relativePath, defaultValue);
+            const value = get(allValues, relativePath, defaultValue);
+            
+            // Only log when form data is empty (debugging issue)
+            if (Object.keys(allValues).length === 0 && relativePath.includes('type')) {
+                console.log('⚠️ Form empty but requesting:', { relativePath, defaultValue });
+            }
+            
+            return value;
         }
 
         if (relativePath.length === 0) {
@@ -313,6 +445,11 @@ const ContextForm = ({
 
         try {
             const relativePath = getRelativeFieldPath(fieldPath);
+            
+            // Log important updates (debug mode only)
+            if (relativePath.includes('type') && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+                console.log('📝 Updating distribution type:', { relativePath, value });
+            }
 
             if (relativePath.length === 1) {
                 form.setFieldValue(relativePath[0], value);
@@ -340,33 +477,78 @@ const ContextForm = ({
         }
     }, [form, isInitialized, getRelativeFieldPath]);
 
+    // Recursively traverse and enhance components
+    const enhanceChild = (child) => {
+        if (!React.isValidElement(child)) {
+            return child;
+        }
+
+        // Check if this component has a path prop (ContextField or DistributionFieldV3)
+        const hasPath = child.props && child.props.path !== undefined;
+        
+        const isContextField = child.type && (
+            child.type.name === 'ContextField' ||
+            child.type.displayName === 'ContextField' ||
+            child.type.name === 'DistributionFieldV3' ||
+            child.type.displayName === 'DistributionFieldV3' ||
+            hasPath
+        );
+
+        // Only log when enhancing components for form mode (debug mode only)
+        if (isContextField && hasPath && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+            console.log(`🔧 ContextForm enhancing ${child.type?.name}:`, child.props?.path);
+        }
+
+        if (isContextField && hasPath) {
+            // Convert relative paths to absolute paths within the form context
+            let absolutePath = child.props.path;
+            
+            // If the path is a simple string and doesn't start with the basePath, make it absolute
+            if (typeof absolutePath === 'string' && !absolutePath.includes('.')) {
+                absolutePath = [...basePath, absolutePath];
+            } else if (Array.isArray(absolutePath) && absolutePath.length > 0) {
+                // Check if this path is already absolute or needs basePath prepending
+                const pathStart = absolutePath.slice(0, basePath.length);
+                const isAlreadyAbsolute = basePath.every((segment, index) => segment === pathStart[index]);
+                
+                if (!isAlreadyAbsolute) {
+                    absolutePath = [...basePath, ...absolutePath];
+                }
+            }
+            
+            const relativePath = getRelativeFieldPath(absolutePath);
+            const fieldName = relativePath.join('.');
+            
+            // Get the actual data at the absolute path for verification
+            const absolutePathData = getValueByPath(absolutePath);
+            
+            // Only log if this is DistributionFieldV3 (debug mode only)
+            if (child.type?.name === 'DistributionFieldV3' && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+                console.log('📊 DistributionFieldV3 data:', { absolutePath, absolutePathData });
+            }
+
+            return React.cloneElement(child, {
+                formMode: true,
+                getValueOverride: getFormValue,
+                updateValueOverride: updateFormValue,
+                name: fieldName,
+                path: absolutePath  // Pass the absolute path
+            });
+        }
+
+        // Recursively process children even if this component doesn't need enhancement
+        if (child.props && child.props.children) {
+            const enhancedChildren = React.Children.map(child.props.children, enhanceChild);
+            return React.cloneElement(child, {}, enhancedChildren);
+        }
+
+        return child;
+    };
+
     // Clone children with form props
     const renderChildren = () => {
         if (!isInitialized) return null;
-
-        return React.Children.map(children, child => {
-            if (!React.isValidElement(child)) {
-                return child;
-            }
-
-            // Only enhance ContextField components
-            const isContextField = child.type && (
-                child.type.name === 'ContextField' ||
-                child.type.displayName === 'ContextField' ||
-                child.props.path !== undefined
-            );
-
-            if (isContextField) {
-                return React.cloneElement(child, {
-                    formMode: true,
-                    getValueOverride: getFormValue,
-                    updateValueOverride: updateFormValue,
-                    name: getRelativeFieldPath(child.props.path)
-                });
-            }
-
-            return child;
-        });
+        return React.Children.map(children, enhanceChild);
     };
 
     // Debug border support

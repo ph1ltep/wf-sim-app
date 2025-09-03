@@ -115,7 +115,7 @@ const EditableCell = ({
 };
 
 /**
- * Enhanced Time Series Table component with inline editing
+ * Enhanced Time Series Table component with inline editing and form mode support
  * 
  * @param {string[]} path Path to the data array in context
  * @param {string} valueLabel Label for the value column
@@ -127,6 +127,10 @@ const EditableCell = ({
  * @param {boolean} disableEditing Whether to disable editing functionality
  * @param {number} minRequiredPoints Minimum points required for distribution fitting
  * @param {boolean} showDataCount Whether to show the data point count
+ * @param {boolean} formMode Whether to render in form mode
+ * @param {string} name Field name for form mode
+ * @param {Function} getValueOverride Value getter override for form mode
+ * @param {Function} updateValueOverride Value updater override for form mode
  */
 const TimeSeriesTable = ({
     path,
@@ -139,16 +143,26 @@ const TimeSeriesTable = ({
     disableEditing = false,
     showDataCount = true,
     minRequiredPoints = 3,
+    // Form mode props
+    formMode = false,
+    name = null,
+    getValueOverride = null,
+    updateValueOverride = null,
 }) => {
     // Get scenario context
     const { getValueByPath, updateByPath } = useScenario();
     const [editingKey, setEditingKey] = useState('');
 
-    // Get data from context with proper fallback
+    // Get data based on mode (form mode vs context mode)
     const timeSeriesData = useMemo(() => {
+        if (formMode && getValueOverride) {
+            const data = getValueOverride(path, []);
+            return Array.isArray(data) ? data : [];
+        }
+        
         const data = getValueByPath(path, []);
         return Array.isArray(data) ? data : [];
-    }, [getValueByPath, path]);
+    }, [formMode, getValueOverride, getValueByPath, path]);
 
     // Calculate data count
     const dataCount = timeSeriesData.length;
@@ -168,7 +182,7 @@ const TimeSeriesTable = ({
         return formattedValue;
     };
 
-    // Handle row save
+    // Handle row save based on mode
     const handleSave = (row) => {
         const newData = [...timeSeriesData];
         const index = newData.findIndex(item => item.year === row.year);
@@ -180,13 +194,24 @@ const TimeSeriesTable = ({
             newData.push(row);
         }
 
-        updateByPath(path, newData);
+        // Use form mode updater if in form mode, otherwise use context
+        if (formMode && updateValueOverride) {
+            updateValueOverride(path, newData);
+        } else {
+            updateByPath(path, newData);
+        }
     };
 
-    // Handle delete row
+    // Handle delete row based on mode
     const handleDelete = (year) => {
         const newData = timeSeriesData.filter(item => item.year !== year);
-        updateByPath(path, newData);
+        
+        // Use form mode updater if in form mode, otherwise use context
+        if (formMode && updateValueOverride) {
+            updateValueOverride(path, newData);
+        } else {
+            updateByPath(path, newData);
+        }
     };
 
     // Handle add row
@@ -205,9 +230,15 @@ const TimeSeriesTable = ({
             defaultValue = sum / timeSeriesData.length;
         }
 
-        // Add new row
+        // Add new row based on mode
         const newData = [...timeSeriesData, { year: newYear, value: defaultValue }];
-        updateByPath(path, newData);
+        
+        // Use form mode updater if in form mode, otherwise use context
+        if (formMode && updateValueOverride) {
+            updateValueOverride(path, newData);
+        } else {
+            updateByPath(path, newData);
+        }
     };
 
     // Define columns

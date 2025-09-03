@@ -40,20 +40,34 @@ export const ContextField = ({
   // Get current value based on mode
   const getRawValue = useCallback(() => {
     if (formMode && getValueOverride) {
-      return getValueOverride(path, defaultValue);
+      const value = getValueOverride(path, defaultValue);
+      // Only log if this seems to be a key field or if form mode isn't working
+      if (!formMode || (Array.isArray(path) && path.includes('type'))) {
+        console.log(`🔍 ContextField[${Array.isArray(path) ? path.slice(-1)[0] : path}]:`, { formMode, value });
+      }
+      return value;
     }
 
     const contextValue = getValueByPath(path);
 
     // If context value doesn't exist and we have a default, initialize it immediately
     if ((contextValue === undefined || contextValue === null) && defaultValue !== undefined) {
-      // Fire and forget - don't block rendering
-      updateByPath(path, defaultValue).catch(console.error);
+      console.log('ContextField initializing with default value:', { path, defaultValue, formMode });
+      
+      // Use form mode override if available, otherwise use direct context update
+      if (formMode && updateValueOverride) {
+        console.log('ContextField: Using updateValueOverride for initialization');
+        updateValueOverride(path, defaultValue);
+      } else {
+        console.log('ContextField: Using direct updateByPath for initialization');
+        // Fire and forget - don't block rendering  
+        updateByPath(path, defaultValue).catch(console.error);
+      }
       return defaultValue;
     }
 
     return contextValue;
-  }, [formMode, getValueOverride, getValueByPath, path, defaultValue, updateByPath]);
+  }, [formMode, getValueOverride, getValueByPath, path, defaultValue, updateByPath, updateValueOverride]);
 
   // Transform value FOR DISPLAY (context -> component)
   const getDisplayValue = useCallback(() => {

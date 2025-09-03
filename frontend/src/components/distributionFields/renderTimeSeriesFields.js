@@ -34,6 +34,10 @@ const { Text } = Typography;
  * @param {Object} options.metadata - Distribution metadata from getMetadata()
  * @param {Object} options.parameters - Current distribution parameters
  * @param {number} options.minRequiredPoints - Minimum points required for fitting
+ * @param {boolean} options.formMode - Whether to render in form mode
+ * @param {string} options.baseName - Base name for form field names when in form mode
+ * @param {Function} options.getValueOverride - Value getter override for form mode
+ * @param {Function} options.updateValueOverride - Value updater override for form mode
  * @returns {React.ReactNode} Time series UI components
  */
 const renderTimeSeriesFields = (
@@ -54,7 +58,11 @@ const renderTimeSeriesFields = (
         hasFittedParams = false,
         metadata = {},
         parameters = {},
-        minRequiredPoints = 3
+        minRequiredPoints = 3,
+        formMode = false,
+        baseName = null,
+        getValueOverride = null,
+        updateValueOverride = null
     } = options;
 
     const hasEnoughData = timeSeriesData && Array.isArray(timeSeriesData) && timeSeriesData.length >= minRequiredPoints;
@@ -71,6 +79,11 @@ const renderTimeSeriesFields = (
                     addonAfter={addonAfter}
                     disableEditing={isFitting}
                     minRequiredPoints={minRequiredPoints}
+                    // Form mode props for TimeSeriesTable
+                    formMode={formMode}
+                    name={formMode && baseName ? `${baseName}.timeSeriesParameters.value` : undefined}
+                    getValueOverride={getValueOverride}
+                    updateValueOverride={updateValueOverride}
                 />
 
                 <Divider style={{ margin: '12px 0' }} />
