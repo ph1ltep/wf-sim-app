@@ -1,6 +1,6 @@
 // src/components/distributionFields/DistributionFieldV3.jsx - Updated with optimized layout
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Typography, Space, Divider, Row, Col, Alert, Spin, message, Popover, Button } from 'antd';
+import { Typography, Space, Divider, Row, Col, Alert, Spin, message, Popover, Button, Form } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { FormRow, FormCol, SelectField, NumberField, CurrencyField, PercentageField } from '../contextFields';
@@ -160,24 +160,63 @@ const DistributionFieldV3 = ({
   allowCurveToggle = true,
   style = {},
   step,
+  // Form mode props
+  formMode = false,
+  name = null,
+  getValueOverride = null,
+  updateValueOverride = null,
   ...rest
 }) => {
   const { getValueByPath, updateByPath } = useScenario();
   const { fitDistributionToData, fittingDistribution } = useInputSim();
 
-  const typePath = [...path, 'type'];
-  const parametersPath = [...path, 'parameters'];
-  const timeSeriesParametersPath = [...path, 'timeSeriesParameters'];
-  const timeSeriesModePath = [...path, 'timeSeriesMode'];
-  const metadataPath = [...path, 'metadata'];
+  // Ensure path is an array to prevent character spreading
+  const pathArray = Array.isArray(path) ? path : [path];
+  
+  // Generate base name for nested form fields when in form mode
+  const baseName = formMode && name ? name : null;
 
-  const currentType = (getValueByPath(typePath, 'fixed')).toLowerCase();
-  const parameters = getValueByPath(parametersPath, {});
-  const timeSeriesParameters = getValueByPath(timeSeriesParametersPath, { value: [] });
-  const timeSeriesMode = getValueByPath(timeSeriesModePath, false);
+  // Debug DistributionFieldV3 props for form integration (only when debugging)
+  if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+    console.log('⚙️ DistributionFieldV3 props:', { 
+      formMode, 
+      name,
+      baseName,
+      hasOverrides: !!getValueOverride && !!updateValueOverride
+    });
+  }
+
+
+  
+  const typePath = [...pathArray, 'type'];
+  const parametersPath = [...pathArray, 'parameters'];
+  const timeSeriesParametersPath = [...pathArray, 'timeSeriesParameters'];
+  const timeSeriesModePath = [...pathArray, 'timeSeriesMode'];
+  const metadataPath = [...pathArray, 'metadata'];
+
+  // Get values respecting form mode
+  const getValue = useCallback((path, defaultVal) => {
+    if (formMode && getValueOverride) {
+      return getValueOverride(path, defaultVal);
+    }
+    return getValueByPath(path, defaultVal);
+  }, [formMode, getValueOverride, getValueByPath]);
+
+  // Update values respecting form mode
+  const updateValue = useCallback(async (path, value) => {
+    if (formMode && updateValueOverride) {
+      return updateValueOverride(path, value);
+    }
+    return await updateByPath(path, value);
+  }, [formMode, updateValueOverride, updateByPath]);
+
+  const currentType = (getValue(typePath, 'fixed')).toLowerCase();
+  const parameters = getValue(parametersPath, {});
+  const timeSeriesParameters = getValue(timeSeriesParametersPath, { value: [] });
+  const timeSeriesMode = getValue(timeSeriesModePath, false);
 
   // Settings state
-  const percentileDirection = getValueByPath([...metadataPath, 'percentileDirection'], 'ascending');
+  const percentileDirection = getValue([...metadataPath, 'percentileDirection'], 'ascending');
   const [viewModeState, setViewModeState] = useState('pdf');
 
   const [hasFittedParams, setHasFittedParams] = useState(false);
@@ -206,24 +245,24 @@ const DistributionFieldV3 = ({
   // Ensure we have the default value from defaultValuePath or distribution metadata
   const defaultValue = useMemo(() => {
     if (defaultValuePath) {
-      return getValueByPath(defaultValuePath, 0);
+      return getValue(defaultValuePath, 0);
     }
     if (distribution && metadata) {
       const valueParam = metadata.parameters.find(p => p.name === 'value');
       return valueParam?.fieldProps?.defaultValue || 0;
     }
     return 0;
-  }, [defaultValuePath, getValueByPath, distribution, metadata]);
+  }, [defaultValuePath, getValue, distribution, metadata]);
 
-  const value = getValueByPath([...parametersPath, 'value'], defaultValue);
+  const value = getValue([...parametersPath, 'value'], defaultValue);
 
   const timeSeriesData = useMemo(() => {
     if (timeSeriesMode) {
-      const tsData = getValueByPath([...timeSeriesParametersPath, 'value'], []);
+      const tsData = getValue([...timeSeriesParametersPath, 'value'], []);
       return Array.isArray(tsData) ? tsData : [];
     }
     return [];
-  }, [timeSeriesMode, timeSeriesParametersPath, getValueByPath]);
+  }, [timeSeriesMode, timeSeriesParametersPath, getValue]);
 
   const canShowPlot = useMemo(() => {
     return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
@@ -231,23 +270,26 @@ const DistributionFieldV3 = ({
 
   const colSpan = compact ? { xs: 24, sm: 8 } : { xs: 24, sm: 12 };
 
-  // Initialize parameters and time series as needed
+  // Initialize parameters and time series as needed (skip in form mode)
   useEffect(() => {
+    // Skip initialization in form mode - ContextForm handles initial values
+    if (formMode) return;
+    
     if (defaultValue !== undefined && defaultValue !== null) {
       if (timeSeriesMode) {
-        const currentTSData = getValueByPath([...timeSeriesParametersPath, 'value'], null);
+        const currentTSData = getValue([...timeSeriesParametersPath, 'value'], null);
         if (!currentTSData || !Array.isArray(currentTSData) || currentTSData.length === 0) {
           const initialData = [];
           if (typeof value === 'number') {
             initialData.push({ year: 0, value: value });
           }
-          updateByPath([...timeSeriesParametersPath, 'value'], initialData);
+          updateValue([...timeSeriesParametersPath, 'value'], initialData);
         }
       } else if (value === undefined || value === null) {
-        updateByPath([...parametersPath, 'value'], defaultValue);
+        updateValue([...parametersPath, 'value'], defaultValue);
       }
     }
-  }, [defaultValue, parametersPath, timeSeriesParametersPath, updateByPath, value, timeSeriesMode, getValueByPath]);
+  }, [formMode, defaultValue, parametersPath, timeSeriesParametersPath, updateValue, value, timeSeriesMode, getValue]);
 
   // Handle fitting distribution to time series data
   const handleFitDistribution = useCallback(async () => {
@@ -326,11 +368,16 @@ const DistributionFieldV3 = ({
         hasFittedParams,
         metadata,
         parameters,
-        minRequiredPoints
+        minRequiredPoints,
+        // Form mode props
+        formMode,
+        baseName,
+        getValueOverride,
+        updateValueOverride
       });
     }
     return { fieldsContent: null, fittedParamsAlert: null };
-  }, [timeSeriesMode, currentType, parametersPath, timeSeriesParametersPath, addonAfter, valueType, displayName, step, timeSeriesData, fittingDistribution, handleFitDistribution, handleClearFit, hasFittedParams, metadata, parameters, minRequiredPoints]);
+  }, [timeSeriesMode, currentType, parametersPath, timeSeriesParametersPath, addonAfter, valueType, displayName, step, timeSeriesData, fittingDistribution, handleFitDistribution, handleClearFit, hasFittedParams, metadata, parameters, minRequiredPoints, formMode, baseName, getValueOverride, updateValueOverride]);
 
 
   return (
@@ -357,6 +404,11 @@ const DistributionFieldV3 = ({
                       dropdownMatchSelectWidth: false,
                       style: { minWidth: 200 }
                     }}
+                    // Form mode props
+                    formMode={formMode}
+                    name={baseName ? `${baseName}.type` : undefined}
+                    getValueOverride={getValueOverride}
+                    updateValueOverride={updateValueOverride}
                     {...rest}
                   />
                 </div>
@@ -381,6 +433,10 @@ const DistributionFieldV3 = ({
                               tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
                               defaultValue={defaultValue}
                               required
+                              formMode={formMode}
+                              name={baseName ? `${baseName}.parameters.value` : undefined}
+                              getValueOverride={getValueOverride}
+                              updateValueOverride={updateValueOverride}
                             />
                           ) : valueType === 'currency' ? (
                             <CurrencyField
@@ -389,6 +445,10 @@ const DistributionFieldV3 = ({
                               tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
                               defaultValue={defaultValue}
                               required
+                              formMode={formMode}
+                              name={baseName ? `${baseName}.parameters.value` : undefined}
+                              getValueOverride={getValueOverride}
+                              updateValueOverride={updateValueOverride}
                             />
                           ) : (
                             <NumberField
@@ -399,40 +459,114 @@ const DistributionFieldV3 = ({
                               step={step}
                               defaultValue={defaultValue}
                               required
+                              formMode={formMode}
+                              name={baseName ? `${baseName}.parameters.value` : undefined}
+                              getValueOverride={getValueOverride}
+                              updateValueOverride={updateValueOverride}
                             />
                           )}
                         </FormCol>
                       </FormRow>
-                      <FormRow>
-                        {(() => {
-                          // Get metadata to extract span information
-                          const fieldMetadata = DistributionUtils.getMetadata(currentType, parameters);
-                          const parametersToRender = fieldMetadata?.parameters?.filter(param => param.name !== 'value') || [];
-
-                          return renderParameterFields(currentType, parametersPath, {
-                            addonAfter,
-                            step,
-                            colSpan,
-                            renderValueSeparately: true,
-                            currentParameters: { value: parameters.value }
-                          }).map((field, index) => {
-                            // Get the corresponding parameter metadata for this field
-                            const paramMetadata = parametersToRender[index];
-                            const fieldSpan = paramMetadata?.fieldProps?.span || colSpan;
-
-                            // Handle both object spans and number spans
-                            const spanProps = typeof fieldSpan === 'object'
-                              ? fieldSpan  // { xs: 24, sm: 8 }
-                              : { span: fieldSpan }; // 24
-
+                      {/* Dynamic Parameter Fields - Use Form.Item shouldUpdate in form mode to trigger re-renders */}
+                      {formMode ? (
+                        <Form.Item
+                          noStyle
+                          shouldUpdate={(prevValues, currentValues) => {
+                            // Re-render when distribution type changes
+                            const typeName = baseName ? `${baseName}.type` : 'type';
+                            const prevType = prevValues[typeName] || (baseName ? prevValues[baseName]?.type : prevValues.type);
+                            const currentType = currentValues[typeName] || (baseName ? currentValues[baseName]?.type : currentValues.type);
+                            return prevType !== currentType;
+                          }}
+                        >
+                          {(form) => {
+                            // Get current type from form values
+                            const typeName = baseName ? `${baseName}.type` : 'type';
+                            const formType = form.getFieldValue(typeName) || 
+                                           (baseName ? form.getFieldValue([baseName, 'type']) : form.getFieldValue('type')) || 
+                                           'fixed';
+                            
+                            // Only log if debug mode is enabled
+                            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+                              console.log('📊 Form.Item shouldUpdate triggered - rendering fields for type:', formType);
+                            }
+                            
                             return (
-                              <FormCol {...spanProps} key={index}>
-                                {field}
-                              </FormCol>
+                              <FormRow>
+                                {(() => {
+                                  // Get metadata for the current form type
+                                  const fieldMetadata = DistributionUtils.getMetadata(formType, parameters);
+                                  const parametersToRender = fieldMetadata?.parameters?.filter(param => param.name !== 'value') || [];
+
+                                  return renderParameterFields(formType, parametersPath, {
+                                    addonAfter,
+                                    step,
+                                    colSpan,
+                                    renderValueSeparately: true,
+                                    currentParameters: { value: parameters.value },
+                                    // Form mode props
+                                    formMode,
+                                    baseName,
+                                    getValueOverride,
+                                    updateValueOverride
+                                  }).map((field, index) => {
+                                    // Get the corresponding parameter metadata for this field
+                                    const paramMetadata = parametersToRender[index];
+                                    const fieldSpan = paramMetadata?.fieldProps?.span || colSpan;
+
+                                    // Handle both object spans and number spans
+                                    const spanProps = typeof fieldSpan === 'object'
+                                      ? fieldSpan  // { xs: 24, sm: 8 }
+                                      : { span: fieldSpan }; // 24
+
+                                    return (
+                                      <FormCol {...spanProps} key={`${formType}-${index}`}>
+                                        {field}
+                                      </FormCol>
+                                    );
+                                  });
+                                })()}
+                              </FormRow>
                             );
-                          });
-                        })()}
-                      </FormRow>
+                          }}
+                        </Form.Item>
+                      ) : (
+                        <FormRow>
+                          {(() => {
+                            // Get metadata to extract span information
+                            const fieldMetadata = DistributionUtils.getMetadata(currentType, parameters);
+                            const parametersToRender = fieldMetadata?.parameters?.filter(param => param.name !== 'value') || [];
+
+                            return renderParameterFields(currentType, parametersPath, {
+                              addonAfter,
+                              step,
+                              colSpan,
+                              renderValueSeparately: true,
+                              currentParameters: { value: parameters.value },
+                              // Form mode props
+                              formMode,
+                              baseName,
+                              getValueOverride,
+                              updateValueOverride
+                            }).map((field, index) => {
+                              // Get the corresponding parameter metadata for this field
+                              const paramMetadata = parametersToRender[index];
+                              const fieldSpan = paramMetadata?.fieldProps?.span || colSpan;
+
+                              // Handle both object spans and number spans
+                              const spanProps = typeof fieldSpan === 'object'
+                                ? fieldSpan  // { xs: 24, sm: 8 }
+                                : { span: fieldSpan }; // 24
+
+                              return (
+                                <FormCol {...spanProps} key={index}>
+                                  {field}
+                                </FormCol>
+                              );
+                            });
+                          })()}
+                        </FormRow>
+                      )}
                     </>
                   )}
                 </Spin>
@@ -468,20 +602,91 @@ const DistributionFieldV3 = ({
                     />
                   ) : (
                     <>
-                      <DistributionPlot
-                        distributionType={currentType}
-                        parameters={parameters}
-                        addonAfter={addonAfter}
-                        showMean={true}
-                        showStdDev={true}
-                        showMarkers={true}
-                        showSummary={false}
-                        showPercentiles={true}
-                        allowCurveToggle={allowCurveToggle}
-                        externalViewMode={showVisualization ? viewModeState : null}
-                        onViewModeChange={setViewModeState}
-                        style={{ marginTop: 0 }}
-                      />
+                      {/* Distribution Plot - Use Form.Item shouldUpdate in form mode to get fresh parameters */}
+                      {formMode ? (
+                        <Form.Item
+                          noStyle
+                          shouldUpdate={(prevValues, currentValues) => {
+                            const typeName = baseName ? `${baseName}.type` : 'type';
+                            const paramPrefix = baseName ? `${baseName}.parameters` : 'parameters';
+                            
+                            // Check if distribution type changed
+                            if (prevValues[typeName] !== currentValues[typeName]) {
+                              return true;
+                            }
+                            
+                            // Check if any parameter field changed
+                            const prevParamKeys = Object.keys(prevValues).filter(key => key.startsWith(paramPrefix + '.'));
+                            const currentParamKeys = Object.keys(currentValues).filter(key => key.startsWith(paramPrefix + '.'));
+                            
+                            // Different number of parameter fields
+                            if (prevParamKeys.length !== currentParamKeys.length) {
+                              return true;
+                            }
+                            
+                            // Check if any parameter value changed
+                            return prevParamKeys.some(key => prevValues[key] !== currentValues[key]);
+                          }}
+                        >
+                          {(form) => {
+                            const typeName = baseName ? `${baseName}.type` : 'type';
+                            const formType = form.getFieldValue(typeName) || 'fixed';
+                            
+                            // Reconstruct parameters object from flattened form fields
+                            const allFormValues = form.getFieldsValue();
+                            const paramPrefix = baseName ? `${baseName}.parameters` : 'parameters';
+                            
+                            // Extract all parameter fields from the flattened form structure
+                            const reconstructedParams = {};
+                            Object.keys(allFormValues).forEach(key => {
+                              if (key.startsWith(paramPrefix + '.')) {
+                                const paramName = key.replace(paramPrefix + '.', '');
+                                reconstructedParams[paramName] = allFormValues[key];
+                              }
+                            });
+                            
+                            // Debug log only if enabled
+                            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+                                console.log('📈 DistributionPlot form data:', { 
+                                    formType, 
+                                    reconstructedParams: Object.keys(reconstructedParams).length > 0 ? reconstructedParams : 'EMPTY'
+                                });
+                            }
+                            
+                            return (
+                              <DistributionPlot
+                                distributionType={formType}
+                                parameters={reconstructedParams}
+                                addonAfter={addonAfter}
+                                showMean={true}
+                                showStdDev={true}
+                                showMarkers={true}
+                                showSummary={false}
+                                showPercentiles={true}
+                                allowCurveToggle={allowCurveToggle}
+                                externalViewMode={showVisualization ? viewModeState : null}
+                                onViewModeChange={setViewModeState}
+                                style={{ marginTop: 0 }}
+                              />
+                            );
+                          }}
+                        </Form.Item>
+                      ) : (
+                        <DistributionPlot
+                          distributionType={currentType}
+                          parameters={parameters}
+                          addonAfter={addonAfter}
+                          showMean={true}
+                          showStdDev={true}
+                          showMarkers={true}
+                          showSummary={false}
+                          showPercentiles={true}
+                          allowCurveToggle={allowCurveToggle}
+                          externalViewMode={showVisualization ? viewModeState : null}
+                          onViewModeChange={setViewModeState}
+                          style={{ marginTop: 0 }}
+                        />
+                      )}
 
                       {/* Add the fitted parameters alert below the visualization */}
                       {timeSeriesResult.fittedParamsAlert && (
@@ -512,6 +717,10 @@ const DistributionFieldV3 = ({
                       onViewModeChange={setViewModeState}
                       allowCurveToggle={allowCurveToggle}
                       disabled={fittingDistribution}
+                      // Form mode props
+                      formMode={formMode}
+                      getValueOverride={getValueOverride}
+                      updateValueOverride={updateValueOverride}
                     />
                   </div>
 
@@ -575,6 +784,10 @@ const DistributionFieldV3 = ({
                     onViewModeChange={setViewModeState}
                     allowCurveToggle={allowCurveToggle}
                     disabled={fittingDistribution}
+                    // Form mode props
+                    formMode={formMode}
+                    getValueOverride={getValueOverride}
+                    updateValueOverride={updateValueOverride}
                   />
                 </div>
 

@@ -1,0 +1,110 @@
+issue_number: 44
+issue_title: "🔧 Refactor MarketFactors CRUD with ContextForm Integration"
+github_url: "https://github.com/ph1ltep/wf-sim-app/issues/44"
+execution_mode: "interactive"
+total_phases: 5
+current_phase: 4
+phases:
+  - phase: 1
+    title: "Enhance DistributionFieldV3 for Form Compatibility"
+    status: "completed"
+    complexity: "medium"
+    agents_used: ["analyzer", "analyzer", "schemas"]
+    completion_time: "2025-01-09T02:15:00Z"
+    checkpoints: 
+      - timestamp: "2025-01-09T02:10:00Z"
+        status: "analysis_complete"
+        agents_completed: ["analyzer", "analyzer"]
+        files_analyzed: ["DistributionFieldV3.jsx", "ContextForm.jsx", "ContextField.jsx"]
+      - timestamp: "2025-01-09T02:15:00Z"
+        status: "implementation_complete"
+        agents_completed: ["schemas"]
+        files_modified: ["frontend/src/components/distributionFields/DistributionFieldV3.jsx"]
+    description: "Add form-awareness to DistributionFieldV3 without breaking existing usage"
+    files_affected: ["frontend/src/components/forms/DistributionFieldV3.jsx"]
+    estimated_lines: 50
+  - phase: 2
+    title: "Create Assignment Detection Logic"
+    status: "completed"
+    complexity: "simple"
+    agents_used: ["analyzer", "schemas"]
+    completion_time: "2025-01-09T02:25:00Z"
+    checkpoints:
+      - timestamp: "2025-01-09T02:20:00Z"
+        status: "analysis_complete"
+        agents_completed: ["analyzer"]
+        files_analyzed: ["MarketFactors.jsx", "helpers.js"]
+      - timestamp: "2025-01-09T02:25:00Z"
+        status: "implementation_complete"
+        agents_completed: ["schemas"]
+        files_modified: ["frontend/src/utils/marketFactors/helpers.js", "frontend/src/pages/scenario/economics/MarketFactors.jsx"]
+    description: "Add helper function to detect assigned factors"
+    files_affected: ["frontend/src/components/MarketFactors.jsx"]
+    estimated_lines: 20
+  - phase: 3
+    title: "Replace Modal with ContextForm"
+    status: "completed"
+    complexity: "complex"
+    agents_used: ["analyzer", "builder"]
+    completion_time: "2025-01-09T02:40:00Z"
+    checkpoints:
+      - timestamp: "2025-01-09T02:30:00Z"
+        status: "analysis_complete"
+        agents_completed: ["analyzer"]
+        files_analyzed: ["MarketFactors.jsx"]
+      - timestamp: "2025-01-09T02:40:00Z"
+        status: "implementation_complete"
+        agents_completed: ["builder"]
+        files_modified: ["frontend/src/pages/scenario/economics/MarketFactors.jsx"]
+    description: "Replace current modal form implementation with ContextForm"
+    files_affected: ["frontend/src/components/MarketFactors.jsx"]
+    estimated_lines: 100
+  - phase: 4
+    title: "Add Assignment Indicators to Table"
+    status: "pending"
+    complexity: "medium"
+    agents_used: []
+    completion_time: null
+    checkpoints: []
+    description: "Update table columns to show assignment status and disable actions"
+    files_affected: ["frontend/src/components/MarketFactors.jsx"]
+    estimated_lines: 40
+  - phase: 5
+    title: "Remove Reset to Defaults Button"
+    status: "pending"
+    complexity: "simple"
+    agents_used: []
+    completion_time: null
+    checkpoints: []
+    description: "Clean up deprecated reset functionality"
+    files_affected: ["frontend/src/components/MarketFactors.jsx"]
+    estimated_lines: 10
+status: "paused"
+created_at: "2025-01-09T02:05:00Z"
+updated_at: "2025-01-09T02:45:00Z"
+branch_name: "feature/marketfactors-contextform-integration"
+pr_number: null
+acceptance_criteria:
+  functionality:
+    - "Modal form uses ContextForm for proper state isolation"
+    - "Name field is disabled when factor is assigned to any cost category"
+    - "Description field is always editable"
+    - "DistributionFieldV3 is always editable and works within ContextForm"
+    - "Delete button is disabled for assigned factors"
+    - "Save button validates and updates context only on success"
+    - "Cancel button discards changes without updating context"
+    - "Assignment status is visible in main table"
+  data_integrity:
+    - "DistributionFieldV3 changes are isolated until form submission"
+    - "Form validation prevents invalid data from reaching context"
+    - "All existing DistributionFieldV3 usage remains unaffected"
+    - "Factor assignments to cost categories work correctly"
+    - "No data loss during modal operations"
+  user_experience:
+    - "Clear visual indicators for locked fields (disabled styling, tooltips)"
+    - "Assignment status visible in table with appropriate icons"
+    - "Proper success/error messaging for all operations"
+    - "Unsaved changes confirmation when closing modal"
+    - "Reset to Defaults button is removed"
+    - "Loading states during operations"
+    - "Form validates before allowing submission"

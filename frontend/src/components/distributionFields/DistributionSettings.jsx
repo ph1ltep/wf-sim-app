@@ -13,10 +13,24 @@ const DistributionSettings = ({
     onViewModeChange,
     allowCurveToggle = true,
     disabled = false,
-    style = {}
+    style = {},
+    // Form mode props
+    formMode,
+    getValueOverride,
+    updateValueOverride
 }) => {
     const timeSeriesModePath = [...basePath, 'timeSeriesMode'];
     const metadataPath = [...basePath, 'metadata'];
+
+    // Debug logging for form mode
+    if (formMode && process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
+        console.log('🎛️ DistributionSettings in form mode:', {
+            basePath,
+            formMode,
+            timeSeriesModePath,
+            hasValueOverride: !!getValueOverride
+        });
+    }
 
     const settingsContent = (
         <div style={{ width: 250 }}>
@@ -47,6 +61,10 @@ const DistributionSettings = ({
                         defaultValue={false}
                         disabled={disabled}
                         style={{ width: '100%' }}
+                        // Form mode props
+                        formMode={formMode}
+                        getValueOverride={getValueOverride}
+                        updateValueOverride={updateValueOverride}
                     />
                 </div>
 
@@ -76,6 +94,10 @@ const DistributionSettings = ({
                         defaultValue="ascending"
                         disabled={disabled}
                         style={{ width: '100%' }}
+                        // Form mode props
+                        formMode={formMode}
+                        getValueOverride={getValueOverride}
+                        updateValueOverride={updateValueOverride}
                     />
                 </div>
 
