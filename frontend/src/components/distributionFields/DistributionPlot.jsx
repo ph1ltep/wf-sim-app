@@ -209,7 +209,7 @@ const DistributionPlot = ({
     }, [
         distributionType,
         normalizedParameters,
-        validationResult.isValid,
+        validationResult,
         addonAfter,
         showMean,
         showStdDev,

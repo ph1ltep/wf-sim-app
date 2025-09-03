@@ -342,7 +342,7 @@ const ContextForm = ({
         } else {
             performCancel();
         }
-    }, [hasUnsavedChanges, confirmOnCancel, resetForm, onCancel]);
+    }, [hasUnsavedChanges, confirmOnCancel, resetForm, onCancel, form]);
 
     // Handle reset with confirmation
     const handleReset = useCallback(() => {
@@ -372,7 +372,7 @@ const ContextForm = ({
         } else {
             resetForm();
         }
-    }, [hasUnsavedChanges, resetForm]);
+    }, [hasUnsavedChanges, resetForm, form]);
 
     // Handle form value changes
     const handleValuesChange = useCallback((changedValues, allValues) => {
@@ -406,7 +406,7 @@ const ContextForm = ({
         if (formProps.onValuesChange) {
             formProps.onValuesChange(changedValues, allValues);
         }
-    }, [isInitialized, validationErrors.length, formProps]);
+    }, [isInitialized, validationErrors.length, formProps, hasUnsavedChanges]);
 
     // Value getter for ContextFields in form mode
     const getFormValue = useCallback((fieldPath, defaultValue = null) => {

@@ -45,8 +45,12 @@ const MarketFactorsSimulation = () => {
     const { getValueByPath, scenarioData } = useScenario();
     const { updateDistributions, loading } = useInputSim();
 
-    // Get market factors array dynamically
-    const marketFactorsArray = getValueByPath(['settings', 'marketFactors', 'factors'], []);
+    // Get market factors from dynamic object structure
+    const marketFactorsObject = getValueByPath(['settings', 'marketFactors'], {});
+    // Convert object values to array, filtering out non-object entries
+    const marketFactorsArray = Object.values(marketFactorsObject || {}).filter(factor => 
+        factor && typeof factor === 'object' && factor.id
+    );
     
     // Fetch simulation data from context
     const marketFactorResults = getValueByPath(['simulation', 'inputSim', 'marketFactors'], {});

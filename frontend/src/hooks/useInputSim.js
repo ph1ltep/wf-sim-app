@@ -29,8 +29,7 @@ const useInputSim = () => {
             electricityPrice: scenarioData.settings.modules.revenue.electricityPrice,
             escalationRate: scenarioData.settings.modules.cost.escalationRate,
             downtimePerEvent: scenarioData.settings.modules.revenue.downtimePerEvent,
-            windVariability: scenarioData.settings.modules.revenue.windVariability,
-            rainfallAmount: scenarioData.settings.marketFactors.rainfallAmount
+            windVariability: scenarioData.settings.modules.revenue.windVariability
         };
 
         // Add hardcoded distributions
@@ -40,12 +39,14 @@ const useInputSim = () => {
             }
         });
 
-        // Add market factor distributions (keys are now guaranteed unique by backend)
-        const marketFactors = scenarioData.settings.marketFactors.factors || [];
-        marketFactors.forEach(factor => {
-            if (factor && factor.distribution) {
-                distributions.push(factor.distribution);
-            }
+        // Add market factor distributions from dynamic key object structure
+        const marketFactorsObject = scenarioData.settings.marketFactors || {};
+        // Convert object values to array and filter out non-object entries
+        const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
+            factor && typeof factor === 'object' && factor.distribution
+        );
+        marketFactorsArray.forEach(factor => {
+            distributions.push(factor.distribution);
         });
 
         return distributions;
@@ -88,8 +89,11 @@ const useInputSim = () => {
                 const results = response.data.simulationInfo;
 
                 // Get market factor IDs for determining storage location
-                const marketFactors = scenarioData.settings.marketFactors.factors || [];
-                const marketFactorIds = marketFactors.map(f => f.id);
+                const marketFactorsObject = scenarioData.settings.marketFactors || {};
+                const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
+                    factor && typeof factor === 'object' && factor.id
+                );
+                const marketFactorIds = marketFactorsArray.map(f => f.id);
 
                 // Separate regular updates from marketFactors updates
                 const regularUpdates = {};

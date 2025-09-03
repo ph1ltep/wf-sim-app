@@ -1,7 +1,7 @@
 // src/components/tables/TimeSeriesTable.jsx - Updated with minimum points display
 import React, { useMemo, useState } from 'react';
 import { Typography, Space, Tooltip, Table, Input, InputNumber, Form, Button, Popconfirm } from 'antd';
-import { LineChartOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { LineChartOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { formatNumber } from '../../utils/formatUtils';
 
@@ -151,7 +151,7 @@ const TimeSeriesTable = ({
 }) => {
     // Get scenario context
     const { getValueByPath, updateByPath } = useScenario();
-    const [editingKey, setEditingKey] = useState('');
+    // Removed unused state: editingKey, setEditingKey
 
     // Get data based on mode (form mode vs context mode)
     const timeSeriesData = useMemo(() => {

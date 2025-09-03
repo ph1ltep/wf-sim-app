@@ -142,7 +142,7 @@ const MarketFactors = () => {
         const factors = getValueByPath(['settings', 'marketFactors'], {});
         console.log('📊 MarketFactors table data updated:', { factors });
         return factors;
-    }, [scenarioData?.settings?.marketFactors, getValueByPath]);
+    }, [getValueByPath]);
 
     const marketFactorsArray = useMemo(() => {
         return Object.values(marketFactorsObject);

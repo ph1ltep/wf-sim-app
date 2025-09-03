@@ -9,70 +9,13 @@ import DistributionSettings from './DistributionSettings';
 import renderParameterFields from './renderParameterFields';
 import renderTimeSeriesFields from './renderTimeSeriesFields';
 import { distributionTypes, DistributionUtils } from '../../utils/distributions';
-import { validateTimeSeriesModeTransition, getAppropriateValue } from '../../utils/distributions/stateTransition';
+// Unused imports removed - validateTimeSeriesModeTransition, getAppropriateValue
 import useInputSim from '../../hooks/useInputSim';
 import ThemedIcon from '../common/ThemedIcon';
 
 const { Title, Text, Paragraph } = Typography;
 
-/**
- * Status icons component for distribution field
- */
-const DistributionStatusIcons = ({
-  timeSeriesMode,
-  percentileDirection,
-  viewMode,
-  allowCurveToggle = true,
-  vertical = false
-}) => {
-  const iconStyle = {
-    fontSize: '16px',
-    cursor: 'default'
-  };
-
-  const icons = [
-    {
-      iconKey: timeSeriesMode ? 'dataMode.timeSeries' : 'dataMode.singleValue',
-      enabled: true
-    },
-    {
-      iconKey: `percentileDirection.${percentileDirection}`,
-      enabled: true
-    },
-    {
-      iconKey: `viewMode.${viewMode}`,
-      enabled: allowCurveToggle
-    }
-  ];
-
-  if (vertical) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-        {icons.map((icon, index) => (
-          <ThemedIcon
-            key={index}
-            iconKey={icon.iconKey}
-            showEnabled={icon.enabled}
-            style={iconStyle}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <Space size={8}>
-      {icons.map((icon, index) => (
-        <ThemedIcon
-          key={index}
-          iconKey={icon.iconKey}
-          showEnabled={icon.enabled}
-          style={{ ...iconStyle, marginRight: index < icons.length - 1 ? 8 : 0 }}
-        />
-      ))}
-    </Space>
-  );
-};
+// DistributionStatusIcons component removed as it's unused
 
 /**
  * Info popover component for distribution information
@@ -189,8 +132,9 @@ const DistributionFieldV3 = ({
 
   
   const typePath = [...pathArray, 'type'];
-  const parametersPath = [...pathArray, 'parameters'];
-  const timeSeriesParametersPath = [...pathArray, 'timeSeriesParameters'];
+  // Wrap path arrays in useMemo to prevent unnecessary re-renders
+  const parametersPath = useMemo(() => [...pathArray, 'parameters'], [pathArray]);
+  const timeSeriesParametersPath = useMemo(() => [...pathArray, 'timeSeriesParameters'], [pathArray]);
   const timeSeriesModePath = [...pathArray, 'timeSeriesMode'];
   const metadataPath = [...pathArray, 'metadata'];
 
@@ -212,7 +156,6 @@ const DistributionFieldV3 = ({
 
   const currentType = (getValue(typePath, 'fixed')).toLowerCase();
   const parameters = getValue(parametersPath, {});
-  const timeSeriesParameters = getValue(timeSeriesParametersPath, { value: [] });
   const timeSeriesMode = getValue(timeSeriesModePath, false);
 
   // Settings state
@@ -264,9 +207,7 @@ const DistributionFieldV3 = ({
     return [];
   }, [timeSeriesMode, timeSeriesParametersPath, getValue]);
 
-  const canShowPlot = useMemo(() => {
-    return !timeSeriesMode || (timeSeriesMode && hasFittedParams);
-  }, [timeSeriesMode, hasFittedParams]);
+  // canShowPlot variable removed as it's unused
 
   const colSpan = compact ? { xs: 24, sm: 8 } : { xs: 24, sm: 12 };
 

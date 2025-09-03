@@ -26,13 +26,10 @@ import { DistributionUtils } from '../../utils/distributions';
  * @returns {Array} Array of parameter field components
  */
 const renderParameterFields = (distributionType, parametersPath, options = {}) => {
-    // Default options
+    // Default options (removed unused variables: addonAfter, valueType, defaultValue)
     const {
-        addonAfter,
         step = 1,
-        valueType = 'number',
         renderValueSeparately = true,
-        defaultValue,
         label,
         currentParameters = {},
         formMode = false,
