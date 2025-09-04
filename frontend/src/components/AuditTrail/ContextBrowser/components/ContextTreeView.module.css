@@ -1,0 +1,45 @@
+/* Compact tree styling for ContextBrowser */
+
+.compactTree {
+  background-color: transparent;
+  font-size: 13px;
+}
+
+/* Make tree nodes more compact */
+.compactTree :global(.ant-tree-node-content-wrapper) {
+  padding: 1px 2px !important;
+  margin: 0 !important;
+  line-height: 20px !important;
+}
+
+.compactTree :global(.ant-tree-treenode) {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.compactTree :global(.ant-tree-switcher) {
+  width: 14px !important;
+  height: 20px !important;
+  line-height: 20px !important;
+  margin-right: 2px !important;
+}
+
+.compactTree :global(.ant-tree-indent-unit) {
+  width: 12px !important;
+}
+
+/* Remove extra spacing */
+.compactTree :global(.ant-tree-list-holder) {
+  background-color: transparent;
+}
+
+.compactTree :global(.ant-tree-list-holder-inner) {
+  padding: 0;
+}
+
+/* Ensure title content fits properly */
+.compactTree :global(.ant-tree-title) {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
