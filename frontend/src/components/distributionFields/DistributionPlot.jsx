@@ -39,14 +39,6 @@ const DistributionPlot = ({
     baseColor = 'rgb(31, 119, 180)',
     style = {}
 }) => {
-    // Debug logging for DistributionPlot data (only when enabled)
-    if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-        console.log('📈 DistributionPlot received props:', { 
-            distributionType, 
-            parameters, 
-            parametersKeys: parameters ? Object.keys(parameters) : 'null'
-        });
-    }
     // State for plot data and layout
     const [plotData, setPlotData] = useState([]);
     const [plotLayout, setPlotLayout] = useState({});
@@ -120,34 +112,15 @@ const DistributionPlot = ({
     // Validate parameters using the distribution utilities
     const validationResult = useMemo(() => {
         if (!distribution) {
-            console.log('❌ DistributionPlot: No distribution found for type:', distributionType);
             return { isValid: false, message: ["Unknown distribution type"] };
         }
         const result = distribution.validate(normalizedParameters);
-        if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-            console.log('🔍 DistributionPlot validation:', { 
-                distributionType, 
-                normalizedParameters, 
-                result 
-            });
-        }
         return result;
-    }, [distribution, normalizedParameters, distributionType]);
+    }, [distribution, normalizedParameters]);
 
     // Update visualization when parameters or curve type changes
     useEffect(() => {
-        if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-            console.log('📊 DistributionPlot useEffect triggered:', { 
-                isValid: validationResult.isValid, 
-                hasDistribution: !!distribution,
-                effectiveShowCdf
-            });
-        }
-        
         if (validationResult.isValid && distribution) {
-            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-                console.log('✅ DistributionPlot generating plot data...');
-            }
             const options = {
                 addonAfter,
                 showMean,
@@ -197,14 +170,6 @@ const DistributionPlot = ({
             };
 
             setPlotLayout(layout);
-            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-                console.log('✅ DistributionPlot plot data set:', { plotDataCount: plotInfo.data.length, hasLayout: !!layout });
-            }
-        } else if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-            console.log('❌ DistributionPlot NOT generating plot:', { 
-                validationResult,
-                hasDistribution: !!distribution
-            });
         }
     }, [
         distributionType,

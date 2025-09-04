@@ -41,10 +41,6 @@ export const ContextField = ({
   const getRawValue = useCallback(() => {
     if (formMode && getValueOverride) {
       const value = getValueOverride(path, defaultValue);
-      // Only log if this seems to be a key field or if form mode isn't working
-      if (!formMode || (Array.isArray(path) && path.includes('type'))) {
-        console.log(`🔍 ContextField[${Array.isArray(path) ? path.slice(-1)[0] : path}]:`, { formMode, value });
-      }
       return value;
     }
 
@@ -52,14 +48,10 @@ export const ContextField = ({
 
     // If context value doesn't exist and we have a default, initialize it immediately
     if ((contextValue === undefined || contextValue === null) && defaultValue !== undefined) {
-      console.log('ContextField initializing with default value:', { path, defaultValue, formMode });
-      
       // Use form mode override if available, otherwise use direct context update
       if (formMode && updateValueOverride) {
-        console.log('ContextField: Using updateValueOverride for initialization');
         updateValueOverride(path, defaultValue);
       } else {
-        console.log('ContextField: Using direct updateByPath for initialization');
         // Fire and forget - don't block rendering  
         updateByPath(path, defaultValue).catch(console.error);
       }

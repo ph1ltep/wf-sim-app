@@ -113,24 +113,12 @@ const DistributionFieldV3 = ({
   const { getValueByPath, updateByPath } = useScenario();
   const { fitDistributionToData, fittingDistribution } = useInputSim();
 
-  // Ensure path is an array to prevent character spreading
-  const pathArray = Array.isArray(path) ? path : [path];
+  // Ensure path is an array to prevent character spreading - wrap in useMemo
+  const pathArray = useMemo(() => Array.isArray(path) ? path : [path], [path]);
   
   // Generate base name for nested form fields when in form mode
   const baseName = formMode && name ? name : null;
 
-  // Debug DistributionFieldV3 props for form integration (only when debugging)
-  if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-    console.log('⚙️ DistributionFieldV3 props:', { 
-      formMode, 
-      name,
-      baseName,
-      hasOverrides: !!getValueOverride && !!updateValueOverride
-    });
-  }
-
-
-  
   const typePath = [...pathArray, 'type'];
   // Wrap path arrays in useMemo to prevent unnecessary re-renders
   const parametersPath = useMemo(() => [...pathArray, 'parameters'], [pathArray]);
@@ -427,10 +415,6 @@ const DistributionFieldV3 = ({
                                            (baseName ? form.getFieldValue([baseName, 'type']) : form.getFieldValue('type')) || 
                                            'fixed';
                             
-                            // Only log if debug mode is enabled
-                            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-                              console.log('📊 Form.Item shouldUpdate triggered - rendering fields for type:', formType);
-                            }
                             
                             return (
                               <FormRow>
@@ -586,13 +570,6 @@ const DistributionFieldV3 = ({
                               }
                             });
                             
-                            // Debug log only if enabled
-                            if (process.env.REACT_APP_DEBUG_FORM_BORDERS === 'true') {
-                                console.log('📈 DistributionPlot form data:', { 
-                                    formType, 
-                                    reconstructedParams: Object.keys(reconstructedParams).length > 0 ? reconstructedParams : 'EMPTY'
-                                });
-                            }
                             
                             return (
                               <DistributionPlot
