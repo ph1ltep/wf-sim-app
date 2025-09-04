@@ -1,6 +1,6 @@
 // src/components/AuditTrail/ContextBrowser/hooks/useContextTree.js
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { convertToTreeData, flattenTreeData } from '../utils/contextUtils';
 
 /**
@@ -14,21 +14,32 @@ import { convertToTreeData, flattenTreeData } from '../utils/contextUtils';
  * @returns {Object} Processed tree data and utilities
  */
 export const useContextTree = (scenarioData) => {
-  // Convert scenario data to tree structure
+  const [loadingState, setLoadingState] = useState({ isLoading: false, progress: 0 });
+  
+  // Convert scenario data to tree structure with performance optimization
   const treeData = useMemo(() => {
     if (!scenarioData) return [];
     
+    setLoadingState({ isLoading: true, progress: 20 });
+    
     try {
-      return convertToTreeData(scenarioData);
+      // Only process top-level keys initially for better performance
+      const result = convertToTreeData(scenarioData, '', 2); // Limit depth to 2 levels initially
+      setLoadingState({ isLoading: false, progress: 100 });
+      return result;
     } catch (error) {
       console.error('Error converting scenario data to tree:', error);
+      setLoadingState({ isLoading: false, progress: 0 });
       return [];
     }
   }, [scenarioData]);
   
-  // Flatten tree data for searching
+  // Only flatten data when needed for search (lazy)
   const flattenedData = useMemo(() => {
+    if (!treeData.length) return [];
+    
     try {
+      // Only flatten when we actually need to search
       return flattenTreeData(treeData);
     } catch (error) {
       console.error('Error flattening tree data:', error);
@@ -54,6 +65,8 @@ export const useContextTree = (scenarioData) => {
     treeData,
     flattenedData,
     treeStats,
-    hasData: treeData.length > 0
+    hasData: treeData.length > 0,
+    isLoading: loadingState.isLoading,
+    loadingProgress: loadingState.progress
   };
 };

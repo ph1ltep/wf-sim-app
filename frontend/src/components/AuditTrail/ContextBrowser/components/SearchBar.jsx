@@ -1,6 +1,6 @@
 // src/components/AuditTrail/ContextBrowser/components/SearchBar.jsx
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Input, Space, Typography, Tooltip } from 'antd';
 import { SearchOutlined, ClearOutlined } from '@ant-design/icons';
 
@@ -24,10 +24,19 @@ const SearchBar = ({
 }) => {
   const inputRef = useRef(null);
   
-  // Handle search input change with debouncing handled by parent
+  // Handle search input change - only store value, don't trigger search
+  const [inputValue, setInputValue] = useState(searchQuery);
+  
   const handleChange = useCallback((e) => {
-    onSearchChange(e.target.value);
-  }, [onSearchChange]);
+    setInputValue(e.target.value);
+  }, []);
+  
+  // Handle Enter key to trigger search
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onSearchChange(inputValue.trim());
+    }
+  }, [inputValue, onSearchChange]);
   
   // Handle clear search
   const handleClear = useCallback(() => {
@@ -40,9 +49,15 @@ const SearchBar = ({
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
+      setInputValue('');
       handleClear();
     }
   }, [handleClear]);
+  
+  // Update local input value when search query changes externally
+  useEffect(() => {
+    setInputValue(searchQuery);
+  }, [searchQuery]);
   
   // Focus input when component mounts
   useEffect(() => {
@@ -55,7 +70,7 @@ const SearchBar = ({
     <Space direction="vertical" size="small" style={{ width: '100%' }}>
       <Input
         ref={inputRef}
-        placeholder="Search paths, values, or types..."
+        placeholder="Search paths, values, or types... (Press Enter to search)"
         prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
         suffix={
           searchQuery && (
@@ -71,9 +86,10 @@ const SearchBar = ({
             </Tooltip>
           )
         }
-        value={searchQuery}
+        value={inputValue}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onPressEnter={handleKeyPress}
         allowClear={false} // We handle clear manually
         style={{
           borderRadius: '6px'

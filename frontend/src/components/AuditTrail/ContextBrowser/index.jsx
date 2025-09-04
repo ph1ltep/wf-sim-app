@@ -8,7 +8,7 @@ import { useContextTree } from './hooks/useContextTree';
 import { useContextSearch } from './hooks/useContextSearch';
 import SearchBar from './components/SearchBar';
 import ContextTreeView from './components/ContextTreeView';
-import { useDebouncedCallback } from 'use-debounce';
+// Removed useDebouncedCallback - search now triggers on Enter only
 
 const { Title, Text } = Typography;
 
@@ -27,8 +27,8 @@ const ContextBrowser = ({
   const { scenarioData, updateByPath, getValueByPath, loading } = useScenario();
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   
-  // Process scenario data into tree structure
-  const { treeData, flattenedData, treeStats, hasData } = useContextTree(scenarioData);
+  // Process scenario data into tree structure with performance optimization
+  const { treeData, flattenedData, treeStats, hasData, isLoading, loadingProgress } = useContextTree(scenarioData);
   
   // Search functionality
   const {
@@ -41,16 +41,10 @@ const ContextBrowser = ({
     hasActiveSearch
   } = useContextSearch(flattenedData);
   
-  // Debounced search to improve performance
-  const debouncedSetSearchQuery = useDebouncedCallback(
-    (query) => setSearchQuery(query),
-    300
-  );
-  
-  // Handle search change
+  // Handle search change - now only triggers on Enter
   const handleSearchChange = useCallback((query) => {
-    debouncedSetSearchQuery(query);
-  }, [debouncedSetSearchQuery]);
+    setSearchQuery(query);
+  }, [setSearchQuery]);
   
   // Handle value updates through ScenarioContext
   const handleValueUpdate = useCallback(async (path, newValue) => {
@@ -199,7 +193,8 @@ const ContextBrowser = ({
               onExpand={setExpandedKeys}
               matchedPaths={searchResults.matchedPaths}
               isNodeVisible={isNodeVisible}
-              loading={loading}
+              loading={loading || isLoading}
+              loadingProgress={loadingProgress}
               searchQuery={searchQuery}
             />
           </div>

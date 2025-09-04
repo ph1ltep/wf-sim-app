@@ -112,18 +112,20 @@ const ContextTreeNode = memo(({
         )}
         
         {/* Show path as tooltip */}
-        <Tooltip title={`Path: ${node.path}`} placement="right">
-          <Text 
-            type="secondary" 
-            style={{ 
-              fontSize: '9px',
-              fontFamily: 'Monaco, Consolas, monospace',
-              opacity: 0.6
-            }}
-          >
-            [{node.path.split('.').length}]
-          </Text>
-        </Tooltip>
+        {node.path && (
+          <Tooltip title={`Path: ${node.path}`} placement="right">
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: '9px',
+                fontFamily: 'Monaco, Consolas, monospace',
+                opacity: 0.6
+              }}
+            >
+              [{node.path.split('.').length}]
+            </Text>
+          </Tooltip>
+        )}
       </Space>
     );
   }, [node, isMatched]);

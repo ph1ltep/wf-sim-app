@@ -64,10 +64,15 @@ export const getValuePreview = (value, maxLength = 50) => {
  * Convert scenario data to tree structure
  * @param {Object} data - Scenario data object
  * @param {string} parentPath - Parent path for nested items
+ * @param {number} maxDepth - Maximum depth to process (0 = unlimited)
+ * @param {number} currentDepth - Current recursion depth
  * @returns {Array} Tree structure array
  */
-export const convertToTreeData = (data, parentPath = '') => {
+export const convertToTreeData = (data, parentPath = '', maxDepth = 0, currentDepth = 0) => {
   if (!data || typeof data !== 'object') return [];
+  
+  // Stop recursion if we've reached max depth
+  if (maxDepth > 0 && currentDepth >= maxDepth) return [];
   
   const treeData = [];
   
@@ -89,12 +94,25 @@ export const convertToTreeData = (data, parentPath = '') => {
               (typeof value === 'object' && Object.keys(value).length === 0)
     };
     
-    // Add children for objects and arrays
+    // Add children for objects and arrays (with depth limiting)
     if (valueType.type === 'object' && value !== null) {
-      const children = convertToTreeData(value, currentPath);
-      if (children.length > 0) {
-        treeNode.children = children;
+      if (maxDepth === 0 || currentDepth < maxDepth - 1) {
+        const children = convertToTreeData(value, currentPath, maxDepth, currentDepth + 1);
+        if (children.length > 0) {
+          treeNode.children = children;
+          treeNode.isLeaf = false;
+        }
+      } else {
+        // Mark as expandable but don't load children yet
         treeNode.isLeaf = false;
+        treeNode.children = [{ 
+          key: `${currentPath}._placeholder`, 
+          title: 'Loading...', 
+          path: `${currentPath}._placeholder`,
+          isPlaceholder: true,
+          isLeaf: true,
+          type: 'placeholder'
+        }];
       }
     } else if (valueType.type === 'array' && Array.isArray(value)) {
       const children = value.map((item, index) => {
