@@ -164,6 +164,36 @@ const SettingsSchema = Yup.object().shape({
             }),
             failureRates: ComponentFailureModelingSchema
         }),
+        economics: Yup.object().shape({
+            marketFactors: Yup.object().shape({
+                // Market factor definitions (moved from settings.marketFactors)
+                factors: Yup.mixed().default(() => {
+                    // Convert default array to object with dynamic keys
+                    return DEFAULT_MARKET_FACTORS.reduce((acc, factor) => {
+                        acc[factor.id] = factor;
+                        return acc;
+                    }, {});
+                }),
+                // Cost category to market factor mappings (moved from failureRates.costCategoryFactors)
+                costCategoryFactors: Yup.object().shape({
+                    material: Yup.string().default('baseEscalationRate'),
+                    labor: Yup.string().default('baseEscalationRate'),
+                    tooling: Yup.string().default('baseEscalationRate'),
+                    crane: Yup.string().default('baseEscalationRate'),
+                    contractsLocal: Yup.string().default('baseEscalationRate'),
+                    contractsForeign: Yup.string().default('baseEscalationRate'),
+                    other: Yup.string().default('baseEscalationRate')
+                }).default(() => ({
+                    material: 'baseEscalationRate',
+                    labor: 'baseEscalationRate',
+                    tooling: 'baseEscalationRate',
+                    crane: 'baseEscalationRate',
+                    contractsLocal: 'baseEscalationRate',
+                    contractsForeign: 'baseEscalationRate',
+                    other: 'baseEscalationRate'
+                }))
+            })
+        }),
         windFarm: Yup.object().shape({
             numWTGs: Yup.number().default(20),
             wtgPlatformType: Yup.string().oneOf(['geared', 'direct-drive']).default('geared'),
@@ -228,14 +258,6 @@ const SettingsSchema = Yup.object().shape({
                 }
             })),
         }),
-    }),
-    // Dynamic keys for market factor IDs - using mixed() for dynamic key support
-    marketFactors: Yup.mixed().default(() => {
-        // Convert default array to object with dynamic keys
-        return DEFAULT_MARKET_FACTORS.reduce((acc, factor) => {
-            acc[factor.id] = factor;
-            return acc;
-        }, {});
     }),
     modules: Yup.object().shape({
         financing: Yup.object().shape({

@@ -34,7 +34,7 @@ const RepairPackageSchema = Yup.object().shape({
         .oneOf(REPAIR_PACKAGE_CATEGORIES, 'Invalid repair package category')
         .required('Category is required'),
     
-    // Repair costs organized by category (material, labor, tooling, crane, other)
+    // Repair costs organized by category (material, labor, tooling, crane, contractsLocal, contractsForeign, other)
     costs: Yup.object().shape({
         material: Yup.object().shape({
             perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
@@ -52,6 +52,16 @@ const RepairPackageSchema = Yup.object().shape({
         }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
         
         crane: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
+        
+        contractsLocal: Yup.object().shape({
+            perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
+            perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
+        }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),
+        
+        contractsForeign: Yup.object().shape({
             perEventEUR: Yup.number().min(0, 'Per-event cost must be at least 0').default(0),
             perDayEUR: Yup.number().min(0, 'Per-day cost must be at least 0').default(0)
         }).default(() => ({ perEventEUR: 0, perDayEUR: 0 })),

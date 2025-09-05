@@ -46,7 +46,7 @@ const MarketFactorsSimulation = () => {
     const { updateDistributions, loading } = useInputSim();
 
     // Get market factors from dynamic object structure
-    const marketFactorsObject = getValueByPath(['settings', 'marketFactors'], {});
+    const marketFactorsObject = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
     // Convert object values to array, filtering out non-object entries
     const marketFactorsArray = Object.values(marketFactorsObject || {}).filter(factor => 
         factor && typeof factor === 'object' && factor.id

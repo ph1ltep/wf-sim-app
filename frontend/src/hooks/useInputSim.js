@@ -40,7 +40,7 @@ const useInputSim = () => {
         });
 
         // Add market factor distributions from dynamic key object structure
-        const marketFactorsObject = scenarioData.settings.marketFactors || {};
+        const marketFactorsObject = scenarioData.settings.project?.economics?.marketFactors?.factors || {};
         // Convert object values to array and filter out non-object entries
         const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
             factor && typeof factor === 'object' && factor.distribution
@@ -89,7 +89,7 @@ const useInputSim = () => {
                 const results = response.data.simulationInfo;
 
                 // Get market factor IDs for determining storage location
-                const marketFactorsObject = scenarioData.settings.marketFactors || {};
+                const marketFactorsObject = scenarioData.settings.project?.economics?.marketFactors?.factors || {};
                 const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
                     factor && typeof factor === 'object' && factor.id
                 );

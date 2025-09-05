@@ -10,59 +10,37 @@ import {
 } from '@ant-design/icons';
 import { useScenario } from 'contexts/ScenarioContext';
 import { getMarketFactorColorScheme } from 'utils/charts/colors';
+import { CORE_COST_CATEGORIES, COST_CATEGORY_MAP } from '../../../constants/costCategories';
 
 const { Text } = Typography;
 const { Option } = Select;
 
-// Cost category configurations
-const COST_CATEGORIES = [
-    { 
-        key: 'material', 
-        label: 'Material', 
-        icon: <DollarOutlined />, 
-        description: 'Component and spare parts costs'
-    },
-    { 
-        key: 'labor', 
-        label: 'Labor', 
-        icon: <UserOutlined />, 
-        description: 'Technician and specialist costs'
-    },
-    { 
-        key: 'tooling', 
-        label: 'Tooling', 
-        icon: <ToolOutlined />, 
-        description: 'Equipment and tool rental'
-    },
-    { 
-        key: 'crane', 
-        label: 'Crane', 
-        icon: <BuildOutlined />, 
-        description: 'Crane mobilization and operation'
-    },
-    { 
-        key: 'other', 
-        label: 'Other', 
-        icon: <AppstoreOutlined />, 
-        description: 'Additional and contingency costs'
-    }
-];
+// Icon mapping for the core cost categories (5 categories used in repair packages)
+const CORE_CATEGORY_ICONS = {
+    material: <DollarOutlined />,
+    labor: <UserOutlined />,
+    tooling: <ToolOutlined />,
+    crane: <BuildOutlined />,
+    other: <AppstoreOutlined />
+};
 
 const CostCategoryFactors = () => {
     const { scenarioData, getValueByPath, updateByPath } = useScenario();
     
     // Get current cost category factors
-    const costCategoryFactors = getValueByPath('settings.project.equipment.failureRates.costCategoryFactors', {
+    const costCategoryFactors = getValueByPath('settings.project.economics.marketFactors.costCategoryFactors', {
         material: 'baseEscalationRate',
         labor: 'baseEscalationRate',
         tooling: 'baseEscalationRate',
         crane: 'baseEscalationRate',
+        contractsLocal: 'baseEscalationRate',
+        contractsForeign: 'baseEscalationRate',
         other: 'baseEscalationRate'
     });
     
     // Get available market factors from dynamic object structure
     const marketFactors = useMemo(() => {
-        const marketFactorsObject = getValueByPath(['settings', 'marketFactors'], {});
+        const marketFactorsObject = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
         // Convert object values to array, filtering out non-object entries
         return Object.values(marketFactorsObject || {})
             .filter(factor => factor && typeof factor === 'object' && factor.id)
@@ -72,7 +50,7 @@ const CostCategoryFactors = () => {
                 description: factor.description,
                 isDefault: factor.isDefault
             }));
-    }, [scenarioData?.settings?.marketFactors, getValueByPath]);
+    }, [scenarioData?.settings?.project?.economics?.marketFactors?.factors, getValueByPath]);
     
     // Handle factor change for a category
     const handleFactorChange = async (category, factorId) => {
@@ -81,7 +59,7 @@ const CostCategoryFactors = () => {
                 ...costCategoryFactors,
                 [category]: factorId
             };
-            await updateByPath('settings.project.equipment.failureRates.costCategoryFactors', updatedFactors);
+            await updateByPath('settings.project.economics.marketFactors.costCategoryFactors', updatedFactors);
         } catch (error) {
             console.error('Error updating cost category factor:', error);
         }
@@ -101,7 +79,7 @@ const CostCategoryFactors = () => {
             style={{ marginBottom: 24 }}
         >
             <Row gutter={[16, 16]}>
-                {COST_CATEGORIES.map(category => {
+                {CORE_COST_CATEGORIES.map(category => {
                     const currentFactor = marketFactors.find(f => f.id === costCategoryFactors[category.key]);
                     
                     return (
@@ -109,7 +87,7 @@ const CostCategoryFactors = () => {
                             <Space direction="vertical" style={{ width: '100%' }}>
                                 <Space>
                                     <span style={{ color: getMarketFactorColorScheme(category.key), fontSize: 18 }}>
-                                        {category.icon}
+                                        {CORE_CATEGORY_ICONS[category.key]}
                                     </span>
                                     <Text strong>{category.label}</Text>
                                 </Space>

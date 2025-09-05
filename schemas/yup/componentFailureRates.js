@@ -157,31 +157,10 @@ const DEFAULT_COMPONENTS = [
 // Portfolio-level component failure rate configuration
 const ComponentFailureModelingSchema = Yup.object().shape({
     enabled: Yup.boolean().default(false),
-    components: Yup.array().of(ComponentFailureRateSchema).default(() => DEFAULT_COMPONENTS),
-    // Maps cost categories to market factor keys
-    costCategoryFactors: Yup.object().shape({
-        material: Yup.string().default('escalationRate'),
-        labor: Yup.string().default('escalationRate'),
-        tooling: Yup.string().default('escalationRate'),
-        crane: Yup.string().default('escalationRate'),
-        other: Yup.string().default('escalationRate')
-    }).default(() => ({
-        material: 'escalationRate',
-        labor: 'escalationRate',
-        tooling: 'escalationRate',
-        crane: 'escalationRate',
-        other: 'escalationRate'
-    }))
+    components: Yup.array().of(ComponentFailureRateSchema).default(() => DEFAULT_COMPONENTS)
 }).default(() => ({ 
     enabled: false, 
-    components: DEFAULT_COMPONENTS,
-    costCategoryFactors: {
-        material: 'escalationRate',
-        labor: 'escalationRate',
-        tooling: 'escalationRate',
-        crane: 'escalationRate',
-        other: 'escalationRate'
-    }
+    components: DEFAULT_COMPONENTS
 }));
 
 module.exports = {

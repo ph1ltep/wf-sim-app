@@ -19,6 +19,18 @@ import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
 import { getMarketFactorColorScheme } from 'utils/charts/colors';
 import { distributionTypes } from '../../../utils/distributions';
+import { COST_CATEGORIES } from '../../../constants/costCategories';
+
+// Icon mapping for cost categories
+const COST_CATEGORY_ICONS = {
+    material: <DollarOutlined />,
+    labor: <UserOutlined />,
+    tooling: <ToolOutlined />,
+    crane: <BuildOutlined />,
+    contractsLocal: <FileTextOutlined />,
+    contractsForeign: <GlobalOutlined />,
+    other: <AppstoreOutlined />
+};
 
 // Default market factors
 const DEFAULT_MARKET_FACTORS = [
@@ -45,51 +57,6 @@ const DEFAULT_MARKET_FACTORS = [
     }
 ];
 
-// Cost category configurations
-const COST_CATEGORIES = [
-    {
-        key: 'material',
-        label: 'Material',
-        icon: <DollarOutlined />,
-        description: 'Component and spare parts costs'
-    },
-    {
-        key: 'labor',
-        label: 'Labor',
-        icon: <UserOutlined />,
-        description: 'Technician and specialist costs'
-    },
-    {
-        key: 'tooling',
-        label: 'Tooling',
-        icon: <ToolOutlined />,
-        description: 'Equipment and tool rental'
-    },
-    {
-        key: 'crane',
-        label: 'Crane',
-        icon: <BuildOutlined />,
-        description: 'Crane mobilization and operation'
-    },
-    {
-        key: 'contractsLocal',
-        label: 'Contracts (Local)',
-        icon: <FileTextOutlined />,
-        description: 'Local contracting and service costs'
-    },
-    {
-        key: 'contractsForeign',
-        label: 'Contracts (Foreign)',
-        icon: <GlobalOutlined />,
-        description: 'International contracting and logistics'
-    },
-    {
-        key: 'other',
-        label: 'Other',
-        icon: <AppstoreOutlined />,
-        description: 'Additional and contingency costs'
-    }
-];
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -110,7 +77,7 @@ const MarketFactorDetail = ({ record }) => {
                     {/* DistributionFieldV3 - Direct context integration, no form wrapper needed */}
                     <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
                         <DistributionFieldV3
-                            path={['settings', 'marketFactors', record.id, 'distribution']}
+                            path={['settings', 'project', 'economics', 'marketFactors', 'factors', record.id, 'distribution']}
                             showVisualization={true}
                             showInfoBox={true}
                             valueType="number"
@@ -137,7 +104,7 @@ const MarketFactors = () => {
 
     // Get market factors object and convert to array for table display
     const marketFactorsObject = useMemo(() => {
-        const factors = getValueByPath(['settings', 'marketFactors'], {});
+        const factors = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
         return factors;
     }, [getValueByPath]);
 
@@ -146,7 +113,7 @@ const MarketFactors = () => {
     }, [marketFactorsObject]);
 
     // Get current cost category factors
-    const costCategoryFactors = getValueByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], {
+    const costCategoryFactors = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'costCategoryFactors'], {
         material: 'baseEscalationRate',
         labor: 'baseEscalationRate',
         tooling: 'baseEscalationRate',
@@ -168,7 +135,7 @@ const MarketFactors = () => {
     // Clean up invalid market factors on component mount
     React.useEffect(() => {
         const cleanupInvalidFactors = async () => {
-            const factors = getValueByPath(['settings', 'marketFactors'], {});
+            const factors = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
             let needsCleanup = false;
             const validFactors = {};
 
@@ -189,14 +156,14 @@ const MarketFactors = () => {
 
             if (needsCleanup) {
                 try {
-                    await updateByPath(['settings', 'marketFactors'], validFactors);
+                    await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], validFactors);
                 } catch (error) {
                     console.error('Error cleaning up market factors:', error);
                 }
             }
         };
 
-        if (scenarioData?.settings?.marketFactors) {
+        if (scenarioData?.settings?.project?.economics?.marketFactors?.factors) {
             cleanupInvalidFactors();
         }
     }, [scenarioData, updateByPath, getValueByPath]);
@@ -226,7 +193,7 @@ const MarketFactors = () => {
     const handleOpenModal = (factorKey = null) => {
         if (factorKey !== null) {
             // Edit existing factor
-            const marketFactorData = getValueByPath(['settings', 'marketFactors', factorKey]);
+            const marketFactorData = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors', factorKey]);
             
             setEditingKey(factorKey);
             form.setFieldsValue({
@@ -256,7 +223,7 @@ const MarketFactors = () => {
     const handleFormSubmit = async (values) => {
         try {
             setLoading(true);
-            const currentFactors = getValueByPath(['settings', 'marketFactors'], {});
+            const currentFactors = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
 
             if (editingKey) {
                 // Update existing factor
@@ -268,7 +235,7 @@ const MarketFactors = () => {
                 };
 
                 const updatedFactors = { ...currentFactors, [editingKey]: updatedFactor };
-                await updateByPath(['settings', 'marketFactors'], updatedFactors);
+                await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], updatedFactors);
                 message.success('Market factor updated successfully');
             } else {
                 // Create new factor
@@ -296,7 +263,7 @@ const MarketFactors = () => {
                 };
 
                 const updatedFactors = { ...currentFactors, [newFactorId]: newFactor };
-                await updateByPath(['settings', 'marketFactors'], updatedFactors);
+                await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], updatedFactors);
                 message.success('New market factor created successfully');
             }
 
@@ -312,7 +279,7 @@ const MarketFactors = () => {
     // Handle delete
     const handleDelete = async (factorKey) => {
         try {
-            const currentFactors = getValueByPath(['settings', 'marketFactors'], {});
+            const currentFactors = getValueByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], {});
             const factorToDelete = currentFactors[factorKey];
 
             // Remove factor from object
@@ -328,10 +295,10 @@ const MarketFactors = () => {
                         updatedMappings[category] = 'baseEscalationRate'; // Reset to default
                     }
                 });
-                await updateByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], updatedMappings);
+                await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'costCategoryFactors'], updatedMappings);
             }
 
-            await updateByPath(['settings', 'marketFactors'], updatedFactors);
+            await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'factors'], updatedFactors);
             message.success('Market factor deleted successfully');
         } catch (error) {
             console.error('Error deleting market factor:', error);
@@ -346,7 +313,7 @@ const MarketFactors = () => {
                 ...costCategoryFactors,
                 [category]: factorId
             };
-            await updateByPath(['settings', 'project', 'equipment', 'failureRates', 'costCategoryFactors'], updatedFactors);
+            await updateByPath(['settings', 'project', 'economics', 'marketFactors', 'costCategoryFactors'], updatedFactors);
         } catch (error) {
             console.error('Error updating cost category factor:', error);
         }
@@ -541,7 +508,7 @@ const MarketFactors = () => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ color: categoryColor, fontSize: 16 }}>
-                                            {category.icon}
+                                            {COST_CATEGORY_ICONS[category.key]}
                                         </span>
                                         <div style={{ flex: 1 }}>
                                             <Text strong>{category.label}</Text>

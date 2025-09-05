@@ -28,7 +28,7 @@ const environmentalFactorsFields = [
     },
     {
         name: 'Rainfall Amount',
-        path: ['settings', 'marketFactors', 'rainfallAmount'],
+        path: ['settings', 'environment', 'rainfallAmount'],
         contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount'],
         key: 'rainfallAmount',
         icon: <CloudOutlined />,
