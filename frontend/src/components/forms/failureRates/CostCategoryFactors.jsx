@@ -60,15 +60,19 @@ const CostCategoryFactors = () => {
         other: 'baseEscalationRate'
     });
     
-    // Get available market factors
+    // Get available market factors from dynamic object structure
     const marketFactors = useMemo(() => {
-        return getValueByPath(['settings', 'marketFactors', 'factors'], []).map(factor => ({
-            id: factor.id,
-            name: factor.name,
-            description: factor.description,
-            isDefault: factor.isDefault
-        }));
-    }, [scenarioData?.settings?.marketFactors?.factors, getValueByPath]);
+        const marketFactorsObject = getValueByPath(['settings', 'marketFactors'], {});
+        // Convert object values to array, filtering out non-object entries
+        return Object.values(marketFactorsObject || {})
+            .filter(factor => factor && typeof factor === 'object' && factor.id)
+            .map(factor => ({
+                id: factor.id,
+                name: factor.name,
+                description: factor.description,
+                isDefault: factor.isDefault
+            }));
+    }, [scenarioData?.settings?.marketFactors, getValueByPath]);
     
     // Handle factor change for a category
     const handleFactorChange = async (category, factorId) => {

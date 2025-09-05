@@ -9,9 +9,9 @@ import {
     Popconfirm,
     Tooltip
 } from 'antd';
-import { LineChartOutlined, LoadingOutlined, FileTextOutlined, FundOutlined } from '@ant-design/icons';
+import { LineChartOutlined, LoadingOutlined } from '@ant-design/icons';
 import { TimeSeriesTable } from '../tables';
-import { formatNumber } from '../../utils/formatUtils';
+// Removed unused import: formatNumber
 
 const { Text } = Typography;
 

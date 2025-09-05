@@ -1,0 +1,466 @@
+
+> frontend@0.1.0 build
+> react-app-rewired build
+
+Creating an optimized production build...
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Compiled with warnings.
+
+[eslint] 
+src/components/AuditTrail/ContextBrowser/components/ContextTreeView.jsx
+  Line 4:29:  'Alert' is defined but never used  no-unused-vars
+
+src/components/AuditTrail/ContextBrowser/components/ValueEditor.jsx
+  Line 9:3:  'CheckOutlined' is defined but never used  no-unused-vars
+
+src/components/AuditTrail/ContextBrowser/index.jsx
+  Line 13:16:  'Text' is assigned a value but never used            no-unused-vars
+  Line 27:39:  'getValueByPath' is assigned a value but never used  no-unused-vars
+  Line 39:5:   'isNodeMatched' is assigned a value but never used   no-unused-vars
+
+src/components/AuditTrail/components/GraphLegend.jsx
+  Line 4:69:  'FunctionOutlined' is defined but never used  no-unused-vars
+  Line 6:9:   'Text' is assigned a value but never used     no-unused-vars
+
+src/components/AuditTrail/components/JsonViewer.jsx
+  Line 8:5:   'CloseOutlined' is defined but never used     no-unused-vars
+  Line 10:5:  'CompressOutlined' is defined but never used  no-unused-vars
+
+src/components/AuditTrail/components/RealRootDetailsPanel.jsx
+  Line 3:10:  'Card' is defined but never used                                                                                 no-unused-vars
+  Line 77:8:  React Hook useEffect has a missing dependency: 'loadPathData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/AuditTrail/components/StepDetailsPanel.jsx
+  Line 3:50:   'Descriptions' is defined but never used                    no-unused-vars
+  Line 6:5:    'ClockCircleOutlined' is defined but never used             no-unused-vars
+  Line 7:5:    'LinkOutlined' is defined but never used                    no-unused-vars
+  Line 15:5:   'CaretRightOutlined' is defined but never used              no-unused-vars
+  Line 16:5:   'FileTextOutlined' is defined but never used                no-unused-vars
+  Line 21:9:   'Panel' is assigned a value but never used                  no-unused-vars
+  Line 34:12:  'selectedDataSample' is assigned a value but never used     no-unused-vars
+  Line 34:32:  'setSelectedDataSample' is assigned a value but never used  no-unused-vars
+
+src/components/AuditTrail/components/TreeAuditView.jsx
+  Line 4:25:  'CalculatorOutlined' is defined but never used  no-unused-vars
+
+src/components/AuditTrail/index.jsx
+  Line 26:72:   'isLoading' is assigned a value but never used   no-unused-vars
+  Line 123:11:  'nodeCounts' is assigned a value but never used  no-unused-vars
+
+src/components/cards/CapexDrawdownCard.jsx
+  Line 7:10:  'TableControls' is defined but never used  no-unused-vars
+
+src/components/cards/CashflowTimelineCard.jsx
+  Line 2:36:    'useEffect' is defined but never used                                                                               no-unused-vars
+  Line 3:49:    'Tag' is defined but never used                                                                                     no-unused-vars
+  Line 4:29:    'InfoCircleOutlined' is defined but never used                                                                      no-unused-vars
+  Line 25:32:   'setSelectedPercentile' is assigned a value but never used                                                          no-unused-vars
+  Line 26:55:   'isReady' is assigned a value but never used                                                                        no-unused-vars
+  Line 46:8:    React Hook useMemo has a missing dependency: 'cardSourceIds'. Either include it or remove the dependency array      react-hooks/exhaustive-deps
+  Line 90:8:    React Hook useMemo has a missing dependency: 'getPercentileData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  Line 121:8:   React Hook useMemo has a missing dependency: 'getValueByPath'. Either include it or remove the dependency array     react-hooks/exhaustive-deps
+  Line 196:67:  Expected '===' and instead saw '=='                                                                                 eqeqeq
+
+src/components/cards/ContractScopeCard.jsx
+  Line 4:58:    'Alert' is defined but never used                     no-unused-vars
+  Line 4:65:    'Button' is defined but never used                    no-unused-vars
+  Line 5:30:    'TableOutlined' is defined but never used             no-unused-vars
+  Line 114:11:  'currentStrategy' is assigned a value but never used  no-unused-vars
+
+src/components/cards/DriverExplorerCard.jsx
+  Line 4:28:    'InfoCircleOutlined' is defined but never used                                                                                                  no-unused-vars
+  Line 14:15:   'Title' is assigned a value but never used                                                                                                      no-unused-vars
+  Line 29:32:   'setSelectedPercentile' is assigned a value but never used                                                                                      no-unused-vars
+  Line 31:9:    'getSensitivity' is assigned a value but never used                                                                                             no-unused-vars
+  Line 35:9:    'cubeStatus' is assigned a value but never used                                                                                                 no-unused-vars
+  Line 38:13:   'getValueByPath' is assigned a value but never used                                                                                             no-unused-vars
+  Line 109:15:  'availablePercentiles' is assigned a value but never used                                                                                       no-unused-vars
+  Line 134:15:  'neutralColor' is assigned a value but never used                                                                                               no-unused-vars
+  Line 227:8:   React Hook useMemo has missing dependencies: 'percentileInfo.available' and 'targetMetric'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  Line 230:11:  'insights' is assigned a value but never used                                                                                                   no-unused-vars
+
+src/components/cards/FinanceabilityCard.jsx
+  Line 153:8:  React Hook useMemo has missing dependencies: 'cardMetricIds', 'setSelectedPercentile', and 'token'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  Line 233:8:  React Hook useMemo has missing dependencies: 'chartSourceIds' and 'percentileInfo'. Either include them or remove the dependency array                  react-hooks/exhaustive-deps
+
+src/components/cards/components/TornadoInsightsPanel.jsx
+  Line 5:5:  'ArrowUpOutlined' is defined but never used    no-unused-vars
+  Line 6:5:  'ArrowDownOutlined' is defined but never used  no-unused-vars
+
+src/components/cards/configs/FinanceabilityConfig.js
+  Line 3:10:   'addCovenantAnnotations' is defined but never used         no-unused-vars
+  Line 188:9:  'metricsData' is assigned a value but never used           no-unused-vars
+  Line 189:9:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+
+src/components/charts/ContractScopeChart.jsx
+  Line 234:28:  'maxValue' is assigned a value but never used  no-unused-vars
+
+src/components/charts/PercentileChart.jsx
+  Line 43:11:  The 'results' logical expression could make the dependencies of useMemo Hook (at line 50) change on every render. To fix this, wrap the initialization of 'results' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 43:11:  The 'results' logical expression could make the dependencies of useMemo Hook (at line 67) change on every render. To fix this, wrap the initialization of 'results' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 43:11:  The 'results' logical expression could make the dependencies of useMemo Hook (at line 83) change on every render. To fix this, wrap the initialization of 'results' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+src/components/charts/StatisticsChart.jsx
+  Line 8:10:   'hexToRgb' is defined but never used                                                                                                                                                                 no-unused-vars
+  Line 39:11:  The 'statistics' logical expression could make the dependencies of useMemo Hook (at line 46) change on every render. To fix this, wrap the initialization of 'statistics' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 39:11:  The 'statistics' logical expression could make the dependencies of useMemo Hook (at line 57) change on every render. To fix this, wrap the initialization of 'statistics' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 39:11:  The 'statistics' logical expression could make the dependencies of useMemo Hook (at line 69) change on every render. To fix this, wrap the initialization of 'statistics' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+src/components/common/LEPSim.jsx
+  Line 3:98:   'Checkbox' is defined but never used                                                                               no-unused-vars
+  Line 169:8:  React Hook useMemo has an unnecessary dependency: 'forceUpdate'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  Line 220:8:  React Hook useMemo has a missing dependency: 'getValueByPath'. Either include it or remove the dependency array    react-hooks/exhaustive-deps
+  Line 273:8:  React Hook useMemo has an unnecessary dependency: 'ieaLevels'. Either exclude it or remove the dependency array    react-hooks/exhaustive-deps
+
+src/components/forms/OMScopes/OEMScopeForm.jsx
+  Line 6:9:  'Option' is assigned a value but never used  no-unused-vars
+
+src/components/forms/selectors/PercentileSelector.jsx
+  Line 2:27:   'useEffect' is defined but never used                                                                                                                                                                              no-unused-vars
+  Line 4:27:   'InfoCircleOutlined' is defined but never used                                                                                                                                                                     no-unused-vars
+  Line 12:13:  'updateByPath' is assigned a value but never used                                                                                                                                                                  no-unused-vars
+  Line 15:96:  'refreshCubeData' is assigned a value but never used                                                                                                                                                               no-unused-vars
+  Line 22:11:  The 'customPercentiles' logical expression could make the dependencies of useMemo Hook (at line 60) change on every render. To fix this, wrap the initialization of 'customPercentiles' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+src/components/layout/Sider.jsx
+  Line 15:3:  'FieldTimeOutlined' is defined but never used     no-unused-vars
+  Line 31:3:  'SecurityScanOutlined' is defined but never used  no-unused-vars
+
+src/components/modals/LoadScenarioModal.jsx
+  Line 3:57:    'Tag' is defined but never used                                                                                    no-unused-vars
+  Line 3:78:    'Popconfirm' is defined but never used                                                                             no-unused-vars
+  Line 4:42:    'InfoCircleOutlined' is defined but never used                                                                     no-unused-vars
+  Line 28:8:    React Hook useEffect has a missing dependency: 'fetchScenarios'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  Line 190:15:  'totalMW' is assigned a value but never used                                                                       no-unused-vars
+  Line 191:15:  'windFarmSize' is assigned a value but never used                                                                  no-unused-vars
+
+src/components/tables/DatabaseTable.jsx
+  Line 3:38:  'Space' is defined but never used  no-unused-vars
+
+src/components/tables/EditableTable.jsx
+  Line 3:39:  'Space' is defined but never used                                                                                                                                                                  no-unused-vars
+  Line 61:9:  The 'dataSource' conditional could make the dependencies of useCallback Hook (at line 94) change on every render. To fix this, wrap the initialization of 'dataSource' in its own useMemo() Hook   react-hooks/exhaustive-deps
+  Line 61:9:  The 'dataSource' conditional could make the dependencies of useCallback Hook (at line 170) change on every render. To fix this, wrap the initialization of 'dataSource' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+src/components/tables/InlineEditTable.jsx
+  Line 8:10:    'DataFieldSelector' is defined but never used                                                                                                                                                        no-unused-vars
+  Line 8:29:    'EditModeControls' is defined but never used                                                                                                                                                         no-unused-vars
+  Line 8:47:    'ViewModeControls' is defined but never used                                                                                                                                                         no-unused-vars
+  Line 106:11:  The 'contextData' conditional could make the dependencies of useMemo Hook (at line 112) change on every render. To fix this, wrap the initialization of 'contextData' in its own useMemo() Hook      react-hooks/exhaustive-deps
+  Line 106:11:  The 'contextData' conditional could make the dependencies of useCallback Hook (at line 204) change on every render. To fix this, wrap the initialization of 'contextData' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 106:11:  The 'contextData' conditional could make the dependencies of useCallback Hook (at line 638) change on every render. To fix this, wrap the initialization of 'contextData' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  Line 106:11:  The 'contextData' conditional could make the dependencies of useMemo Hook (at line 655) change on every render. To fix this, wrap the initialization of 'contextData' in its own useMemo() Hook      react-hooks/exhaustive-deps
+  Line 431:15:  'collectRowDataForTotals' is assigned a value but never used                                                                                                                                         no-unused-vars
+  Line 443:15:  'collectColDataForTotals' is assigned a value but never used                                                                                                                                         no-unused-vars
+
+src/components/tables/MetricsTable.jsx
+  Line 6:10:   'MetricsCell' is defined but never used                  no-unused-vars
+  Line 56:11:  'renderMetricHeader' is assigned a value but never used  no-unused-vars
+
+src/components/tables/columns.js
+  Line 323:7:  Duplicate key 'true'                         no-dupe-keys
+  Line 324:7:  Duplicate key 'false'                        no-dupe-keys
+  Line 350:5:  'format' is assigned a value but never used  no-unused-vars
+
+src/components/tables/inline/EditableCell.jsx
+  Line 113:5:  Expected a default case  default-case
+
+src/components/tables/inline/TableConfiguration.js
+  Line 10:10:   'max' is defined but never used                 no-unused-vars
+  Line 170:50:  'className' is assigned a value but never used  no-unused-vars
+
+src/components/tables/metrics/DataOperations.js
+  Line 262:9:  Expected a default case  default-case
+
+src/components/tables/metrics/MetricsCell.jsx
+  Line 4:10:  'evaluateThresholds' is defined but never used                                                          no-unused-vars
+  Line 93:8:  React Hook useMemo has a missing dependency: 'style'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/components/tables/shared/ColumnGenerators.js
+  Line 75:9:  'editable' is assigned a value but never used  no-unused-vars
+
+src/components/tables/shared/FormatUtils.js
+  Line 11:28:  'currency' is assigned a value but never used  no-unused-vars
+
+src/components/tables/shared/TableThemeEngine.js
+  Line 4:10:   'BASE_TABLE_THEMES' is defined but never used     no-unused-vars
+  Line 166:9:  'orientation' is assigned a value but never used  no-unused-vars
+
+src/components/tables/shared/TableThemes.js
+  Line 2:36:   'grey' is defined but never used                         no-unused-vars
+  Line 3:10:   'min' is defined but never used                          no-unused-vars
+  Line 50:11:  'primaryColorActive' is assigned a value but never used  no-unused-vars
+  Line 53:11:  'warningColor' is assigned a value but never used        no-unused-vars
+  Line 57:11:  'primaryRgbActive' is assigned a value but never used    no-unused-vars
+  Line 58:11:  'successRgb' is assigned a value but never used          no-unused-vars
+  Line 59:11:  'errorRgb' is assigned a value but never used            no-unused-vars
+
+src/components/tables/shared/TimelineUtils.js
+  Line 25:9:  'orientation' is assigned a value but never used  no-unused-vars
+
+src/contexts/CubeContext.jsx
+  Line 16:10:  'get' is defined but never used                                                                                                                   no-unused-vars
+  Line 16:15:  'set' is defined but never used                                                                                                                   no-unused-vars
+  Line 36:11:  'selectedPercentile' is assigned a value but never used                                                                                           no-unused-vars
+  Line 37:11:  'availablePercentiles' is assigned a value but never used                                                                                         no-unused-vars
+  Line 38:11:  'primaryPercentile' is assigned a value but never used                                                                                            no-unused-vars
+  Line 56:8:   React Hook useCallback has a missing dependency: 'updatePercentileData'. Either include it or remove the dependency array                         react-hooks/exhaustive-deps
+  Line 115:8:  React Hook useMemo has a missing dependency: 'scenarioData'. Either include it or remove the dependency array                                     react-hooks/exhaustive-deps
+  Line 206:8:  React Hook useCallback has a missing dependency: 'initializeCustomPercentiles'. Either include it or remove the dependency array                  react-hooks/exhaustive-deps
+  Line 330:8:  React Hook useEffect has missing dependencies: 'getData', 'getMetric', and 'scenarioData'. Either include them or remove the dependency array     react-hooks/exhaustive-deps
+  Line 685:8:  React Hook useCallback has a missing dependency: 'sensitivityData?.percentileMatrices?.length'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/contexts/ScenarioContext.jsx
+  Line 19:7:   'Yup' is assigned a value but never used             no-unused-vars
+  Line 318:9:  'updateByPathV1' is assigned a value but never used  no-unused-vars
+
+src/hooks/useCubeMetrics.js
+  Line 2:10:    'useMemo' is defined but never used                                                                                       no-unused-vars
+  Line 7:10:    'col' is defined but never used                                                                                           no-unused-vars
+  Line 186:11:  'getNestedValue' is assigned a value but never used                                                                       no-unused-vars
+  Line 194:54:  Expected '===' and instead saw '=='                                                                                       eqeqeq
+  Line 395:8:   React Hook useCallback has an unnecessary dependency: 'percentileInfo'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/hooks/useCubeSensitivity.js
+  Line 262:53:  'method' is assigned a value but never used                no-unused-vars
+  Line 432:11:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+
+src/hooks/useCubeSources.js
+  Line 2:10:   'useMemo' is defined but never used              no-unused-vars
+  Line 2:19:   'useCallback' is defined but never used          no-unused-vars
+  Line 4:10:   'SOURCES_REGISTRY' is defined but never used     no-unused-vars
+  Line 11:22:  'sourceData' is assigned a value but never used  no-unused-vars
+
+src/hooks/useLocations.js
+  Line 6:3:  'getLocationById' is defined but never used  no-unused-vars
+
+src/hooks/useOEMScopes.js
+  Line 72:9:  'getScopeById' is assigned a value but never used  no-unused-vars
+
+src/pages/analyses/Cashflow.jsx
+  Line 114:11:  'toggleCardVisibility' is assigned a value but never used  no-unused-vars
+
+src/pages/analyses/Sensitivity.jsx
+  Line 6:5:     'DotChartOutlined' is defined but never used               no-unused-vars
+  Line 8:5:     'InfoCircleOutlined' is defined but never used             no-unused-vars
+  Line 77:9:    'cubeError' is assigned a value but never used             no-unused-vars
+  Line 84:11:   'primaryPercentile' is assigned a value but never used     no-unused-vars
+  Line 85:11:   'percentileStrategy' is assigned a value but never used    no-unused-vars
+  Line 105:11:  'toggleCardVisibility' is assigned a value but never used  no-unused-vars
+
+src/pages/config/project/ProjectSettings.jsx
+  Line 106:6:  React Hook useEffect has a missing dependency: 'windFarmPath'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+src/pages/config/scenario/ScenarioSettings.jsx
+  Line 3:29:  'Input' is defined but never used                         no-unused-vars
+  Line 9:3:   'FormRow' is defined but never used                       no-unused-vars
+  Line 10:3:  'FormCol' is defined but never used                       no-unused-vars
+  Line 12:3:  'SelectField' is defined but never used                   no-unused-vars
+  Line 28:9:  'scenarioTypeOptions' is assigned a value but never used  no-unused-vars
+
+src/pages/scenario/economics/Investment.jsx
+  Line 4:10:  'DollarOutlined' is defined but never used  no-unused-vars
+
+src/pages/scenario/economics/Revenue.jsx
+  Line 4:10:  'RiseOutlined' is defined but never used  no-unused-vars
+
+src/pages/scenario/equipment/FailureRates.jsx
+  Line 24:10:  'createActionsColumn' is defined but never used  no-unused-vars
+
+src/pages/scenario/equipment/Specifications.jsx
+  Line 20:5:   'CompactFieldGroup' is defined but never used    no-unused-vars
+  Line 29:11:  'bladesPath' is assigned a value but never used  no-unused-vars
+
+src/pages/scenario/operations/OperatingCosts.jsx
+  Line 6:5:    'ScheduleOutlined' is defined but never used         no-unused-vars
+  Line 7:5:    'DollarOutlined' is defined but never used           no-unused-vars
+  Line 28:27:  'getValueByPath' is assigned a value but never used  no-unused-vars
+
+src/pages/scenario/operations/Performance.jsx
+  Line 5:5:  'FieldTimeOutlined' is defined but never used  no-unused-vars
+
+src/pages/scenario/risk/Mitigations.jsx
+  Line 3:29:  'Card' is defined but never used    no-unused-vars
+  Line 3:41:  'Switch' is defined but never used  no-unused-vars
+
+src/pages/simulations/Environmental.jsx
+  Line 4:26:  'Space' is defined but never used  no-unused-vars
+
+src/pages/simulations/MarketFactorsSimulation.jsx
+  Line 4:26:  'Space' is defined but never used  no-unused-vars
+
+src/pages/simulations/OperationalRisks.jsx
+  Line 4:26:  'Space' is defined but never used           no-unused-vars
+  Line 10:5:  'SafetyOutlined' is defined but never used  no-unused-vars
+
+src/utils/charts/annotations.js
+  Line 377:13:  'type' is assigned a value but never used  no-unused-vars
+
+src/utils/charts/colors.js
+  Line 99:7:   'hslToHex' is assigned a value but never used  no-unused-vars
+  Line 148:9:  Expected a default case                        default-case
+
+src/utils/cube/audit.js
+  Line 2:10:  'DataPointSchema' is defined but never used   no-unused-vars
+  Line 2:27:  'SimResultsSchema' is defined but never used  no-unused-vars
+
+src/utils/cube/metrics/processor.js
+  Line 4:10:  'extractPercentileMetric' is defined but never used  no-unused-vars
+
+src/utils/cube/metrics/registry.js
+  Line 3:5:     'calculateNPVCosts' is defined but never used       no-unused-vars
+  Line 4:5:     'calculateNPVEnergy' is defined but never used      no-unused-vars
+  Line 168:31:  'npvCostsValue' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/metrics/transformers/financial.js
+  Line 2:10:    'extractSourcePercentileData' is defined but never used    no-unused-vars
+  Line 2:39:    'extractMetricValue' is defined but never used             no-unused-vars
+  Line 2:73:    'calculateNPV' is defined but never used                   no-unused-vars
+  Line 2:87:    'buildMetricResults' is defined but never used             no-unused-vars
+  Line 213:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 213:35:  'allReferences' is assigned a value but never used         no-unused-vars
+  Line 213:50:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+
+src/utils/cube/metrics/transformers/index.js
+  Line 1:13:  'common' is defined but never used       no-unused-vars
+  Line 2:13:  'financing' is defined but never used    no-unused-vars
+  Line 3:13:  'performance' is defined but never used  no-unused-vars
+
+src/utils/cube/metrics/transformers/performance.js
+  Line 2:10:   'extractSourcePercentileData' is defined but never used    no-unused-vars
+  Line 2:39:   'buildMetricResults' is defined but never used             no-unused-vars
+  Line 11:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 11:35:  'aggregationResults' is assigned a value but never used    no-unused-vars
+  Line 11:55:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+  Line 29:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 29:35:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+  Line 46:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 46:35:  'allReferences' is assigned a value but never used         no-unused-vars
+  Line 46:50:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+  Line 65:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 65:35:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+  Line 83:13:  'availablePercentiles' is assigned a value but never used  no-unused-vars
+  Line 83:35:  'allReferences' is assigned a value but never used         no-unused-vars
+  Line 83:50:  'addAuditEntry' is assigned a value but never used         no-unused-vars
+
+src/utils/cube/sensitivity/processor.js
+  Line 29:42:  'getReferences' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/sensitivity/transformers/tornado.js
+  Line 2:10:    'generateMatrixKey' is defined but never used         no-unused-vars
+  Line 185:11:  'includeNegative' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/sources/processor.js
+  Line 2:10:    'CubeSourceDataSchema' is defined but never used  no-unused-vars
+  Line 3:45:    'SimulationInfoSchema' is defined but never used  no-unused-vars
+  Line 5:10:    'use' is defined but never used                   no-unused-vars
+  Line 227:56:  Expected '===' and instead saw '=='               eqeqeq
+
+src/utils/cube/sources/registry.js
+  Line 4:5:  'totalDebt' is defined but never used  no-unused-vars
+
+src/utils/cube/sources/transformers/cashflow.js
+  Line 63:28:   'percentileInfo' is assigned a value but never used    no-unused-vars
+  Line 63:44:   'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 104:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 104:77:  'allReferences' is assigned a value but never used     no-unused-vars
+  Line 184:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/sources/transformers/common.js
+  Line 103:32:  'customPercentile' is assigned a value but never used     no-unused-vars
+  Line 339:11:  'useCustomPercentile' is assigned a value but never used  no-unused-vars
+  Line 356:21:  Unnecessarily computed property ['fixed'] found           no-useless-computed-key
+
+src/utils/cube/sources/transformers/cost.js
+  Line 1:10:   'filterCubeSourceData' is defined but never used     no-unused-vars
+  Line 1:32:   'aggregateCubeSourceData' is defined but never used  no-unused-vars
+  Line 15:11:  'projectLife' is assigned a value but never used     no-unused-vars
+  Line 29:17:  'name' is assigned a value but never used            no-unused-vars
+
+src/utils/cube/sources/transformers/drawdown.js
+  Line 1:10:  'filterCubeSourceData' is defined but never used     no-unused-vars
+  Line 1:32:  'aggregateCubeSourceData' is defined but never used  no-unused-vars
+
+src/utils/cube/sources/transformers/equipment.js
+  Line 15:9:   'processedData' is assigned a value but never used         no-unused-vars
+  Line 139:9:  'processedData' is assigned a value but never used         no-unused-vars
+  Line 273:9:  'processedPercentiles' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/sources/transformers/financing.js
+  Line 2:57:    'normalizeIntoSimResults' is defined but never used    no-unused-vars
+  Line 12:44:   'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 107:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 118:11:  'projectLife' is assigned a value but never used       no-unused-vars
+  Line 202:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 432:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+  Line 486:15:  'debtServiceMap' is assigned a value but never used    no-unused-vars
+  Line 542:44:  'customPercentile' is assigned a value but never used  no-unused-vars
+
+src/utils/cube/sources/transformers/totals.js
+  Line 1:57:  'normalizeIntoSimResults' is defined but never used  no-unused-vars
+
+src/utils/dependencies/checkFunctions.js
+  Line 2:10:  'get' is defined but never used  no-unused-vars
+
+src/utils/distributions/distributionBase.js
+  Line 2:13:  'jStat' is defined but never used    no-unused-vars
+  Line 3:10:  'roundTo' is defined but never used  no-unused-vars
+
+src/utils/distributions/gbm.js
+  Line 188:15:  'mu' is assigned a value but never used     no-unused-vars
+  Line 189:15:  'sigma' is assigned a value but never used  no-unused-vars
+
+src/utils/distributions/index.js
+  Line 15:5:  'hexToRgb' is defined but never used             no-unused-vars
+  Line 18:5:  'organizePercentiles' is defined but never used  no-unused-vars
+
+src/utils/distributions/kaimal.js
+  Line 77:15:  'turbulenceIntensity' is assigned a value but never used  no-unused-vars
+
+src/utils/lepSimUtils.js
+  Line 439:48:  'bladeLength' is assigned a value but never used  no-unused-vars
+
+src/utils/plotUtils.js
+  Line 573:15:  'meanPoint' is assigned a value but never used        no-unused-vars
+  Line 689:26:  'percentilePairs' is assigned a value but never used  no-unused-vars
+  Line 689:43:  'singles' is assigned a value but never used          no-unused-vars
+
+src/utils/tables/formatting.js
+  Line 11:28:   'currency' is assigned a value but never used   no-unused-vars
+  Line 73:34:   'codYear' is assigned a value but never used    no-unused-vars
+  Line 140:32:  'precision' is assigned a value but never used  no-unused-vars
+
+src/utils/validate.js
+  Line 250:11:  'NODE_ENV' is assigned a value but never used  no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+File sizes after gzip:
+
+  2.08 MB (+7.43 kB)  build/static/js/main.59f41f75.js
+  2 kB                build/static/css/main.9292c92a.css
+  1.77 kB             build/static/js/453.d855a71b.chunk.js
+
+The bundle size is significantly larger than recommended.
+Consider reducing it with code splitting: https://goo.gl/9VhYWB
+You can also analyze the project dependencies: https://goo.gl/LeUzfb
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  npm install -g serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+

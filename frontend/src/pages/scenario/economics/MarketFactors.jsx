@@ -119,9 +119,7 @@ const MarketFactorDetail = ({ record }) => {
                             showTitle={false}
                             options={distributionTypes}
                             addonAfter="×"
-                            valueReadOnly={true}
                             defaultValue={1.0}
-                            enforceValue={1.0}
                         />
                     </div>
                 </Col>
@@ -140,9 +138,8 @@ const MarketFactors = () => {
     // Get market factors object and convert to array for table display
     const marketFactorsObject = useMemo(() => {
         const factors = getValueByPath(['settings', 'marketFactors'], {});
-        console.log('📊 MarketFactors table data updated:', { factors });
         return factors;
-    }, [scenarioData?.settings?.marketFactors, getValueByPath]);
+    }, [getValueByPath]);
 
     const marketFactorsArray = useMemo(() => {
         return Object.values(marketFactorsObject);
@@ -230,11 +227,6 @@ const MarketFactors = () => {
         if (factorKey !== null) {
             // Edit existing factor
             const marketFactorData = getValueByPath(['settings', 'marketFactors', factorKey]);
-            console.log('🚀 Opening modal for editing:', { 
-                factorKey, 
-                path: ['settings', 'marketFactors', factorKey],
-                data: marketFactorData 
-            });
             
             setEditingKey(factorKey);
             form.setFieldsValue({
@@ -544,7 +536,7 @@ const MarketFactors = () => {
                                     borderRadius: '6px',
                                     backgroundColor: '#fafafa'
                                 }}
-                                bodyStyle={{ padding: '12px' }}
+                                styles={{ body: { padding: '12px' } }}
                             >
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -565,7 +557,7 @@ const MarketFactors = () => {
                                         style={{ width: '100%' }}
                                         size="small"
                                         placeholder="Select market factor"
-                                        dropdownMatchSelectWidth={true}
+                                        popupMatchSelectWidth={true}
                                     >
                                         {marketFactorsArray.map(factor => (
                                             <Option key={factor.id} value={factor.id}>

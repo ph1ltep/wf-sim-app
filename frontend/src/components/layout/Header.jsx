@@ -4,13 +4,14 @@ import { Layout, Button, Typography, Space, Tooltip } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  PlayCircleOutlined,
+  BugOutlined,
   SaveOutlined,
   UploadOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import { ConfirmationModal, LoadScenarioModal, SaveScenarioModal } from '../modals';
+import ContextBrowser from '../AuditTrail/ContextBrowser';
 
 const { Header: AntHeader } = Layout;
 const { Title } = Typography;
@@ -28,6 +29,7 @@ const Header = ({ collapsed, toggle }) => {
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [newConfirmVisible, setNewConfirmVisible] = useState(false);
+  const [contextBrowserVisible, setContextBrowserVisible] = useState(false);
 
   // Handle opening save modal
   const handleOpenSaveModal = () => {
@@ -37,6 +39,11 @@ const Header = ({ collapsed, toggle }) => {
   // Handle opening load modal
   const handleOpenLoadModal = () => {
     setLoadModalVisible(true);
+  };
+
+  // Handle opening context browser
+  const handleOpenContextBrowser = () => {
+    setContextBrowserVisible(true);
   };
 
   // Handle new scenario
@@ -73,14 +80,17 @@ const Header = ({ collapsed, toggle }) => {
           </Title>
         </div>
         <Space>
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={() => { }} // To be implemented
-            loading={loading}
-          >
-            Run Simulation
-          </Button>
+          <Tooltip title="Debug scenario context structure and values">
+            <Button
+              type="primary"
+              icon={<BugOutlined />}
+              onClick={handleOpenContextBrowser}
+              loading={loading}
+              disabled={!scenarioData}
+            >
+              Debug Context
+            </Button>
+          </Tooltip>
           <Tooltip title={isNewScenario() ? "Save scenario" : "Save or update scenario"}>
             <Button
               icon={<SaveOutlined />}
@@ -130,6 +140,13 @@ const Header = ({ collapsed, toggle }) => {
         confirmText="Create New"
         loading={loading}
         type="warning"
+      />
+
+      {/* Context Browser */}
+      <ContextBrowser
+        visible={contextBrowserVisible}
+        onClose={() => setContextBrowserVisible(false)}
+        title="Context Debug Browser"
       />
     </>
   );
