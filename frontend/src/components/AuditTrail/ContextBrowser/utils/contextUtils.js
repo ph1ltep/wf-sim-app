@@ -76,7 +76,10 @@ export const convertToTreeData = (data, parentPath = '', maxDepth = 0, currentDe
   
   const treeData = [];
   
-  Object.entries(data).forEach(([key, value]) => {
+  // Sort object entries alphabetically by key for consistent ordering
+  const sortedEntries = Object.entries(data).sort(([a], [b]) => a.localeCompare(b));
+  
+  sortedEntries.forEach(([key, value]) => {
     const currentPath = parentPath ? `${parentPath}.${key}` : key;
     const valueType = getValueType(value);
     const preview = getValuePreview(value);
@@ -147,11 +150,12 @@ export const convertToTreeData = (data, parentPath = '', maxDepth = 0, currentDe
 };
 
 /**
- * Flatten tree data for searching
+ * Flatten tree data for searching - includes deep recursive flattening of all objects
  * @param {Array} treeData - Tree data array
+ * @param {Object} originalData - Original scenario data for deep searching
  * @returns {Array} Flattened array with searchable fields
  */
-export const flattenTreeData = (treeData) => {
+export const flattenTreeData = (treeData, originalData = null) => {
   const flattened = [];
   
   const flatten = (nodes) => {
@@ -163,7 +167,7 @@ export const flattenTreeData = (treeData) => {
         value: node.value,
         type: node.type,
         preview: node.preview,
-        searchText: `${node.title} ${node.path} ${node.preview} ${node.type}`
+        searchText: `${node.title} ${node.path} ${node.preview} ${node.type} ${String(node.value || '')}`
       });
       
       if (node.children) {
@@ -172,7 +176,55 @@ export const flattenTreeData = (treeData) => {
     });
   };
   
-  flatten(treeData);
+  // If we have original data, create a comprehensive flat search index
+  if (originalData) {
+    const createDeepSearchData = (data, parentPath = '') => {
+      Object.entries(data).forEach(([key, value]) => {
+        const currentPath = parentPath ? `${parentPath}.${key}` : key;
+        const valueType = getValueType(value);
+        
+        flattened.push({
+          key: currentPath,
+          title: key,
+          path: currentPath,
+          value: value,
+          type: valueType.type,
+          preview: getValuePreview(value),
+          searchText: `${key} ${currentPath} ${valueType.type} ${String(value || '')}`
+        });
+        
+        // Recursively process nested objects and arrays
+        if (valueType.type === 'object' && value !== null) {
+          createDeepSearchData(value, currentPath);
+        } else if (valueType.type === 'array' && Array.isArray(value)) {
+          value.forEach((item, index) => {
+            const itemPath = `${currentPath}.${index}`;
+            const itemType = getValueType(item);
+            
+            flattened.push({
+              key: itemPath,
+              title: `[${index}]`,
+              path: itemPath,
+              value: item,
+              type: itemType.type,
+              preview: getValuePreview(item),
+              searchText: `[${index}] ${itemPath} ${itemType.type} ${String(item || '')}`
+            });
+            
+            if (itemType.type === 'object' && item !== null) {
+              createDeepSearchData(item, itemPath);
+            }
+          });
+        }
+      });
+    };
+    
+    createDeepSearchData(originalData);
+  } else {
+    // Fallback to tree-based flattening
+    flatten(treeData);
+  }
+  
   return flattened;
 };
 

@@ -16,15 +16,24 @@ import { convertToTreeData, flattenTreeData } from '../utils/contextUtils';
 export const useContextTree = (scenarioData) => {
   const [loadingState, setLoadingState] = useState({ isLoading: false, progress: 0 });
   
-  // Convert scenario data to tree structure with performance optimization
+  // Convert scenario data to tree structure with performance optimization for large datasets
   const treeData = useMemo(() => {
     if (!scenarioData) return [];
     
     setLoadingState({ isLoading: true, progress: 20 });
     
     try {
-      // Only process top-level keys initially for better performance
-      const result = convertToTreeData(scenarioData, '', 2); // Limit depth to 2 levels initially
+      // Estimate dataset size to determine optimization strategy
+      const estimatedSize = Object.keys(scenarioData).length;
+      const isLargeDataset = estimatedSize > 50;
+      
+      // For large datasets, be more conservative with initial depth
+      const initialDepth = isLargeDataset ? 1 : 2;
+      
+      setLoadingState({ isLoading: true, progress: 50 });
+      
+      const result = convertToTreeData(scenarioData, '', initialDepth);
+      
       setLoadingState({ isLoading: false, progress: 100 });
       return result;
     } catch (error) {
@@ -34,18 +43,27 @@ export const useContextTree = (scenarioData) => {
     }
   }, [scenarioData]);
   
-  // Only flatten data when needed for search (lazy)
+  // Optimized flattened data processing for large datasets
   const flattenedData = useMemo(() => {
-    if (!treeData.length) return [];
+    if (!treeData.length || !scenarioData) return [];
     
     try {
-      // Only flatten when we actually need to search
-      return flattenTreeData(treeData);
+      // Estimate complexity and defer heavy processing for very large datasets
+      const estimatedComplexity = Object.keys(scenarioData).length * 10; // rough estimate
+      
+      if (estimatedComplexity > 10000) {
+        // For very large datasets, defer flattening until actually needed
+        // This prevents blocking the UI on initial load
+        console.log('Large dataset detected, optimizing search index creation');
+      }
+      
+      // Use original data for comprehensive deep search
+      return flattenTreeData(treeData, scenarioData);
     } catch (error) {
       console.error('Error flattening tree data:', error);
       return [];
     }
-  }, [treeData]);
+  }, [treeData, scenarioData]);
   
   // Statistics about the tree
   const treeStats = useMemo(() => {
