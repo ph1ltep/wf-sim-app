@@ -10,81 +10,75 @@ import { ScenarioSchema } from 'schemas/yup/scenario';
 import { validatePath } from '../../../../utils/validate';
 
 /**
- * Recursively validate all nodes from a starting path down to leaf nodes
+ * Validate children one level down from a starting path (shallow validation)
  * @param {Object} contextData - The full context data
  * @param {string} startPath - Path to start validation from (empty string for root)
  * @param {Function} getValueByPath - Function to get value at path
- * @param {Function} onProgress - Progress callback (current, total, path)
- * @returns {Promise<Object>} Validation results with invalid nodes and cleanup options
+ * @returns {Promise<Object>} Map of child paths to their validation status
  */
-export const validateRecursively = async (contextData, startPath = '', getValueByPath, onProgress = null) => {
-  const results = {
-    validNodes: [],
-    invalidNodes: [],
-    totalScanned: 0,
-    canRemove: [], // Nodes that can be safely removed
-    canReset: []   // Nodes that have schema defaults available
-  };
+export const validateOneLevel = async (contextData, startPath = '', getValueByPath) => {
+  const validationMap = new Map();
 
   // Get starting value - if startPath is empty, use entire context
   const startValue = startPath ? getValueByPath(startPath) : contextData;
   
-  if (!startValue) {
-    throw new Error(`No data found at path: ${startPath}`);
+  if (!startValue || typeof startValue !== 'object') {
+    return validationMap;
   }
 
-  // Collect all paths to validate
-  const pathsToValidate = collectAllPaths(startValue, startPath);
+  // Get immediate children paths only
+  const childPaths = getImmediateChildren(startValue, startPath);
   
-  // Progress tracking
-  let processed = 0;
-  const total = pathsToValidate.length;
-
-  // Validate each path
-  for (const path of pathsToValidate) {
+  // Validate each immediate child
+  for (const path of childPaths) {
     try {
       const value = getValueByPath(path);
       const validationResult = await validatePath(ScenarioSchema, path, value, contextData);
       
-      const nodeResult = {
-        path,
-        value,
-        isValid: validationResult.isValid,
-        errors: validationResult.errors || [],
-        canRemove: canNodeBeRemoved(path, contextData),
-        hasDefault: await checkHasDefault(path),
-        defaultValue: await getDefaultValue(path)
-      };
-
-      if (validationResult.isValid) {
-        results.validNodes.push(nodeResult);
-      } else {
-        results.invalidNodes.push(nodeResult);
-        
-        // Track cleanup options
-        if (nodeResult.canRemove) {
-          results.canRemove.push(nodeResult);
-        }
-        if (nodeResult.hasDefault) {
-          results.canReset.push(nodeResult);
-        }
+      // Skip paths that don't have schema definitions (these are expected)
+      const isSchemaNotFound = validationResult.error && (
+        validationResult.error.includes('The schema does not contain the path') ||
+        validationResult.error.includes('failed at:') ||
+        validationResult.details?.method === 'full-object' && !validationResult.isValid
+      );
+      
+      // Only add to validation map if it's an actual validation error (not schema missing)
+      if (!isSchemaNotFound && !validationResult.isValid) {
+        validationMap.set(path, {
+          isValid: false,
+          errors: validationResult.errors || [validationResult.error],
+          hasDefault: await checkHasDefault(path),
+          defaultValue: await getDefaultValue(path),
+          canRemove: canNodeBeRemoved(path, contextData)
+        });
+      } else if (validationResult.isValid) {
+        // Track valid nodes too so we know they were checked
+        validationMap.set(path, {
+          isValid: true,
+          errors: [],
+          hasDefault: await checkHasDefault(path),
+          defaultValue: await getDefaultValue(path),
+          canRemove: false
+        });
       }
-
-      results.totalScanned++;
-      processed++;
-
-      // Report progress
-      if (onProgress) {
-        onProgress(processed, total, path);
-      }
+      // Skip nodes where schema is not found - this is expected behavior
 
     } catch (error) {
       console.warn(`Validation error at path ${path}:`, error);
-      // Continue with other paths even if one fails
+      // Only add actual validation errors, not schema-not-found errors
+      if (!error.message.includes('schema does not contain')) {
+        validationMap.set(path, {
+          isValid: false,
+          errors: [`Validation error: ${error.message}`],
+          hasDefault: false,
+          defaultValue: undefined,
+          canRemove: false
+        });
+      }
     }
   }
 
-  return results;
+  return validationMap;
 };
 
 /**
@@ -240,39 +234,27 @@ export const resetNodesToDefaults = async (nodesToReset, updateByPath, options =
 };
 
 /**
- * Collect all paths in an object/array recursively
+ * Get immediate children paths (one level down only)
  * @private
  */
-const collectAllPaths = (obj, basePath = '', visited = new WeakSet()) => {
+const getImmediateChildren = (obj, basePath = '') => {
   const paths = [];
   
   if (obj === null || obj === undefined || typeof obj !== 'object') {
-    if (basePath) paths.push(basePath);
     return paths;
-  }
-
-  // Prevent circular references
-  if (visited.has(obj)) {
-    return paths;
-  }
-  visited.add(obj);
-
-  // Add current path if it's not root
-  if (basePath) {
-    paths.push(basePath);
   }
 
   if (Array.isArray(obj)) {
-    // For arrays, collect paths for each element
+    // For arrays, get paths for each immediate element
     obj.forEach((item, index) => {
       const itemPath = basePath ? `${basePath}[${index}]` : `[${index}]`;
-      paths.push(...collectAllPaths(item, itemPath, visited));
+      paths.push(itemPath);
     });
   } else {
-    // For objects, collect paths for each property
+    // For objects, get paths for each immediate property
     Object.keys(obj).forEach(key => {
       const keyPath = basePath ? `${basePath}.${key}` : key;
-      paths.push(...collectAllPaths(obj[key], keyPath, visited));
+      paths.push(keyPath);
     });
   }
 

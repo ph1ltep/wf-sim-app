@@ -200,7 +200,7 @@ export const checkDataCompatibility = (type, data) => {
  * @returns {Object} Distribution with initialized time series data
  */
 export const initializeTimeSeriesIfEmpty = (distribution) => {
-    const normalized = normalizeDistribution(distribution);
+    const normalized = DistributionUtils.normalizeDistribution(distribution);
 
     // If in time series mode but no data points, initialize with current value
     if (normalized.timeSeriesMode &&
