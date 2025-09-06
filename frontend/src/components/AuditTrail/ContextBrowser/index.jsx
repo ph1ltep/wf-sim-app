@@ -323,7 +323,7 @@ const ContextBrowser = ({
         errors: nodeInfo?.errors || []
       }];
       
-      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath);
+      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath, getValueByPath);
       
       if (removeResults.removed.length > 0) {
         message.success(`Removed ${selectedNodeKey}`);
@@ -421,7 +421,7 @@ const ContextBrowser = ({
         errors: nodeInfo?.errors || []
       }];
       
-      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath);
+      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath, getValueByPath);
       
       if (removeResults.removed.length > 0) {
         message.success(`Removed ${nodePath}`);

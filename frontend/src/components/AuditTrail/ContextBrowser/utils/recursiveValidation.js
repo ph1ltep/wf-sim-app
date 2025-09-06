@@ -85,10 +85,11 @@ export const validateOneLevel = async (contextData, startPath = '', getValueByPa
  * Remove invalid nodes from context data
  * @param {Array} nodesToRemove - Array of node objects with path and validation info
  * @param {Function} updateByPath - Function to update context at path
+ * @param {Function} getValueByPath - Function to get context value at path
  * @param {Object} options - Removal options
  * @returns {Promise<Object>} Results of removal operation
  */
-export const removeInvalidNodes = async (nodesToRemove, updateByPath, options = {}) => {
+export const removeInvalidNodes = async (nodesToRemove, updateByPath, getValueByPath, options = {}) => {
   const { 
     confirmEach = false, // Ask for confirmation before each removal
     dryRun = false       // Just return what would be removed
@@ -136,7 +137,7 @@ export const removeInvalidNodes = async (nodesToRemove, updateByPath, options = 
 
       if (parentPath) {
         // Update parent object/array to remove this key
-        await removeFromParent(parentPath, lastKey, updateByPath);
+        await removeFromParent(parentPath, lastKey, updateByPath, getValueByPath);
       } else {
         // Can't remove root-level keys safely
         results.skipped.push({ path: node.path, reason: 'Cannot remove root-level key' });
@@ -343,9 +344,9 @@ const getDefaultValue = async (path) => {
  * Remove a key from its parent object or array
  * @private
  */
-const removeFromParent = async (parentPath, keyToRemove, updateByPath) => {
-  // Get the parent object
-  const parent = await updateByPath(parentPath, undefined, { getOnly: true });
+const removeFromParent = async (parentPath, keyToRemove, updateByPath, getValueByPath) => {
+  // Get the parent object using the correct getter function
+  const parent = getValueByPath(parentPath);
   
   if (Array.isArray(parent)) {
     // Remove from array by index
