@@ -1,0 +1,21 @@
+/* Clean Antd-native validation styles for ContextTreeNode */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Container improvements - clean Antd-aligned layout with proper padding */
+.nodeContent {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: calc(100% - 24px); /* Reserve space for validation highlights and icons */
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-right: 8px; /* Extra padding to prevent right-edge overflow */
+}
