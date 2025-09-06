@@ -22,6 +22,9 @@ const { Text } = Typography;
  * @param {string} props.selectedNodeKey - Currently selected node key
  * @param {Function} props.isCurrentMatch - Function to check if node is current search match
  * @param {Object} props.originalData - Original scenario data for lazy loading
+ * @param {Map} props.validationMap - Map of validation results for tree nodes
+ * @param {Function} props.onRemoveNode - Handler for removing invalid nodes
+ * @param {Function} props.onResetNode - Handler for resetting nodes to default
  */
 const ContextTreeView = ({
   treeData,
@@ -35,7 +38,10 @@ const ContextTreeView = ({
   onNodeSelect,
   selectedNodeKey,
   isCurrentMatch,
-  originalData
+  originalData,
+  validationMap = new Map(),
+  onRemoveNode,
+  onResetNode
 }) => {
   const [selectedKeys, setSelectedKeys] = useState(selectedNodeKey ? [selectedNodeKey] : []);
   const [editingKey, setEditingKey] = useState(null);
@@ -249,6 +255,9 @@ const ContextTreeView = ({
             onSelect={(selectedNode) => handleSelect([selectedNode.key])}
             isSelected={selectedKeys.includes(node.key)}
             onToggleExpand={handleToggleExpand}
+            validationInfo={validationMap.get(node.key)}
+            onRemoveNode={onRemoveNode}
+            onResetNode={onResetNode}
           />
         ),
         key: node.key,
@@ -270,7 +279,10 @@ const ContextTreeView = ({
     handleValueSave,
     handleSelect,
     isCurrentMatch,
-    handleToggleExpand
+    handleToggleExpand,
+    validationMap,
+    onRemoveNode,
+    onResetNode
   ]);
   
   // Handle loading state

@@ -11,18 +11,26 @@ import {
   FileOutlined,
   SafetyOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  ThunderboltOutlined,
+  DeleteOutlined,
+  ReloadOutlined,
+  ClearOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../../contexts/ScenarioContext';
 import { useContextTree } from './hooks/useContextTree';
 import { useContextSearch } from './hooks/useContextSearch';
 import SearchBar from './components/SearchBar';
 import ContextTreeView from './components/ContextTreeView';
-// Removed useDebouncedCallback - search now triggers on Enter only
-
 // Import validation utilities
 import { ScenarioSchema } from 'schemas/yup/scenario';
-const { validatePath } = require('../../../utils/validate');
+import { validatePath } from '../../../utils/validate';
+import { checkChildren } from './utils/simpleValidation';
+import { 
+  removeInvalidNodes, 
+  resetNodesToDefaults 
+} from './utils/recursiveValidation';
+// Removed useDebouncedCallback - search now triggers on Enter only
 
 const { Title, Text } = Typography;
 
@@ -47,6 +55,10 @@ const ContextBrowser = ({
   const [validationLoading, setValidationLoading] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   
+  // Shallow validation state - stores validation status for tree nodes
+  const [validationMap, setValidationMap] = useState(new Map());
+  const [validatingOneLevel, setValidatingOneLevel] = useState(false);
+  
   // Process scenario data into tree structure with performance optimization
   const { treeData, flattenedData, treeStats, hasData, isLoading, loadingProgress } = useContextTree(scenarioData);
   
@@ -70,6 +82,23 @@ const ContextBrowser = ({
   const handleSearchChange = useCallback((query) => {
     setSearchQuery(query);
   }, [setSearchQuery]);
+
+  // Enhanced clear handler - clears both search and validation
+  const handleClearAll = useCallback(() => {
+    clearSearch();
+    setValidationMap(new Map());
+    message.success('Cleared search and validation results');
+  }, [clearSearch]);
+
+  // Reset All handler - clears everything but keeps expand/collapse state
+  const handleResetAll = useCallback(() => {
+    clearSearch();
+    setValidationMap(new Map());
+    setSelectedNodeKey(null);
+    setValidationModalVisible(false);
+    setValidationResult(null);
+    message.success('Reset interface - cleared all highlights and selections');
+  }, [clearSearch]);
   
   // Handle value updates through ScenarioContext
   const handleValueUpdate = useCallback(async (path, newValue) => {
@@ -206,6 +235,250 @@ const ContextBrowser = ({
     setValidationResult(null);
   }, []);
 
+  // Handler for simple validation check (one level down)
+  const handleShallowValidation = useCallback(async () => {
+    if (!scenarioData) {
+      message.warning('No context data available for validation');
+      return;
+    }
+
+    const startPath = selectedNodeKey || ''; // Start from selected node or root
+    const startLabel = startPath || 'root level';
+    
+    setValidatingOneLevel(true);
+    
+    try {
+      const checkResults = await checkChildren(scenarioData, startPath, getValueByPath);
+      
+      // Convert results to validation map format for UI
+      const newValidationMap = new Map();
+      checkResults.forEach((result, path) => {
+        newValidationMap.set(path, {
+          isValid: result.status === 'SCHEMA_VALID',
+          status: result.status,
+          errors: result.errors || [],
+          message: result.message,
+          hasDefault: result.hasDefault,
+          defaultValue: result.defaultValue,
+          canRemove: result.canRemove,
+          canReset: result.canReset
+        });
+      });
+      
+      // Merge with existing validation map
+      setValidationMap(prevMap => {
+        const mergedMap = new Map(prevMap);
+        newValidationMap.forEach((value, key) => {
+          mergedMap.set(key, value);
+        });
+        return mergedMap;
+      });
+      
+      // Count results by category
+      const schemaValid = Array.from(checkResults.values()).filter(v => v.status === 'SCHEMA_VALID').length;
+      const schemaInvalid = Array.from(checkResults.values()).filter(v => v.status === 'SCHEMA_INVALID').length;
+      const notInSchema = Array.from(checkResults.values()).filter(v => v.status === 'NOT_IN_SCHEMA').length;
+      const totalChecked = schemaValid + schemaInvalid + notInSchema;
+      
+      if (totalChecked === 0) {
+        message.info(`No children found at ${startLabel}`);
+      } else {
+        let statusParts = [];
+        if (schemaValid > 0) statusParts.push(`${schemaValid} valid`);
+        if (schemaInvalid > 0) statusParts.push(`${schemaInvalid} invalid`);
+        if (notInSchema > 0) statusParts.push(`${notInSchema} not in schema`);
+        
+        const statusMessage = `Checked ${totalChecked} children at ${startLabel}: ${statusParts.join(', ')}`;
+        
+        if (schemaInvalid > 0 || notInSchema > 0) {
+          message.warning(statusMessage + ' - issues found');
+        } else {
+          message.success(statusMessage + ' - all good');
+        }
+      }
+      
+    } catch (error) {
+      console.error('Validation check error:', error);
+      message.error(`Validation check failed: ${error.message}`);
+    } finally {
+      setValidatingOneLevel(false);
+    }
+  }, [selectedNodeKey, scenarioData, getValueByPath]);
+
+  // Handler for removing current selected node
+  const handleRemoveCurrentNode = useCallback(async () => {
+    if (!selectedNodeKey) return;
+    
+    const confirmed = window.confirm(
+      `Remove '${selectedNodeKey}' from context?\n\nThis cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const nodeInfo = validationMap.get(selectedNodeKey);
+      const nodesToRemove = [{
+        path: selectedNodeKey,
+        value: getValueByPath(selectedNodeKey),
+        errors: nodeInfo?.errors || []
+      }];
+      
+      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath);
+      
+      if (removeResults.removed.length > 0) {
+        message.success(`Removed ${selectedNodeKey}`);
+        
+        // Clear from validation map
+        setValidationMap(prevMap => {
+          const newMap = new Map(prevMap);
+          newMap.delete(selectedNodeKey);
+          return newMap;
+        });
+        
+        // Close modal and clear selection
+        setValidationModalVisible(false);
+        setSelectedNodeKey(null);
+      } else {
+        message.error('Failed to remove node');
+      }
+      
+    } catch (error) {
+      console.error('Remove current node error:', error);
+      message.error(`Failed to remove node: ${error.message}`);
+    }
+  }, [selectedNodeKey, validationMap, getValueByPath, updateByPath]);
+
+  // Handler for resetting current selected node to default
+  const handleResetCurrentNode = useCallback(async () => {
+    if (!selectedNodeKey) return;
+    
+    const nodeInfo = validationMap.get(selectedNodeKey);
+    if (!nodeInfo?.hasDefault) {
+      message.warning('No default value available for this node');
+      return;
+    }
+    
+    const confirmed = window.confirm(
+      `Reset '${selectedNodeKey}' to default value?\n\nCurrent: ${JSON.stringify(getValueByPath(selectedNodeKey))}\nDefault: ${JSON.stringify(nodeInfo.defaultValue)}\n\nThis cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const nodesToReset = [{
+        path: selectedNodeKey,
+        value: getValueByPath(selectedNodeKey),
+        hasDefault: true,
+        defaultValue: nodeInfo.defaultValue
+      }];
+      
+      const resetResults = await resetNodesToDefaults(nodesToReset, updateByPath);
+      
+      if (resetResults.reset.length > 0) {
+        message.success(`Reset ${selectedNodeKey} to default`);
+        
+        // Update validation map to show as valid now
+        setValidationMap(prevMap => {
+          const newMap = new Map(prevMap);
+          newMap.set(selectedNodeKey, {
+            ...nodeInfo,
+            isValid: true,
+            errors: []
+          });
+          return newMap;
+        });
+        
+        // Re-validate the node to confirm
+        setTimeout(() => handleValidateSelected(), 500);
+      } else {
+        message.error('Failed to reset node to default');
+      }
+      
+    } catch (error) {
+      console.error('Reset current node error:', error);
+      message.error(`Failed to reset node: ${error.message}`);
+    }
+  }, [selectedNodeKey, validationMap, getValueByPath, updateByPath, handleValidateSelected]);
+
+  // Handler for removing nodes directly from tree
+  const handleRemoveNodeFromTree = useCallback(async (nodePath) => {
+    const nodeInfo = validationMap.get(nodePath);
+    if (!nodeInfo?.canRemove) {
+      message.warning('This node cannot be removed');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove '${nodePath}' from context?\n\nThis node is not defined in the schema and can be safely removed.\n\nThis cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const nodesToRemove = [{
+        path: nodePath,
+        value: getValueByPath(nodePath),
+        errors: nodeInfo?.errors || []
+      }];
+      
+      const removeResults = await removeInvalidNodes(nodesToRemove, updateByPath);
+      
+      if (removeResults.removed.length > 0) {
+        message.success(`Removed ${nodePath}`);
+        
+        // Clear from validation map
+        setValidationMap(prevMap => {
+          const newMap = new Map(prevMap);
+          newMap.delete(nodePath);
+          return newMap;
+        });
+      } else {
+        message.error('Failed to remove node');
+      }
+    } catch (error) {
+      console.error('Error removing node:', error);
+      message.error(`Failed to remove node: ${error.message}`);
+    }
+  }, [validationMap, getValueByPath, updateByPath]);
+
+  // Handler for resetting nodes to default from tree
+  const handleResetNodeFromTree = useCallback(async (nodePath) => {
+    const nodeInfo = validationMap.get(nodePath);
+    if (!nodeInfo?.hasDefault) {
+      message.warning('No default value available for this node');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reset '${nodePath}' to default value?\n\nCurrent: ${JSON.stringify(getValueByPath(nodePath))}\nDefault: ${JSON.stringify(nodeInfo.defaultValue)}\n\nThis cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const nodesToReset = [{
+        path: nodePath,
+        value: getValueByPath(nodePath),
+        defaultValue: nodeInfo.defaultValue,
+        hasDefault: nodeInfo.hasDefault
+      }];
+      
+      const resetResults = await resetNodesToDefaults(nodesToReset, updateByPath);
+      
+      if (resetResults.reset.length > 0) {
+        message.success(`Reset ${nodePath} to default value`);
+        
+        // Re-validate this node after reset
+        await handleShallowValidation();
+      } else {
+        message.error('Failed to reset node to default');
+      }
+    } catch (error) {
+      console.error('Error resetting node:', error);
+      message.error(`Failed to reset node: ${error.message}`);
+    }
+  }, [validationMap, getValueByPath, updateByPath, handleShallowValidation]);
+
   // Calculate statistics for selected subtree or entire tree
   const displayStats = useMemo(() => {
     if (!hasData || !flattenedData) return treeStats;
@@ -306,17 +579,17 @@ const ContextBrowser = ({
           color: '#666',
           paddingBottom: '8px'
         }}>
-          {selectedNodeKey && (
-            <div style={{ marginBottom: '4px' }}>
-              <div style={{ 
-                fontSize: '10px', 
-                color: '#666',
-                marginBottom: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <span>Schema Path:</span>
+          <div style={{ marginBottom: '4px', minHeight: '36px' }}>
+            <div style={{ 
+              fontSize: '10px', 
+              color: '#666',
+              marginBottom: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>Schema Path:</span>
+              {selectedNodeKey && (
                 <Button 
                   type="text" 
                   size="small" 
@@ -330,7 +603,9 @@ const ContextBrowser = ({
                 >
                   × Clear
                 </Button>
-              </div>
+              )}
+            </div>
+            {selectedNodeKey ? (
               <Breadcrumb
                 separator="."
                 style={{ fontSize: '11px' }}
@@ -348,8 +623,17 @@ const ContextBrowser = ({
                   )
                 }))}
               />
-            </div>
-          )}
+            ) : (
+              <div style={{ 
+                fontSize: '11px', 
+                color: '#999', 
+                fontStyle: 'italic',
+                padding: '2px 0'
+              }}>
+                Click on a tree node to see its path
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '16px' }}>
             <span>
               <DatabaseOutlined style={{ marginRight: '4px' }} />
@@ -377,7 +661,7 @@ const ContextBrowser = ({
           <SearchBar
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
-            onClear={clearSearch}
+            onClear={handleClearAll}
             hasResults={searchResults.hasResults}
             resultCount={totalMatches}
             currentMatchIndex={currentMatchIndex}
@@ -502,6 +786,37 @@ const ContextBrowser = ({
                   Validate
                 </Button>
               </Tooltip>
+              
+              <Tooltip title={selectedNodeKey ? `Check children of: ${selectedNodeKey}` : 'Check root level children'}>
+                <Button 
+                  size="small" 
+                  icon={<ThunderboltOutlined />} 
+                  onClick={handleShallowValidation}
+                  type="text"
+                  loading={validatingOneLevel}
+                  style={{ 
+                    fontSize: '11px',
+                    color: '#1890ff'
+                  }}
+                >
+                  Check Children
+                </Button>
+              </Tooltip>
+
+              <Tooltip title="Reset all highlights and clear selections (keeps expand/collapse state)">
+                <Button 
+                  size="small" 
+                  icon={<ClearOutlined />} 
+                  onClick={handleResetAll}
+                  type="text"
+                  style={{ 
+                    fontSize: '11px',
+                    color: '#52c41a'
+                  }}
+                >
+                  Reset All
+                </Button>
+              </Tooltip>
             </Space>
           </div>
         )}
@@ -527,6 +842,9 @@ const ContextBrowser = ({
               selectedNodeKey={selectedNodeKey}
               isCurrentMatch={isCurrentMatch}
               originalData={scenarioData}
+              validationMap={validationMap}
+              onRemoveNode={handleRemoveNodeFromTree}
+              onResetNode={handleResetNodeFromTree}
             />
           </div>
         )}
@@ -560,7 +878,28 @@ const ContextBrowser = ({
         footer={[
           <Button key="close" onClick={handleCloseValidationModal}>
             Close
-          </Button>
+          </Button>,
+          // Show cleanup options based on validation status
+          validationMap.get(selectedNodeKey)?.canRemove && (
+            <Button 
+              key="remove" 
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleRemoveCurrentNode()}
+            >
+              Remove (Not in Schema)
+            </Button>
+          ),
+          validationMap.get(selectedNodeKey)?.canReset && (
+            <Button 
+              key="reset" 
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={() => handleResetCurrentNode()}
+            >
+              Reset to Default
+            </Button>
+          )
         ]}
         width={600}
         style={{ top: 50 }}
