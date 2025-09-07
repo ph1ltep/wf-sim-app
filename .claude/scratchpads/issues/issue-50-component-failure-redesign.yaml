@@ -1,0 +1,149 @@
+issue_number: 50
+issue_title: "Complete Component Failure Rates Redesign (Option 4)"
+github_url: "https://github.com/ph1ltep/wf-sim-app/issues/50"
+execution_mode: "guided" # Will prompt for confirmation between major phases
+total_phases: 5
+current_phase: 4
+phases:
+  - phase: 1
+    title: "Data Foundation (Schema and Context)"
+    status: "completed"
+    complexity: "complex" # Multiple files, schema changes, architectural impact
+    agents_used: ["analyzer", "analyzer", "schemas", "finance"]
+    completion_time: "2025-01-06T20:15:00Z"
+    files_affected: ["schemas/yup/componentFailureRates.js"]
+    checkpoints:
+      - timestamp: "2025-01-06T20:00:00Z"
+        status: "analysis_complete"
+        agents_completed: ["analyzer", "finance", "schemas"]
+        details: "Multi-agent analysis revealed schema-UI mismatches and missing components"
+      - timestamp: "2025-01-06T20:15:00Z"
+        status: "implementation_complete"
+        agents_completed: ["schemas"]
+        changes: "Complete schema transformation with object-based storage"
+    tasks_completed:
+      - "✅ Updated Yup Schema: failureRate → distribution rename"
+      - "✅ Added computed quantity field with numWTGs reactivity"
+      - "✅ Complete 10-component DEFAULT_COMPONENTS (added blades, bladeBearings)"
+      - "✅ Fixed controlSystem lambda: 0.008 → 0.018"
+      - "✅ Implemented object-based storage following MarketFactors pattern"
+      - "✅ Added isDefault flags and displayOrder for UI management"
+      - "✅ Added backward compatibility migration transform"
+  - phase: 2
+    title: "UI Foundation (Component structure and table)"
+    status: "completed" 
+    complexity: "complex" # Major component rewrite, new patterns
+    agents_used: ["analyzer"]
+    completion_time: "2025-01-07T14:30:00Z"
+    files_affected: ["pages/scenario/equipment/FailureRates.jsx"]
+    checkpoints:
+      - timestamp: "2025-01-07T14:30:00Z"
+        status: "analysis_complete"
+        agents_completed: ["analyzer"]
+        details: "Phase 2 found to be 95% complete - all core requirements met"
+    tasks_completed:
+      - "✅ Standard Antd Table with object→array conversion implemented"
+      - "✅ Expandable rows for DistributionFieldV3 following MarketFactors pattern"
+      - "✅ Modal editing with ContextForm patterns"
+      - "✅ Global enable/disable functionality with proper toggle"
+      - "✅ Visual consistency with existing patterns applied"
+    remaining_issues:
+      - "Schema alignment: embedded costs vs repair package references"
+  - phase: 3
+    title: "Integration Components (Modal and RepairPackage)"
+    status: "completed"
+    complexity: "complex" # OMScopes pattern integration, data handling
+    agents_used: ["analyzer", "builder"]
+    completion_time: "2025-01-07T14:45:00Z"
+    files_affected: [
+      "components/selectors/RepairPackageSelector.jsx",
+      "components/forms/CostCategoryOverrides.jsx",
+      "components/forms/QuantityConfiguration.jsx",
+      "pages/scenario/equipment/FailureRates.jsx"
+    ]
+    checkpoints:
+      - timestamp: "2025-01-07T14:35:00Z"
+        status: "components_created"
+        agents_completed: ["builder"]
+        details: "RepairPackageSelector, CostCategoryOverrides, QuantityConfiguration created"
+      - timestamp: "2025-01-07T14:45:00Z"
+        status: "modal_integration_complete"
+        agents_completed: ["builder"]
+        details: "Enhanced modal with full OMScopes pattern integration"
+    tasks_completed:
+      - "✅ RepairPackageSelector: OMScopes pattern data copying, cost preview, package selection"
+      - "✅ CostCategoryOverrides: 5 cost categories with DistributionFieldV3 integration"
+      - "✅ QuantityConfiguration: Reactive quantity calculation (fixed/perTurbine/perBlade modes)"
+      - "✅ Enhanced Modal: 1000px width, scrollable, multi-section layout"
+      - "✅ Context Integration: Direct ScenarioContext updateByPath/getValueByPath usage"
+  - phase: 4
+    title: "Visual & UX Polish (Consistency and summaries)"
+    status: "pending"
+    complexity: "medium" # Visual updates, consistent patterns
+    agents_planned: ["analyzer", "builder"]
+    completion_time: null
+    files_affected: ["components/summaries/*.jsx", "utils/componentUtils.js"]
+    checkpoints: []
+    tasks:
+      - "Apply visual consistency with MarketFactors patterns"
+      - "Create summary components for failure rates and costs"
+      - "Add proper action columns with tooltips"
+  - phase: 5
+    title: "Integration & Testing (Context and data flow)"
+    status: "pending"
+    complexity: "medium" # Testing and validation
+    agents_planned: ["builder", "validator"]
+    completion_time: null
+    files_affected: ["test integration"]
+    checkpoints: []
+    tasks:
+      - "Test ContextField integration"
+      - "Validate data flow and persistence"
+      - "UI/UX testing and responsive design"
+status: "initialized"
+created_at: "2025-01-06T19:30:00Z"
+updated_at: "2025-01-06T19:30:00Z"
+branch_name: "feature/context-browser-recursive-validation" # Continue on existing branch
+pr_number: null
+key_implementation_details:
+  yup_computed_transform: |
+    quantity: Yup.number().transform(function(value) {
+      const parent = this.parent;
+      const config = parent.quantityConfig || { mode: 'fixed', value: 1 };
+      const context = this.options.context || {};
+      const numWTGs = context.numWTGs || 20;
+      return config.mode === 'perTurbine' ? config.value * numWTGs : config.value;
+    }).meta({ computed: true, readOnly: true })
+  component_quantities: |
+    // From calculateComponentQuantities()
+    {
+      blades: numWTGs * 3,
+      bladeBearings: numWTGs * 3,  
+      transformers: numWTGs,
+      gearboxes: wtgPlatformType === 'geared' ? numWTGs : 0,
+      generators: numWTGs,
+      converters: numWTGs,
+      mainBearings: numWTGs,
+      yawSystems: numWTGs,
+    }
+  repair_package_copying: |
+    const handleRepairPackageSelect = async (componentId, repairPackageId) => {
+      const repairPackage = await getRepairPackage(repairPackageId);
+      await updateByPath(`failureRates.components.${componentId}.repairConfig`, {
+        repairPackageId,
+        repairPackageSnapshot: repairPackage,
+        costOverrides: {} // Preserve existing overrides
+      });
+    };
+architectural_patterns:
+  - "MarketFactors object-based storage with dynamic keys"
+  - "DistributionFieldV3 in expandable rows"
+  - "OMScopes pattern for external data copying"
+  - "ContextForm integration throughout"
+  - "SimulationInfoSchema compatibility"
+critical_requirements:
+  - "No migration needed - complete replacement"
+  - "DEFAULT_COMPONENTS aligned with calculateComponentQuantities()"
+  - "Support cost override of 0 to zero out categories"
+  - "Visual consistency with existing theming functions"
+  - "Lock protection for isDefault components"
