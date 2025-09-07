@@ -66,8 +66,8 @@ const FailureRateDetail = ({ record }) => {
                                 { value: 'lognormal', label: 'General Uncertainty' },
                                 { value: 'normal', label: 'Normal Distribution' }
                             ]}
-                            addonAfter="failures/year"
-                            tooltip="Annual probability of component failure"
+                            addonAfter="% chance/year"
+                            tooltip="Annual probability of component failure (percentage chance per component per year)"
                         />
                     </div>
                 </Col>
@@ -536,7 +536,7 @@ const FailureRates = () => {
             align: 'center'
         },
         {
-            title: 'Rate/Year',
+            title: 'Annual Failure Rate',
             dataIndex: 'distribution',
             key: 'baseRate',
             render: (distribution) => (
@@ -639,9 +639,13 @@ const FailureRates = () => {
             {/* Header */}
             <div style={{ marginBottom: '24px' }}>
                 <Title level={2}>Component Failure Rates</Title>
-                <Text type="secondary">
-                    Configure failure rates and cost modeling for major wind turbine components
-                </Text>
+                <div>
+                    <Text type="secondary">
+                        Configure failure rates and cost modeling for major wind turbine components. 
+                        Rates are specified as annual probability (% chance per component per year). 
+                        During simulation, these rates are multiplied by component quantities to estimate total expected failures.
+                    </Text>
+                </div>
             </div>
 
             {/* Global Configuration Card */}

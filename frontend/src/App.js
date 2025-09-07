@@ -31,6 +31,7 @@ import RiskWarranties from './pages/scenario/risk/Warranties';
 
 // Simulations pages
 import MarketFactorsSimulation from './pages/simulations/MarketFactorsSimulation';
+import FailureRatesSimulation from './pages/simulations/FailureRatesSimulation';
 import Environmental from './pages/simulations/Environmental';
 import OperationalRisks from './pages/simulations/OperationalRisks';
 
@@ -106,6 +107,7 @@ function App() {
                 {/* Simulations routes */}
                 <Route path="simulations">
                   <Route path="market-factors" element={<MarketFactorsSimulation />} />
+                  <Route path="failure-rates" element={<FailureRatesSimulation />} />
                   <Route path="environmental-factors" element={<Environmental />} />
                   <Route path="operational-risks" element={<OperationalRisks />} />
                   <Route index element={<Navigate to="/simulations/market-factors" replace />} />

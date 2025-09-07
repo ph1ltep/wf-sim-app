@@ -453,6 +453,8 @@ const InputSimSchema = Yup.object().shape({
     }),
     // Dynamic keys for market factor IDs - using mixed() instead of lazy() for Mongoose compatibility
     marketFactors: Yup.mixed().default({}),
+    // Dynamic keys for failure rate component IDs - following marketFactors pattern
+    failureRates: Yup.mixed().default({}),
 });
 
 // OutputSim Schema

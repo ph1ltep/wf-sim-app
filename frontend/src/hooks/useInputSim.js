@@ -15,7 +15,7 @@ const useInputSim = () => {
     const [fittingDistribution, setFittingDistribution] = useState(false);
 
     /**
-     * Collect all distributions from hardcoded sources and market factors
+     * Collect all distributions from hardcoded sources, market factors, and failure rates
      * @returns {Array} Array of all distributions
      */
     const collectAllDistributions = useCallback(() => {
@@ -48,6 +48,19 @@ const useInputSim = () => {
         marketFactorsArray.forEach(factor => {
             distributions.push(factor.distribution);
         });
+
+        // Add failure rate distributions from dynamic key object structure
+        const failureRatesConfig = scenarioData.settings.project?.equipment?.failureRates || {};
+        if (failureRatesConfig.enabled && failureRatesConfig.components) {
+            const failureRatesObject = failureRatesConfig.components || {};
+            // Convert object values to array and filter enabled components with distributions
+            const failureRatesArray = Object.values(failureRatesObject).filter(component => 
+                component && typeof component === 'object' && component.enabled && component.distribution
+            );
+            failureRatesArray.forEach(component => {
+                distributions.push(component.distribution);
+            });
+        }
 
         return distributions;
     }, [scenarioData]);
@@ -95,9 +108,18 @@ const useInputSim = () => {
                 );
                 const marketFactorIds = marketFactorsArray.map(f => f.id);
 
-                // Separate regular updates from marketFactors updates
+                // Get failure rate component IDs for determining storage location
+                const failureRatesConfig = scenarioData.settings.project?.equipment?.failureRates || {};
+                const failureRatesObject = failureRatesConfig.components || {};
+                const failureRatesArray = Object.values(failureRatesObject).filter(component => 
+                    component && typeof component === 'object' && component.enabled && component.id
+                );
+                const failureRateIds = failureRatesArray.map(c => c.id);
+
+                // Separate regular updates from specialized updates
                 const regularUpdates = {};
                 const marketFactorsUpdates = [];
+                const failureRatesUpdates = [];
                 
                 for (const result of results) {
                     if (result.distribution && result.distribution.key) {
@@ -107,6 +129,10 @@ const useInputSim = () => {
                             // Store market factor results with dynamicKeys option
                             const path = ['simulation', 'inputSim', 'marketFactors', key];
                             marketFactorsUpdates.push({ path, value: result });
+                        } else if (failureRateIds.includes(key)) {
+                            // Store failure rate results with dynamicKeys option
+                            const path = ['simulation', 'inputSim', 'failureRates', key];
+                            failureRatesUpdates.push({ path, value: result });
                         } else {
                             // Store existing distributions in distributionAnalysis (unchanged behavior)
                             const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
@@ -130,6 +156,18 @@ const useInputSim = () => {
                         result.error = marketResult.error || result.error;
                     } else {
                         result.applied += marketResult.applied;
+                    }
+                }
+
+                // Perform failureRates updates with dynamicKeys flag
+                for (const { path, value } of failureRatesUpdates) {
+                    const failureRateResult = await updateByPath(path, value, { dynamicKeys: true });
+                    if (!failureRateResult.isValid) {
+                        result.isValid = false;
+                        result.errors = [...(result.errors || []), ...(failureRateResult.errors || [])];
+                        result.error = failureRateResult.error || result.error;
+                    } else {
+                        result.applied += failureRateResult.applied;
                     }
                 }
 

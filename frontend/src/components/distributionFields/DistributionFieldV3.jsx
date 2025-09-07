@@ -362,6 +362,7 @@ const DistributionFieldV3 = ({
                               tooltip={currentType === 'fixed' ? 'Exact value to use (no randomness)' : 'Default value'}
                               defaultValue={defaultValue}
                               required
+                              decimalStorage={true} // Enable decimal ↔ percentage conversion for failure rates
                               formMode={formMode}
                               name={baseName ? `${baseName}.parameters.value` : undefined}
                               getValueOverride={getValueOverride}

@@ -172,19 +172,29 @@ export const PercentageField = ({
   min = 0,
   max = 100,
   step = 1,
+  decimalStorage = false, // New prop for failure rates and other decimal-stored percentages
   ...rest
-}) => (
-  <NumberField
-    path={path}
-    label={label}
-    tooltip={tooltip}
-    min={min}
-    max={max}
-    step={step}
-    addonAfter="%" // Display % as addon
-    {...rest}
-  />
-);
+}) => {
+  // Transform for decimal storage (0.008 ↔ 0.8%)
+  const decimalTransform = decimalStorage ? {
+    toDisplay: (value) => value != null ? value * 100 : value,  // 0.008 → 0.8 for display
+    toStorage: (value) => value != null ? value / 100 : value   // 0.8 → 0.008 for storage
+  } : undefined;
+
+  return (
+    <NumberField
+      path={path}
+      label={label}
+      tooltip={tooltip}
+      min={min}
+      max={max}
+      step={step}
+      addonAfter="%" // Display % as addon
+      transform={decimalTransform}
+      {...rest}
+    />
+  );
+};
 
 // Select Field
 export const SelectField = ({

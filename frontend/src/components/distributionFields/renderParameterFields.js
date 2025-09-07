@@ -100,7 +100,7 @@ const renderParameterFields = (distributionType, parametersPath, options = {}) =
 
         switch (param.fieldType) {
             case 'percentage':
-                return <PercentageField key={param.name} {...fieldProps} />;
+                return <PercentageField key={param.name} {...fieldProps} decimalStorage={true} />;
             case 'currency':
                 return <CurrencyField key={param.name} {...fieldProps} />;
             case 'number':

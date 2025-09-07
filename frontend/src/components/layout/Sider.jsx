@@ -30,7 +30,8 @@ import {
   BuildOutlined,
   SecurityScanOutlined,
   LockOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 
 const { Sider: AntSider } = Layout;
@@ -266,6 +267,11 @@ const Sider = ({ collapsed }) => {
           key: '/simulations/market-factors',
           icon: <RiseOutlined />,
           label: 'Market Factors'
+        },
+        {
+          key: '/simulations/failure-rates',
+          icon: <WarningOutlined />,
+          label: 'Failure Rates'
         },
         {
           key: '/simulations/environmental-factors',

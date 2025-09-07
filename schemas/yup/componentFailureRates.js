@@ -76,6 +76,7 @@ const DEFAULT_COMPONENTS = [
         category: 'rotor',
         enabled: false,
         distribution: {
+            key: 'blades',
             type: 'exponential',
             parameters: { lambda: 0.008, value: 0.008 },
             timeSeriesMode: false,
@@ -97,6 +98,7 @@ const DEFAULT_COMPONENTS = [
         category: 'rotor',
         enabled: false,
         distribution: {
+            key: 'bladeBearings',
             type: 'exponential',
             parameters: { lambda: 0.014, value: 0.014 },
             timeSeriesMode: false,
@@ -118,6 +120,7 @@ const DEFAULT_COMPONENTS = [
         category: 'electrical',
         enabled: false,
         distribution: {
+            key: 'transformers',
             type: 'exponential',
             parameters: { lambda: 0.010, value: 0.010 },
             timeSeriesMode: false,
@@ -139,6 +142,7 @@ const DEFAULT_COMPONENTS = [
         category: 'drivetrain',
         enabled: false,
         distribution: {
+            key: 'gearboxes',
             type: 'exponential',
             parameters: { lambda: 0.025, value: 0.025 },
             timeSeriesMode: false,
@@ -160,6 +164,7 @@ const DEFAULT_COMPONENTS = [
         category: 'electrical',
         enabled: false,
         distribution: {
+            key: 'generators',
             type: 'exponential',
             parameters: { lambda: 0.020, value: 0.020 },
             timeSeriesMode: false,
@@ -181,6 +186,7 @@ const DEFAULT_COMPONENTS = [
         category: 'electrical',
         enabled: false,
         distribution: {
+            key: 'converters',
             type: 'exponential',
             parameters: { lambda: 0.022, value: 0.022 },
             timeSeriesMode: false,
@@ -202,6 +208,7 @@ const DEFAULT_COMPONENTS = [
         category: 'drivetrain',
         enabled: false,
         distribution: {
+            key: 'mainBearings',
             type: 'exponential',
             parameters: { lambda: 0.018, value: 0.018 },
             timeSeriesMode: false,
@@ -223,6 +230,7 @@ const DEFAULT_COMPONENTS = [
         category: 'mechanical',
         enabled: false,
         distribution: {
+            key: 'yawSystems',
             type: 'exponential',
             parameters: { lambda: 0.012, value: 0.012 },
             timeSeriesMode: false,
