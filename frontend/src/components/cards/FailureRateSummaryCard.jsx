@@ -32,11 +32,12 @@ const FailureRateSummaryCard = ({ title = "Failure Rate Summary" }) => {
     // Get failure rates configuration
     const failureRatesConfig = getValueByPath('settings.project.equipment.failureRates', {
         enabled: false,
-        components: []
+        components: {}
     });
 
-    // Calculate summary statistics
-    const componentsArray = failureRatesConfig.components || [];
+    // Calculate summary statistics - convert object to array
+    const componentsObject = failureRatesConfig.components || {};
+    const componentsArray = Object.values(componentsObject);
     const enabledComponents = componentsArray.filter(component => component.enabled);
     
     const enabledCount = enabledComponents.length;
@@ -45,17 +46,20 @@ const FailureRateSummaryCard = ({ title = "Failure Rate Summary" }) => {
 
     // Calculate estimated annual failure probability
     const annualFailureProbability = enabledComponents.reduce((sum, component) => {
-        const failureRate = component?.failureRate?.parameters?.value || 
-                          component?.failureRate?.parameters?.lambda || 0;
+        const failureRate = component?.distribution?.parameters?.value || 
+                          component?.distribution?.parameters?.lambda || 0;
         return sum + failureRate;
     }, 0);
 
-    // Calculate estimated annual cost (simplified)
+    // Calculate estimated annual cost (simplified) - using repair package data
     const estimatedAnnualCost = enabledComponents.reduce((sum, component) => {
-        const failureRate = component?.failureRate?.parameters?.value || 
-                          component?.failureRate?.parameters?.lambda || 0;
-        const replacementCost = component?.costs?.componentReplacement?.parameters?.value || 500000;
-        const craneCost = component?.costs?.craneMobilization?.parameters?.value || 120000;
+        const failureRate = component?.distribution?.parameters?.value || 
+                          component?.distribution?.parameters?.lambda || 0;
+        
+        // Get cost from repair package snapshot or fallback to default
+        const repairPackage = component?.repairConfig?.repairPackageSnapshot;
+        const replacementCost = repairPackage?.costs?.material?.perEventEUR || 500000;
+        const craneCost = repairPackage?.costs?.crane?.perEventEUR || 120000;
         
         return sum + (failureRate * (replacementCost + craneCost));
     }, 0);

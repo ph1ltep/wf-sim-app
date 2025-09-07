@@ -280,7 +280,7 @@ export const getMarketFactorColorScheme = (costCategory) => {
         contractsLocal: cyan[5],     // #13c2c2 - cyan (local contractor costs)
         contractsForeign: geekblue[5], // #2f54eb - geek blue (foreign contractor costs)
         other: magenta[5],           // #eb2f96 - magenta (miscellaneous costs)
-        
+
         // Default market factors
         escalationRate: volcano[5],         // #fa541c - warm red-orange (legacy escalation rate)
         baseEscalationRate: volcano[5]      // #fa541c - warm red-orange (base escalation rate)
@@ -306,19 +306,19 @@ export const getDistributionColorScheme = (fieldKey) => {
     const distributionMap = {
         // Revenue and pricing (green - positive financial impact)
         electricityPrice: green[5],      // #52c41a - standard green for electricity price/revenue
-        
+
         // Cost escalation (red - negative financial impact)
         escalationRate: red[5],          // #f5222d - standard red for rising costs
-        
+
         // Environmental variability (magenta - natural variance)
         windVariability: magenta[5],     // #eb2f96 - magenta for wind patterns
-        
+
         // Water/weather related (blue - natural elements)
         rainfallAmount: blue[5],         // #1890ff - primary blue for water/rainfall
-        
+
         // Energy production (cyan - energy generation)
         energyProduction: cyan[5],       // #13c2c2 - cyan for energy output (distinct from rainfall)
-        
+
         // Operational issues (orange - warnings/disruptions)
         downtimePerEvent: orange[5]      // #fa8c16 - warning orange for operational downtime
     };
@@ -354,6 +354,36 @@ export const getCategoryColorScheme = (category) => {
     };
 
     return categoryMap[category] || categoryMap.default;
+};
+/**
+ * Component Category Color Scheme
+ * Provides consistent colors for wind turbine component categories
+ * Used in failure rates, repair packages, and component selectors
+ * @param {string} category - Component category (drivetrain, electrical, rotor, mechanical, control)
+ * @returns {string} Hex color code
+ */
+export const getComponentCategoryColorScheme = (category) => {
+    const componentCategoryMap = {
+        // Wind turbine component categories - distinct, accessible colors
+        drivetrain: blue[6],         // #1677ff - primary blue for drivetrain systems
+        electrical: orange[6],       // #fa8c16 - orange for electrical systems
+        rotor: green[6],            // #389e0d - green for rotor/blade systems
+        mechanical: purple[6],       // #531dab - purple for mechanical systems
+        control: cyan[6],           // #08979c - cyan for control systems
+
+        // Repair package complexity categories
+        major: red[5],              // #ff4d4f - red for major repairs
+        medium: orange[5],          // #ff7a45 - orange for medium repairs
+        minor: green[5],            // #52c41a - green for minor repairs
+        electronic: blue[5],        // #1890ff - blue for electronic repairs
+        blade: purple[5],           // #722ed1 - purple for blade repairs
+
+        // Default fallback
+        unknown: grey[6],           // #595959 - neutral grey for unknown
+        default: grey[5]            // #8c8c8c - lighter grey default
+    };
+
+    return componentCategoryMap[category] || componentCategoryMap.default;
 };
 
 /**

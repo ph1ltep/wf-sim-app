@@ -14,7 +14,7 @@ import {
   CarOutlined,
   MoreOutlined
 } from '@ant-design/icons';
-import { getMarketFactorColorScheme } from '../../../utils/charts/colors';
+import { getMarketFactorColorScheme, getComponentCategoryColorScheme } from '../../../utils/charts/colors';
 
 /**
  * Format currency with EUR symbol and commas
@@ -25,17 +25,9 @@ const formatCurrency = (value) => {
 };
 
 /**
- * Format category display with solid color tags
+ * Format category display with solid color tags - using centralized theming
  */
 const getCategoryTag = (category) => {
-  const categoryColors = {
-    major: '#f50',
-    medium: '#fa8c16', 
-    minor: '#52c41a',
-    electronic: '#1890ff',
-    blade: '#722ed1'
-  };
-  
   const categoryLabels = {
     major: 'Major',
     medium: 'Medium',
@@ -45,7 +37,7 @@ const getCategoryTag = (category) => {
   };
 
   return (
-    <Tag color={categoryColors[category]} style={{ border: 'none' }}>
+    <Tag color={getComponentCategoryColorScheme(category)} style={{ border: 'none' }}>
       {categoryLabels[category] || category}
     </Tag>
   );

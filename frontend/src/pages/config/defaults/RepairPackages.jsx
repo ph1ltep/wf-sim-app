@@ -10,18 +10,19 @@ import useRepairPackages from 'hooks/useRepairPackages';
 import RepairPackageForm from 'components/forms/repairPackages/RepairPackageForm';
 import { getRepairPackageColumns } from 'components/forms/repairPackages/repairPackageColumns';
 import RepairPackageDetails from 'components/forms/repairPackages/RepairPackageDetails';
+import { getComponentCategoryColorScheme } from 'utils/charts/colors';
 
 const { Title } = Typography;
 const { Search } = Input;
 const { Option } = Select;
 
-// Repair package categories for filtering
+// Repair package categories for filtering - using centralized theming
 const REPAIR_PACKAGE_CATEGORIES = [
-  { value: 'major', label: 'Major', color: '#f50' },
-  { value: 'medium', label: 'Medium', color: '#fa8c16' },
-  { value: 'minor', label: 'Minor', color: '#52c41a' },
-  { value: 'electronic', label: 'Electronic', color: '#1890ff' },
-  { value: 'blade', label: 'Blade', color: '#722ed1' }
+  { value: 'major', label: 'Major', color: getComponentCategoryColorScheme('major') },
+  { value: 'medium', label: 'Medium', color: getComponentCategoryColorScheme('medium') },
+  { value: 'minor', label: 'Minor', color: getComponentCategoryColorScheme('minor') },
+  { value: 'electronic', label: 'Electronic', color: getComponentCategoryColorScheme('electronic') },
+  { value: 'blade', label: 'Blade', color: getComponentCategoryColorScheme('blade') }
 ];
 
 const RepairPackages = () => {
