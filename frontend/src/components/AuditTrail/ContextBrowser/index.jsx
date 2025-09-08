@@ -15,7 +15,9 @@ import {
   ThunderboltOutlined,
   DeleteOutlined,
   ReloadOutlined,
-  ClearOutlined
+  ClearOutlined,
+  CopyOutlined,
+  CodeOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../../contexts/ScenarioContext';
 import { useContextTree } from './hooks/useContextTree';
@@ -233,6 +235,78 @@ const ContextBrowser = ({
   const handleCloseValidationModal = useCallback(() => {
     setValidationModalVisible(false);
     setValidationResult(null);
+  }, []);
+
+  // Handler for setting the field to its default value
+  const handleSetToDefault = useCallback(async () => {
+    if (!selectedNodeKey || validationResult?.result?.details?.defaultValue === undefined) {
+      message.warning('No default value available for this field');
+      return;
+    }
+
+    const defaultValue = validationResult.result.details.defaultValue;
+    const currentValue = validationResult.value;
+
+    // Check if current value is already the default
+    if (JSON.stringify(currentValue) === JSON.stringify(defaultValue)) {
+      message.info('Field is already set to default value');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Set '${selectedNodeKey}' to its default value?\n\nCurrent: ${JSON.stringify(currentValue, null, 2)}\nDefault: ${JSON.stringify(defaultValue, null, 2)}\n\nThis cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const result = await updateByPath(selectedNodeKey, defaultValue);
+      
+      if (result.isValid) {
+        message.success(`Set ${selectedNodeKey} to default value`);
+        
+        // Re-validate the field to show updated status
+        setTimeout(() => handleValidateSelected(), 500);
+      } else {
+        const errorMsg = result.error || result.errors?.[0] || 'Failed to set default value';
+        message.error(`Failed to set ${selectedNodeKey} to default: ${errorMsg}`);
+      }
+    } catch (error) {
+      console.error('Error setting to default:', error);
+      message.error(`Error setting to default: ${error.message}`);
+    }
+  }, [selectedNodeKey, validationResult, updateByPath, handleValidateSelected]);
+
+  // Handler for navigating to schema path
+  const handleSchemaNavigate = useCallback(async (pathToValidate) => {
+    if (!scenarioData) return;
+    
+    // Set the selected node to the clicked path and trigger validation
+    setSelectedNodeKey(pathToValidate);
+    
+    // Wait a moment for state to update, then validate
+    setTimeout(async () => {
+      await handleValidateSelected();
+    }, 100);
+  }, [scenarioData, handleValidateSelected]);
+
+  // Handler for copying path in dot notation
+  const handleCopyDotNotation = useCallback((path) => {
+    navigator.clipboard.writeText(path).then(() => {
+      message.success('Copied dot notation to clipboard');
+    }).catch(() => {
+      message.error('Failed to copy to clipboard');
+    });
+  }, []);
+
+  // Handler for copying path in array notation
+  const handleCopyArrayNotation = useCallback((path) => {
+    const arrayNotation = "['" + path.split('.').join("', '") + "']";
+    navigator.clipboard.writeText(arrayNotation).then(() => {
+      message.success('Copied array notation to clipboard');
+    }).catch(() => {
+      message.error('Failed to copy to clipboard');
+    });
   }, []);
 
   // Handler for simple validation check (one level down)
@@ -934,25 +1008,10 @@ const ContextBrowser = ({
               </Space>
             </div>
             
-            {/* Path and Schema Chain */}
-            <div>
-              <Text strong>Path:</Text>
-              <div style={{ 
-                fontFamily: 'Monaco, Consolas, monospace',
-                fontSize: '12px',
-                padding: '8px',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '4px',
-                marginTop: '4px'
-              }}>
-                {validationResult.path}
-              </div>
-            </div>
-            
             {/* Schema Object Chain */}
             {validationResult.schemaChain && (
               <div>
-                <Text strong>Schema Chain (Dot Notation):</Text>
+                <Text strong>Schema Chain:</Text>
                 <div style={{ 
                   fontFamily: 'Monaco, Consolas, monospace',
                   fontSize: '12px',
@@ -962,14 +1021,48 @@ const ContextBrowser = ({
                   marginTop: '4px'
                 }}>
                   {validationResult.schemaChain.map((segment, index, array) => (
-                    <div key={index} style={{ marginBottom: '2px' }}>
-                      <span style={{ color: segment.note ? '#d46b08' : '#389e0d' }}>
-                        {segment.path}
-                      </span>
-                      {' → '}
-                      <span style={{ color: '#666', fontSize: '11px' }}>
-                        {segment.note || `${segment.type}${segment.required ? ' (required)' : ''}${segment.nullable ? ' (nullable)' : ''}`}
-                      </span>
+                    <div key={index} style={{ 
+                      marginBottom: index === array.length - 1 ? '0' : '1px', 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span 
+                          style={{ 
+                            color: segment.note ? '#d46b08' : '#389e0d',
+                            cursor: segment.note ? 'default' : 'pointer',
+                            textDecoration: segment.note ? 'none' : 'underline'
+                          }}
+                          onClick={() => segment.note ? null : handleSchemaNavigate(segment.path)}
+                        >
+                          {segment.path}
+                        </span>
+                        {' → '}
+                        <span style={{ color: '#666', fontSize: '11px' }}>
+                          {segment.note || `${segment.type}${segment.required ? ' (required)' : ''}${segment.nullable ? ' (nullable)' : ''}`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Tooltip title="Copy as dot notation">
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<CopyOutlined />}
+                            onClick={() => handleCopyDotNotation(segment.path)}
+                            style={{ fontSize: '10px', padding: '2px 4px', minWidth: 'auto' }}
+                          />
+                        </Tooltip>
+                        <Tooltip title="Copy as array notation">
+                          <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<CodeOutlined />}
+                            onClick={() => handleCopyArrayNotation(segment.path)}
+                            style={{ fontSize: '10px', padding: '2px 4px', color: '#1890ff', minWidth: 'auto' }}
+                          />
+                        </Tooltip>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -982,22 +1075,23 @@ const ContextBrowser = ({
                 fontFamily: 'Monaco, Consolas, monospace',
                 fontSize: '12px',
                 padding: '8px',
-                backgroundColor: '#1e1e1e',
+                backgroundColor: '#2d3748',
                 borderRadius: '4px',
                 marginTop: '4px',
                 maxHeight: '200px',
                 overflow: 'auto',
-                color: '#d4d4d4'
+                color: '#e2e8f0',
+                border: '1px solid #4a5568'
               }}>
                 <pre 
                   style={{ margin: 0 }}
                   dangerouslySetInnerHTML={{
                     __html: JSON.stringify(validationResult.value, null, 2)
-                      .replace(/(".*?")/g, '<span style="color: #ce9178">$1</span>')  // strings
-                      .replace(/(\b\d+\.?\d*\b)/g, '<span style="color: #b5cea8">$1</span>')  // numbers
-                      .replace(/(\btrue\b|\bfalse\b)/g, '<span style="color: #569cd6">$1</span>')  // booleans
-                      .replace(/(\bnull\b)/g, '<span style="color: #569cd6">$1</span>')  // null
-                      .replace(/([{}[\],])/g, '<span style="color: #ffffff">$1</span>')  // brackets/braces
+                      .replace(/(".*?")/g, '<span style="color: #68d391">$1</span>')  // strings - green
+                      .replace(/(\b\d+\.?\d*\b)/g, '<span style="color: #63b3ed">$1</span>')  // numbers - blue
+                      .replace(/(\btrue\b|\bfalse\b)/g, '<span style="color: #f6ad55">$1</span>')  // booleans - orange
+                      .replace(/(\bnull\b)/g, '<span style="color: #b794f6">$1</span>')  // null - purple
+                      .replace(/([{}[\],])/g, '<span style="color: #e2e8f0">$1</span>')  // brackets/braces - light
                   }}
                 />
               </div>
@@ -1006,19 +1100,65 @@ const ContextBrowser = ({
             {/* Validation Details */}
             {validationResult.result.details && (
               <div>
-                <Text strong>Validation Details:</Text>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text strong>Validation Details:</Text>
+                  {validationResult.result.details.defaultValue !== undefined && (
+                    <Tooltip title="Set field to default value">
+                      <Button 
+                        type="text"
+                        size="small"
+                        icon={<ReloadOutlined />}
+                        onClick={handleSetToDefault}
+                        style={{ fontSize: '12px', color: '#1890ff' }}
+                      />
+                    </Tooltip>
+                  )}
+                </div>
                 <div style={{ 
+                  fontFamily: 'Monaco, Consolas, monospace',
                   fontSize: '12px',
                   padding: '8px',
-                  backgroundColor: '#f9f9f9',
+                  backgroundColor: '#f5f5f5',
                   borderRadius: '4px',
                   marginTop: '4px'
                 }}>
-                  <div><Text type="secondary">Method:</Text> {validationResult.result.details.method}</div>
+                  <div style={{ marginBottom: '6px' }}>
+                    <Text type="secondary" style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '12px' }}>Method:</Text>{' '}
+                    <span style={{ color: '#333' }}>{validationResult.result.details.method}</span>
+                  </div>
                   {validationResult.result.details.defaultValue !== undefined && (
-                    <div><Text type="secondary">Default:</Text> {JSON.stringify(validationResult.result.details.defaultValue)}</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <Text type="secondary" style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '12px' }}>Default:</Text>
+                      <div style={{ 
+                        fontFamily: 'Monaco, Consolas, monospace',
+                        fontSize: '11px',
+                        padding: '6px',
+                        backgroundColor: '#2d3748',
+                        borderRadius: '4px',
+                        marginTop: '4px',
+                        maxHeight: '120px',
+                        overflow: 'auto',
+                        color: '#e2e8f0',
+                        border: '1px solid #4a5568'
+                      }}>
+                        <pre 
+                          style={{ margin: 0 }}
+                          dangerouslySetInnerHTML={{
+                            __html: JSON.stringify(validationResult.result.details.defaultValue, null, 2)
+                              .replace(/(".*?")/g, '<span style="color: #68d391">$1</span>')
+                              .replace(/(\b\d+\.?\d*\b)/g, '<span style="color: #63b3ed">$1</span>')
+                              .replace(/(\btrue\b|\bfalse\b)/g, '<span style="color: #f6ad55">$1</span>')
+                              .replace(/(\bnull\b)/g, '<span style="color: #b794f6">$1</span>')
+                              .replace(/([{}[\],])/g, '<span style="color: #e2e8f0">$1</span>')
+                          }}
+                        />
+                      </div>
+                    </div>
                   )}
-                  <div><Text type="secondary">Applied:</Text> {validationResult.result.details.applied ? 'Yes' : 'No'}</div>
+                  <div>
+                    <Text type="secondary" style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '12px' }}>Applied:</Text>{' '}
+                    <span style={{ color: '#333' }}>{validationResult.result.details.applied ? 'Yes' : 'No'}</span>
+                  </div>
                 </div>
               </div>
             )}
