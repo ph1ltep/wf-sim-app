@@ -139,16 +139,23 @@ const useInputSim = () => {
                     if (result.distribution && result.distribution.key) {
                         const key = result.distribution.key;
                         
+                        console.log(`🔍 [INPUT SIM DEBUG] Processing result for key: '${key}'`);
+                        console.log('🔍 [INPUT SIM DEBUG] Market factor IDs:', marketFactorIds);
+                        console.log('🔍 [INPUT SIM DEBUG] Failure rate IDs:', failureRateIds);
+                        console.log(`🔍 [INPUT SIM DEBUG] Market factor match for '${key}':`, marketFactorIds.includes(key));
+                        console.log(`🔍 [INPUT SIM DEBUG] Failure rate match for '${key}':`, failureRateIds.includes(key));
+                        
                         if (marketFactorIds.includes(key)) {
                             // Store market factor results with dynamicKeys option
                             const path = ['simulation', 'inputSim', 'marketFactors', key];
                             marketFactorsUpdates.push({ path, value: result });
+                            console.log(`✅ [INPUT SIM DEBUG] Added market factor update for '${key}'`);
                         } else if (failureRateIds.includes(key)) {
                             // Store failure rate results with dynamicKeys option
                             const path = ['simulation', 'inputSim', 'failureRates', key];
                             failureRatesUpdates.push({ path, value: result });
                             
-                            console.log(`💾 [INPUT SIM DEBUG] Storing failure rate result for ${key}:`, {
+                            console.log(`💾 [INPUT SIM DEBUG] Storing failure rate result for '${key}':`, {
                                 key,
                                 path: path.join('.'),
                                 originalDistribution: result.distribution,
@@ -160,7 +167,10 @@ const useInputSim = () => {
                             // Store existing distributions in distributionAnalysis (unchanged behavior)
                             const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
                             regularUpdates[path.join('.')] = result;
+                            console.log(`📝 [INPUT SIM DEBUG] Added regular update for '${key}'`);
                         }
+                    } else {
+                        console.log('⚠️ [INPUT SIM DEBUG] Result missing distribution or key:', result);
                     }
                 }
 

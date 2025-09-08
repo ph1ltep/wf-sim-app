@@ -42,15 +42,8 @@ const FailureRateDetail = ({ record }) => {
         <div style={{ padding: '16px 0', backgroundColor: '#fafafa', borderRadius: '4px' }}>
             <Row gutter={24}>
                 <Col span={24}>
-                    <div style={{ marginBottom: 12 }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                            Configure the statistical distribution for {record.name} failure rate (annual probability as percentage). 
-                            Changes are applied immediately to scenario calculations.
-                        </Text>
-                    </div>
-                    
                     {/* DistributionFieldV3 - Direct context integration */}
-                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #d9d9d9' }}>
+                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #d9d9d9', marginBottom: 16 }}>
                         <DistributionFieldV3
                             path={['settings', 'project', 'equipment', 'failureRates', 'components', record.id, 'distribution']}
                             showVisualization={true}
@@ -71,6 +64,20 @@ const FailureRateDetail = ({ record }) => {
                             addonAfter="% chance/year"
                             tooltip="Annual probability as percentage (e.g., 2.5% means 2.5% chance per component per year)"
                         />
+                    </div>
+                    
+                    {/* Parameter Scaling Notice */}
+                    <div style={{ 
+                        padding: 12, 
+                        backgroundColor: '#e6f7ff', 
+                        borderLeft: '3px solid #1890ff',
+                        borderRadius: '0 4px 4px 0'
+                    }}>
+                        <Text style={{ fontSize: 11, color: '#096dd9' }}>
+                            <InfoCircleOutlined style={{ marginRight: 4 }} />
+                            <strong>Parameter Scaling:</strong> All distribution parameters are calibrated for annual failure rates as decimal probabilities (e.g., 0.008 = 0.8% per year). 
+                            For components with historical "mean time to failure" data, convert using: annual rate ≈ 1/years_to_failure.
+                        </Text>
                     </div>
                 </Col>
             </Row>

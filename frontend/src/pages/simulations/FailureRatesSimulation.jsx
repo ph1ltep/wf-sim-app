@@ -5,16 +5,7 @@ import { Row, Col, Card, Space, Typography, Divider, Statistic, Button, Alert, S
 import {
     ReloadOutlined,
     LineChartOutlined,
-    DollarOutlined,
-    UserOutlined,
-    ToolOutlined,
-    BuildOutlined,
-    AppstoreOutlined,
-    WarningOutlined,
-    SettingOutlined,
-    CarOutlined,
-    PoweroffOutlined,
-    ControlOutlined
+    WarningOutlined
 } from '@ant-design/icons';
 import { useScenario } from '../../contexts/ScenarioContext';
 import useInputSim from '../../hooks/useInputSim';
@@ -23,28 +14,8 @@ import { getComponentCategoryColorScheme } from '../../utils/charts/colors';
 
 const { Title, Paragraph } = Typography;
 
-// Icon mapping for different component categories
-const COMPONENT_CATEGORY_ICONS = {
-    drivetrain: <SettingOutlined />,
-    electrical: <PoweroffOutlined />,
-    rotor: <CarOutlined />,
-    mechanical: <BuildOutlined />,
-    control: <ControlOutlined />
-};
-
-// Component-specific icons for individual components
-const COMPONENT_ICONS = {
-    blades: <CarOutlined />,
-    bladeBearings: <SettingOutlined />,
-    transformers: <PoweroffOutlined />,
-    gearboxes: <SettingOutlined />,
-    generators: <PoweroffOutlined />,
-    converters: <PoweroffOutlined />,
-    mainBearings: <SettingOutlined />,
-    yawSystems: <BuildOutlined />,
-    pitchSystem: <BuildOutlined />,
-    controlSystem: <ControlOutlined />
-};
+// Standardized icon for all failure rate components
+const FAILURE_RATE_ICON = <WarningOutlined />;
 
 /**
  * Failure Rates simulation page showing component failure rate distributions.
@@ -243,12 +214,8 @@ const FailureRatesSimulation = () => {
                             // Determine color scheme based on component category
                             const fieldColor = getComponentCategoryColorScheme(component.category) || getComponentCategoryColorScheme('default');
                             
-                            // Get appropriate icon for this component
-                            const componentIcon = COMPONENT_ICONS[component.id] || 
-                                                 COMPONENT_CATEGORY_ICONS[component.category] ||
-                                                 <WarningOutlined />;
-                            
-                            const iconWithColor = React.cloneElement(componentIcon, {
+                            // Use standardized icon for all failure rate components
+                            const iconWithColor = React.cloneElement(FAILURE_RATE_ICON, {
                                 style: { color: fieldColor }
                             });
                             

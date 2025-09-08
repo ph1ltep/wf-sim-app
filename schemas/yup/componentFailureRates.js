@@ -16,8 +16,8 @@ const ComponentFailureRateSchema = Yup.object().shape({
     
     // Renamed failureRate → distribution for MarketFactors alignment
     distribution: DistributionTypeSchema.default(() => ({
-        type: 'exponential',
-        parameters: { lambda: 0.025, value: 0.025 },
+        type: 'weibull',
+        parameters: { shape: 2.0, scale: 50, value: 2.5 },
         timeSeriesMode: false,
         metadata: { percentileDirection: 'ascending' }
     })),
@@ -77,8 +77,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'blades',
-            type: 'exponential',
-            parameters: { lambda: 0.008, value: 0.008 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters (shape, scale for annual failure rate)
+                shape: 2.8, scale: 0.007, value: 0.008,
+                // Normal parameters (mean, std for annual failure rate)  
+                mean: 0.008, std: 0.002,
+                // Exponential parameters (lambda = annual failure rate)
+                lambda: 0.008,
+                // Lognormal parameters (mu, sigma for log of annual rate)
+                mu: -4.83, sigma: 0.3,
+                // Beta parameters (alpha, beta for rate between 0-1)
+                alpha: 2.1, beta: 260,
+                // Gamma parameters (shape, rate for annual failure rate)
+                shapeGamma: 4.0, rate: 500
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -99,8 +112,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'bladeBearings',
-            type: 'exponential',
-            parameters: { lambda: 0.014, value: 0.014 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 1.8, scale: 0.012, value: 0.014,
+                // Normal parameters
+                mean: 0.014, std: 0.004,
+                // Exponential parameters
+                lambda: 0.014,
+                // Lognormal parameters  
+                mu: -4.27, sigma: 0.35,
+                // Beta parameters
+                alpha: 3.5, beta: 246,
+                // Gamma parameters
+                shapeGamma: 3.5, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -121,8 +147,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'transformers',
-            type: 'exponential',
-            parameters: { lambda: 0.010, value: 0.010 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 1.2, scale: 0.009, value: 0.010,
+                // Normal parameters
+                mean: 0.010, std: 0.003,
+                // Exponential parameters
+                lambda: 0.010,
+                // Lognormal parameters
+                mu: -4.61, sigma: 0.3,
+                // Beta parameters
+                alpha: 2.5, beta: 247.5,
+                // Gamma parameters
+                shapeGamma: 2.5, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -143,8 +182,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'gearboxes',
-            type: 'exponential',
-            parameters: { lambda: 0.025, value: 0.025 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 2.2, scale: 0.020, value: 0.025,
+                // Normal parameters
+                mean: 0.025, std: 0.008,
+                // Exponential parameters
+                lambda: 0.025,
+                // Lognormal parameters
+                mu: -3.69, sigma: 0.32,
+                // Beta parameters
+                alpha: 6.25, beta: 243.75,
+                // Gamma parameters
+                shapeGamma: 6.25, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -165,8 +217,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'generators',
-            type: 'exponential',
-            parameters: { lambda: 0.020, value: 0.020 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 2.0, scale: 0.017, value: 0.020,
+                // Normal parameters
+                mean: 0.020, std: 0.006,
+                // Exponential parameters
+                lambda: 0.020,
+                // Lognormal parameters
+                mu: -3.91, sigma: 0.3,
+                // Beta parameters
+                alpha: 5.0, beta: 245,
+                // Gamma parameters
+                shapeGamma: 5.0, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -187,8 +252,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'converters',
-            type: 'exponential',
-            parameters: { lambda: 0.022, value: 0.022 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 1.5, scale: 0.019, value: 0.022,
+                // Normal parameters
+                mean: 0.022, std: 0.007,
+                // Exponential parameters
+                lambda: 0.022,
+                // Lognormal parameters
+                mu: -3.82, sigma: 0.32,
+                // Beta parameters
+                alpha: 5.5, beta: 244.5,
+                // Gamma parameters
+                shapeGamma: 5.5, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -209,8 +287,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'mainBearings',
-            type: 'exponential',
-            parameters: { lambda: 0.018, value: 0.018 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 1.9, scale: 0.015, value: 0.018,
+                // Normal parameters
+                mean: 0.018, std: 0.005,
+                // Exponential parameters
+                lambda: 0.018,
+                // Lognormal parameters
+                mu: -4.02, sigma: 0.28,
+                // Beta parameters
+                alpha: 4.5, beta: 245.5,
+                // Gamma parameters
+                shapeGamma: 4.5, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },
@@ -231,8 +322,21 @@ const DEFAULT_COMPONENTS = [
         enabled: false,
         distribution: {
             key: 'yawSystems',
-            type: 'exponential',
-            parameters: { lambda: 0.012, value: 0.012 },
+            type: 'weibull',
+            parameters: { 
+                // Weibull parameters
+                shape: 1.6, scale: 0.011, value: 0.012,
+                // Normal parameters
+                mean: 0.012, std: 0.003,
+                // Exponential parameters
+                lambda: 0.012,
+                // Lognormal parameters
+                mu: -4.42, sigma: 0.25,
+                // Beta parameters
+                alpha: 3.0, beta: 247,
+                // Gamma parameters
+                shapeGamma: 3.0, rate: 250
+            },
             timeSeriesMode: false,
             metadata: { percentileDirection: 'ascending' }
         },

@@ -97,8 +97,8 @@ const PercentileChart = React.memo(({
         yaxis: {
             ...(percentileChartData.layout.yaxis || {}),
             title: units ? `${units}` : '',
-            hoverformat: units ? '.2f%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
-            tickformat: units ? '.2f%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
+            hoverformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
+            tickformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
         },
         xaxis: {
             ...(percentileChartData.layout.xaxis || {}),
