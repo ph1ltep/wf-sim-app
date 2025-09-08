@@ -77,8 +77,14 @@ export const NumberField = ({
   parser,
   ...rest
 }) => {
-  // Default formatter: adds commas as thousand separators
-  const defaultFormatter = (value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Default formatter: adds commas as thousand separators (decimal-aware)
+  const defaultFormatter = (value) => {
+    if (value == null) return '';
+    const numStr = `${value}`;
+    const [integerPart, decimalPart] = numStr.split('.');
+    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+  };
 
   // Default parser: removes commas to convert back to a number
   const defaultParser = (value) => value?.replace(/,/g, '');
