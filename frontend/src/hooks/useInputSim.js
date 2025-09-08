@@ -78,6 +78,8 @@ const useInputSim = () => {
             // Collect all distributions (existing + market factors)
             const allDistributions = collectAllDistributions();
 
+            console.log('🔍 [INPUT SIM DEBUG] Raw collected distributions:', allDistributions);
+
             // Ensure proper structure for each distribution
             const normalizeDistribution = (dist) => {
                 return dist //DistributionUtils.normalizeDistribution(dist);
@@ -94,12 +96,22 @@ const useInputSim = () => {
                 }
             };
 
+            console.log('📤 [INPUT SIM DEBUG] API request parameters:', params);
+            console.log('📤 [INPUT SIM DEBUG] Failure rate distributions being sent:', 
+                params.distributions.filter(d => d.key && d.key.startsWith('failure_')));
+
             // Call simulation API
             const response = await simulateDistributions(params);
+
+            console.log('📥 [INPUT SIM DEBUG] Raw API response:', response);
 
             if (response && response.success) {
                 // Get all simulation results
                 const results = response.data.simulationInfo;
+
+                console.log('🔄 [INPUT SIM DEBUG] Simulation results received:', results);
+                console.log('🔄 [INPUT SIM DEBUG] Failure rate results:', 
+                    results.filter(r => r.distribution?.key?.startsWith('failure_')));
 
                 // Get market factor IDs for determining storage location
                 const marketFactorsObject = scenarioData.settings.project?.economics?.marketFactors?.factors || {};
@@ -115,6 +127,8 @@ const useInputSim = () => {
                     component && typeof component === 'object' && component.enabled && component.id
                 );
                 const failureRateIds = failureRatesArray.map(c => c.id);
+
+                console.log('🎯 [INPUT SIM DEBUG] Failure rate component IDs:', failureRateIds);
 
                 // Separate regular updates from specialized updates
                 const regularUpdates = {};
@@ -133,6 +147,15 @@ const useInputSim = () => {
                             // Store failure rate results with dynamicKeys option
                             const path = ['simulation', 'inputSim', 'failureRates', key];
                             failureRatesUpdates.push({ path, value: result });
+                            
+                            console.log(`💾 [INPUT SIM DEBUG] Storing failure rate result for ${key}:`, {
+                                key,
+                                path: path.join('.'),
+                                originalDistribution: result.distribution,
+                                percentiles: result.percentiles,
+                                statistics: result.statistics,
+                                sampleStats: result.sampleStatistics
+                            });
                         } else {
                             // Store existing distributions in distributionAnalysis (unchanged behavior)
                             const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
@@ -160,8 +183,15 @@ const useInputSim = () => {
                 }
 
                 // Perform failureRates updates with dynamicKeys flag
+                console.log('🚀 [INPUT SIM DEBUG] About to store failure rate updates:', failureRatesUpdates);
+                
                 for (const { path, value } of failureRatesUpdates) {
+                    console.log(`📝 [INPUT SIM DEBUG] Updating path ${path.join('.')} with:`, value);
+                    
                     const failureRateResult = await updateByPath(path, value, { dynamicKeys: true });
+                    
+                    console.log(`✅ [INPUT SIM DEBUG] Update result for ${path.join('.')}:`, failureRateResult);
+                    
                     if (!failureRateResult.isValid) {
                         result.isValid = false;
                         result.errors = [...(result.errors || []), ...(failureRateResult.errors || [])];

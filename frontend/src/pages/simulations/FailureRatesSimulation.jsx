@@ -188,7 +188,7 @@ const FailureRatesSimulation = () => {
 
             <Paragraph>
                 This page shows component failure rate distributions that model the probability of component failures over time.
-                Each distribution shows the annual failure rate per component (configured as % chance per year), which is multiplied 
+                Each distribution shows the annual failure rate per component (expressed as % chance per year), which is multiplied 
                 by component quantities during Monte Carlo simulation to estimate total expected failures and maintenance costs 
                 throughout the project lifecycle.
             </Paragraph>
@@ -261,7 +261,8 @@ const FailureRatesSimulation = () => {
                                         icon={iconWithColor}
                                         units="%"
                                         color={fieldColor}
-                                        precision={4}
+                                        precision={2}
+                                        decimalStorage={true}
                                         cardProps={{ 
                                             style: { marginBottom: '16px' },
                                             extra: (

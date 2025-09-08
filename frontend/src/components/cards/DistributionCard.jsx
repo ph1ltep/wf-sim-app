@@ -24,6 +24,7 @@ const { Text } = Typography;
  * @param {Object} [props.extraLayoutOptions={}] - Additional Plotly layout options
  * @param {boolean} [props.showMetadata=true] - Whether to show simulation metadata
  * @param {number|null} [props.precision=null] - Number of decimal places (null for Plotly default)
+ * @param {boolean} [props.decimalStorage=false] - Whether data is stored as decimals (0.008) but should display as percentages (0.8%)
  * @returns {JSX.Element} Distribution analysis card
  */
 const DistributionCard = ({
@@ -37,7 +38,8 @@ const DistributionCard = ({
     height = 300,
     extraLayoutOptions = {},
     showMetadata = true,
-    precision = null
+    precision = null,
+    decimalStorage = false
 }) => {
     // State for toggling chart mode and table visibility
     const [dataTableVisible, setDataTableVisible] = useState(false);
@@ -174,6 +176,7 @@ const DistributionCard = ({
                         extraLayoutOptions={extraLayoutOptions}
                         dataTableVisible={dataTableVisible}
                         toggleTableVisibility={() => setDataTableVisible(!dataTableVisible)}
+                        decimalStorage={decimalStorage}
                     />
                 ) : (
                     <StatisticsChart
@@ -186,6 +189,7 @@ const DistributionCard = ({
                         extraLayoutOptions={extraLayoutOptions}
                         dataTableVisible={dataTableVisible}
                         toggleTableVisibility={() => setDataTableVisible(!dataTableVisible)}
+                        decimalStorage={decimalStorage}
                     />
                 )
             )}

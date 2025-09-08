@@ -13,16 +13,6 @@ import {
 
 const PLOTLY_CONFIG = { responsive: true, displayModeBar: false };
 
-/**
- * Converts decimal values to display values based on units.
- * When units="%", multiplies values by 100 for proper percentage display.
- * @param {number|null|undefined} value - The value to convert
- * @param {string} units - The units (e.g., "%", "MWh")
- * @returns {number|null|undefined} Converted value for display
- */
-const convertValueForDisplay = (value, units) => {
-    return units === "%" ? (value != null ? value * 100 : value) : value;
-};
 
 
 // Component for rendering percentile chart and table
@@ -38,6 +28,7 @@ const convertValueForDisplay = (value, units) => {
  * @param {Object} props.extraLayoutOptions - Additional Plotly layout options
  * @param {boolean} props.dataTableVisible - Whether to show the data table
  * @param {Function} props.toggleTableVisibility - Toggles table visibility
+ * @param {boolean} [props.decimalStorage=false] - Whether data is stored as decimals but should display as percentages
  * @returns {JSX.Element} Percentile chart and table
  */
 const PercentileChart = React.memo(({
@@ -49,7 +40,8 @@ const PercentileChart = React.memo(({
     height,
     extraLayoutOptions,
     dataTableVisible,
-    toggleTableVisibility
+    toggleTableVisibility,
+    decimalStorage = false
 }) => {
     // Extract results and check validity
     const results = simulationInfo?.results || [];
@@ -58,65 +50,45 @@ const PercentileChart = React.memo(({
     // Prepare summary data for the right-hand column
     const summaryData = useMemo(() => {
         if (!hasResults) return [];
-        const rawSummaryData = prepareSummaryData(results, primaryPercentile, precision, simulationInfo?.distribution?.parameters?.value);
-        // Convert values for percentage display
-        return rawSummaryData.map(summary => ({
-            ...summary,
-            mean: convertValueForDisplay(summary.mean, units),
-            t0Value: convertValueForDisplay(summary.t0Value, units)
-        }));
-    }, [hasResults, results, primaryPercentile, precision, simulationInfo, units]);
+        const rawSummaryData = prepareSummaryData(results, primaryPercentile, precision, simulationInfo?.distribution?.parameters?.value, decimalStorage);
+        return rawSummaryData;
+    }, [hasResults, results, primaryPercentile, precision, simulationInfo, units, decimalStorage]);
 
     // Compute chart data for percentiles with bands
     const percentileChartData = useMemo(() => {
         if (!hasResults) return { data: [], layout: {}, config: PLOTLY_CONFIG };
-        const chartData = preparePercentileChartData(results, primaryPercentile, color, precision, simulationInfo);
-        const enhancedData = chartData.data.map(trace => {
-            // Convert y values for percentage display
-            const convertedTrace = {
-                ...trace,
-                y: trace.y ? trace.y.map(value => convertValueForDisplay(value, units)) : trace.y,
-                hovertemplate: trace.name.includes('-')
-                    ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y}${units ? ' ' + units : ''}<extra></extra>`
-                    : `Year: %{x}<br>${trace.name}: %{y}${units ? ' ' + units : ''}<extra></extra>`
-            };
-            return convertedTrace;
-        });
+        const chartData = preparePercentileChartData(results, primaryPercentile, color, precision, simulationInfo, units, decimalStorage);
+        const enhancedData = chartData.data.map(trace => ({
+            ...trace,
+            hovertemplate: trace.name.includes('-')
+                ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y:.2f}${units ? '%' : ''}<extra></extra>`
+                : `Year: %{x}<br>${trace.name}: %{y:.2f}${units ? '%' : ''}<extra></extra>`
+        }));
         return {
             data: enhancedData,
             layout: chartData.layout,
             config: PLOTLY_CONFIG
         };
-    }, [hasResults, results, primaryPercentile, color, precision, units, simulationInfo]);
+    }, [hasResults, results, primaryPercentile, color, precision, units, simulationInfo, decimalStorage]);
 
     // Lazily prepare table data for percentiles only when visible
     const { columns: percentileColumns, data: percentileTableData } = useMemo(() => {
         if (!hasResults || !dataTableVisible) return { columns: [], data: [] };
-        const tableInfo = generatePercentileTableData(results, primaryPercentile, color, precision);
+        const tableInfo = generatePercentileTableData(results, primaryPercentile, color, precision, decimalStorage);
         const formattedColumns = tableInfo.columns.map(column => {
             if (column.dataIndex !== 'year') {
                 return {
                     ...column,
                     render: (text) => {
-                        const convertedValue = convertValueForDisplay(text, units);
-                        return formatNumber(convertedValue, precision);
+                        const displayValue = decimalStorage ? text * 100 : text;
+                        return units ? `${formatNumber(displayValue, precision || 2)}%` : formatNumber(displayValue, precision);
                     }
                 };
             }
             return column;
         });
-        // Convert table data values for percentage display
-        const convertedTableData = tableInfo.data.map(row => {
-            const convertedRow = { ...row };
-            Object.keys(convertedRow).forEach(key => {
-                if (key !== 'year' && key !== 'key') {
-                    convertedRow[key] = convertValueForDisplay(convertedRow[key], units);
-                }
-            });
-            return convertedRow;
-        });
-        return { columns: formattedColumns, data: convertedTableData };
-    }, [hasResults, dataTableVisible, results, primaryPercentile, color, precision, units]);
+        return { columns: formattedColumns, data: tableInfo.data };
+    }, [hasResults, dataTableVisible, results, primaryPercentile, color, precision, units, decimalStorage]);
 
     // Customize Plotly layout
     const customizedLayout = useMemo(() => ({
@@ -124,9 +96,9 @@ const PercentileChart = React.memo(({
         height,
         yaxis: {
             ...(percentileChartData.layout.yaxis || {}),
-            title: units,
-            hoverformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined,
-            tickformat: precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s'
+            title: units ? `${units}` : '',
+            hoverformat: units ? '.2f%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
+            tickformat: units ? '.2f%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
         },
         xaxis: {
             ...(percentileChartData.layout.xaxis || {}),
@@ -189,8 +161,8 @@ const PercentileChart = React.memo(({
                                     fontWeight: summary.isPrimary ? 'bold' : 'normal',
                                     color: summary.isPrimary ? color : '#333'
                                 }}>
-                                    {formatCompactNumber(summary.mean, precision || 2)}
-                                    {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
+                                    {formatCompactNumber(decimalStorage ? summary.mean * 100 : summary.mean, precision || 2)}
+                                    {units && <span style={{ marginLeft: '2px' }}>%</span>}
                                 </div>
                             </div>
                         ))}
@@ -209,8 +181,8 @@ const PercentileChart = React.memo(({
                                     T=0
                                 </div>
                                 <div style={{ color: '#333' }}>
-                                    {formatCompactNumber(summaryData[0].t0Value, precision || 2)}
-                                    {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
+                                    {formatCompactNumber(decimalStorage ? summaryData[0].t0Value * 100 : summaryData[0].t0Value, precision || 2)}
+                                    {units && <span style={{ marginLeft: '2px' }}>%</span>}
                                 </div>
                             </div>
                         )}

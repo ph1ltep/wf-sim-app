@@ -44,7 +44,7 @@ const FailureRateDetail = ({ record }) => {
                 <Col span={24}>
                     <div style={{ marginBottom: 12 }}>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                            Configure the statistical distribution for {record.name} failure rate. 
+                            Configure the statistical distribution for {record.name} failure rate (annual probability as percentage). 
                             Changes are applied immediately to scenario calculations.
                         </Text>
                     </div>
@@ -60,14 +60,16 @@ const FailureRateDetail = ({ record }) => {
                             step={0.001}
                             showTitle={false}
                             options={[
-                                { value: 'fixed', label: 'Fixed Rate' },
-                                { value: 'exponential', label: 'Constant Rate (Exponential)' },
-                                { value: 'weibull', label: 'Aging Effects (Weibull)' },
-                                { value: 'lognormal', label: 'General Uncertainty' },
-                                { value: 'normal', label: 'Normal Distribution' }
+                                { value: 'fixed', label: 'Fixed Rate - Constant value (no uncertainty)' },
+                                { value: 'weibull', label: 'Weibull - Aging/wear-out patterns (recommended for mechanical)' },
+                                { value: 'exponential', label: 'Exponential - Constant hazard rate (memoryless failures)' },
+                                { value: 'lognormal', label: 'Log-normal - Multiplicative effects and right skew' },
+                                { value: 'normal', label: 'Normal - Symmetric uncertainty around mean' },
+                                { value: 'beta', label: 'Beta - Bounded between 0% and 100%' },
+                                { value: 'gamma', label: 'Gamma - Shape flexibility for aging patterns' }
                             ]}
                             addonAfter="% chance/year"
-                            tooltip="Annual probability of component failure (percentage chance per component per year)"
+                            tooltip="Annual probability as percentage (e.g., 2.5% means 2.5% chance per component per year)"
                         />
                     </div>
                 </Col>
@@ -345,11 +347,21 @@ const FailureRates = () => {
         }
     };
 
-    // Format distribution for display
+    // Format distribution for display - values are stored as decimals but display as percentages
     const formatDistribution = (distribution) => {
         if (!distribution || !distribution.parameters) return 'Not configured';
         const rate = distribution.parameters.lambda || distribution.parameters.value || 0;
+        // Convert from decimal storage (0.008) to percentage display (0.8%)
         return `${(rate * 100).toFixed(2)}%`;
+    };
+
+    // Calculate expected events per year
+    const calculateExpectedEvents = (distribution, quantity) => {
+        if (!distribution || !distribution.parameters || quantity === 0) return 0;
+        const rate = distribution.parameters.lambda || distribution.parameters.value || 0;
+        // Rate is stored as decimal (e.g., 0.025 for 2.5% annual failure rate)
+        // Use directly for calculation since it's already in decimal form
+        return rate * quantity;
     };
 
     // Get cost summary icons with tooltips - using repair package structure
@@ -456,7 +468,9 @@ const FailureRates = () => {
             key: 'name',
             render: (text, record) => (
                 <Text strong>{text}</Text>
-            )
+            ),
+            flex: 1,
+            minWidth: 200
         },
         {
             title: 'Category',
@@ -467,7 +481,7 @@ const FailureRates = () => {
                     {category?.charAt(0).toUpperCase() + category?.slice(1)}
                 </Tag>
             ),
-            width: 120
+            width: 100
         },
         {
             title: 'Enabled',
@@ -536,7 +550,7 @@ const FailureRates = () => {
             align: 'center'
         },
         {
-            title: 'Annual Failure Rate',
+            title: '%/Year',
             dataIndex: 'distribution',
             key: 'baseRate',
             render: (distribution) => (
@@ -544,7 +558,7 @@ const FailureRates = () => {
                     {formatDistribution(distribution)}
                 </Text>
             ),
-            width: 120
+            width: 90
         },
         {
             title: 'Quantity',
@@ -574,12 +588,50 @@ const FailureRates = () => {
                 }
                 
                 return (
-                    <Text strong style={{ color: '#1890ff' }}>
+                    <Text>
                         {total.toLocaleString()}
                     </Text>
                 );
             },
             width: 80
+        },
+        {
+            title: 'Events/Year',
+            key: 'expectedEvents',
+            render: (_, record) => {
+                const numWTGs = getValueByPath(['settings', 'project', 'windFarm', 'numWTGs'], 100);
+                const quantityConfig = record.quantityConfig || { mode: 'perTurbine', value: 1 };
+                
+                let quantity = 0;
+                switch (quantityConfig.mode) {
+                    case 'fixed':
+                        quantity = quantityConfig.value || 0;
+                        break;
+                    case 'perBlade':
+                        quantity = numWTGs * 3 * (quantityConfig.value || 1);
+                        break;
+                    case 'perTurbine':
+                    default:
+                        // Special handling for gearboxes
+                        if (record.id === 'gearboxes') {
+                            const wtgPlatformType = getValueByPath(['settings', 'project', 'windFarm', 'wtgPlatformType'], 'geared');
+                            quantity = wtgPlatformType === 'geared' ? numWTGs * (quantityConfig.value || 1) : 0;
+                        } else {
+                            quantity = numWTGs * (quantityConfig.value || 1);
+                        }
+                        break;
+                }
+                
+                const expectedEvents = calculateExpectedEvents(record.distribution, quantity);
+                
+                return (
+                    <Text style={{ fontFamily: 'monospace' }}>
+                        {expectedEvents.toFixed(2)}
+                    </Text>
+                );
+            },
+            width: 120,
+            align: 'right'
         },
         {
             title: 'Costs',
@@ -591,7 +643,7 @@ const FailureRates = () => {
         {
             title: 'Actions',
             key: 'actions',
-            width: 120,
+            width: 100,
             render: (_, record) => (
                 <Space>
                     <Button
@@ -642,7 +694,7 @@ const FailureRates = () => {
                 <div>
                     <Text type="secondary">
                         Configure failure rates and cost modeling for major wind turbine components. 
-                        Rates are specified as annual probability (% chance per component per year). 
+                        Rates are specified as annual probability percentages per component per year. 
                         During simulation, these rates are multiplied by component quantities to estimate total expected failures.
                     </Text>
                 </div>
