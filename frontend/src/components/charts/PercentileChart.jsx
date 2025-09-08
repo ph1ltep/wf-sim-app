@@ -13,6 +13,18 @@ import {
 
 const PLOTLY_CONFIG = { responsive: true, displayModeBar: false };
 
+/**
+ * Converts decimal values to display values based on units.
+ * When units="%", multiplies values by 100 for proper percentage display.
+ * @param {number|null|undefined} value - The value to convert
+ * @param {string} units - The units (e.g., "%", "MWh")
+ * @returns {number|null|undefined} Converted value for display
+ */
+const convertValueForDisplay = (value, units) => {
+    return units === "%" ? (value != null ? value * 100 : value) : value;
+};
+
+
 // Component for rendering percentile chart and table
 /**
  * Renders a percentile chart with bands and optional table for simulation results.
@@ -46,19 +58,30 @@ const PercentileChart = React.memo(({
     // Prepare summary data for the right-hand column
     const summaryData = useMemo(() => {
         if (!hasResults) return [];
-        return prepareSummaryData(results, primaryPercentile, precision, simulationInfo?.distribution?.parameters?.value);
-    }, [hasResults, results, primaryPercentile, precision, simulationInfo]);
+        const rawSummaryData = prepareSummaryData(results, primaryPercentile, precision, simulationInfo?.distribution?.parameters?.value);
+        // Convert values for percentage display
+        return rawSummaryData.map(summary => ({
+            ...summary,
+            mean: convertValueForDisplay(summary.mean, units),
+            t0Value: convertValueForDisplay(summary.t0Value, units)
+        }));
+    }, [hasResults, results, primaryPercentile, precision, simulationInfo, units]);
 
     // Compute chart data for percentiles with bands
     const percentileChartData = useMemo(() => {
         if (!hasResults) return { data: [], layout: {}, config: PLOTLY_CONFIG };
         const chartData = preparePercentileChartData(results, primaryPercentile, color, precision, simulationInfo);
-        const enhancedData = chartData.data.map(trace => ({
-            ...trace,
-            hovertemplate: trace.name.includes('-')
-                ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y}${units ? ' ' + units : ''}<extra></extra>`
-                : `Year: %{x}<br>${trace.name}: %{y}${units ? ' ' + units : ''}<extra></extra>`
-        }));
+        const enhancedData = chartData.data.map(trace => {
+            // Convert y values for percentage display
+            const convertedTrace = {
+                ...trace,
+                y: trace.y ? trace.y.map(value => convertValueForDisplay(value, units)) : trace.y,
+                hovertemplate: trace.name.includes('-')
+                    ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y}${units ? ' ' + units : ''}<extra></extra>`
+                    : `Year: %{x}<br>${trace.name}: %{y}${units ? ' ' + units : ''}<extra></extra>`
+            };
+            return convertedTrace;
+        });
         return {
             data: enhancedData,
             layout: chartData.layout,
@@ -74,13 +97,26 @@ const PercentileChart = React.memo(({
             if (column.dataIndex !== 'year') {
                 return {
                     ...column,
-                    render: (text) => formatNumber(text, precision)
+                    render: (text) => {
+                        const convertedValue = convertValueForDisplay(text, units);
+                        return formatNumber(convertedValue, precision);
+                    }
                 };
             }
             return column;
         });
-        return { columns: formattedColumns, data: tableInfo.data };
-    }, [hasResults, dataTableVisible, results, primaryPercentile, color, precision]);
+        // Convert table data values for percentage display
+        const convertedTableData = tableInfo.data.map(row => {
+            const convertedRow = { ...row };
+            Object.keys(convertedRow).forEach(key => {
+                if (key !== 'year' && key !== 'key') {
+                    convertedRow[key] = convertValueForDisplay(convertedRow[key], units);
+                }
+            });
+            return convertedRow;
+        });
+        return { columns: formattedColumns, data: convertedTableData };
+    }, [hasResults, dataTableVisible, results, primaryPercentile, color, precision, units]);
 
     // Customize Plotly layout
     const customizedLayout = useMemo(() => ({

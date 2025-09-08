@@ -5,9 +5,19 @@ import { Divider, Empty, Table } from 'antd';
 import Plot from 'react-plotly.js';
 import { formatNumber, formatCompactNumber } from '../../utils/formatUtils';
 import { generateStatisticsTableData, prepareStatisticsBoxPlotData } from '../../utils/chartUtils';
-import { hexToRgb } from '../../utils/plotUtils';
 
 const PLOTLY_CONFIG = { responsive: true, displayModeBar: false };
+
+/**
+ * Converts decimal values to display values based on units.
+ * When units="%", multiplies values by 100 for proper percentage display.
+ * @param {number|null|undefined} value - The value to convert
+ * @param {string} units - The units (e.g., "%", "MWh")
+ * @returns {number|null|undefined} Converted value for display
+ */
+const convertValueForDisplay = (value, units) => {
+    return units === "%" ? (value != null ? value * 100 : value) : value;
+};
 
 // Component for rendering statistics box plot and table
 /**
@@ -42,7 +52,16 @@ const StatisticsChart = React.memo(({
     // Compute box plot data for statistics
     const statsChartData = useMemo(() => {
         if (!hasResults) return { data: [], layout: {}, config: PLOTLY_CONFIG };
-        return prepareStatisticsBoxPlotData(statistics, color, precision, units);
+        const chartData = prepareStatisticsBoxPlotData(statistics, color, precision, units);
+        // Convert y values for percentage display in box plot data
+        const convertedData = chartData.data.map(trace => ({
+            ...trace,
+            y: trace.y ? trace.y.map(value => convertValueForDisplay(value, units)) : trace.y
+        }));
+        return {
+            ...chartData,
+            data: convertedData
+        };
     }, [hasResults, statistics, color, precision, units]);
 
     // Lazily prepare table data for statistics only when visible
@@ -51,10 +70,23 @@ const StatisticsChart = React.memo(({
         const tableInfo = generateStatisticsTableData(statistics, color, precision);
         const formattedColumns = tableInfo.columns.map(column => ({
             ...column,
-            render: (text) => formatNumber(text, precision)
+            render: (text) => {
+                const convertedValue = convertValueForDisplay(text, units);
+                return formatNumber(convertedValue, precision);
+            }
         }));
-        return { columns: formattedColumns, data: tableInfo.data };
-    }, [hasResults, dataTableVisible, statistics, color, precision]);
+        // Convert table data values for percentage display
+        const convertedTableData = tableInfo.data.map(row => {
+            const convertedRow = { ...row };
+            Object.keys(convertedRow).forEach(key => {
+                if (key !== 'year' && key !== 'key') {
+                    convertedRow[key] = convertValueForDisplay(convertedRow[key], units);
+                }
+            });
+            return convertedRow;
+        });
+        return { columns: formattedColumns, data: convertedTableData };
+    }, [hasResults, dataTableVisible, statistics, color, precision, units]);
 
     // Compute summary statistics for right-side box
     const summaryStats = useMemo(() => {
@@ -65,8 +97,14 @@ const StatisticsChart = React.memo(({
             min: statistics.min.reduce((min, point) => Math.min(min, point.value), Infinity),
             max: statistics.max.reduce((max, point) => Math.max(max, point.value), -Infinity)
         };
-        return stats;
-    }, [hasResults, statistics]);
+        // Convert values for percentage display
+        return {
+            mean: convertValueForDisplay(stats.mean, units),
+            stdDev: convertValueForDisplay(stats.stdDev, units),
+            min: convertValueForDisplay(stats.min, units),
+            max: convertValueForDisplay(stats.max, units)
+        };
+    }, [hasResults, statistics, units]);
 
     // Customize Plotly layout
     const customizedLayout = useMemo(() => ({
