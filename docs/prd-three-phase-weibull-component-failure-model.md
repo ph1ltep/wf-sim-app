@@ -18,19 +18,20 @@ Design a physics-based component failure rate model that generates realistic ann
 ## 2. Technical Architecture
 
 ### 2.1 Model Structure
-The model implements a **piecewise hazard function** using three sequential Weibull distributions:
+The model implements a **piecewise hazard function** using three sequential Weibull distributions, with ensured continuity at phase transitions:
 
 ```yaml
 Three-Phase Structure:
-  Phase 1 - Infant Mortality: Years 0-2, β < 1 (decreasing hazard)
-  Phase 2 - Useful Life: Years 2-(0.85×design_life), β = 1 (constant hazard)
-  Phase 3 - Wear-out: Years (0.85×design_life)-30, β > 1 (increasing hazard)
+  Phase 1 - Infant Mortality: Years 0-2, β = 0.6 (decreasing hazard)
+  Phase 2 - Useful Life: Years 2-max(15, 0.8×design_life), β = 1 (constant hazard)
+  Phase 3 - Wear-out: Years max(15, 0.8×design_life)-30, β = 3.0 (increasing hazard)
+  Continuity: Hazard rates matched at phase boundaries within tolerance
 ```
 
 ### 2.2 Data Flow
 ```
 Site Data + OEM Specs → Physics Calculations → Load Factors → 
-Weibull Parameters (β,η) → Annual Failure Rates → SimResultsSchema
+Weibull Parameters (β,η) → Cumulative Hazards → Annual Failure Rates → SimResultsSchema
 ```
 
 ## 3. Input Parameters
@@ -108,6 +109,13 @@ Weibull Parameters (β,η) → Annual Failure Rates → SimResultsSchema
 | source_park_similarity | float | 0-1 similarity score | Transfer confidence |
 | fleet_baseline_rate | float | Industry average rate | Prior for Bayesian update |
 
+### 3.5 Additional Model Parameters
+
+| Parameter | Type | Range/Values | Default | Description |
+|-----------|------|--------------|---------|-------------|
+| phase_continuity_tolerance | float | 0.01-0.1 | 0.05 | Max allowed hazard discontinuity at transitions |
+| wear_out_multiplier | float | 2.0-3.0 | 2.5 | Hazard scaling at design_life for Phase 3 |
+
 ## 4. Physics-Based Calculations
 
 ### 4.1 Load Factor Calculations
@@ -132,6 +140,7 @@ Gearbox:
   bearing_life_years = L10_hours / (8760 × capacity_factor)
   oil_thermal_factor = if temp > 70°C: 3.0, else: 1.0
   stages_multiplier = 1 + 0.2 × (stages - 1)
+  interaction_factor = 1.1 if generator_cooling_method == 'air' else 1.0  # Minor thermal spillover
 
 Generator:
   thermal_limit_factor = (junction_temp / insulation_limit)³
@@ -156,41 +165,39 @@ Power Electronics:
 
 ```yaml
 Step 1 - Calculate Adjusted Baseline:
-  adjusted_rate = fleet_baseline × site_load_factor × component_factor
+  adjusted_rate = fleet_baseline × site_load_factor × component_factor × interaction_factor
 
-Step 2 - Generate Phase Parameters:
+Step 2 - Generate Phase Parameters with Continuity:
   Phase 1 (Infant Mortality):
-    β₁ = 0.5 to 0.8
-    η₁ = solve for 50% lower rate than baseline
-    duration = 2 years (fixed)
+    β₁ = 0.6
+    η₁ = solve iteratively so average hazard over [0,2] = 0.5 × adjusted_rate
+    duration = min(2, max(1, operational_years / 3)) if calibrated else 2
   
   Phase 2 (Useful Life):
     β₂ = 1.0 (exponential)
-    η₂ = 1 / adjusted_baseline_rate
-    duration = 2 to (design_life × 0.85)
+    η₂ = 1 / adjusted_rate
+    duration = max(15, 0.8 × design_life) - duration_phase1
   
   Phase 3 (Wear-out):
-    β₃ = 2.5 to 3.5
-    η₃ = calibrated to 2.5× baseline at design_life
-    duration = (design_life × 0.85) to 30 years
+    β₃ = 3.0
+    η₃ = solve so h3(t_design - t_phase3_start) = wear_out_multiplier × adjusted_rate
+    Adjust η₃ slightly to ensure h3(0) ≈ h2(duration_phase2) within tolerance
+    duration = 30 - (duration_phase1 + duration_phase2)
 ```
 
 ### 5.2 Annual Failure Probability Calculation
 
 ```yaml
-For each year t in [1, 30]:
-  if t ≤ 2:
-    phase = 1
-    t_phase = t
-  elif t ≤ design_life × 0.85:
-    phase = 2
-    t_phase = t - 2
-  else:
-    phase = 3
-    t_phase = t - (design_life × 0.85)
-  
-  hazard_rate = (β[phase] / η[phase]) × (t_phase / η[phase])^(β[phase] - 1)
-  annual_failure_prob[t] = 1 - exp(-hazard_rate)
+Define Cumulative Hazard H(τ):
+  d1 = duration_phase1
+  d2 = d1 + duration_phase2
+  If τ ≤ d1: H(τ) = (τ / η₁)^β₁
+  If d1 < τ ≤ d2: H(τ) = (d1 / η₁)^β₁ + ((τ - d1) / η₂)^β₂
+  If τ > d2: H(τ) = (d1 / η₁)^β₁ + (d2 / η₂)^β₂ + ((τ - d2) / η₃)^β₃
+
+For each integer year t in [1, 30]:
+  ΔH_t = H(t) - H(t - 1)
+  annual_failure_prob[t] = 1 - exp(-ΔH_t)
 ```
 
 ## 6. Output Specification
@@ -239,10 +246,12 @@ Transfer Confidence:
 
 ```yaml
 By Years Available:
-  Years 1-3: Update infant mortality (β₁, η₁) directly
+  Years 1-3: Update infant mortality (β₁, η₁) directly, enforcing continuity
   Years 4-8: Calibrate useful life rate with high confidence
   Years 9-15: Detect wear-out trend, extrapolate remaining life
   Years 16+: Full validation of all three phases
+
+Additional: If >5 years data, fit β values via MLE, penalizing discontinuous posteriors
 ```
 
 ## 8. Validation Requirements
@@ -255,7 +264,7 @@ By Years Available:
 ### 8.2 Statistical Validation
 - Monotonic hazard rate in wear-out phase
 - Cumulative failures match SGRE operational data ±15%
-- Phase transitions occur at expected lifecycle points
+- Phase transitions occur at expected lifecycle points with smooth continuity
 
 ### 8.3 Component Ranking
 Expected failure rate hierarchy (highest to lowest):
@@ -268,20 +277,20 @@ Expected failure rate hierarchy (highest to lowest):
 ## 9. Implementation Phases
 
 ### Phase 1: Core Model (Priority)
-- Implement three-phase Weibull parameter generation
+- Implement three-phase Weibull parameter generation with continuity
 - Add physics-based load factor calculations
-- Generate annual failure probability arrays
+- Generate annual failure probability arrays using cumulative hazards
 - Support gearbox and generator (highest impact components)
 
 ### Phase 2: Full Component Coverage
 - Add main bearing, blades, power electronics
-- Implement component-specific physics adjustments
+- Implement component-specific physics adjustments including minor interactions
 - Add environmental degradation factors
 
 ### Phase 3: Calibration Framework
 - Site similarity matching algorithm
 - Operational data integration
-- Bayesian parameter updating
+- Bayesian parameter updating with continuity enforcement
 - Confidence weighting system
 
 ### Phase 4: Maintenance Impact (Future)
@@ -292,19 +301,19 @@ Expected failure rate hierarchy (highest to lowest):
 ## 10. Key Design Decisions
 
 ### 10.1 Fixed Assumptions
-- Infant mortality duration: 2 years (industry standard)
-- Wear-out start: 85% of design life (IEC fatigue methodology)
-- Phase transitions: Hard boundaries (not gradual)
+- Infant mortality duration: 2 years (industry standard, data-flexible)
+- Wear-out start: max(15, 0.8×design_life) (adjusted for realism in IEC fatigue methodology)
+- Phase transitions: Hard boundaries with enforced continuity (not gradual)
 
 ### 10.2 Physics-First Principles
 - All load factors derived from measurable site data
 - No arbitrary correlation factors
-- Component interactions minimal (no cascading failures)
+- Minor component interactions (capped at 10% impact) for select pairs
 
 ### 10.3 Integration Constraints
 - Output format: Simple annual probability arrays
 - Backend handles distribution sampling and uncertainty
-- Component independence maintained for simplicity
+- Component semi-independence maintained for simplicity
 
 ## Appendix A: Default Fleet Baseline Rates
 
