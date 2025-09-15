@@ -382,30 +382,81 @@ const renderVisualization = () => {
 };
 ```
 
-## Backend Implementation
+## Backend Physics Engine Implementation
 
-### 1. New Physics Simulation API Route
+### **Architecture Overview**
+The physics engine follows the same extensible pattern as `monte-carlo-v2/distributions/` but for complex multi-parameter physics models. It orchestrates dependencies internally and provides a clean API for physics-based calculations.
+
+```
+/backend/services/physics/
+├── index.js                          ← Physics engine factory
+├── physicsEngine.js                  ← Central orchestrator
+├── models/
+│   ├── physicsModelBase.js          ← Base class for all physics models
+│   ├── threePhaseWeibull.js         ← Three-phase Weibull failure model
+│   └── [future models]              ← Extensible for other physics models
+└── utils/
+    ├── loadFactorCalculations.js    ← Shared physics utilities
+    └── continuityConstraints.js     ← Shared math functions
+```
+
+### 1. Physics Request Schema
+
+**File**: `/schemas/yup/physicsRequest.js`
+```javascript
+const Yup = require('yup');
+const { DistributionTypeSchema } = require('./distribution');
+const { CubeSourceDataSchema } = require('./cubeData'); // Assuming this exists
+
+const PhysicsRequestSchema = Yup.object().shape({
+  model: Yup.string().oneOf(['three-phase-weibull']).required(),
+
+  components: Yup.array().of(
+    Yup.object().shape({
+      id: Yup.string().required(),
+      type: Yup.string().oneOf(['gearboxes', 'generators', 'blades', 'mainBearings']).required(),
+      parameters: Yup.object().required() // Component-specific physics params
+    })
+  ).min(1).required(),
+
+  // Loose inputs - validated by individual models
+  inputs: Yup.object().required(),
+
+  // Typed dependencies - handled uniformly by engine
+  dependencies: Yup.object().shape({
+    distributions: Yup.array().of(DistributionTypeSchema).optional(),
+    sources: Yup.array().of(CubeSourceDataSchema).optional()
+  }).optional(),
+
+  settings: Yup.object().shape({
+    iterations: Yup.number().min(1000).max(50000).default(10000),
+    years: Yup.number().min(1).max(50).default(25),
+    percentiles: Yup.array().of(Yup.number().min(1).max(99)).default([5, 25, 50, 75, 95]),
+    seed: Yup.number().optional()
+  })
+});
+
+module.exports = { PhysicsRequestSchema };
+```
+
+### 2. Physics API Routes
 
 **File**: `/backend/routes/physicsRoutes.js`
 ```javascript
 const express = require('express');
 const router = express.Router();
 const { validateMiddleware } = require('../utils/validate');
-const { PhysicsSimRequestSchema } = require('../../schemas/yup/physicsSimulation');
+const { PhysicsRequestSchema } = require('../../schemas/yup/physicsRequest');
 const {
-    simulatePhysicsDistributions,
-    getPhysicsModelsInfo,
-    validatePhysicsParameters
+    simulatePhysics,
+    getPhysicsModels
 } = require('../controllers/physicsController');
 
-// POST /api/physics/simulate - Physics-based simulation with dependencies
-router.post('/simulate', validateMiddleware(PhysicsSimRequestSchema), simulatePhysicsDistributions);
+// POST /api/physics/simulate - Physics-based simulation
+router.post('/simulate', validateMiddleware(PhysicsRequestSchema), simulatePhysics);
 
-// GET /api/physics/info - Physics model metadata
-router.get('/info', getPhysicsModelsInfo);
-
-// POST /api/physics/validate - Physics parameter validation
-router.post('/validate', validatePhysicsParameters);
+// GET /api/physics/models - Available physics models
+router.get('/models', getPhysicsModels);
 
 module.exports = router;
 ```
@@ -417,342 +468,541 @@ const physicsRoutes = require('./physicsRoutes');
 app.use('/api/physics', physicsRoutes);
 ```
 
-### 2. Physics Simulation Controller
+### 3. Physics Controller
 
 **File**: `/backend/controllers/physicsController.js`
 ```javascript
-const { createPhysicsEngine } = require('../services/physics-monte-carlo');
+const { createPhysicsEngine } = require('../services/physics');
 const { formatSuccess, formatError } = require('../utils/responseFormatter');
 
-const simulatePhysicsDistributions = async (req, res) => {
-    try {
-        const {
-            distributions,     // Components to simulate (failure_rate_weibull)
-            dependencies,      // Physics inputs (windVariability, temperature, etc.)
-            settings = {}
-        } = req.body;
+const simulatePhysics = async (req, res) => {
+  try {
+    // Request already validated by middleware
+    const { model, components, inputs, dependencies = {}, settings = {} } = req.body;
 
-        // Validate that all distributions are physics-compatible
-        const physicsDistributions = distributions.filter(d => d.type === 'failure_rate_weibull');
-        if (physicsDistributions.length !== distributions.length) {
-            return res.status(400).json(formatError(
-                'Physics simulation route only supports failure_rate_weibull distributions'
-            ));
-        }
+    // Create and execute physics model
+    const engine = createPhysicsEngine();
+    const results = await engine.simulate(model, components, inputs, dependencies, settings);
 
-        // Create physics-aware Monte Carlo engine
-        const engine = createPhysicsEngine({
-            iterations: settings.iterations || 10000,
-            years: settings.years || 25,
-            seed: settings.seed,
-            percentiles: settings.percentiles || [5, 25, 50, 75, 95]
-        });
-
-        // Run simulation with dependency optimization
-        const results = await engine.simulateWithDependencies(distributions, dependencies);
-
-        res.json(formatSuccess('Physics simulation completed', results));
-    } catch (error) {
-        console.error('Physics simulation error:', error);
-        res.status(500).json(formatError(error.message));
+    res.json(formatSuccess('Physics simulation completed', results));
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json(formatError('Invalid request format', error.errors));
     }
+    res.status(500).json(formatError(error.message));
+  }
 };
 
-const getPhysicsModelsInfo = async (req, res) => {
-    try {
-        const modelsInfo = {
-            supportedTypes: ['failure_rate_weibull'],
-            requiredDependencies: [
-                'windVariability',
-                'temperatureRange',
-                'turbulenceIntensity'
-            ],
-            componentTypes: [
-                'gearboxes', 'generators', 'blades',
-                'bladeBearings', 'transformers', 'converters',
-                'mainBearings', 'yawSystems'
-            ]
-        };
+const getPhysicsModels = async (req, res) => {
+  try {
+    const engine = createPhysicsEngine();
+    const models = engine.getAvailableModels();
 
-        res.json(formatSuccess('Physics models info retrieved', modelsInfo));
-    } catch (error) {
-        res.status(500).json(formatError(error.message));
-    }
-};
-
-const validatePhysicsParameters = async (req, res) => {
-    try {
-        const { distribution } = req.body;
-
-        // Validate physics parameters
-        // ... validation logic
-
-        res.json(formatSuccess('Parameters valid'));
-    } catch (error) {
-        res.status(400).json(formatError(error.message));
-    }
+    res.json(formatSuccess('Available physics models', models));
+  } catch (error) {
+    res.status(500).json(formatError(error.message));
+  }
 };
 
 module.exports = {
-    simulatePhysicsDistributions,
-    getPhysicsModelsInfo,
-    validatePhysicsParameters
+  simulatePhysics,
+  getPhysicsModels
 };
 ```
 
-### 3. Physics Monte Carlo Service
+### 4. Physics Engine Core
 
-**File**: `/backend/services/physics-monte-carlo/index.js`
+**File**: `/backend/services/physics/index.js`
 ```javascript
-const PhysicsMonteCarloEngine = require('./physicsEngine');
-const FailureRateWeibullDistribution = require('./distributions/failureRateWeibull');
+const PhysicsEngine = require('./physicsEngine');
+const ThreePhaseWeibullModel = require('./models/threePhaseWeibull');
 
 const createPhysicsEngine = (settings = {}) => {
-    const engine = new PhysicsMonteCarloEngine(settings);
+  const engine = new PhysicsEngine(settings);
 
-    // Register physics-aware distributions
-    engine.registerDistribution('failure_rate_weibull', FailureRateWeibullDistribution);
+  // Auto-register physics models (like distributions)
+  engine.registerModel('three-phase-weibull', ThreePhaseWeibullModel);
+  // Future: engine.registerModel('fatigue-lifecycle', FatigueLifeCycleModel);
 
-    return engine;
+  return engine;
 };
 
-module.exports = {
-    createPhysicsEngine
+module.exports = { createPhysicsEngine };
+```
+
+**File**: `/backend/services/physics/physicsEngine.js`
+```javascript
+const { createEngine } = require('../monte-carlo-v2');
+
+class PhysicsEngine {
+  constructor(settings) {
+    this.settings = settings;
+    this.models = new Map();
+  }
+
+  registerModel(name, modelClass) {
+    this.models.set(name, modelClass);
+  }
+
+  async simulate(modelName, components, inputs, dependencies = {}, settings = {}) {
+    const ModelClass = this.models.get(modelName);
+    if (!ModelClass) {
+      throw new Error(`Unknown physics model: ${modelName}`);
+    }
+
+    // Validate inputs against model requirements
+    const validatedInputs = ModelClass.validateInputs(inputs);
+
+    // Validate dependencies against model requirements
+    ModelClass.validateDependencies(dependencies);
+
+    // Pre-process dependencies uniformly
+    const dependencyResults = await this.preprocessDependencies(dependencies, {
+      ...this.settings,
+      ...settings
+    });
+
+    // Execute model with clean, processed data
+    const model = new ModelClass();
+    return await model.execute(components, validatedInputs, dependencyResults, {
+      ...this.settings,
+      ...settings
+    });
+  }
+
+  async preprocessDependencies(dependencies, settings) {
+    const results = {};
+
+    // Process distributions array through monte-carlo-v2
+    if (dependencies.distributions && dependencies.distributions.length > 0) {
+      const mcEngine = createEngine(settings);
+      const mcResults = await mcEngine.simulate(dependencies.distributions);
+      results.distributions = mcResults;
+    }
+
+    // Process sources array (CubeSourceDataSchema)
+    if (dependencies.sources && dependencies.sources.length > 0) {
+      results.sources = {};
+
+      dependencies.sources.forEach(source => {
+        // source is CubeSourceDataSchema with sourceId, data, etc.
+        results.sources[source.sourceId] = this.processCubeSource(source, settings);
+      });
+    }
+
+    return results;
+  }
+
+  processCubeSource(cubeSource, settings) {
+    // cubeSource is CubeSourceDataSchema
+    // Convert to per-iteration format for physics models
+    const processed = {};
+
+    for (let iteration = 1; iteration <= settings.iterations; iteration++) {
+      // Sample from cube source data
+      if (cubeSource.data && cubeSource.data.length > 0) {
+        const randomIndex = Math.floor(Math.random() * cubeSource.data.length);
+        processed[iteration] = cubeSource.data[randomIndex].value;
+      } else {
+        processed[iteration] = 0;
+      }
+    }
+
+    return processed;
+  }
+
+  getAvailableModels() {
+    const models = {};
+    for (const [name, ModelClass] of this.models) {
+      models[name] = ModelClass.getMetadata();
+    }
+    return models;
+  }
+}
+
+module.exports = PhysicsEngine;
+```
+
+### 5. Physics Model Base Class
+
+**File**: `/backend/services/physics/models/physicsModelBase.js`
+```javascript
+class PhysicsModelBase {
+  static getMetadata() {
+    throw new Error('getMetadata() must be implemented by physics model');
+  }
+
+  static getInputRequirements() {
+    throw new Error('getInputRequirements() must be implemented by physics model');
+  }
+
+  static getDependencyRequirements() {
+    return {
+      distributions: [], // List of required distribution indices or names
+      sources: []        // List of required source sourceIds
+    };
+  }
+
+  static validateInputs(inputs) {
+    const requirements = this.getInputRequirements();
+
+    // Check for required fields
+    for (const field of requirements.required || []) {
+      if (!inputs[field]) {
+        throw new Error(`Missing required input: ${field}`);
+      }
+    }
+
+    // Validate field types/values if specified
+    if (requirements.schema) {
+      return requirements.schema.validate(inputs);
+    }
+
+    return inputs;
+  }
+
+  static validateDependencies(dependencies) {
+    const requirements = this.getDependencyRequirements();
+
+    // Check required distributions count
+    if (requirements.distributions.length > 0) {
+      if (!dependencies.distributions || dependencies.distributions.length < requirements.distributions.length) {
+        throw new Error(`Requires ${requirements.distributions.length} distributions`);
+      }
+    }
+
+    // Check required sources
+    for (const sourceId of requirements.sources) {
+      const hasSource = dependencies.sources?.some(source => source.sourceId === sourceId);
+      if (!hasSource) {
+        throw new Error(`Missing required source: ${sourceId}`);
+      }
+    }
+
+    return true;
+  }
+
+  async execute(components, inputs, dependencyResults, settings) {
+    throw new Error('execute() must be implemented by physics model');
+  }
+}
+
+module.exports = PhysicsModelBase;
+```
+
+### 6. Three-Phase Weibull Model Implementation
+
+**File**: `/backend/services/physics/models/threePhaseWeibull.js`
+```javascript
+const Yup = require('yup');
+const PhysicsModelBase = require('./physicsModelBase');
+
+class ThreePhaseWeibullModel extends PhysicsModelBase {
+  static getMetadata() {
+    return {
+      name: 'Three-Phase Weibull Component Failure',
+      description: 'Physics-based failure modeling with infant mortality, useful life, and wear-out phases',
+      supportedComponents: ['gearboxes', 'generators', 'blades', 'mainBearings'],
+      outputFormat: 'SimResultsSchema[]'
+    };
+  }
+
+  static getInputRequirements() {
+    return {
+      required: ['siteConditions', 'turbineSpecs'],
+      schema: Yup.object().shape({
+        siteConditions: Yup.object().shape({
+          windShearExponent: Yup.number().required(),
+          airDensity: Yup.number().required(),
+          salinityLevel: Yup.string().oneOf(['low', 'moderate', 'high', 'marine']).required(),
+          startStopCyclesPerYear: Yup.number().default(200)
+        }).required(),
+
+        turbineSpecs: Yup.object().shape({
+          iecClass: Yup.string().oneOf(['IA', 'IB', 'IIA', 'IIB']).required(),
+          designLifeYears: Yup.number().oneOf([20, 25, 30]).required(),
+          ratedPowerMW: Yup.number().required()
+        }).required(),
+
+        // Optional calibration data
+        calibration: Yup.object().shape({
+          operationalYears: Yup.number().nullable(),
+          observedFailures: Yup.array().of(Yup.number()).default([]),
+          fleetBaselineRate: Yup.number().nullable()
+        }).optional()
+      })
+    };
+  }
+
+  static getDependencyRequirements() {
+    return {
+      distributions: [
+        { index: 0, name: 'windVariability' },
+        { index: 1, name: 'temperatureRange' },
+        { index: 2, name: 'turbulenceIntensity' }
+      ],
+      sources: [] // Optional: ['historicalFailures', 'downtimeEvents']
+    };
+  }
+
+  async execute(components, inputs, dependencyResults, settings) {
+    // Inputs are already validated by engine
+    // dependencyResults contains processed distribution and source data
+
+    const results = {};
+
+    for (const component of components) {
+      results[component.id] = await this.calculateComponentFailures(
+        component,
+        inputs,
+        dependencyResults,
+        settings
+      );
+    }
+
+    return results;
+  }
+
+  async calculateComponentFailures(component, inputs, dependencyResults, settings) {
+    const results = {};
+
+    for (let iteration = 1; iteration <= settings.iterations; iteration++) {
+      // Extract dependency values for this iteration - clean, pre-processed
+      const physicsInputs = {
+        windSpeed: dependencyResults.distributions[0][iteration],
+        tempRange: dependencyResults.distributions[1][iteration],
+        turbulence: dependencyResults.distributions[2][iteration]
+      };
+
+      // If we have sources, extract those too
+      if (dependencyResults.sources?.['historicalFailures']) {
+        physicsInputs.historicalData = dependencyResults.sources['historicalFailures'][iteration];
+      }
+
+      // Calculate load factors using clean inputs
+      const loadFactors = this.calculateLoadFactors({
+        ...physicsInputs,
+        component,
+        siteConditions: inputs.siteConditions,
+        turbineSpecs: inputs.turbineSpecs,
+        calibration: inputs.calibration
+      });
+
+      // Generate three-phase Weibull parameters
+      const phases = this.calculateThreePhaseParameters(loadFactors, component.parameters);
+
+      // Calculate annual failure rates
+      const annualRates = {};
+      for (let year = 1; year <= settings.years; year++) {
+        annualRates[year] = this.sampleThreePhaseWeibull(phases, year, iteration, year);
+      }
+
+      // Store iteration results
+      Object.keys(annualRates).forEach(year => {
+        if (!results[year]) results[year] = [];
+        results[year].push(annualRates[year]);
+      });
+    }
+
+    return this.processResultsToSchema(results, settings.percentiles);
+  }
+
+  calculateLoadFactors({ windSpeed, tempRange, turbulence, component, siteConditions, turbineSpecs, calibration }) {
+    // Implement PRD Section 3 physics calculations
+    const baseFactors = {
+      wind: Math.pow(windSpeed / 8.5, 2),
+      thermal: Math.pow(tempRange / 60, 2),
+      turbulence: Math.pow(turbulence / 0.16, 3)
+    };
+
+    // Component-specific adjustments
+    const componentFactors = this.getComponentSpecificFactors(component, siteConditions, turbineSpecs);
+
+    return {
+      ...baseFactors,
+      ...componentFactors,
+      combined: baseFactors.wind * baseFactors.thermal * baseFactors.turbulence * componentFactors.component
+    };
+  }
+
+  getComponentSpecificFactors(component, siteConditions, turbineSpecs) {
+    // Component-specific physics from PRD Section 4
+    switch (component.type) {
+      case 'gearboxes':
+        return {
+          component: this.calculateGearboxFactors(component.parameters, siteConditions),
+          bearingLife: component.parameters.bearingL10Hours / 175000,
+          stageMultiplier: 1 + 0.2 * (component.parameters.gearStages - 1)
+        };
+
+      case 'generators':
+        return {
+          component: this.calculateGeneratorFactors(component.parameters, siteConditions),
+          thermalLimit: Math.pow(70 / component.parameters.maxOperatingTemp, 3),
+          coolingFactor: component.parameters.coolingMethod === 'liquid' ? 0.8 : 1.0
+        };
+
+      case 'blades':
+        return {
+          component: this.calculateBladeFactors(component.parameters, siteConditions),
+          fatigueFactor: component.parameters.fatigueLimitMPa / 100,
+          surfaceFactor: component.parameters.surfaceTreatment === 'premium' ? 0.7 : 1.0
+        };
+
+      default:
+        return { component: 1.0 };
+    }
+  }
+
+  calculateThreePhaseParameters(loadFactors, componentParams) {
+    // Apply load factors to base Weibull parameters with continuity constraints
+    const baseFailureRate = 0.02; // 2% annual base rate
+    const adjustedRate = baseFailureRate * loadFactors.combined;
+
+    // Calculate three-phase parameters following PRD Section 5 methodology
+    return {
+      phase1: {
+        shape: 0.6, // Fixed infant mortality shape
+        scale: this.solveForContinuity(0.6, adjustedRate * 0.5, 2) // Lower rate in early years
+      },
+      phase2: {
+        shape: 1.0, // Exponential (constant hazard)
+        scale: 1 / adjustedRate
+      },
+      phase3: {
+        shape: 3.0, // Fixed wear-out shape
+        scale: this.solveForWearOut(3.0, adjustedRate * 2.5, 25) // Higher rate in later years
+      }
+    };
+  }
+
+  sampleThreePhaseWeibull(phases, year, iteration, yearInPhase) {
+    // Determine current phase based on year and component lifecycle
+    let currentPhase;
+    if (year <= 2) {
+      currentPhase = phases.phase1;
+    } else if (year <= 22) {
+      currentPhase = phases.phase2;
+    } else {
+      currentPhase = phases.phase3;
+    }
+
+    // Generate deterministic random for this specific iteration/year
+    const random = this.getSeededRandom(iteration, year);
+
+    // Weibull inverse transform sampling
+    const { shape, scale } = currentPhase;
+    return scale * Math.pow(-Math.log(1 - random), 1 / shape);
+  }
+
+  getSeededRandom(iteration, year) {
+    // Deterministic random based on iteration and year
+    const seedValue = `${iteration}-${year}`;
+    let hash = 0;
+    for (let i = 0; i < seedValue.length; i++) {
+      const char = seedValue.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash) / Math.pow(2, 31);
+  }
+
+  processResultsToSchema(results, percentiles) {
+    // Convert to SimResultsSchema format with percentiles
+    const processedYears = {};
+
+    Object.keys(results).forEach(year => {
+      const yearValues = results[year].sort((a, b) => a - b);
+
+      processedYears[year] = {
+        values: yearValues,
+        percentiles: percentiles.reduce((acc, p) => {
+          const index = Math.floor((p / 100) * yearValues.length);
+          acc[p] = yearValues[index];
+          return acc;
+        }, {}),
+        mean: yearValues.reduce((sum, v) => sum + v, 0) / yearValues.length,
+        stdDev: this.calculateStdDev(yearValues)
+      };
+    });
+
+    return {
+      type: 'failure_rate_weibull',
+      years: processedYears,
+      metadata: {
+        physicsEnabled: true,
+        model: 'three-phase-weibull'
+      }
+    };
+  }
+
+  calculateStdDev(values) {
+    const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+    const squaredDiffs = values.map(v => Math.pow(v - mean, 2));
+    const avgSquaredDiff = squaredDiffs.reduce((sum, d) => sum + d, 0) / values.length;
+    return Math.sqrt(avgSquaredDiff);
+  }
+}
+
+module.exports = ThreePhaseWeibullModel;
+```
+
+### 7. Frontend Integration
+
+The frontend `failure_rate_weibull` distribution calls the physics API with structured inputs:
+
+```javascript
+// Frontend physics request structure
+const physicsRequest = {
+  model: 'three-phase-weibull',
+
+  components: [
+    {
+      id: 'gearbox_1',
+      type: 'gearboxes',
+      parameters: {
+        bearingL10Hours: 175000,
+        gearStages: 3,
+        bearingCount: 8
+      }
+    }
+  ],
+
+  inputs: {
+    siteConditions: {
+      windShearExponent: 0.14,
+      airDensity: 1.225,
+      salinityLevel: 'moderate',
+      startStopCyclesPerYear: 200
+    },
+    turbineSpecs: {
+      iecClass: 'IIA',
+      designLifeYears: 25,
+      ratedPowerMW: 5.0
+    }
+  },
+
+  dependencies: {
+    // Array of DistributionTypeSchema
+    distributions: [
+      getValueByPath(['settings', 'project', 'environment', 'weather', 'windVariability']),
+      getValueByPath(['settings', 'project', 'environment', 'weather', 'temperatureRange']),
+      getValueByPath(['settings', 'project', 'environment', 'siteConditions', 'turbulenceIntensity'])
+    ],
+
+    // Array of CubeSourceDataSchema (optional)
+    sources: [
+      getCubeData({ sourceId: 'component_failures', percentile: 50 }),
+      getCubeData({ sourceId: 'downtime_events', percentile: 75 })
+    ]
+  },
+
+  settings: {
+    iterations: 10000,
+    years: 25,
+    percentiles: [5, 25, 50, 75, 95]
+  }
 };
-```
-
-**File**: `/backend/services/physics-monte-carlo/physicsEngine.js`
-```javascript
-class PhysicsMonteCarloEngine {
-    constructor(settings) {
-        this.iterations = settings.iterations || 10000;
-        this.years = settings.years || 25;
-        this.seed = settings.seed || Math.random();
-        this.percentiles = settings.percentiles || [5, 25, 50, 75, 95];
-        this.distributions = new Map();
-    }
-
-    registerDistribution(type, distributionClass) {
-        this.distributions.set(type, distributionClass);
-    }
-
-    async simulateWithDependencies(distributions, dependencies) {
-        const results = {};
-
-        for (let iteration = 1; iteration <= this.iterations; iteration++) {
-            const iterationResults = {};
-
-            // 1. Calculate dependencies first (physics inputs)
-            const dependencyContext = await this.calculateDependencies(dependencies, iteration);
-
-            // 2. Calculate failure rate distributions using dependency context
-            for (const distConfig of distributions) {
-                const DistributionClass = this.distributions.get(distConfig.type);
-                const distribution = new DistributionClass(distConfig.parameters);
-
-                const yearlyResults = {};
-                for (let year = 1; year <= this.years; year++) {
-                    const random = this.getSeededRandom(distConfig.id, iteration, year);
-                    yearlyResults[year] = distribution.generate(year, random, dependencyContext);
-                }
-
-                iterationResults[distConfig.id] = yearlyResults;
-            }
-
-            // Store results
-            Object.keys(iterationResults).forEach(id => {
-                if (!results[id]) results[id] = [];
-                results[id].push(iterationResults[id]);
-            });
-        }
-
-        // Calculate percentiles and return SimResultsSchema format
-        return this.processResults(results);
-    }
-
-    async calculateDependencies(dependencies, iteration) {
-        const dependencyResults = {};
-
-        for (const depConfig of dependencies) {
-            // Use existing monte-carlo-v2 engine for standard distributions
-            const { createEngine } = require('../monte-carlo-v2');
-            const standardEngine = createEngine({
-                iterations: 1,
-                years: this.years,
-                seed: this.getSeededRandom(depConfig.id, iteration)
-            });
-
-            const result = await standardEngine.simulate([depConfig]);
-            dependencyResults[depConfig.id] = result[depConfig.id];
-        }
-
-        return { dependencies: dependencyResults };
-    }
-
-    processResults(results) {
-        // Convert to SimResultsSchema format with percentiles
-        const processedResults = {};
-
-        Object.keys(results).forEach(distributionId => {
-            const yearlyData = results[distributionId];
-            const processedYears = {};
-
-            for (let year = 1; year <= this.years; year++) {
-                const yearValues = yearlyData.map(iteration => iteration[year]).sort((a, b) => a - b);
-
-                processedYears[year] = {
-                    values: yearValues,
-                    percentiles: this.percentiles.reduce((acc, p) => {
-                        const index = Math.floor((p / 100) * yearValues.length);
-                        acc[p] = yearValues[index];
-                        return acc;
-                    }, {}),
-                    mean: yearValues.reduce((sum, v) => sum + v, 0) / yearValues.length,
-                    stdDev: this.calculateStdDev(yearValues)
-                };
-            }
-
-            processedResults[distributionId] = {
-                type: 'failure_rate_weibull',
-                years: processedYears,
-                metadata: {
-                    iterations: this.iterations,
-                    physicsEnabled: true
-                }
-            };
-        });
-
-        return processedResults;
-    }
-
-    getSeededRandom(id, iteration, year = 1) {
-        // Deterministic random based on seed, id, iteration, year
-        const seedValue = `${this.seed}-${id}-${iteration}-${year}`;
-        // Simple seeded random implementation
-        let hash = 0;
-        for (let i = 0; i < seedValue.length; i++) {
-            const char = seedValue.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
-        }
-        return Math.abs(hash) / Math.pow(2, 31);
-    }
-}
-
-module.exports = PhysicsMonteCarloEngine;
-```
-
-### 4. Failure Rate Weibull Distribution
-
-**File**: `/backend/services/physics-monte-carlo/distributions/failureRateWeibull.js`
-```javascript
-class FailureRateWeibullDistribution {
-    constructor(parameters) {
-        this.parameters = parameters;
-        this.componentPhysics = parameters.componentPhysics || {};
-        this.validate();
-    }
-
-    static getMetadata() {
-        return {
-            name: 'Physics-Based Three-Phase Weibull',
-            description: 'Component failure modeling with physics load factors and lifecycle phases',
-            requiredParameters: ['phase1', 'phase2', 'phase3'],
-            dependsOn: ['windVariability', 'temperatureRange', 'turbulenceIntensity']
-        };
-    }
-
-    validate() {
-        const phases = ['phase1', 'phase2', 'phase3'];
-        phases.forEach(phase => {
-            if (!this.parameters[phase] ||
-                !this.parameters[phase].shape ||
-                !this.parameters[phase].scale) {
-                throw new Error(`Missing ${phase} parameters`);
-            }
-        });
-    }
-
-    generate(year, random, context) {
-        // 1. Extract physics inputs from dependency context
-        const physicsInputs = this.extractPhysicsInputs(context, year);
-
-        // 2. Calculate load factors using PRD physics formulas
-        const loadFactors = this.calculateLoadFactors(physicsInputs);
-
-        // 3. Generate three-phase Weibull parameters with load factor adjustments
-        const adjustedPhases = this.calculateThreePhaseParameters(loadFactors);
-
-        // 4. Sample from appropriate phase based on year
-        return this.sampleThreePhaseWeibull(adjustedPhases, year, random);
-    }
-
-    extractPhysicsInputs(context, year) {
-        const dependencies = context.dependencies || {};
-
-        return {
-            windSpeed: dependencies.windVariability?.[year] || 8.5,
-            temperatureRange: dependencies.temperatureRange?.[year] || 60,
-            turbulenceIntensity: dependencies.turbulenceIntensity?.[year] || 0.16,
-            // Add other physics inputs as needed
-        };
-    }
-
-    calculateLoadFactors(physicsInputs) {
-        // Implement PRD Section 3 physics calculations
-        const turbulenceLoadFactor = Math.pow(physicsInputs.turbulenceIntensity / 0.16, 3);
-        const thermalCyclingFactor = Math.pow(physicsInputs.temperatureRange / 60, 2);
-        const windLoadFactor = Math.pow(physicsInputs.windSpeed / 8.5, 2);
-
-        return {
-            turbulence: turbulenceLoadFactor,
-            thermal: thermalCyclingFactor,
-            wind: windLoadFactor,
-            combined: turbulenceLoadFactor * thermalCyclingFactor * windLoadFactor
-        };
-    }
-
-    calculateThreePhaseParameters(loadFactors) {
-        // Apply load factors to base Weibull parameters
-        const baseFailureRate = 0.02; // 2% annual base rate
-        const adjustedRate = baseFailureRate * loadFactors.combined;
-
-        // Calculate three-phase parameters with continuity constraints
-        // Following PRD Section 5 methodology
-        return {
-            phase1: {
-                shape: this.parameters.phase1.shape,
-                scale: this.parameters.phase1.scale * (1 / loadFactors.combined)
-            },
-            phase2: {
-                shape: this.parameters.phase2.shape,
-                scale: this.parameters.phase2.scale * (1 / loadFactors.combined)
-            },
-            phase3: {
-                shape: this.parameters.phase3.shape,
-                scale: this.parameters.phase3.scale * (1 / loadFactors.combined)
-            }
-        };
-    }
-
-    sampleThreePhaseWeibull(phases, year, random) {
-        // Determine current phase based on year and component lifecycle
-        let currentPhase;
-        if (year <= 2) {
-            currentPhase = phases.phase1;
-        } else if (year <= 22) {
-            currentPhase = phases.phase2;
-        } else {
-            currentPhase = phases.phase3;
-        }
-
-        // Weibull inverse transform sampling
-        const { shape, scale } = currentPhase;
-        return scale * Math.pow(-Math.log(1 - random), 1 / shape);
-    }
-}
-
-module.exports = FailureRateWeibullDistribution;
 ```
 
 ## Schema Definitions
