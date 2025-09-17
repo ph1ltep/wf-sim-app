@@ -66,10 +66,10 @@ Scenario/
 | Turbulence Intensity | 3.1.2 | `settings.project.environment.siteConditions.turbulenceIntensity` | Environment/Site Conditions | Distribution | 0.16 |
 | Surface Roughness | 3.1.2b | `settings.project.environment.siteConditions.surfaceRoughness` | Environment/Site Conditions | Number | 0.03 |
 | Kaimal Scale | 3.1.2c | `settings.project.environment.siteConditions.kaimalScale` | Environment/Site Conditions | Number | 8.1 |
-| Temperature Range | 3.1.3 | `settings.project.environment.weather.temperatureRange` | Environment/Weather | Distribution | [-20, 40]°C |
-| Daily Temp Swing | 3.1.4 | `settings.project.environment.weather.dailyTempSwing` | Environment/Weather | Distribution | 15°C |
+| Temperature Range | 3.1.3 | `settings.project.environment.weather.temperatureRange` | Environment/Weather | Number | 60°C |
+| Daily Temp Swing | 3.1.4 | `settings.project.environment.weather.dailyTempSwing` | Environment/Weather | Number | 15°C |
 | Air Density | 3.1.5 | `settings.project.environment.siteConditions.airDensity` | Environment/Site Conditions | Number | 1.225 kg/m³ |
-| Relative Humidity | 3.1.6 | `settings.project.environment.weather.relativeHumidity` | Environment/Weather | Distribution | 0.65 |
+| Relative Humidity | 3.1.6 | `settings.project.environment.weather.relativeHumidity` | Environment/Weather | Number | 0.65 |
 | Salinity Level | 3.1.7 | `settings.project.environment.siteConditions.salinityLevel` | Environment/Site Conditions | Select | 'moderate' |
 | Wind Shear Exponent | 3.1.8 | `settings.project.environment.siteConditions.windShearExponent` | Environment/Site Conditions | Number | 0.14 |
 | Start/Stop Cycles | 3.1.9 | `settings.project.environment.siteConditions.startStopCyclesPerYear` | Environment/Site Conditions | Number | 200 |
@@ -219,12 +219,11 @@ const designRefs = getDesignReferences(
   scenarioData.settings.project.windFarm.turbineSpecs.iecClass,
   {
     turbulenceIntensity: scenarioData.settings.project.environment.siteConditions.turbulenceIntensity?.parameters?.value,
-    temperatureRange: scenarioData.settings.project.environment.weather.temperatureRange?.parameters?.range?.[1] -
-                     scenarioData.settings.project.environment.weather.temperatureRange?.parameters?.range?.[0],
+    temperatureRange: scenarioData.settings.project.environment.weather.temperatureRange,
     windShearExponent: scenarioData.settings.project.environment.siteConditions.windShearExponent,
     airDensity: scenarioData.settings.project.environment.siteConditions.airDensity,
     oilTempMax: scenarioData.settings.project.equipment.failureRates.components.gearboxes?.physicsParameters?.oilTempMax,
-    relativeHumidity: scenarioData.settings.project.environment.weather.relativeHumidity?.parameters?.value
+    relativeHumidity: scenarioData.settings.project.environment.weather.relativeHumidity
   }
 );
 ```
