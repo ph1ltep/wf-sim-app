@@ -230,33 +230,57 @@ const SettingsSchema = Yup.object().shape({
         }),
         location: Yup.string(),
         environment: Yup.object().shape({
-            rainfallAmount: DistributionTypeSchema.default(() => ({
-                key: 'rainfallAmount',
-                type: 'gamma',
-                timeSeriesMode: false,
-                parameters: {
-                    value: 1200,
-                    scale: 12,
-                    shape: 100,
-                    stdDev: 10
-                },
-                metadata: {
-                    percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
-                }
-            })),
-            windVariability: DistributionTypeSchema.default(() => ({
-                key: 'windVariability',
-                type: 'weibull',
-                timeSeriesMode: false,
-                parameters: {
-                    value: 7.5,
-                    scale: 7.9,
-                    shape: 1.8
-                },
-                metadata: {
-                    percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
-                }
-            })),
+            siteConditions: Yup.object().shape({
+                turbulenceIntensity: DistributionTypeSchema.default(() => ({
+                    key: 'turbulenceIntensity',
+                    type: 'fixed',
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 10
+                    },
+                    metadata: {
+                        percentileDirection: 'ascending' // Higher percentiles = more turbulence = more conservative
+                    }
+                })),
+                surfaceRoughness: Yup.number().default(0.03),
+                kaimalScale: Yup.number().default(8.1),
+                airDensity: Yup.number().default(1.225),
+                windShearExponent: Yup.number().default(0.14),
+                salinityLevel: Yup.string().oneOf(['low', 'moderate', 'high', 'marine']).default('moderate'),
+                startStopCyclesPerYear: Yup.number().default(200)
+            }),
+            weather: Yup.object().shape({
+                windVariability: DistributionTypeSchema.default(() => ({
+                    key: 'windVariability',
+                    type: 'weibull',
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 7.5,
+                        scale: 7.9,
+                        shape: 1.8
+                    },
+                    metadata: {
+                        percentileDirection: 'descending' // Higher percentiles = lower wind speeds = more conservative
+                    }
+                })),
+                temperatureRange: Yup.number().default(60),
+                dailyTempSwing: Yup.number().default(15),
+                relativeHumidity: Yup.number().min(0).max(1).default(0.65),
+                rainfallAmount: DistributionTypeSchema.default(() => ({
+                    key: 'rainfallAmount',
+                    type: 'gamma',
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 1200,
+                        scale: 12,
+                        shape: 100,
+                        stdDev: 10
+                    },
+                    metadata: {
+                        percentileDirection: 'ascending' // Higher percentiles = lower production = more conservative
+                    }
+                }))
+            })
         }),
     }),
     modules: Yup.object().shape({
@@ -336,9 +360,6 @@ const SettingsSchema = Yup.object().shape({
                     percentileDirection: 'ascending' // Higher percentiles = more downtime = more conservative (cost-like)
                 }
             })),
-            turbulenceIntensity: Yup.number().default(10), // Matches getDefaultSettings
-            surfaceRoughness: Yup.number().default(0.03), // Matches getDefaultSettings
-            kaimalScale: Yup.number().default(8.1), // Matches getDefaultSettings
             adjustments: Yup.array().of(AdjustmentSchema).default([]),
         }),
         risk: Yup.object().shape({

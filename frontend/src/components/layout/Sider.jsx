@@ -186,6 +186,23 @@ const Sider = ({ collapsed }) => {
           ]
         },
         {
+          key: 'scenario-environment',
+          icon: <CloudOutlined />,
+          label: 'Environment',
+          children: [
+            {
+              key: '/scenario/environment/site-conditions',
+              icon: <GlobalOutlined />,
+              label: 'Site Conditions'
+            },
+            {
+              key: '/scenario/environment/weather',
+              icon: <CloudOutlined />,
+              label: 'Weather'
+            }
+          ]
+        },
+        {
           key: 'scenario-economics',
           icon: <DollarOutlined />,
           label: 'Economics',

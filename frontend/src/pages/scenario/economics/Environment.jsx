@@ -2,17 +2,26 @@
 import React from 'react';
 import { Typography, Alert } from 'antd';
 import { useScenario } from 'contexts/ScenarioContext';
-import { DistributionFieldV3 } from 'components/distributionFields';
 
 // Import context field components
 import {
     FormSection,
     FormRow,
-    FormCol
+    FormCol,
+    NumberField
 } from 'components/contextFields';
 
 const { Title } = Typography;
 
+/**
+ * Economics Environment component focused on environmental factors that have direct economic impacts.
+ * Physical environmental parameters are configured in the dedicated Environment section.
+ *
+ * This component handles:
+ * - Environmental costs and economic adjustments
+ * - Weather-related operational cost impacts
+ * - Environmental compliance costs
+ */
 const Environment = () => {
     // Get scenario data directly from context
     const { scenarioData } = useScenario();
@@ -21,7 +30,7 @@ const Environment = () => {
     if (!scenarioData) {
         return (
             <div>
-                <Title level={2}>Environment</Title>
+                <Title level={2}>Environmental Economics</Title>
                 <Alert
                     message="No Active Scenario"
                     description="Please create or load a scenario first."
@@ -33,50 +42,64 @@ const Environment = () => {
 
     return (
         <div>
-            <Title level={2}>Environment</Title>
-            <p>Configure environmental factors affecting wind farm operations including wind resources and weather conditions.</p>
+            <Title level={2}>Environmental Economics</Title>
+            <p>Configure economic impacts of environmental factors, including weather-related operational costs and environmental compliance expenses.</p>
 
-            <FormSection title="Wind Variability" style={{ marginBottom: 24 }}>
+            <FormSection title="Weather-Related Operational Costs" style={{ marginBottom: 24 }}>
+                <p>Configure economic impacts of weather conditions on operations and maintenance costs.</p>
                 <FormRow>
-                    <FormCol>
-                        <p>Configure the statistical distribution for wind resource variability.</p>
-                        <DistributionFieldV3
-                            path={['settings', 'project', 'environment', 'windVariability']}
-                            tooltip="Method for simulating wind resource variability"
-                            showVisualization={true}
-                            addonAfter="m/s"
-                            step={0.1}
-                            valueType="number"
-                            valueName="Wind Speed (mean)"
-                            showInfoBox={true}
-                            options={[
-                                { value: 'fixed', label: 'Fixed Value' },
-                                { value: 'weibull', label: 'Weibull Distribution' },
-                                { value: 'normal', label: 'Normal Distribution' }
-                            ]}
+                    <FormCol span={12}>
+                        <NumberField
+                            path={['settings', 'economics', 'environmental', 'weatherMaintenanceMultiplier']}
+                            label="Weather Maintenance Cost Multiplier"
+                            tooltip="Multiplier for maintenance costs due to adverse weather conditions"
+                            step={0.01}
+                            precision={2}
+                            min={1.0}
+                            max={3.0}
+                            defaultValue={1.15}
+                        />
+                    </FormCol>
+                    <FormCol span={12}>
+                        <NumberField
+                            path={['settings', 'economics', 'environmental', 'weatherDowntimeMultiplier']}
+                            label="Weather Downtime Cost Multiplier"
+                            tooltip="Multiplier for lost revenue due to weather-related downtime"
+                            step={0.01}
+                            precision={2}
+                            min={1.0}
+                            max={2.0}
+                            defaultValue={1.05}
                         />
                     </FormCol>
                 </FormRow>
             </FormSection>
 
-            <FormSection title="Rainfall Amount" style={{ marginBottom: 24 }}>
+            <FormSection title="Environmental Compliance" style={{ marginBottom: 24 }}>
+                <p>Configure costs related to environmental compliance and mitigation measures.</p>
                 <FormRow>
-                    <FormCol>
-                        <p>Configure the statistical distribution for rainfall amounts affecting wind farm operations.</p>
-                        <DistributionFieldV3
-                            path={['settings', 'project', 'environment', 'rainfallAmount']}
-                            tooltip="Annual rainfall amount distribution for modeling weather-related impacts on operations"
-                            showVisualization={true}
-                            addonAfter="mm"
+                    <FormCol span={12}>
+                        <NumberField
+                            path={['settings', 'economics', 'environmental', 'environmentalComplianceCostPerMW']}
+                            label="Environmental Compliance Cost"
+                            tooltip="Annual environmental compliance cost per MW of installed capacity"
+                            addonAfter="$/MW/year"
+                            step={100}
+                            min={0}
+                            max={10000}
+                            defaultValue={1000}
+                        />
+                    </FormCol>
+                    <FormCol span={12}>
+                        <NumberField
+                            path={['settings', 'economics', 'environmental', 'carbonOffsetCostPerTonne']}
+                            label="Carbon Offset Cost"
+                            tooltip="Cost per tonne of CO2 for carbon offset programs (if applicable)"
+                            addonAfter="$/tonne CO2"
                             step={1}
-                            valueType="number"
-                            valueName="Mean Rainfall"
-                            showInfoBox={true}
-                            options={[
-                                { value: 'fixed', label: 'Fixed Value' },
-                                { value: 'normal', label: 'Normal Distribution' },
-                                { value: 'gamma', label: 'Gamma Distribution' }
-                            ]}
+                            min={0}
+                            max={200}
+                            defaultValue={25}
                         />
                     </FormCol>
                 </FormRow>

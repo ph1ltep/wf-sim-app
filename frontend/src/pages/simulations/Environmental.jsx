@@ -19,7 +19,7 @@ const { Title, Paragraph } = Typography;
 const environmentalFactorsFields = [
     {
         name: 'Wind Variability',
-        path: ['settings', 'modules', 'revenue', 'windVariability'],
+        path: ['settings', 'project', 'environment', 'weather', 'windVariability'],
         contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'windVariability'],
         key: 'windVariability',
         icon: <AreaChartOutlined />,
@@ -28,7 +28,7 @@ const environmentalFactorsFields = [
     },
     {
         name: 'Rainfall Amount',
-        path: ['settings', 'environment', 'rainfallAmount'],
+        path: ['settings', 'project', 'environment', 'weather', 'rainfallAmount'],
         contextPath: ['simulation', 'inputSim', 'distributionAnalysis', 'rainfallAmount'],
         key: 'rainfallAmount',
         icon: <CloudOutlined />,

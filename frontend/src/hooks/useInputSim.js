@@ -29,7 +29,7 @@ const useInputSim = () => {
             electricityPrice: scenarioData.settings.modules.revenue.electricityPrice,
             escalationRate: scenarioData.settings.modules.cost.escalationRate,
             downtimePerEvent: scenarioData.settings.modules.revenue.downtimePerEvent,
-            windVariability: scenarioData.settings.modules.revenue.windVariability
+            windVariability: scenarioData.settings.project.environment.weather.windVariability
         };
 
         // Add hardcoded distributions
