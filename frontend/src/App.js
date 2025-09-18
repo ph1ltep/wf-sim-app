@@ -21,7 +21,6 @@ import EquipmentFailureRates from './pages/scenario/equipment/FailureRates';
 import Investment from './pages/scenario/economics/Investment';
 import EconomicsRevenue from './pages/scenario/economics/Revenue';
 import MarketFactors from './pages/scenario/economics/MarketFactors';
-import Environment from './pages/scenario/economics/Environment';
 import SiteConditions from './pages/scenario/environment/SiteConditions';
 import Weather from './pages/scenario/environment/Weather';
 import ServiceContracts from './pages/scenario/operations/ServiceContracts';
@@ -89,7 +88,6 @@ function App() {
                     <Route path="investment" element={<Investment />} />
                     <Route path="revenue" element={<EconomicsRevenue />} />
                     <Route path="market-factors" element={<MarketFactors />} />
-                    <Route path="environment" element={<Environment />} />
                   </Route>
                   <Route path="environment">
                     <Route index element={<Navigate to="/scenario/environment/site-conditions" replace />} />

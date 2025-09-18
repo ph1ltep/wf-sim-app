@@ -222,11 +222,6 @@ const Sider = ({ collapsed }) => {
               icon: <AreaChartOutlined />,
               label: 'Market Factors'
             },
-            {
-              key: '/scenario/economics/environment',
-              icon: <CloudOutlined />,
-              label: 'Environment'
-            }
           ]
         },
         {
