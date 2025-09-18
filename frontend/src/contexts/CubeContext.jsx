@@ -32,6 +32,9 @@ export const CubeProvider = ({ children }) => {
     const [lastRefresh, setLastRefresh] = useState(null);
     const [cubeVersion, setCubeVersion] = useState(null);
     const [cubeError, setCubeError] = useState(null);
+    const [refreshAttempts, setRefreshAttempts] = useState(0); // Circuit breaker for infinite loops
+
+    const MAX_REFRESH_ATTEMPTS = 3; // Maximum retry attempts before skipping validation
 
     const selectedPercentile = percentileInfo?.selected;
     const availablePercentiles = percentileInfo?.available;
@@ -133,6 +136,7 @@ export const CubeProvider = ({ children }) => {
             setRefreshRequested(true);
             setIsLoading(true);
             setCubeError(null);
+            setRefreshAttempts(0); // Reset retry counter on new refresh
             setRefreshStage('initialization');
 
             // Sequential execution handled by useEffect switch/case pattern
@@ -229,10 +233,21 @@ export const CubeProvider = ({ children }) => {
                     case 'dependencies':
                         console.log('🔍 Checking dependencies...');
 
+                        // Circuit breaker protection against infinite loops
+                        if (refreshAttempts >= MAX_REFRESH_ATTEMPTS) {
+                            console.warn(`⚠️ CubeContext: Max refresh attempts (${MAX_REFRESH_ATTEMPTS}) reached, skipping dependency validation and continuing with available data`);
+                            setRefreshStage('sources'); // Continue with partial data
+                            break;
+                        }
+
                         // ✅ FIXED: Call with only getValueByPath
                         if (!isDistributionsComplete(getValueByPath)) {
-                            throw new Error('Distributions not complete - missing required distribution data');
+                            setRefreshAttempts(prev => prev + 1);
+                            throw new Error(`Distributions not complete - missing required distribution data (attempt ${refreshAttempts + 1}/${MAX_REFRESH_ATTEMPTS})`);
                         }
+
+                        // Reset attempts counter on successful validation
+                        setRefreshAttempts(0);
 
                         // ✅ FIXED: Call with only getValueByPath
                         if (!isConstructionSourcesComplete(getValueByPath)) {

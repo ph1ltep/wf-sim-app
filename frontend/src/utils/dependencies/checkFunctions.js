@@ -8,12 +8,35 @@ import { get } from 'lodash';
  */
 export const isDistributionsComplete = (getValueByPath) => {
     const distributionAnalysis = getValueByPath(['simulation', 'inputSim', 'distributionAnalysis'], {});
-    const requiredDistributions = ['energyProduction', 'electricityPrice', 'escalationRate'];
 
-    return requiredDistributions.every(key => {
+    // Updated list based on actual distributions collected in useInputSim.js after environment parameter migration
+    const requiredDistributions = [
+        'energyProduction',
+        'electricityPrice',
+        'downtimePerEvent',
+        'windVariability',    // Moved from revenue to environment/weather
+        'rainfallAmount'      // Moved from revenue to environment/weather
+    ];
+    // Note: escalationRate commented out in useInputSim.js, so not required
+
+    const missing = [];
+    const available = Object.keys(distributionAnalysis);
+
+    const results = requiredDistributions.every(key => {
         const simInfo = distributionAnalysis[key];
-        return simInfo && simInfo.results && simInfo.results.length > 0;
+        const isValid = simInfo && simInfo.results && simInfo.results.length > 0;
+        if (!isValid) missing.push(key);
+        return isValid;
     });
+
+    if (!results) {
+        console.warn('🔍 Distribution validation failed:');
+        console.warn('  Missing distributions:', missing);
+        console.warn('  Available distributions:', available);
+        console.warn('  Required distributions:', requiredDistributions);
+    }
+
+    return results;
 };
 
 /**

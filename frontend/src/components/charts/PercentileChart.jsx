@@ -61,8 +61,8 @@ const PercentileChart = React.memo(({
         const enhancedData = chartData.data.map(trace => ({
             ...trace,
             hovertemplate: trace.name.includes('-')
-                ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y:.2f}${units ? '%' : ''}<extra></extra>`
-                : `Year: %{x}<br>${trace.name}: %{y:.2f}${units ? '%' : ''}<extra></extra>`
+                ? `Year: %{x}<br>Range: ${trace.name} <br>Value: %{y:.2f}${units ? ` ${units}` : ''}<extra></extra>`
+                : `Year: %{x}<br>${trace.name}: %{y:.2f}${units ? ` ${units}` : ''}<extra></extra>`
         }));
         return {
             data: enhancedData,
@@ -81,7 +81,8 @@ const PercentileChart = React.memo(({
                     ...column,
                     render: (text) => {
                         const displayValue = decimalStorage ? text * 100 : text;
-                        return units ? `${formatNumber(displayValue, precision || 2)}%` : formatNumber(displayValue, precision);
+                        const formattedValue = formatNumber(displayValue, precision || 2);
+                        return units ? `${formattedValue} ${units}` : formattedValue;
                     }
                 };
             }
@@ -97,8 +98,8 @@ const PercentileChart = React.memo(({
         yaxis: {
             ...(percentileChartData.layout.yaxis || {}),
             title: units ? `${units}` : '',
-            hoverformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
-            tickformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
+            hoverformat: decimalStorage ? `,.${precision || 2}f` : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
+            tickformat: decimalStorage ? `,.${precision || 2}f` : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
         },
         xaxis: {
             ...(percentileChartData.layout.xaxis || {}),
@@ -162,7 +163,7 @@ const PercentileChart = React.memo(({
                                     color: summary.isPrimary ? color : '#333'
                                 }}>
                                     {formatCompactNumber(decimalStorage ? summary.mean * 100 : summary.mean, precision || 2)}
-                                    {units && <span style={{ marginLeft: '2px' }}>%</span>}
+                                    {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
                                 </div>
                             </div>
                         ))}
@@ -182,7 +183,7 @@ const PercentileChart = React.memo(({
                                 </div>
                                 <div style={{ color: '#333' }}>
                                     {formatCompactNumber(decimalStorage ? summaryData[0].t0Value * 100 : summaryData[0].t0Value, precision || 2)}
-                                    {units && <span style={{ marginLeft: '2px' }}>%</span>}
+                                    {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
                                 </div>
                             </div>
                         )}

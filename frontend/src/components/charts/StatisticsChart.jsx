@@ -56,7 +56,8 @@ const StatisticsChart = React.memo(({
             ...column,
             render: (text) => {
                 const displayValue = decimalStorage ? text * 100 : text;
-                return units ? `${formatNumber(displayValue, precision || 2)}%` : formatNumber(displayValue, precision);
+                const formattedValue = formatNumber(displayValue, precision || 2);
+                return units ? `${formattedValue} ${units}` : formattedValue;
             }
         }));
         return { columns: formattedColumns, data: tableInfo.data };
@@ -90,8 +91,8 @@ const StatisticsChart = React.memo(({
         yaxis: {
             ...(statsChartData.layout.yaxis || {}),
             title: units ? `${units}` : '',
-            hoverformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
-            tickformat: units ? '.2%' : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
+            hoverformat: decimalStorage ? `,.${precision || 2}f` : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : undefined),
+            tickformat: decimalStorage ? `,.${precision || 2}f` : (precision !== null && Number.isInteger(precision) && precision >= 0 ? `,.${precision}f` : ',~s')
         },
         xaxis: {
             ...(statsChartData.layout.xaxis || {}),
@@ -156,7 +157,7 @@ const StatisticsChart = React.memo(({
                                 </div>
                                 <div style={{ color: '#333' }}>
                                     {formatCompactNumber(stat.value, precision || 2)}
-                                    {units && <span style={{ marginLeft: '2px' }}>%</span>}
+                                    {units && <span style={{ marginLeft: '2px' }}>{units}</span>}
                                 </div>
                             </div>
                         ))}
