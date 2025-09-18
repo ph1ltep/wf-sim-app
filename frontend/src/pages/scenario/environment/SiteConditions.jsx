@@ -1,12 +1,10 @@
 // frontend/src/pages/scenario/environment/SiteConditions.jsx
 import React from 'react';
-import { Typography, Alert } from 'antd';
+import { Typography, Alert, Card } from 'antd';
 import { useScenario } from 'contexts/ScenarioContext';
-import { DistributionFieldV3 } from 'components/distributionFields';
 
 // Import context field components
 import {
-    FormSection,
     FormRow,
     FormCol,
     NumberField,
@@ -20,7 +18,7 @@ const { Title } = Typography;
  * that affect wind turbine performance and reliability.
  *
  * Includes parameters for:
- * - Turbulence intensity (distribution)
+ * - Turbulence intensity (percentage)
  * - Surface roughness
  * - Kaimal scale parameter
  * - Air density
@@ -51,24 +49,25 @@ const SiteConditions = () => {
             <Title level={2}>Site Conditions</Title>
             <p>Configure site-specific environmental parameters that affect turbine performance, reliability, and operational costs.</p>
 
-            <FormSection title="Atmospheric Conditions" style={{ marginBottom: 24 }}>
+            <Card title="Atmospheric Conditions" style={{ marginBottom: 24 }}>
                 <p>Configure atmospheric parameters that directly impact wind turbine loads and performance.</p>
                 <FormRow>
                     <FormCol span={12}>
-                        <DistributionFieldV3
+                        <NumberField
                             path={['settings', 'project', 'environment', 'siteConditions', 'turbulenceIntensity']}
-                            tooltip="Statistical distribution for turbulence intensity affecting wind turbine loads and fatigue"
-                            showVisualization={true}
+                            label="Turbulence Intensity"
+                            tooltip="Turbulence intensity affecting wind turbine loads and fatigue"
                             addonAfter="%"
-                            step={0.1}
-                            valueType="number"
-                            valueName="Turbulence Intensity"
-                            showInfoBox={true}
-                            options={[
-                                { value: 'fixed', label: 'Fixed Value' },
-                                { value: 'normal', label: 'Normal Distribution' },
-                                { value: 'lognormal', label: 'Log-Normal Distribution' }
-                            ]}
+                            step={0.01}
+                            precision={2}
+                            min={0.05}
+                            max={0.50}
+                            defaultValue={0.16}
+                            formatter={value => value != null ? `${(value * 100).toFixed(0)}` : ''}
+                            parser={value => {
+                                const num = parseFloat(value ? value.replace('%', '') : '');
+                                return isNaN(num) ? null : num / 100;
+                            }}
                         />
                     </FormCol>
                     <FormCol span={12}>
@@ -112,9 +111,9 @@ const SiteConditions = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
 
-            <FormSection title="Wind Modeling Parameters" style={{ marginBottom: 24 }}>
+            <Card title="Wind Modeling Parameters" style={{ marginBottom: 24 }}>
                 <p>Configure parameters for wind turbulence modeling and spectral analysis.</p>
                 <FormRow>
                     <FormCol span={12}>
@@ -130,9 +129,9 @@ const SiteConditions = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
 
-            <FormSection title="Environmental Stressors" style={{ marginBottom: 24 }}>
+            <Card title="Environmental Stressors" style={{ marginBottom: 24 }}>
                 <p>Configure environmental factors that affect component degradation and maintenance requirements.</p>
                 <FormRow>
                     <FormCol span={12}>
@@ -161,7 +160,7 @@ const SiteConditions = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
         </div>
     );
 };

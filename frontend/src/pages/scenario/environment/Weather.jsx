@@ -1,12 +1,11 @@
 // frontend/src/pages/scenario/environment/Weather.jsx
 import React from 'react';
-import { Typography, Alert } from 'antd';
+import { Typography, Alert, Card } from 'antd';
 import { useScenario } from 'contexts/ScenarioContext';
 import { DistributionFieldV3 } from 'components/distributionFields';
 
 // Import context field components
 import {
-    FormSection,
     FormRow,
     FormCol,
     NumberField
@@ -48,7 +47,7 @@ const Weather = () => {
             <Title level={2}>Weather Conditions</Title>
             <p>Configure weather-related parameters affecting wind farm operations, maintenance requirements, and performance variability.</p>
 
-            <FormSection title="Wind Resource Variability" style={{ marginBottom: 24 }}>
+            <Card title="Wind Resource Variability" style={{ marginBottom: 24 }}>
                 <p>Configure the statistical modeling of wind resource variability for Monte Carlo simulations.</p>
                 <FormRow>
                     <FormCol span={24}>
@@ -69,9 +68,9 @@ const Weather = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
 
-            <FormSection title="Temperature Conditions" style={{ marginBottom: 24 }}>
+            <Card title="Temperature Conditions" style={{ marginBottom: 24 }}>
                 <p>Configure temperature parameters that affect component thermal stress and performance.</p>
                 <FormRow>
                     <FormCol span={12}>
@@ -99,9 +98,9 @@ const Weather = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
 
-            <FormSection title="Atmospheric Conditions" style={{ marginBottom: 24 }}>
+            <Card title="Atmospheric Conditions" style={{ marginBottom: 24 }}>
                 <p>Configure atmospheric parameters affecting component degradation and operational efficiency.</p>
                 <FormRow>
                     <FormCol span={12}>
@@ -123,9 +122,9 @@ const Weather = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
 
-            <FormSection title="Precipitation" style={{ marginBottom: 24 }}>
+            <Card title="Precipitation" style={{ marginBottom: 24 }}>
                 <p>Configure precipitation parameters for modeling weather-related impacts on operations and maintenance.</p>
                 <FormRow>
                     <FormCol span={24}>
@@ -146,7 +145,7 @@ const Weather = () => {
                         />
                     </FormCol>
                 </FormRow>
-            </FormSection>
+            </Card>
         </div>
     );
 };

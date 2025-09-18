@@ -192,6 +192,34 @@ const SettingsSchema = Yup.object().shape({
                     contractsForeign: 'baseEscalationRate',
                     other: 'baseEscalationRate'
                 }))
+            }),
+            revenue: Yup.object().shape({
+                energyProduction: DistributionTypeSchema.default(() => ({
+                    key: 'energyProduction',
+                    type: 'normal',
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 100000,
+                        stdDev: 10
+                    },
+                    metadata: {
+                        percentileDirection: 'descending' // Higher percentiles = lower production = more conservative
+                    }
+                })),
+                electricityPrice: DistributionTypeSchema.default(() => ({
+                    key: 'electricityPrice',
+                    type: 'gbm', // Changed to GBM type
+                    timeSeriesMode: false,
+                    parameters: {
+                        value: 50,
+                        drift: 4,
+                        volatility: 2,
+                        timeStep: 1
+                    },
+                    metadata: {
+                        percentileDirection: 'descending' // Higher percentiles = lower prices = more conservative
+                    }
+                }))
             })
         }),
         windFarm: Yup.object().shape({
@@ -231,17 +259,7 @@ const SettingsSchema = Yup.object().shape({
         location: Yup.string(),
         environment: Yup.object().shape({
             siteConditions: Yup.object().shape({
-                turbulenceIntensity: DistributionTypeSchema.default(() => ({
-                    key: 'turbulenceIntensity',
-                    type: 'fixed',
-                    timeSeriesMode: false,
-                    parameters: {
-                        value: 10
-                    },
-                    metadata: {
-                        percentileDirection: 'ascending' // Higher percentiles = more turbulence = more conservative
-                    }
-                })),
+                turbulenceIntensity: Yup.number().default(0.16),
                 surfaceRoughness: Yup.number().default(0.03),
                 kaimalScale: Yup.number().default(8.1),
                 airDensity: Yup.number().default(1.225),
@@ -320,32 +338,6 @@ const SettingsSchema = Yup.object().shape({
             }),
         }),
         revenue: Yup.object().shape({
-            energyProduction: DistributionTypeSchema.default(() => ({
-                key: 'energyProduction',
-                type: 'normal',
-                timeSeriesMode: false,
-                parameters: {
-                    value: 100000,
-                    stdDev: 10
-                },
-                metadata: {
-                    percentileDirection: 'descending' // Higher percentiles = lower production = more conservative
-                }
-            })),
-            electricityPrice: DistributionTypeSchema.default(() => ({
-                key: 'electricityPrice',
-                type: 'gbm', // Changed to GBM type
-                timeSeriesMode: false,
-                parameters: {
-                    value: 50,
-                    drift: 4,
-                    volatility: 2,
-                    timeStep: 1
-                },
-                metadata: {
-                    percentileDirection: 'descending' // Higher percentiles = lower prices = more conservative
-                }
-            })),
             revenueDegradationRate: Yup.number().default(0.5),
             downtimePerEvent: DistributionTypeSchema.default(() => ({
                 key: 'downtimePerEvent',

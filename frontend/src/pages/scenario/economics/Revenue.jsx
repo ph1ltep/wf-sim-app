@@ -43,7 +43,7 @@ const Revenue = () => {
                         <p>Configure the gross annual energy production and its variability. This is the gross AEP at the Primary Percentile (do not deduct losses, downtime, and contractual availability).</p>
 
                         <DistributionFieldV3
-                            path={['settings', 'modules', 'revenue', 'energyProduction']}
+                            path={['settings', 'project', 'economics', 'revenue', 'energyProduction']}
                             defaultValuePath={['settings', 'metrics', 'netAEP']}
                             tooltip="Statistical distribution of the annual energy production"
                             showVisualization={true}
@@ -66,7 +66,7 @@ const Revenue = () => {
                 <FormRow>
                     <FormCol>
                         <DistributionFieldV3
-                            path={['settings', 'modules', 'revenue', 'electricityPrice']}
+                            path={['settings', 'project', 'economics', 'revenue', 'electricityPrice']}
                             label="Fixed Price per MWh"
                             tooltip="Fixed electricity price under PPA or other agreement"
                             addonAfter="/MWh"

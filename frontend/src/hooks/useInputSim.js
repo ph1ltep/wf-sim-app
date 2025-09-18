@@ -25,11 +25,12 @@ const useInputSim = () => {
 
         // Hardcoded existing distributions
         const hardcodedDistributions = {
-            energyProduction: scenarioData.settings.modules.revenue.energyProduction,
-            electricityPrice: scenarioData.settings.modules.revenue.electricityPrice,
-            escalationRate: scenarioData.settings.modules.cost.escalationRate,
+            energyProduction: scenarioData.settings.project.economics.revenue.energyProduction,
+            electricityPrice: scenarioData.settings.project.economics.revenue.electricityPrice,
+            //escalationRate: scenarioData.settings.modules.cost.escalationRate,
             downtimePerEvent: scenarioData.settings.modules.revenue.downtimePerEvent,
-            windVariability: scenarioData.settings.project.environment.weather.windVariability
+            windVariability: scenarioData.settings.project.environment.weather.windVariability,
+            rainfallAmount: scenarioData.settings.project.environment.weather.rainfallAmount
         };
 
         // Add hardcoded distributions
@@ -42,7 +43,7 @@ const useInputSim = () => {
         // Add market factor distributions from dynamic key object structure
         const marketFactorsObject = scenarioData.settings.project?.economics?.marketFactors?.factors || {};
         // Convert object values to array and filter out non-object entries
-        const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
+        const marketFactorsArray = Object.values(marketFactorsObject).filter(factor =>
             factor && typeof factor === 'object' && factor.distribution
         );
         marketFactorsArray.forEach(factor => {
@@ -54,7 +55,7 @@ const useInputSim = () => {
         if (failureRatesConfig.enabled && failureRatesConfig.components) {
             const failureRatesObject = failureRatesConfig.components || {};
             // Convert object values to array and filter enabled components with distributions
-            const failureRatesArray = Object.values(failureRatesObject).filter(component => 
+            const failureRatesArray = Object.values(failureRatesObject).filter(component =>
                 component && typeof component === 'object' && component.enabled && component.distribution
             );
             failureRatesArray.forEach(component => {
@@ -104,10 +105,9 @@ const useInputSim = () => {
                 // Get all simulation results
                 const results = response.data.simulationInfo;
 
-
                 // Get market factor IDs for determining storage location
                 const marketFactorsObject = scenarioData.settings.project?.economics?.marketFactors?.factors || {};
-                const marketFactorsArray = Object.values(marketFactorsObject).filter(factor => 
+                const marketFactorsArray = Object.values(marketFactorsObject).filter(factor =>
                     factor && typeof factor === 'object' && factor.id
                 );
                 const marketFactorIds = marketFactorsArray.map(f => f.id);
@@ -115,77 +115,36 @@ const useInputSim = () => {
                 // Get failure rate component IDs for determining storage location
                 const failureRatesConfig = scenarioData.settings.project?.equipment?.failureRates || {};
                 const failureRatesObject = failureRatesConfig.components || {};
-                const failureRatesArray = Object.values(failureRatesObject).filter(component => 
+                const failureRatesArray = Object.values(failureRatesObject).filter(component =>
                     component && typeof component === 'object' && component.enabled && component.id
                 );
                 const failureRateIds = failureRatesArray.map(c => c.id);
 
+                // Build single batch update object for ALL results to avoid context sync issues
+                const allUpdates = {};
 
-                // Separate regular updates from specialized updates
-                const regularUpdates = {};
-                const marketFactorsUpdates = [];
-                const failureRatesUpdates = [];
-                
                 for (const result of results) {
                     if (result.distribution && result.distribution.key) {
                         const key = result.distribution.key;
-                        
+                        let pathKey;
+
                         if (marketFactorIds.includes(key)) {
-                            // Store market factor results with dynamicKeys option
-                            const path = ['simulation', 'inputSim', 'marketFactors', key];
-                            marketFactorsUpdates.push({ path, value: result });
+                            // Store market factor results
+                            pathKey = ['simulation', 'inputSim', 'marketFactors', key].join('.');
                         } else if (failureRateIds.includes(key)) {
-                            // Store failure rate results with dynamicKeys option
-                            const path = ['simulation', 'inputSim', 'failureRates', key];
-                            failureRatesUpdates.push({ path, value: result });
+                            // Store failure rate results
+                            pathKey = ['simulation', 'inputSim', 'failureRates', key].join('.');
                         } else {
-                            // Store existing distributions in distributionAnalysis (unchanged behavior)
-                            const path = ['simulation', 'inputSim', 'distributionAnalysis', key];
-                            regularUpdates[path.join('.')] = result;
+                            // Store existing distributions in distributionAnalysis
+                            pathKey = ['simulation', 'inputSim', 'distributionAnalysis', key].join('.');
                         }
+
+                        allUpdates[pathKey] = result;
                     }
                 }
 
-                // Perform regular batch update first
-                let result = { isValid: true, applied: 0, errors: [] };
-                if (Object.keys(regularUpdates).length > 0) {
-                    result = await updateByPath(regularUpdates);
-                }
-
-                // Perform marketFactors updates with dynamicKeys flag
-                for (const { path, value } of marketFactorsUpdates) {
-                    const marketResult = await updateByPath(path, value, { dynamicKeys: true });
-                    if (!marketResult.isValid) {
-                        result.isValid = false;
-                        result.errors = [...(result.errors || []), ...(marketResult.errors || [])];
-                        result.error = marketResult.error || result.error;
-                    } else {
-                        result.applied += marketResult.applied;
-                    }
-                }
-
-                // Perform failureRates updates using batch mode to avoid context sync issues
-                if (failureRatesUpdates.length > 0) {
-                    // Build batch update object for all failure rates
-                    const failureRatesBatch = {};
-                    
-                    failureRatesUpdates.forEach(({ path, value }) => {
-                        // Use full path as key for batch update
-                        const pathKey = path.join('.');
-                        failureRatesBatch[pathKey] = value;
-                    });
-                    
-                    // Single batch update for all failure rates
-                    const failureRateResult = await updateByPath(failureRatesBatch, null, { dynamicKeys: true });
-                    
-                    if (!failureRateResult.isValid) {
-                        result.isValid = false;
-                        result.errors = [...(result.errors || []), ...(failureRateResult.errors || [])];
-                        result.error = failureRateResult.error || result.error;
-                    } else {
-                        result.applied += failureRateResult.applied;
-                    }
-                }
+                // Single batch update for ALL results at once
+                const result = await updateByPath(allUpdates, null, { dynamicKeys: true });
 
                 if (result.isValid) {
                     message.success('Distributions updated successfully');

@@ -125,8 +125,8 @@ const ProjectSettings = () => {
       [`${currencyPath.join('.')}.exchangeRate`]: selectedLocation.exchangeRate,
 
       // Revenue module values
-      'settings.modules.revenue.electricityPrice.parameters.value': selectedLocation.energyPrice,
-      'settings.modules.revenue.electricityPrice.parameters.drift': selectedLocation.inflationRate,
+      'settings.project.economics.revenue.electricityPrice.parameters.value': selectedLocation.energyPrice,
+      'settings.project.economics.revenue.electricityPrice.parameters.drift': selectedLocation.inflationRate,
 
       // Cost module values
       'settings.modules.cost.escalationRate.parameters.value': 1,
