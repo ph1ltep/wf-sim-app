@@ -1,0 +1,536 @@
+openapi: 3.0.3
+info:
+  title: Physics Engine API
+  description: Physics-based component failure rate calculation service for three-phase Weibull modeling
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Local development server
+  - url: https://api.windfinance.com/v1
+    description: Production server
+
+paths:
+  /physics/models:
+    get:
+      summary: List available physics models
+      description: Retrieve list of registered physics models with metadata
+      responses:
+        '200':
+          description: List of available physics models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PhysicsModel'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /physics/models/{modelType}:
+    get:
+      summary: Get physics model details
+      description: Retrieve detailed information about a specific physics model
+      parameters:
+        - name: modelType
+          in: path
+          required: true
+          schema:
+            type: string
+            example: three-phase-weibull
+      responses:
+        '200':
+          description: Physics model details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/PhysicsModelDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /physics/calculate:
+    post:
+      summary: Calculate physics-based failure rates
+      description: Execute physics model calculation for component failure rates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhysicsCalculationRequest'
+            examples:
+              gearboxCalculation:
+                summary: Gearbox failure rate calculation
+                value:
+                  model: three-phase-weibull
+                  components: ["gearbox_001"]
+                  inputs:
+                    environmental:
+                      turbulenceIntensity: 0.18
+                      temperatureRange: 65
+                      relativeHumidity: 0.75
+                      salinityLevel: moderate
+                    component:
+                      componentType: gearbox
+                      bearingL10Hours: 175000
+                      oilTempMax: 75
+                      gearStages: 3
+                    design:
+                      iecClass: IIA
+                  settings:
+                    iterations: 10000
+                    precision: 0.01
+      responses:
+        '200':
+          description: Calculation completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhysicsCalculationResult'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '422':
+          description: Physics calculation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: PHYSICS_CALCULATION_FAILED
+                  message:
+                    type: string
+                    example: Environmental parameters outside valid range
+                  details:
+                    type: object
+                  fallback:
+                    type: object
+                    nullable: true
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /physics/validate:
+    post:
+      summary: Validate physics calculation parameters
+      description: Validate input parameters without executing calculation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  example: three-phase-weibull
+                inputs:
+                  type: object
+      responses:
+        '200':
+          description: Validation successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      valid:
+                        type: boolean
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /physics/cache/stats:
+    get:
+      summary: Get cache performance statistics
+      description: Retrieve load factor cache hit rates and performance metrics
+      responses:
+        '200':
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      hitRate:
+                        type: number
+                        example: 0.85
+                      totalRequests:
+                        type: integer
+                        example: 1250
+                      cacheSize:
+                        type: integer
+                        example: 450
+                      avgResponseTime:
+                        type: number
+                        example: 125.5
+
+components:
+  schemas:
+    PhysicsModel:
+      type: object
+      properties:
+        modelType:
+          type: string
+          example: three-phase-weibull
+        version:
+          type: string
+          example: 1.0.0
+        description:
+          type: string
+          example: Three-phase Weibull component failure modeling
+        supportedComponents:
+          type: array
+          items:
+            type: string
+          example: [gearbox, generator, blades]
+
+    PhysicsModelDetail:
+      allOf:
+        - $ref: '#/components/schemas/PhysicsModel'
+        - type: object
+          properties:
+            metadata:
+              type: object
+              properties:
+                scientificReferences:
+                  type: array
+                  items:
+                    type: string
+                formulas:
+                  type: object
+                validationBenchmarks:
+                  type: object
+            inputSchema:
+              type: object
+            outputSchema:
+              type: object
+
+    PhysicsCalculationRequest:
+      type: object
+      required:
+        - model
+        - components
+        - inputs
+      properties:
+        model:
+          type: string
+          enum: [three-phase-weibull]
+          example: three-phase-weibull
+        components:
+          type: array
+          items:
+            type: string
+          example: ["gearbox_001", "generator_002"]
+        inputs:
+          type: object
+          required:
+            - environmental
+            - component
+            - design
+          properties:
+            environmental:
+              type: object
+              required:
+                - turbulenceIntensity
+                - temperatureRange
+                - relativeHumidity
+              properties:
+                turbulenceIntensity:
+                  type: number
+                  minimum: 0.05
+                  maximum: 0.30
+                  example: 0.16
+                temperatureRange:
+                  type: number
+                  minimum: 20
+                  maximum: 80
+                  example: 60
+                dailyTempSwing:
+                  type: number
+                  minimum: 5
+                  maximum: 30
+                  example: 15
+                relativeHumidity:
+                  type: number
+                  minimum: 0.3
+                  maximum: 1.0
+                  example: 0.65
+                salinityLevel:
+                  type: string
+                  enum: [low, moderate, high, marine]
+                  example: moderate
+                windShearExponent:
+                  type: number
+                  minimum: 0.05
+                  maximum: 0.40
+                  example: 0.14
+            component:
+              type: object
+              required:
+                - componentType
+              properties:
+                componentType:
+                  type: string
+                  enum: [gearbox, generator, blades, main-bearing, power-electronics]
+                  example: gearbox
+                # Component-specific parameters (varies by type)
+                bearingL10Hours:
+                  type: number
+                  minimum: 50000
+                  maximum: 500000
+                  example: 175000
+                oilTempMax:
+                  type: number
+                  minimum: 60
+                  maximum: 90
+                  example: 70
+            design:
+              type: object
+              required:
+                - iecClass
+              properties:
+                iecClass:
+                  type: string
+                  enum: [IA, IB, IIA, IIB, IIIA, IIIB, S]
+                  example: IIA
+                designLifeYears:
+                  type: number
+                  minimum: 15
+                  maximum: 30
+                  example: 25
+        dependencies:
+          type: object
+          description: External data dependencies (optional)
+        settings:
+          type: object
+          properties:
+            iterations:
+              type: integer
+              minimum: 1000
+              maximum: 100000
+              default: 10000
+              example: 10000
+            precision:
+              type: number
+              minimum: 0.001
+              maximum: 0.1
+              default: 0.01
+              example: 0.01
+
+    PhysicsCalculationResult:
+      type: object
+      required:
+        - requestId
+        - success
+      properties:
+        requestId:
+          type: string
+          example: "calc_123456789"
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            failureRateDistribution:
+              type: object
+              properties:
+                phase1:
+                  type: object
+                  properties:
+                    shape:
+                      type: number
+                      example: 0.6
+                    scale:
+                      type: number
+                      example: 2.1
+                    timeRange:
+                      type: object
+                      properties:
+                        start:
+                          type: number
+                          example: 0
+                        end:
+                          type: number
+                          example: 2
+                phase2:
+                  type: object
+                  properties:
+                    shape:
+                      type: number
+                      example: 1.0
+                    scale:
+                      type: number
+                      example: 25.0
+                    timeRange:
+                      type: object
+                      properties:
+                        start:
+                          type: number
+                          example: 2
+                        end:
+                          type: number
+                          example: 20
+                phase3:
+                  type: object
+                  properties:
+                    shape:
+                      type: number
+                      example: 3.0
+                    scale:
+                      type: number
+                      example: 28.0
+                    timeRange:
+                      type: object
+                      properties:
+                        start:
+                          type: number
+                          example: 20
+                        end:
+                          type: number
+                          example: 30
+            loadFactors:
+              type: object
+              properties:
+                turbulenceLoadFactor:
+                  type: number
+                  example: 1.35
+                thermalLoadFactor:
+                  type: number
+                  example: 1.15
+                corrosionFactor:
+                  type: number
+                  example: 1.50
+                combinedLoadFactor:
+                  type: number
+                  example: 2.33
+            validationMetrics:
+              type: object
+              properties:
+                phaseContinuity:
+                  type: boolean
+                  example: true
+                industryBenchmarkMatch:
+                  type: number
+                  example: 0.92
+        metadata:
+          type: object
+          properties:
+            model:
+              type: string
+              example: three-phase-weibull
+            version:
+              type: string
+              example: 1.0.0
+            iterations:
+              type: integer
+              example: 10000
+            calculationTime:
+              type: number
+              example: 1250.5
+            scientificReferences:
+              type: array
+              items:
+                type: string
+              example: ["IEC 61400-1 Ed. 4", "ISO 281:2007", "AGMA 2001-D04"]
+        error:
+          type: string
+          nullable: true
+          example: null
+        fallback:
+          type: object
+          nullable: true
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: VALIDATION_ERROR
+              message:
+                type: string
+                example: Invalid input parameters
+              details:
+                type: object
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: NOT_FOUND
+              message:
+                type: string
+                example: Physics model not found
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: INTERNAL_ERROR
+              message:
+                type: string
+                example: Internal server error occurred
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
